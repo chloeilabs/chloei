@@ -1,0 +1,44 @@
+.user-message-border {
+  background: linear-gradient(var(--border), var(--border), var(--highlight));
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    #737373 25%,
+    var(--foreground) 50%,
+    #737373 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+  animation-timing-function: linear;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.crafting-dot-pulse {
+  animation: crafting-dot-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes crafting-dot-pulse {
+  0%,
+  100% {
+    opacity: 0.96;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.72;
+    transform: scale(0.82);
+  }
+}

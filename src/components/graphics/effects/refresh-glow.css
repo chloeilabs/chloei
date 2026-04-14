@@ -1,0 +1,40 @@
+.refresh-glow {
+  background: radial-gradient(
+    circle at 50% 0%,
+    var(--background) 0%,
+    var(--background) 32%,
+    color-mix(in oklab, var(--vesper-orange) 88%, var(--background)) 46%,
+    color-mix(in oklab, var(--vesper-orange) 76%, transparent) 58%,
+    color-mix(in oklab, var(--vesper-teal) 82%, transparent) 74%,
+    transparent 94%
+  );
+  filter: blur(132px) saturate(126%);
+
+  opacity: 0;
+  transform-origin: top;
+
+  animation: refresh-glow 1.8s var(--ease-out-cubic) forwards;
+}
+
+@keyframes refresh-glow {
+  0% {
+    transform: scale(1.02);
+    opacity: 0;
+  }
+  18% {
+    opacity: 0.06;
+  }
+  32% {
+    opacity: 0.145;
+  }
+  58% {
+    opacity: 0.09;
+  }
+  82% {
+    opacity: 0;
+  }
+  100% {
+    transform: scaleX(0.54) scaleY(0.12);
+    opacity: 0;
+  }
+}
