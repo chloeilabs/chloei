@@ -1,4 +1,4 @@
-const YURIE_LOGO_SVG = `<svg width="11" height="11" viewBox="0 0 11 11" fill="none" xmlns="http://www.w3.org/2000/svg">
+const CHLOEI_LOGO_SVG = `<svg width="11" height="11" viewBox="0 0 11 11" fill="none" xmlns="http://www.w3.org/2000/svg">
 <rect y="5" width="1" height="1" fill="white"/>
 <rect x="8" y="5" width="1" height="1" fill="white"/>
 <rect x="1" y="5" width="1" height="1" fill="white"/>
@@ -33,7 +33,7 @@ const YURIE_LOGO_SVG = `<svg width="11" height="11" viewBox="0 0 11 11" fill="no
 export const dynamic = "force-static"
 
 export function GET() {
-  return new Response(YURIE_LOGO_SVG, {
+  return new Response(CHLOEI_LOGO_SVG, {
     headers: {
       "cache-control": "public, max-age=31536000, immutable",
       "content-type": "image/svg+xml",
