@@ -67,14 +67,14 @@ export function HomePageContent({
   const homeHeroTransitionStyle: CSSProperties | undefined = isMobile
     ? undefined
     : {
-        viewTransitionName: "yurie-home-hero",
+        viewTransitionName: "chloei-home-hero",
       }
   const threadPaneTransitionStyle: CSSProperties | undefined = isMobile
     ? undefined
     : {
-        viewTransitionName: "yurie-thread-pane",
+        viewTransitionName: "chloei-thread-pane",
       }
-  const promptViewTransitionName = isMobile ? undefined : "yurie-prompt-shell"
+  const promptViewTransitionName = isMobile ? undefined : "chloei-prompt-shell"
   const showHomeView = !hasMessages || isFallbackEnteringConversation
   const isActiveTurnInProgress = state.isSubmitting || state.isStreaming
   const targetThreadScrollTop = useCallback(
@@ -239,8 +239,8 @@ export function HomePageContent({
                 "relative flex h-full w-full flex-col",
                 isFallbackEnteringConversation &&
                   (isMobile
-                    ? "pointer-events-none absolute inset-0 z-20 animate-[yurie-home-layer-out_110ms_var(--ease-out-cubic)_forwards] bg-background"
-                    : "pointer-events-none absolute inset-0 z-20 animate-[yurie-home-layer-out_140ms_var(--ease-in-out-cubic)_forwards] bg-background")
+                    ? "pointer-events-none absolute inset-0 z-20 animate-[chloei-home-layer-out_110ms_var(--ease-out-cubic)_forwards] bg-background"
+                    : "pointer-events-none absolute inset-0 z-20 animate-[chloei-home-layer-out_140ms_var(--ease-in-out-cubic)_forwards] bg-background")
               )}
             >
               <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center gap-10 px-4 pt-[20vh] sm:px-6">
@@ -250,7 +250,7 @@ export function HomePageContent({
                 >
                   <LogoHover size="lg" />
                   Welcome to{" "}
-                  <span className="text-muted-foreground">Yurie</span>
+                  <span className="text-muted-foreground">Chloei</span>
                 </div>
 
                 <PromptForm
@@ -273,8 +273,8 @@ export function HomePageContent({
                 "relative flex min-h-0 w-full grow flex-col overflow-y-auto",
                 isFallbackEnteringConversation &&
                   (isMobile
-                    ? "animate-[yurie-thread-layer-in_110ms_var(--ease-out-cubic)_both]"
-                    : "animate-[yurie-thread-layer-in_150ms_var(--ease-out-cubic)_both]")
+                    ? "animate-[chloei-thread-layer-in_110ms_var(--ease-out-cubic)_both]"
+                    : "animate-[chloei-thread-layer-in_150ms_var(--ease-out-cubic)_both]")
               )}
               resize="smooth"
               initial="smooth"

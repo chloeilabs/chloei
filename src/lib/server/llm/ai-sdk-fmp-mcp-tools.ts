@@ -71,7 +71,7 @@ const FMP_CURATED_TOOLS: readonly CuratedFmpToolConfig[] = [
     remoteToolName: "search",
     baseLabel: "FMP: company search",
     curatedDescription:
-      "Search public companies and stock symbols with FMP. Only the `search-name` and `search-symbol` endpoints are enabled in Yurie.",
+      "Search public companies and stock symbols with FMP. Only the `search-name` and `search-symbol` endpoints are enabled in Chloei.",
     allowedEndpoints: ["search-name", "search-symbol"],
     endpointLabels: {
       "search-name": "FMP: company search",
@@ -82,7 +82,7 @@ const FMP_CURATED_TOOLS: readonly CuratedFmpToolConfig[] = [
     remoteToolName: "quote",
     baseLabel: "FMP: quote",
     curatedDescription:
-      "Get structured equity quote data with FMP. Only the `quote`, `quote-short`, `batch-quote`, and `batch-quote-short` endpoints are enabled in Yurie.",
+      "Get structured equity quote data with FMP. Only the `quote`, `quote-short`, `batch-quote`, and `batch-quote-short` endpoints are enabled in Chloei.",
     allowedEndpoints: [
       "quote",
       "quote-short",
@@ -100,7 +100,7 @@ const FMP_CURATED_TOOLS: readonly CuratedFmpToolConfig[] = [
     remoteToolName: "company",
     baseLabel: "FMP: company profile",
     curatedDescription:
-      "Get company profile data with FMP. Only the `profile-symbol` and `profile-cik` endpoints are enabled in Yurie.",
+      "Get company profile data with FMP. Only the `profile-symbol` and `profile-cik` endpoints are enabled in Chloei.",
     allowedEndpoints: ["profile-symbol", "profile-cik"],
     endpointLabels: {
       "profile-symbol": "FMP: company profile",
@@ -111,7 +111,7 @@ const FMP_CURATED_TOOLS: readonly CuratedFmpToolConfig[] = [
     remoteToolName: "chart",
     baseLabel: "FMP: historical prices",
     curatedDescription:
-      "Get historical and intraday equity price charts with FMP. Only stock chart endpoints are enabled in Yurie.",
+      "Get historical and intraday equity price charts with FMP. Only stock chart endpoints are enabled in Chloei.",
     allowedEndpoints: [
       "historical-price-eod-dividend-adjusted",
       "historical-price-eod-full",
@@ -141,7 +141,7 @@ const FMP_CURATED_TOOLS: readonly CuratedFmpToolConfig[] = [
     remoteToolName: "statements",
     baseLabel: "FMP: financial statements",
     curatedDescription:
-      "Get structured financial statements with FMP. Only the `income-statement`, `balance-sheet-statement`, and `cashflow-statement` endpoints are enabled in Yurie.",
+      "Get structured financial statements with FMP. Only the `income-statement`, `balance-sheet-statement`, and `cashflow-statement` endpoints are enabled in Chloei.",
     allowedEndpoints: [
       "income-statement",
       "balance-sheet-statement",
@@ -319,7 +319,7 @@ function assertEndpointAllowed(
 
   if (!config.allowedEndpoints.includes(endpoint)) {
     throw new Error(
-      `${config.baseLabel} only supports these endpoints in Yurie: ${config.allowedEndpoints.join(", ")}. Received: ${endpoint}.`
+      `${config.baseLabel} only supports these endpoints in Chloei: ${config.allowedEndpoints.join(", ")}. Received: ${endpoint}.`
     )
   }
 }
@@ -346,7 +346,7 @@ function restrictInputSchema(
       endpoint: {
         ...endpointRecord,
         enum: [...config.allowedEndpoints],
-        description: `Allowed endpoints in Yurie: ${config.allowedEndpoints.join(", ")}.`,
+        description: `Allowed endpoints in Chloei: ${config.allowedEndpoints.join(", ")}.`,
       },
     },
   })
@@ -394,7 +394,7 @@ export async function createAiSdkFmpMcpToolsContext(
 
   try {
     client = await createMCPClient({
-      name: "yurie",
+      name: "chloei",
       transport: {
         type: "http",
         url: url.toString(),

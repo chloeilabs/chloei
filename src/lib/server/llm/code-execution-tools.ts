@@ -234,7 +234,7 @@ async function runProcess(args: {
   timeoutMs: number
 }): Promise<CodeExecutionToolResultPayload> {
   const startedAt = Date.now()
-  const tempDir = await mkdtemp(path.join(tmpdir(), "yurie-code-exec-"))
+  const tempDir = await mkdtemp(path.join(tmpdir(), "chloei-code-exec-"))
 
   let stdout = ""
   let stderr = ""

@@ -5,34 +5,34 @@ import { normalizePostgresConnectionString } from "../src/lib/server/postgres-ur
 
 test("postgres connection normalization upgrades require-like sslmode to verify-full", () => {
   const result = normalizePostgresConnectionString(
-    "postgres://user:pass@db.example.com/yurie?sslmode=require"
+    "postgres://user:pass@db.example.com/chloei?sslmode=require"
   )
 
   assert.equal(
     result,
-    "postgres://user:pass@db.example.com/yurie?sslmode=verify-full"
+    "postgres://user:pass@db.example.com/chloei?sslmode=verify-full"
   )
 })
 
 test("postgres connection normalization preserves explicit libpq compatibility", () => {
   const result = normalizePostgresConnectionString(
-    "postgres://user:pass@db.example.com/yurie?sslmode=require&uselibpqcompat=true"
+    "postgres://user:pass@db.example.com/chloei?sslmode=require&uselibpqcompat=true"
   )
 
   assert.equal(
     result,
-    "postgres://user:pass@db.example.com/yurie?sslmode=require&uselibpqcompat=true"
+    "postgres://user:pass@db.example.com/chloei?sslmode=require&uselibpqcompat=true"
   )
 })
 
 test("postgres connection normalization leaves unsupported sslmodes alone", () => {
   const result = normalizePostgresConnectionString(
-    "postgres://user:pass@db.example.com/yurie?sslmode=no-verify"
+    "postgres://user:pass@db.example.com/chloei?sslmode=no-verify"
   )
 
   assert.equal(
     result,
-    "postgres://user:pass@db.example.com/yurie?sslmode=no-verify"
+    "postgres://user:pass@db.example.com/chloei?sslmode=no-verify"
   )
 })
 

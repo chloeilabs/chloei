@@ -99,14 +99,14 @@ const MemoizedMarkdownBlock = memo(
         )
       },
       table: ({ children }) => (
-        <div className="yurie-markdown-table">
+        <div className="chloei-markdown-table">
           <table>{children}</table>
         </div>
       ),
     }
 
     return (
-      <div className="yurie-markdown prose prose-sm max-w-none min-w-0 text-foreground prose-neutral prose-invert prose-headings:font-medium prose-h1:text-2xl prose-code:rounded-sm prose-code:border prose-code:bg-card prose-code:px-1 prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-pre:bg-background prose-pre:p-0 prose-ol:list-decimal prose-ul:list-disc prose-li:marker:text-muted-foreground">
+      <div className="chloei-markdown prose prose-sm max-w-none min-w-0 text-foreground prose-neutral prose-invert prose-headings:font-medium prose-h1:text-2xl prose-code:rounded-sm prose-code:border prose-code:bg-card prose-code:px-1 prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-pre:bg-background prose-pre:p-0 prose-ol:list-decimal prose-ul:list-disc prose-li:marker:text-muted-foreground">
         <ReactMarkdown components={components} remarkPlugins={[remarkGfm]}>
           {content}
         </ReactMarkdown>

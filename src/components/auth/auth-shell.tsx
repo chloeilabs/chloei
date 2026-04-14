@@ -30,7 +30,7 @@ export function AuthShell({
                 )}
               >
                 <LogoHover size="md" />
-                <span className="font-departureMono">Yurie</span>
+                <span className="font-departureMono">Chloei</span>
               </Link>
 
               <div className="flex flex-col gap-1">

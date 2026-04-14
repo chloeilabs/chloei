@@ -2,7 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "yurie-next-dev",
+      "name": "chloei-next-dev",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["dev"],
       "port": 3000

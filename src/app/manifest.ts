@@ -21,8 +21,8 @@ export default function manifest(): MetadataRoute.Manifest {
         type: "image/png",
       },
     ],
-    name: "Yurie",
-    short_name: "Yurie",
+    name: "Chloei",
+    short_name: "Chloei",
     start_url: "/",
     theme_color: installIconThemeColor,
   }

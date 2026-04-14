@@ -27,12 +27,12 @@ function isFamilyApp(app: FamilyApp | undefined): app is FamilyApp {
   return app !== undefined
 }
 
-// Add future Yurie apps here as they come online.
-const YURIE_FAMILY_APPS: FamilyApp[] = [
+// Add future Chloei apps here as they come online.
+const CHLOEI_FAMILY_APPS: FamilyApp[] = [
   {
     name: "Space",
     shortName: "SP",
-    href: "https://yuriespace-app-production.up.railway.app",
+    href: "https://space.chloei.ai",
     badgeClassName:
       "border-stone-950/10 bg-linear-to-br from-violet-200 via-fuchsia-100 to-pink-100 text-stone-950",
     external: true,
@@ -40,7 +40,7 @@ const YURIE_FAMILY_APPS: FamilyApp[] = [
   {
     name: "Markets",
     shortName: "MK",
-    href: "https://markets.yurie.ai",
+    href: "https://markets.chloei.ai",
     badgeClassName:
       "border-stone-950/10 bg-linear-to-br from-emerald-200 via-lime-100 to-yellow-100 text-stone-950",
     external: true,
@@ -48,7 +48,7 @@ const YURIE_FAMILY_APPS: FamilyApp[] = [
   {
     name: "Cloud",
     shortName: "CL",
-    href: "https://cloud.yurie.ai",
+    href: "https://cloud.chloei.ai",
     badgeClassName:
       "border-stone-950/10 bg-linear-to-br from-cyan-200 via-sky-100 to-indigo-100 text-stone-950",
     external: true,
@@ -56,7 +56,7 @@ const YURIE_FAMILY_APPS: FamilyApp[] = [
   {
     name: "Notes",
     shortName: "NO",
-    href: "https://notes.yurie.ai",
+    href: "https://notes.chloei.ai",
     badgeClassName:
       "border-stone-950/10 bg-linear-to-br from-amber-200 via-orange-100 to-rose-50 text-stone-950",
     external: true,
@@ -150,7 +150,7 @@ export function AppLauncher({
     <Popover>
       <PopoverTrigger asChild>
         <Button
-          aria-label="Yurie apps"
+          aria-label="Chloei apps"
           className={className}
           size={triggerSize}
           variant={triggerVariant}
@@ -168,17 +168,17 @@ export function AppLauncher({
           <div className="flex items-center gap-2">
             <LayoutGrid className="size-3.5 text-muted-foreground" />
             <div className="font-departureMono text-sm tracking-tight">
-              Yurie Apps
+              Chloei Apps
             </div>
           </div>
         </div>
 
         <div className="grid auto-rows-fr grid-cols-2 gap-px bg-border/70 p-px">
-          {YURIE_FAMILY_APPS.map((app, index) => {
+          {CHLOEI_FAMILY_APPS.map((app, index) => {
             const isCurrent = !app.external && pathname === app.href
             const spanTwoColumns =
-              YURIE_FAMILY_APPS.length % 2 === 1 &&
-              index === YURIE_FAMILY_APPS.length - 1
+              CHLOEI_FAMILY_APPS.length % 2 === 1 &&
+              index === CHLOEI_FAMILY_APPS.length - 1
 
             return (
               <AppLauncherCard

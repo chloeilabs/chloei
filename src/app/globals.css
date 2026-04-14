@@ -160,43 +160,43 @@
 }
 
 @layer components {
-  .yurie-markdown {
+  .chloei-markdown {
     overflow-wrap: anywhere;
   }
 
-  .yurie-markdown .yurie-markdown-table {
+  .chloei-markdown .chloei-markdown-table {
     width: 100%;
     overflow-x: auto;
     overscroll-behavior-x: contain;
     -webkit-overflow-scrolling: touch;
   }
 
-  .yurie-markdown .yurie-markdown-table > table {
+  .chloei-markdown .chloei-markdown-table > table {
     width: max-content;
     min-width: 100%;
     table-layout: auto;
   }
 
-  .yurie-markdown .yurie-markdown-table th,
-  .yurie-markdown .yurie-markdown-table td {
+  .chloei-markdown .chloei-markdown-table th,
+  .chloei-markdown .chloei-markdown-table td {
     vertical-align: top;
     white-space: normal;
   }
 
   @media (max-width: 639px) {
-    .yurie-markdown .yurie-markdown-table {
+    .chloei-markdown .chloei-markdown-table {
       margin-inline: -0.75rem;
       padding-inline: 0.75rem;
       padding-bottom: 0.25rem;
     }
 
-    .yurie-markdown .yurie-markdown-table th,
-    .yurie-markdown .yurie-markdown-table td {
+    .chloei-markdown .chloei-markdown-table th,
+    .chloei-markdown .chloei-markdown-table td {
       min-width: 10rem;
     }
 
-    .yurie-markdown .yurie-markdown-table th:first-child,
-    .yurie-markdown .yurie-markdown-table td:first-child {
+    .chloei-markdown .chloei-markdown-table th:first-child,
+    .chloei-markdown .chloei-markdown-table td:first-child {
       min-width: 5.5rem;
     }
   }
@@ -212,7 +212,7 @@ img {
   user-select: none;
 }
 
-@keyframes yurie-home-hero-out {
+@keyframes chloei-home-hero-out {
   from {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -225,7 +225,7 @@ img {
   }
 }
 
-@keyframes yurie-home-layer-out {
+@keyframes chloei-home-layer-out {
   from {
     opacity: 1;
     transform: translateY(0);
@@ -236,7 +236,7 @@ img {
   }
 }
 
-@keyframes yurie-thread-layer-in {
+@keyframes chloei-thread-layer-in {
   from {
     opacity: 0;
     transform: translateY(0.14rem);
@@ -247,7 +247,7 @@ img {
   }
 }
 
-@keyframes yurie-thread-pane-in {
+@keyframes chloei-thread-pane-in {
   from {
     opacity: 0;
     transform: translateY(0.18rem);
@@ -267,18 +267,18 @@ img {
     animation-timing-function: var(--ease-in-out-cubic);
   }
 
-  ::view-transition-group(yurie-home-hero),
-  ::view-transition-group(yurie-thread-pane),
-  ::view-transition-group(yurie-prompt-shell) {
+  ::view-transition-group(chloei-home-hero),
+  ::view-transition-group(chloei-thread-pane),
+  ::view-transition-group(chloei-prompt-shell) {
     animation-duration: 150ms;
     animation-timing-function: var(--ease-in-out-cubic);
   }
 
-  ::view-transition-old(yurie-home-hero) {
-    animation: yurie-home-hero-out 140ms var(--ease-in-out-cubic) both;
+  ::view-transition-old(chloei-home-hero) {
+    animation: chloei-home-hero-out 140ms var(--ease-in-out-cubic) both;
   }
 
-  ::view-transition-new(yurie-thread-pane) {
-    animation: yurie-thread-pane-in 150ms var(--ease-out-cubic) both;
+  ::view-transition-new(chloei-thread-pane) {
+    animation: chloei-thread-pane-in 150ms var(--ease-out-cubic) both;
   }
 }

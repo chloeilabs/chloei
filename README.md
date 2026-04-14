@@ -1,6 +1,6 @@
-# Yurie
+# Chloei
 
-Yurie is a Next.js 16 chat app backed by OpenRouter. It supports web search, X search, local code execution, optional Tavily retrieval, optional Financial Modeling Prep MCP tools, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
+Chloei is a Next.js 16 chat app backed by OpenRouter. It supports web search, X search, local code execution, optional Tavily retrieval, optional Financial Modeling Prep MCP tools, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
 
 ## Requirements
 
@@ -25,7 +25,7 @@ To enable auth locally, provision PostgreSQL and add:
 - `BETTER_AUTH_SECRET`
 - `BETTER_AUTH_URL=http://localhost:3000`
 - `BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000` when you need multiple allowed origins
-- `BETTER_AUTH_COOKIE_DOMAIN=yurie.ai` when you need shared sessions across trusted subdomains
+- `BETTER_AUTH_COOKIE_DOMAIN=chloei.ai` when you need shared sessions across trusted subdomains
 - `vercel env pull .env.local` if you want local development to mirror the Vercel Development environment
 
 ## Scripts
@@ -62,7 +62,7 @@ Optional variables let you override the built-in safe defaults for message limit
 - `TAVILY_API_KEY`: enables Tavily search and extract callable tools for chat requests
 - `FMP_API_KEY`: enables curated Financial Modeling Prep MCP tools for structured finance data
 
-By default, Yurie enforces safe built-in agent limits even if you leave all optional `AGENT_*` env vars unset.
+By default, Chloei enforces safe built-in agent limits even if you leave all optional `AGENT_*` env vars unset.
 
 ## Important paths
 
@@ -81,6 +81,6 @@ By default, Yurie enforces safe built-in agent limits even if you leave all opti
 - The current model list is defined in `src/lib/shared/llm/models.ts`.
 - `/`, `/api/agent`, and `/api/models` require an authenticated Better Auth session.
 - FMP MCP uses a single server-owned API key and is intentionally limited to a curated set of finance tools.
-- To share logins with another Yurie app, point both apps at the same Better Auth database and secret, set `BETTER_AUTH_COOKIE_DOMAIN` to the shared parent domain, and include every live subdomain in `BETTER_AUTH_TRUSTED_ORIGINS`.
+- To share logins with another Chloei app, point both apps at the same Better Auth database and secret, set `BETTER_AUTH_COOKIE_DOMAIN` to the shared parent domain, and include every live subdomain in `BETTER_AUTH_TRUSTED_ORIGINS`.
 - Rate limiting and concurrency protection are in-memory, so they reset on process restart and do not synchronize across instances.
 - Thread storage does not self-initialize on live requests. Vercel deployments in this repo run `pnpm migrate` before `next build`.

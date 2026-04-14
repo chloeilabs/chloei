@@ -29,23 +29,23 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: "Yurie",
+  title: "Chloei",
   description: "Multi-provider AI agent.",
-  applicationName: "Yurie",
+  applicationName: "Chloei",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Yurie",
+    title: "Chloei",
   },
   icons: {
     icon: [
       {
-        url: "/yurie-black.svg",
+        url: "/chloei-black.svg",
         media: "(prefers-color-scheme: light)",
       },
       {
-        url: "/yurie.svg",
+        url: "/chloei.svg",
         media: "(prefers-color-scheme: dark)",
       },
     ],

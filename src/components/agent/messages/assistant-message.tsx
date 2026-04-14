@@ -385,11 +385,11 @@ export function AssistantMessage({
                 return (
                   <div
                     key={entry.id}
-                    className="rounded-none border bg-muted/40 px-2.5 py-1.5 text-xs text-muted-foreground [&_.prose]:w-full [&_.prose]:text-xs [&_.prose]:leading-relaxed [&_.prose>*]:my-0 [&_.prose>*+*]:mt-3 [&_.yurie-markdown]:w-full"
+                    className="rounded-none border bg-muted/40 px-2.5 py-1.5 text-xs text-muted-foreground [&_.prose]:w-full [&_.prose]:text-xs [&_.prose]:leading-relaxed [&_.prose>*]:my-0 [&_.prose>*+*]:mt-3 [&_.chloei-markdown]:w-full"
                   >
                     <div className="min-w-0">
                       <MemoizedMarkdown
-                        className="space-y-0 [&>.yurie-markdown:has(p)]:mb-2.5 [&>.yurie-markdown:has(p):last-child]:mb-0"
+                        className="space-y-0 [&>.chloei-markdown:has(p)]:mb-2.5 [&>.chloei-markdown:has(p):last-child]:mb-0"
                         content={entry.text}
                         id={`${entry.id}-activity`}
                         showSourceFavicon={showSourceFavicon}
