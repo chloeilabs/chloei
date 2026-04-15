@@ -4,7 +4,7 @@ import { nextCookies } from "better-auth/next-js"
 import { DATABASE_URL_ENV_NAME, getAuthDatabase } from "./postgres"
 
 declare global {
-  var yurieAuth: ReturnType<typeof createAuth> | undefined
+  var chloeiAuth: ReturnType<typeof createAuth> | undefined
 }
 
 const AUTH_DEFAULT_RATE_LIMIT_WINDOW_SECONDS = 10
@@ -230,6 +230,6 @@ export function getAuthOrNull(): ReturnType<typeof createAuth> | null {
     return null
   }
 
-  globalThis.yurieAuth ??= createAuth()
-  return globalThis.yurieAuth
+  globalThis.chloeiAuth ??= createAuth()
+  return globalThis.chloeiAuth
 }

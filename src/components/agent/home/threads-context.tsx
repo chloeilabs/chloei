@@ -12,8 +12,8 @@ import {
 import { toast } from "sonner"
 
 import {
-  LEGACY_THREADS_STORAGE_KEY,
-  LEGACY_THREADS_STORAGE_MIGRATION_KEY,
+  LEGACY_THREADS_STORAGE_KEYS,
+  LEGACY_THREADS_STORAGE_MIGRATION_KEYS,
   normalizeThread,
   sortThreadsNewestFirst,
   type Thread,
@@ -436,9 +436,11 @@ export function ThreadsProvider({
   )
 
   useEffect(() => {
-    const legacyThreadStorageValue = localStorage.getItem(
-      LEGACY_THREADS_STORAGE_KEY
-    )
+    const legacyThreadStorageValue =
+      localStorage.getItem(THREADS_STORAGE_KEY) ??
+      LEGACY_THREADS_STORAGE_KEYS.reduce<string | null>((value, key) => {
+        return value ?? localStorage.getItem(key)
+      }, null)
 
     if (
       legacyThreadStorageValue !== null &&
@@ -447,9 +449,14 @@ export function ThreadsProvider({
       localStorage.setItem(THREADS_STORAGE_KEY, legacyThreadStorageValue)
     }
 
-    const legacyMigrationValue = localStorage.getItem(
-      LEGACY_THREADS_STORAGE_MIGRATION_KEY
-    )
+    const legacyMigrationValue =
+      localStorage.getItem(THREADS_STORAGE_MIGRATION_KEY) ??
+      LEGACY_THREADS_STORAGE_MIGRATION_KEYS.reduce<string | null>(
+        (value, key) => {
+          return value ?? localStorage.getItem(key)
+        },
+        null
+      )
 
     if (
       legacyMigrationValue !== null &&
@@ -462,9 +469,13 @@ export function ThreadsProvider({
       localStorage.getItem(THREADS_STORAGE_KEY)
     )
 
-    localStorage.removeItem(LEGACY_THREADS_STORAGE_KEY)
+    LEGACY_THREADS_STORAGE_KEYS.forEach((key) => {
+      localStorage.removeItem(key)
+    })
     localStorage.removeItem(THREADS_STORAGE_KEY)
-    localStorage.removeItem(LEGACY_THREADS_STORAGE_MIGRATION_KEY)
+    LEGACY_THREADS_STORAGE_MIGRATION_KEYS.forEach((key) => {
+      localStorage.removeItem(key)
+    })
     localStorage.setItem(THREADS_STORAGE_MIGRATION_KEY, "1")
 
     if (localThreads.length === 0) {

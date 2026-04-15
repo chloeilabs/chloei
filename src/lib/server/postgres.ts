@@ -4,10 +4,10 @@ import { Pool } from "pg"
 import { normalizePostgresConnectionString } from "./postgres-url.mjs"
 
 declare global {
-  var yuriePgPool: Pool | undefined
-  var yurieDatabase: Kysely<Record<string, never>> | undefined
-  var yurieAuthPgPool: Pool | undefined
-  var yurieAuthDatabase: Kysely<Record<string, never>> | undefined
+  var chloeiPgPool: Pool | undefined
+  var chloeiDatabase: Kysely<Record<string, never>> | undefined
+  var chloeiAuthPgPool: Pool | undefined
+  var chloeiAuthDatabase: Kysely<Record<string, never>> | undefined
 }
 
 export const DATABASE_URL_ENV_NAME = "DATABASE_URL" as const
@@ -61,20 +61,20 @@ function getPrimaryDatabaseOrNull(): Kysely<Record<string, never>> | null {
     return null
   }
 
-  const existingDatabase = globalThis.yurieDatabase
+  const existingDatabase = globalThis.chloeiDatabase
   if (existingDatabase) {
     return existingDatabase
   }
 
   const pgPool =
-    globalThis.yuriePgPool ??
+    globalThis.chloeiPgPool ??
     createPool(getRequiredDatabaseUrl(DATABASE_URL_ENV_NAME))
   const database = createDatabase(pgPool)
 
-  globalThis.yuriePgPool ??= pgPool
-  globalThis.yurieDatabase ??= database
+  globalThis.chloeiPgPool ??= pgPool
+  globalThis.chloeiDatabase ??= database
 
-  return globalThis.yurieDatabase
+  return globalThis.chloeiDatabase
 }
 
 export function getDatabase(): Kysely<Record<string, never>> {
@@ -99,18 +99,18 @@ function getAuthDatabaseOrNull(): Kysely<Record<string, never>> | null {
     return getPrimaryDatabaseOrNull()
   }
 
-  const existingDatabase = globalThis.yurieAuthDatabase
+  const existingDatabase = globalThis.chloeiAuthDatabase
   if (existingDatabase) {
     return existingDatabase
   }
 
-  const pgPool = globalThis.yurieAuthPgPool ?? createPool(authDatabaseUrl)
+  const pgPool = globalThis.chloeiAuthPgPool ?? createPool(authDatabaseUrl)
   const database = createDatabase(pgPool)
 
-  globalThis.yurieAuthPgPool ??= pgPool
-  globalThis.yurieAuthDatabase ??= database
+  globalThis.chloeiAuthPgPool ??= pgPool
+  globalThis.chloeiAuthDatabase ??= database
 
-  return globalThis.yurieAuthDatabase
+  return globalThis.chloeiAuthDatabase
 }
 
 export function getAuthDatabase(): Kysely<Record<string, never>> {
