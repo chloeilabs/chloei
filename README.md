@@ -31,9 +31,9 @@ To enable auth locally, provision PostgreSQL and add:
 ## Scripts
 
 - `pnpm dev`: start the Next.js dev server
-- `pnpm migrate`: run both Better Auth and thread-storage migrations
+- `pnpm migrate`: run both Better Auth and app-storage migrations
 - `pnpm auth:migrate`: apply Better Auth schema changes to PostgreSQL
-- `pnpm threads:migrate`: apply thread storage schema changes to PostgreSQL
+- `pnpm app:migrate`: apply app storage schema changes to PostgreSQL
 - `pnpm build`: build the production app
 - `pnpm start`: run the production server
 - `pnpm test`: run regression tests
@@ -80,4 +80,4 @@ By default, Chloei enforces safe built-in agent limits even if you leave all opt
 - FMP MCP uses a single server-owned API key and is intentionally limited to a curated set of finance tools.
 - To share logins with another Chloei app, point both apps at the same Better Auth database and secret, set `BETTER_AUTH_COOKIE_DOMAIN` to the shared parent domain, and include every live subdomain in `BETTER_AUTH_TRUSTED_ORIGINS`.
 - Rate limiting and concurrency protection are in-memory, so they reset on process restart and do not synchronize across instances.
-- Thread storage does not self-initialize on live requests. Vercel deployments in this repo run `pnpm migrate` before `next build`.
+- App storage does not self-initialize on live requests. Vercel deployments in this repo run `pnpm migrate` before `next build`.

@@ -182,7 +182,7 @@ test("thread store wraps missing table errors as initialization failures", async
     (error) =>
       isThreadStoreNotInitializedError(error) &&
       error.message ===
-        "Thread storage is not initialized. Run `pnpm threads:migrate` to create the thread table."
+        "Thread storage is not initialized. Run `pnpm app:migrate` to initialize app tables."
   )
 })
 

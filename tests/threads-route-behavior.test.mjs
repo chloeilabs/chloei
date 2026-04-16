@@ -192,7 +192,7 @@ test("threads GET surfaces thread-store initialization errors", async () => {
       ...getTestMocks().threads,
       async listThreadsForUser() {
         const error = new Error(
-          "Thread storage is not initialized. Run `pnpm threads:migrate` to create the thread table."
+          "Thread storage is not initialized. Run `pnpm app:migrate` to initialize app tables."
         )
         error.code = "THREAD_INIT"
         throw error
@@ -205,7 +205,7 @@ test("threads GET surfaces thread-store initialization errors", async () => {
   await assertApiErrorResponse(response, {
     status: 500,
     error:
-      "Thread storage is not initialized. Run `pnpm threads:migrate` to create the thread table.",
+      "Thread storage is not initialized. Run `pnpm app:migrate` to initialize app tables.",
     errorCode: "THREAD_STORE_NOT_INITIALIZED",
   })
 })

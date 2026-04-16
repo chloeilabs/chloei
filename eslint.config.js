@@ -22,7 +22,7 @@ const nodeConfigFiles = [
   "eslint.config.js",
   "next.config.mjs",
   "postcss.config.mjs",
-  "threads-migrate.mjs",
+  "app-migrate.mjs",
 ]
 const typeCheckedConfigs = [
   ...tseslint.configs.recommendedTypeChecked,

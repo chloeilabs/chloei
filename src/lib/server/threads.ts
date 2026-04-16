@@ -17,7 +17,7 @@ export { parseThreadPayload } from "./thread-payload"
 const logger = createLogger("thread-store")
 
 const THREAD_STORE_SETUP_MESSAGE =
-  "Thread storage is not initialized. Run `pnpm threads:migrate` to create the thread table."
+  "Thread storage is not initialized. Run `pnpm app:migrate` to initialize app tables."
 const POSTGRES_UNDEFINED_TABLE_ERROR_CODE = "42P01"
 const POSTGRES_UNDEFINED_COLUMN_ERROR_CODE = "42703"
 

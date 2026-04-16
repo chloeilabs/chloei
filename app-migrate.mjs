@@ -14,7 +14,7 @@ for (const envFile of [".env", ".env.local"]) {
 const databaseUrl = process.env.DATABASE_URL?.trim()
 const LEGACY_EVENT_TABLE = ["comp", "osio_webhook_event"].join("")
 const LEGACY_THREAD_CONFIG_COLUMN = ["agent", "Config"].join("")
-const THREAD_STORAGE_SCHEMA_SQL = `
+const APP_STORAGE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS thread (
   "userId" text NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
   id text NOT NULL,
@@ -67,9 +67,9 @@ await client.connect()
 
 try {
   await client.query("BEGIN")
-  await client.query(THREAD_STORAGE_SCHEMA_SQL)
+  await client.query(APP_STORAGE_SCHEMA_SQL)
   await client.query("COMMIT")
-  console.log("Applied thread storage schema.")
+  console.log("Applied app storage schema.")
 } catch (error) {
   await client.query("ROLLBACK").catch(() => undefined)
   throw error
