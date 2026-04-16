@@ -16,7 +16,8 @@ const threadPayloadUrl = pathToFileURL(
 
 const { deriveThreadTitle, normalizeThread, sortThreadsNewestFirst } =
   await import(sharedThreadsUrl)
-const { parseThreadPayload, prepareThreadForPersistence } = await import(
+const { parseStoredThread, parseThreadPayload, prepareThreadForPersistence } =
+  await import(
   threadPayloadUrl
 )
 
@@ -196,4 +197,43 @@ test("prepareThreadForPersistence aligns createdAt with the first message and tr
   assert.equal(normalizedThread.createdAt, "2026-04-15T09:59:00.000Z")
   assert.equal(title, "Explicit title that should be trimmed")
   assert.equal(normalizedThread.isPinned, true)
+})
+
+test("parseStoredThread normalizes stored rows with Date timestamps", () => {
+  const parsed = parseStoredThread({
+    id: "stored-thread-1",
+    title: "   ",
+    model: null,
+    isPinned: null,
+    messages: [
+      createMessage({
+        content: "  Persisted title from the first message  ",
+        createdAt: "2026-04-15T09:00:00.000Z",
+      }),
+    ],
+    createdAt: new Date("2026-04-15T12:00:00.000Z"),
+    updatedAt: new Date("2026-04-15T12:05:00.000Z"),
+  })
+
+  assert.equal(parsed.title, "Persisted title from the first message")
+  assert.equal(parsed.model, undefined)
+  assert.equal(parsed.isPinned, false)
+  assert.equal(parsed.createdAt, "2026-04-15T09:00:00.000Z")
+  assert.equal(parsed.updatedAt, "2026-04-15T12:05:00.000Z")
+})
+
+test("parseStoredThread throws when stored row timestamps are invalid", () => {
+  assert.throws(
+    () =>
+      parseStoredThread({
+        id: "stored-thread-2",
+        title: "Bad timestamp",
+        model: null,
+        isPinned: false,
+        messages: [createMessage()],
+        createdAt: "not-a-date",
+        updatedAt: "2026-04-15T12:05:00.000Z",
+      }),
+    /Invalid thread timestamp/
+  )
 })
