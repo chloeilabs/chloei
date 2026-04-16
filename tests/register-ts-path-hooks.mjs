@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 
 const cwd = fileURLToPath(new URL("..", import.meta.url))
 const registrationKey = Symbol.for("chloei.tests.ts-path-hooks")
+const stubModulesKey = Symbol.for("chloei.tests.stub-modules")
 
 function isFile(candidate) {
   try {
@@ -50,9 +51,44 @@ function resolveCandidatePath(specifier, parentURL) {
   return null
 }
 
+function getStubModuleUrl(specifier) {
+  const stubModules = globalThis[stubModulesKey]
+  if (!(stubModules instanceof Map)) {
+    return null
+  }
+
+  return stubModules.get(specifier) ?? null
+}
+
+export function toProjectFileUrl(relativePath) {
+  return pathToFileURL(path.join(cwd, relativePath)).href
+}
+
+export function setTestModuleStubs(stubs) {
+  const currentStubs =
+    globalThis[stubModulesKey] instanceof Map
+      ? globalThis[stubModulesKey]
+      : new Map()
+
+  for (const [specifier, stubUrl] of Object.entries(stubs)) {
+    currentStubs.set(specifier, stubUrl)
+  }
+
+  globalThis[stubModulesKey] = currentStubs
+}
+
+export function clearTestModuleStubs() {
+  delete globalThis[stubModulesKey]
+}
+
 if (!globalThis[registrationKey]) {
   registerHooks({
     resolve(specifier, context, nextResolve) {
+      const stubModuleUrl = getStubModuleUrl(specifier)
+      if (stubModuleUrl) {
+        return nextResolve(stubModuleUrl, context)
+      }
+
       const candidate = resolveCandidatePath(specifier, context.parentURL)
       if (candidate) {
         return nextResolve(candidate, context)
