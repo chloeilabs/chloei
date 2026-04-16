@@ -2,6 +2,7 @@ import { createMCPClient, type ListToolsResult } from "@ai-sdk/mcp"
 import { jsonSchema, type ToolSet } from "ai"
 
 import { asRecord, asString } from "@/lib/cast"
+import { createLogger } from "@/lib/logger"
 import type { MessageSource, ToolName } from "@/lib/shared"
 
 const FMP_MCP_TOOL_NAME = "fmp_mcp" as const
@@ -159,6 +160,7 @@ const FMP_CURATED_TOOL_BY_NAME = new Map(
   FMP_CURATED_TOOLS.map((tool) => [tool.remoteToolName, tool] as const)
 )
 
+const logger = createLogger("fmp-mcp")
 let cachedCuratedDefinitions: ListToolsResult | null = null
 const loggedFmpMessages = new Set<string>()
 
@@ -168,14 +170,12 @@ function logFmpOnce(key: string, level: "warn" | "error", message: string) {
   }
 
   loggedFmpMessages.add(key)
-  const payload = `[fmp-mcp] ${message}`
-
   if (level === "error") {
-    console.error(payload)
+    logger.error(message)
     return
   }
 
-  console.warn(payload)
+  logger.warn(message)
 }
 
 function getEndpointFromInput(input: unknown): string | null {

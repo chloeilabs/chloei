@@ -1,10 +1,13 @@
 import { sql } from "kysely"
 import { headers } from "next/headers"
 
+import { createLogger } from "@/lib/logger"
 import type { AuthViewer } from "@/lib/shared"
 
 import { getAuthOrNull } from "./auth"
 import { getAuthDatabase } from "./postgres"
+
+const logger = createLogger("auth-session")
 
 interface AuthSessionUser {
   id: string
@@ -85,7 +88,7 @@ export async function getViewerById(userId: string): Promise<AuthViewer | null> 
       email: row.email ?? "",
     }
   } catch (error) {
-    console.warn(`[auth-session] Failed to resolve viewer ${userId}:`, error)
+    logger.warn(`Failed to resolve viewer ${userId}.`, error)
     return null
   }
 }

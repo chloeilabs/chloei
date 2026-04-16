@@ -5,9 +5,12 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard"
 import { getHighlighter } from "@/lib/editor/highlighter"
+import { createLogger } from "@/lib/logger"
 import { cn } from "@/lib/utils"
 
 import { Button } from "./button"
+
+const logger = createLogger("shiki-code")
 
 function resolveLanguageName(language?: string, className?: string): string {
   const rawLanguage =
@@ -57,6 +60,13 @@ function normalizeHighlightedCodeHtml(html: string): string {
   )
 }
 
+function escapeHtml(text: string): string {
+  return text
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+}
+
 export function ShikiCode({
   children,
   className,
@@ -87,8 +97,8 @@ export function ShikiCode({
         })
         setHighlightedCode(normalizeHighlightedCodeHtml(html))
       } catch (error) {
-        console.warn("Failed to highlight code:", error)
-        setHighlightedCode(`<pre><code>${children}</code></pre>`)
+        logger.warn("Failed to highlight code.", error)
+        setHighlightedCode(`<pre><code>${escapeHtml(children)}</code></pre>`)
       } finally {
         setIsLoading(false)
       }

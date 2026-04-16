@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { z, ZodError } from "zod"
 
+import { createLogger } from "@/lib/logger"
 import {
   createAuthUnavailableResponse,
   isAuthConfigured,
@@ -56,6 +57,7 @@ async function requireSession(request: NextRequest, requestId: string) {
 
 export async function GET(request: NextRequest) {
   const requestId = crypto.randomUUID()
+  const logger = createLogger(`threads:${requestId}`)
 
   try {
     const session = await requireSession(request, requestId)
@@ -74,13 +76,14 @@ export async function GET(request: NextRequest) {
       return createErrorResponse(requestId, error.message, 500)
     }
 
-    console.error(`[threads:${requestId}] Failed to fetch threads:`, error)
+    logger.error("Failed to fetch threads.", error)
     return createErrorResponse(requestId, "Failed to fetch threads.", 500)
   }
 }
 
 export async function PUT(request: NextRequest) {
   const requestId = crypto.randomUUID()
+  const logger = createLogger(`threads:${requestId}`)
 
   try {
     const session = await requireSession(request, requestId)
@@ -105,13 +108,14 @@ export async function PUT(request: NextRequest) {
       return createErrorResponse(requestId, error.message, 500)
     }
 
-    console.error(`[threads:${requestId}] Failed to save thread:`, error)
+    logger.error("Failed to save thread.", error)
     return createErrorResponse(requestId, "Failed to save thread.", 500)
   }
 }
 
 export async function DELETE(request: NextRequest) {
   const requestId = crypto.randomUUID()
+  const logger = createLogger(`threads:${requestId}`)
 
   try {
     const session = await requireSession(request, requestId)
@@ -138,7 +142,7 @@ export async function DELETE(request: NextRequest) {
       return createErrorResponse(requestId, error.message, 500)
     }
 
-    console.error(`[threads:${requestId}] Failed to delete thread:`, error)
+    logger.error("Failed to delete thread.", error)
     return createErrorResponse(requestId, "Failed to delete thread.", 500)
   }
 }

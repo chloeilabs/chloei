@@ -11,14 +11,11 @@ import {
 } from "react"
 import { toast } from "sonner"
 
+import { createLogger } from "@/lib/logger"
 import {
-  LEGACY_THREADS_STORAGE_KEYS,
-  LEGACY_THREADS_STORAGE_MIGRATION_KEYS,
   normalizeThread,
   sortThreadsNewestFirst,
   type Thread,
-  THREADS_STORAGE_KEY,
-  THREADS_STORAGE_MIGRATION_KEY,
 } from "@/lib/shared"
 
 const THREAD_SYNC_DEBOUNCE_MS = 800
@@ -26,6 +23,7 @@ const THREAD_SYNC_RETRY_MS = 3_000
 const THREAD_SYNC_ERROR_TOAST_ID = "thread-sync-error"
 const THREAD_DELETE_ERROR_TOAST_ID = "thread-delete-error"
 const EMPTY_ASYNC_FLUSH = () => Promise.resolve()
+const logger = createLogger("threads-client")
 
 interface SaveThreadOptions {
   immediate?: boolean
@@ -75,40 +73,6 @@ function mergeThreads(existingThreads: Thread[], incomingThreads: Thread[]) {
   incomingThreads.forEach(upsertThread)
 
   return sortThreadsNewestFirst(Array.from(merged.values()))
-}
-
-function parseLegacyThreads(value: string | null): Thread[] {
-  if (!value) {
-    return []
-  }
-
-  try {
-    const parsed = JSON.parse(value) as unknown
-
-    if (!Array.isArray(parsed)) {
-      return []
-    }
-
-    return parsed
-      .filter((candidate): candidate is Thread => {
-        if (typeof candidate !== "object" || candidate === null) {
-          return false
-        }
-
-        const thread = candidate as Partial<Thread>
-
-        return (
-          typeof thread.id === "string" &&
-          typeof thread.title === "string" &&
-          Array.isArray(thread.messages) &&
-          typeof thread.createdAt === "string" &&
-          typeof thread.updatedAt === "string"
-        )
-      })
-      .map(normalizeThread)
-  } catch {
-    return []
-  }
 }
 
 function getErrorMessage(response: Response, fallbackMessage: string) {
@@ -215,7 +179,7 @@ export function ThreadsProvider({
         return
       }
 
-      console.error("Failed to sync thread:", error)
+      logger.error("Failed to sync thread.", error)
       pendingSyncsRef.current.set(thread.id, thread)
       toast.error(
         "Failed to sync conversation history. Recent changes may not appear on other devices yet.",
@@ -295,7 +259,7 @@ export function ThreadsProvider({
       }
 
       if (!isAbortError(result.reason)) {
-        console.error("Failed to sync thread:", result.reason)
+        logger.error("Failed to sync thread.", result.reason)
         pendingSyncsRef.current.set(thread.id, thread)
         failedThreads.push(thread)
       }
@@ -420,7 +384,7 @@ export function ThreadsProvider({
             return
           }
 
-          console.error("Failed to delete thread:", error)
+          logger.error("Failed to delete thread.", error)
 
           if (deletedThread) {
             setThreads((prev) => mergeThreads(prev, [deletedThread]))
@@ -434,91 +398,6 @@ export function ThreadsProvider({
     },
     [clearScheduledFlush, currentThreadId, threads]
   )
-
-  useEffect(() => {
-    const legacyThreadStorageValue =
-      localStorage.getItem(THREADS_STORAGE_KEY) ??
-      LEGACY_THREADS_STORAGE_KEYS.reduce<string | null>((value, key) => {
-        return value ?? localStorage.getItem(key)
-      }, null)
-
-    if (
-      legacyThreadStorageValue !== null &&
-      localStorage.getItem(THREADS_STORAGE_KEY) === null
-    ) {
-      localStorage.setItem(THREADS_STORAGE_KEY, legacyThreadStorageValue)
-    }
-
-    const legacyMigrationValue =
-      localStorage.getItem(THREADS_STORAGE_MIGRATION_KEY) ??
-      LEGACY_THREADS_STORAGE_MIGRATION_KEYS.reduce<string | null>(
-        (value, key) => {
-          return value ?? localStorage.getItem(key)
-        },
-        null
-      )
-
-    if (
-      legacyMigrationValue !== null &&
-      localStorage.getItem(THREADS_STORAGE_MIGRATION_KEY) === null
-    ) {
-      localStorage.setItem(THREADS_STORAGE_MIGRATION_KEY, legacyMigrationValue)
-    }
-
-    const localThreads = parseLegacyThreads(
-      localStorage.getItem(THREADS_STORAGE_KEY)
-    )
-
-    LEGACY_THREADS_STORAGE_KEYS.forEach((key) => {
-      localStorage.removeItem(key)
-    })
-    localStorage.removeItem(THREADS_STORAGE_KEY)
-    LEGACY_THREADS_STORAGE_MIGRATION_KEYS.forEach((key) => {
-      localStorage.removeItem(key)
-    })
-    localStorage.setItem(THREADS_STORAGE_MIGRATION_KEY, "1")
-
-    if (localThreads.length === 0) {
-      return
-    }
-
-    let threadsToPersist: Thread[] = []
-
-    setThreads((prev) => {
-      const serverThreadsById = new Map(
-        prev.map((thread) => [thread.id, thread])
-      )
-
-      threadsToPersist = localThreads.filter((thread) => {
-        const serverThread = serverThreadsById.get(thread.id)
-
-        if (!serverThread) {
-          return true
-        }
-
-        const localUpdatedAt = Date.parse(thread.updatedAt)
-        const serverUpdatedAt = Date.parse(serverThread.updatedAt)
-
-        return (
-          Number.isFinite(localUpdatedAt) &&
-          (!Number.isFinite(serverUpdatedAt) ||
-            localUpdatedAt > serverUpdatedAt)
-        )
-      })
-
-      return mergeThreads(prev, localThreads)
-    })
-
-    if (threadsToPersist.length === 0) {
-      return
-    }
-
-    threadsToPersist.forEach((thread) => {
-      pendingSyncsRef.current.set(thread.id, normalizeThread(thread))
-    })
-
-    scheduleFlush(0)
-  }, [scheduleFlush])
 
   useEffect(() => {
     const controllers = inFlightControllersRef.current

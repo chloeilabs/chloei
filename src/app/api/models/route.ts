@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 
 import { getModels } from "@/lib/actions/api-keys"
+import { createLogger } from "@/lib/logger"
 import {
   createAuthUnavailableResponse,
   isAuthConfigured,
@@ -11,6 +12,7 @@ export const runtime = "nodejs"
 
 export async function GET(request: NextRequest) {
   const requestId = crypto.randomUUID()
+  const logger = createLogger(`models:${requestId}`)
   const headers = {
     "Cache-Control": "no-store",
     "X-Content-Type-Options": "nosniff",
@@ -39,7 +41,7 @@ export async function GET(request: NextRequest) {
       headers,
     })
   } catch (error) {
-    console.error(`[models:${requestId}] Failed to fetch model list:`, error)
+    logger.error("Failed to fetch model list.", error)
     return NextResponse.json(
       { error: "Failed to fetch models." },
       {

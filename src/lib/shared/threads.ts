@@ -1,15 +1,6 @@
 import type { Message } from "./agent/messages"
 import type { ModelType } from "./llm/models"
 
-export const THREADS_STORAGE_KEY = "chloei_threads"
-export const LEGACY_THREADS_STORAGE_KEYS = [
-  "cleo_threads",
-] as const
-export const THREADS_STORAGE_MIGRATION_KEY =
-  "chloei_threads_server_migrated_v1"
-export const LEGACY_THREADS_STORAGE_MIGRATION_KEYS = [
-  "cleo_threads_server_migrated_v1",
-] as const
 export const DEFAULT_THREAD_TITLE = "New Conversation"
 export const THREAD_TITLE_MAX_LENGTH = 50
 

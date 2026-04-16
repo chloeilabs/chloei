@@ -5,8 +5,11 @@ import {
   DEFAULT_AUTH_REDIRECT_PATH,
   sanitizeAuthRedirectPath,
 } from "@/lib/auth-redirect"
+import { createLogger } from "@/lib/logger"
 import { AUTH_UNAVAILABLE_MESSAGE, isAuthConfigured } from "@/lib/server/auth"
 import { getRequestSession } from "@/lib/server/auth-session"
+
+const logger = createLogger("proxy")
 
 function isAuthPage(pathname: string): boolean {
   return pathname === "/sign-in" || pathname === "/sign-up"
@@ -60,7 +63,7 @@ export async function proxy(request: NextRequest) {
   try {
     session = await getRequestSession(request.headers)
   } catch (error) {
-    console.error("[proxy] Failed to resolve auth session:", error)
+    logger.error("Failed to resolve auth session.", error)
     return NextResponse.next()
   }
 

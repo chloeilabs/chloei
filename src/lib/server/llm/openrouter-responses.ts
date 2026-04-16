@@ -2,6 +2,7 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import { type ModelMessage, stepCountIs, streamText, type ToolSet } from "ai"
 
 import { asRecord, asString } from "@/lib/cast"
+import { createLogger } from "@/lib/logger"
 import { AGENT_TOOL_MAX_STEPS } from "@/lib/server/agent-runtime-config"
 import { type AgentStreamEvent, type ModelType } from "@/lib/shared"
 
@@ -18,6 +19,8 @@ import {
   getAiSdkCodeExecutionToolResultMetadata,
   isAiSdkCodeExecutionToolName,
 } from "./code-execution-tools"
+
+const logger = createLogger("fmp-mcp")
 
 interface AgentInputMessage {
   role: "system" | "user" | "assistant"
@@ -262,7 +265,7 @@ export async function* startOpenRouterResponseStream(
     }
   } finally {
     await fmpToolsContext?.close().catch((error: unknown) => {
-      console.warn("[fmp-mcp] Failed to close MCP client:", error)
+      logger.warn("Failed to close MCP client.", error)
     })
   }
 }

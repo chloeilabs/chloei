@@ -6,9 +6,10 @@ import { fileURLToPath } from "node:url"
 
 const cwd = fileURLToPath(new URL("..", import.meta.url))
 const routePath = path.join(cwd, "src/app/api/agent/route.ts")
+const helperPath = path.join(cwd, "src/lib/server/agent-route.ts")
 
-test("agent route request contract no longer accepts legacy connector config", async () => {
-  const source = await readFile(routePath, "utf8")
+test("agent route validates model, threadId, and messages", async () => {
+  const source = await readFile(helperPath, "utf8")
 
   assert.match(
     source,
@@ -19,28 +20,35 @@ test("agent route request contract no longer accepts legacy connector config", a
   assert.doesNotMatch(
     source,
     /agentConfig/,
-    "Expected /api/agent to drop legacy connector config."
+    "Expected the request contract to avoid removed connector config fields."
   )
 })
 
-test("agent route still streams through the simplified OpenRouter path", async () => {
-  const source = await readFile(routePath, "utf8")
+test("agent route streams through the extracted OpenRouter helper path", async () => {
+  const helperSource = await readFile(helperPath, "utf8")
+  const routeSource = await readFile(routePath, "utf8")
 
   assert.match(
-    source,
-    /const stream = startOpenRouterResponseStream\(\{[\s\S]*messages: parsed\.data\.messages,[\s\S]*systemInstruction: withAiSdkInlineCitationInstruction\(/,
-    "Expected /api/agent to stream via startOpenRouterResponseStream."
+    routeSource,
+    /from "@\/lib\/server\/agent-route"/,
+    "Expected /api/agent to delegate request helpers to the server helper module."
   )
 
   assert.doesNotMatch(
-    source,
+    helperSource,
     /approvalGrant|userId:\s*session\.user\.id/,
-    "Expected /api/agent to avoid the removed connector and approval flow."
+    "Expected the helper to avoid removed connector and approval flow state."
   )
 
   assert.match(
-    source,
-    /withAiSdkInlineCitationInstruction\(\s*systemInstruction,\s*\{\s*fmpEnabled: Boolean\(fmpApiKey\?\.trim\(\)\),\s*\}\s*\)/,
-    "Expected /api/agent to pass only the remaining augmentation options."
+    helperSource,
+    /const stream = startOpenRouterResponseStream\(\{[\s\S]*messages: params\.messages,[\s\S]*systemInstruction: withAiSdkInlineCitationInstruction\(/,
+    "Expected the helper to stream via startOpenRouterResponseStream."
+  )
+
+  assert.match(
+    helperSource,
+    /withAiSdkInlineCitationInstruction\(\s*params\.systemInstruction,\s*\{\s*fmpEnabled: Boolean\(params\.fmpApiKey\?\.trim\(\)\),\s*\}\s*\)/,
+    "Expected the helper to pass only the remaining augmentation options."
   )
 })

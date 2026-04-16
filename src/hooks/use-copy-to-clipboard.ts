@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
+import { createLogger } from "@/lib/logger"
+
+const logger = createLogger("clipboard")
+
 export function useCopyToClipboard() {
   const [isCopied, setIsCopied] = useState(false)
   const timeoutRef = useRef<number | null>(null)
@@ -28,7 +32,7 @@ export function useCopyToClipboard() {
 
       return true
     } catch (error) {
-      console.error("Failed to copy to clipboard:", error)
+      logger.error("Failed to copy to clipboard.", error)
       return false
     }
   }, [])

@@ -192,8 +192,7 @@ export async function getResponseErrorMessage(
   }
 
   try {
-    const parsed = JSON.parse(bodyText) as unknown
-    const record = asRecord(parsed)
+    const record = asRecord(JSON.parse(bodyText))
     const error = asString(record?.error)
     if (error) {
       return error

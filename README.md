@@ -4,8 +4,8 @@ Chloei is a Next.js 16 chat app backed by OpenRouter. It supports web search, X 
 
 ## Requirements
 
-- Node.js 20+
-- pnpm 9+
+- Node.js 24.x
+- pnpm 10.32.1
 
 ## Getting started
 

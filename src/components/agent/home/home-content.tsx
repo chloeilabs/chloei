@@ -29,6 +29,7 @@ import { PromptForm } from "../prompt-form/prompt-form"
 import { useAgentSession } from "./use-agent-session"
 
 type ViewTransitionStarter = (updateCallback: () => void) => unknown
+
 const DEFAULT_FALLBACK_TRANSITION_MS = 150
 const MOBILE_FALLBACK_TRANSITION_MS = 110
 const STREAMING_SCROLL_EARLY_TRIGGER_PX = 72
@@ -170,11 +171,14 @@ export function HomePageContent({
         return
       }
 
-      const startViewTransition = (
-        document as unknown as {
-          startViewTransition?: ViewTransitionStarter
-        }
-      ).startViewTransition?.bind(document)
+      const startViewTransitionValue = Reflect.get(
+        document,
+        "startViewTransition"
+      )
+      const startViewTransition =
+        typeof startViewTransitionValue === "function"
+          ? (startViewTransitionValue as ViewTransitionStarter).bind(document)
+          : null
 
       if (!startViewTransition) {
         startFallbackConversationTransition()
