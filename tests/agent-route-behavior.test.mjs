@@ -48,15 +48,34 @@ let recorded
 
 function jsonErrorResponse(params) {
   recorded.jsonErrors.push(params)
+
   return Response.json(
-    { error: params.error },
+    {
+      error: params.error,
+      errorCode: params.errorCode,
+      requestId: params.requestId,
+    },
     {
       status: params.status,
       headers: {
+        "X-Error-Code": params.errorCode,
         "X-Request-Id": params.requestId,
       },
     }
   )
+}
+
+async function assertErrorResponse(response, expected) {
+  const body = await response.json()
+
+  assert.equal(response.status, expected.status)
+  assert.equal(response.headers.get("X-Error-Code"), expected.errorCode)
+  assert.equal(response.headers.get("X-Request-Id"), expected.requestId)
+  assert.deepEqual(body, {
+    error: expected.error,
+    errorCode: expected.errorCode,
+    requestId: expected.requestId,
+  })
 }
 
 function createRequest(overrides = {}) {
@@ -123,11 +142,22 @@ beforeEach(() => {
       },
       createAuthUnavailableResponse(headers) {
         recorded.authUnavailableHeaders.push(headers)
+        const responseHeaders = new Headers(headers)
+        const requestId =
+          responseHeaders.get("X-Request-Id")?.trim() ??
+          "request-auth-unavailable"
+        responseHeaders.set("X-Error-Code", "AUTH_UNAVAILABLE")
+        responseHeaders.set("X-Request-Id", requestId)
+
         return Response.json(
-          { error: "Auth unavailable." },
+          {
+            error: "Auth unavailable.",
+            errorCode: "AUTH_UNAVAILABLE",
+            requestId,
+          },
           {
             status: 503,
-            headers,
+            headers: responseHeaders,
           }
         )
       },
@@ -187,10 +217,17 @@ test("agent route returns auth unavailable when auth is disabled", async () => {
 
   const response = await POST(createRequest())
 
-  assert.equal(response.status, 503)
-  assert.deepEqual(await response.json(), { error: "Auth unavailable." })
+  await assertErrorResponse(response, {
+    status: 503,
+    error: "Auth unavailable.",
+    errorCode: "AUTH_UNAVAILABLE",
+    requestId: "request-1",
+  })
   assert.equal(recorded.streamCalls.length, 0)
-  assert.equal(recorded.authUnavailableHeaders[0]["X-Request-Id"], "request-1")
+  assert.equal(
+    new Headers(recorded.authUnavailableHeaders[0]).get("X-Request-Id"),
+    "request-1"
+  )
 })
 
 test("agent route returns a rate-limit error before reading the body", async () => {
@@ -219,9 +256,11 @@ test("agent route returns a rate-limit error before reading the body", async () 
     })
   )
 
-  assert.equal(response.status, 429)
-  assert.deepEqual(await response.json(), {
+  await assertErrorResponse(response, {
+    status: 429,
     error: "Too many requests. Please retry shortly.",
+    errorCode: "AGENT_RATE_LIMITED",
+    requestId: "request-1",
   })
   assert.equal(recorded.jsonErrors[0]?.retryAfterSeconds, 12)
 })
@@ -235,9 +274,11 @@ test("agent route rejects invalid JSON payloads", async () => {
     })
   )
 
-  assert.equal(response.status, 400)
-  assert.deepEqual(await response.json(), {
+  await assertErrorResponse(response, {
+    status: 400,
     error: "Invalid JSON payload.",
+    errorCode: "AGENT_INVALID_JSON",
+    requestId: "request-1",
   })
   assert.equal(recorded.streamCalls.length, 0)
 })

@@ -6,10 +6,13 @@ import {
   sanitizeAuthRedirectPath,
 } from "@/lib/auth-redirect"
 import { createLogger } from "@/lib/logger"
-import { AUTH_UNAVAILABLE_MESSAGE, isAuthConfigured } from "@/lib/server/auth"
+import { createApiErrorResponse } from "@/lib/server/api-response"
+import {
+  AUTH_UNAVAILABLE_ERROR_CODE,
+  AUTH_UNAVAILABLE_MESSAGE,
+  isAuthConfigured,
+} from "@/lib/server/auth"
 import { getRequestSession } from "@/lib/server/auth-session"
-
-const logger = createLogger("proxy")
 
 function isAuthPage(pathname: string): boolean {
   return pathname === "/sign-in" || pathname === "/sign-up"
@@ -26,20 +29,19 @@ function createSignInRedirectUrl(request: NextRequest): URL {
   return redirectUrl
 }
 
-function createAuthUnavailableApiResponse() {
-  return NextResponse.json(
-    { error: AUTH_UNAVAILABLE_MESSAGE },
-    {
-      status: 503,
-      headers: {
-        "Cache-Control": "no-store",
-        "X-Content-Type-Options": "nosniff",
-      },
-    }
-  )
+function createAuthUnavailableApiResponse(requestId: string) {
+  return createApiErrorResponse({
+    requestId,
+    error: AUTH_UNAVAILABLE_MESSAGE,
+    errorCode: AUTH_UNAVAILABLE_ERROR_CODE,
+    status: 503,
+  })
 }
 
 export async function proxy(request: NextRequest) {
+  const requestId =
+    request.headers.get("x-request-id")?.trim() ?? crypto.randomUUID()
+  const logger = createLogger(`proxy:${requestId}`)
   const { pathname } = request.nextUrl
 
   if (pathname.startsWith("/api/auth")) {
@@ -52,7 +54,7 @@ export async function proxy(request: NextRequest) {
     }
 
     if (pathname.startsWith("/api/")) {
-      return createAuthUnavailableApiResponse()
+      return createAuthUnavailableApiResponse(requestId)
     }
 
     return NextResponse.redirect(createSignInRedirectUrl(request))
@@ -63,7 +65,11 @@ export async function proxy(request: NextRequest) {
   try {
     session = await getRequestSession(request.headers)
   } catch (error) {
-    logger.error("Failed to resolve auth session.", error)
+    logger.error("Failed to resolve auth session.", {
+      error,
+      errorCode: "PROXY_AUTH_SESSION_FAILED",
+      requestId,
+    })
     return NextResponse.next()
   }
 
@@ -81,16 +87,12 @@ export async function proxy(request: NextRequest) {
 
   if (!session) {
     if (pathname.startsWith("/api/")) {
-      return NextResponse.json(
-        { error: "Unauthorized." },
-        {
-          status: 401,
-          headers: {
-            "Cache-Control": "no-store",
-            "X-Content-Type-Options": "nosniff",
-          },
-        }
-      )
+      return createApiErrorResponse({
+        requestId,
+        error: "Unauthorized.",
+        errorCode: "PROXY_UNAUTHORIZED",
+        status: 401,
+      })
     }
 
     return NextResponse.redirect(createSignInRedirectUrl(request))

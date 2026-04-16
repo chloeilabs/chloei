@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { z, ZodError } from "zod"
 
 import { createLogger } from "@/lib/logger"
+import { createApiErrorResponse, createApiHeaders } from "@/lib/server/api-response"
 import {
   createAuthUnavailableResponse,
   isAuthConfigured,
@@ -24,21 +25,21 @@ const deleteThreadSchema = z
   .strict()
 
 function createHeaders(requestId: string) {
-  return {
-    "Cache-Control": "no-store",
-    "X-Content-Type-Options": "nosniff",
-    "X-Request-Id": requestId,
-  }
+  return createApiHeaders({ requestId })
 }
 
-function createErrorResponse(requestId: string, error: string, status: number) {
-  return NextResponse.json(
-    { error },
-    {
-      status,
-      headers: createHeaders(requestId),
-    }
-  )
+function createErrorResponse(
+  requestId: string,
+  error: string,
+  errorCode: string,
+  status: number
+) {
+  return createApiErrorResponse({
+    requestId,
+    error,
+    errorCode,
+    status,
+  })
 }
 
 async function requireSession(request: NextRequest, requestId: string) {
@@ -49,7 +50,12 @@ async function requireSession(request: NextRequest, requestId: string) {
   const session = await getRequestSession(request.headers)
 
   if (!session) {
-    return createErrorResponse(requestId, "Unauthorized.", 401)
+    return createErrorResponse(
+      requestId,
+      "Unauthorized.",
+      "THREADS_UNAUTHORIZED",
+      401
+    )
   }
 
   return session
@@ -73,11 +79,30 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     if (isThreadStoreNotInitializedError(error)) {
-      return createErrorResponse(requestId, error.message, 500)
+      logger.error("Thread store is not initialized.", {
+        error,
+        errorCode: "THREAD_STORE_NOT_INITIALIZED",
+        requestId,
+      })
+      return createErrorResponse(
+        requestId,
+        error.message,
+        "THREAD_STORE_NOT_INITIALIZED",
+        500
+      )
     }
 
-    logger.error("Failed to fetch threads.", error)
-    return createErrorResponse(requestId, "Failed to fetch threads.", 500)
+    logger.error("Failed to fetch threads.", {
+      error,
+      errorCode: "THREADS_FETCH_FAILED",
+      requestId,
+    })
+    return createErrorResponse(
+      requestId,
+      "Failed to fetch threads.",
+      "THREADS_FETCH_FAILED",
+      500
+    )
   }
 }
 
@@ -101,15 +126,39 @@ export async function PUT(request: NextRequest) {
     })
   } catch (error) {
     if (error instanceof ZodError) {
-      return createErrorResponse(requestId, "Invalid thread payload.", 400)
+      return createErrorResponse(
+        requestId,
+        "Invalid thread payload.",
+        "THREADS_INVALID_PAYLOAD",
+        400
+      )
     }
 
     if (isThreadStoreNotInitializedError(error)) {
-      return createErrorResponse(requestId, error.message, 500)
+      logger.error("Thread store is not initialized.", {
+        error,
+        errorCode: "THREAD_STORE_NOT_INITIALIZED",
+        requestId,
+      })
+      return createErrorResponse(
+        requestId,
+        error.message,
+        "THREAD_STORE_NOT_INITIALIZED",
+        500
+      )
     }
 
-    logger.error("Failed to save thread.", error)
-    return createErrorResponse(requestId, "Failed to save thread.", 500)
+    logger.error("Failed to save thread.", {
+      error,
+      errorCode: "THREAD_SAVE_FAILED",
+      requestId,
+    })
+    return createErrorResponse(
+      requestId,
+      "Failed to save thread.",
+      "THREAD_SAVE_FAILED",
+      500
+    )
   }
 }
 
@@ -135,14 +184,38 @@ export async function DELETE(request: NextRequest) {
     })
   } catch (error) {
     if (error instanceof ZodError) {
-      return createErrorResponse(requestId, "Invalid thread id.", 400)
+      return createErrorResponse(
+        requestId,
+        "Invalid thread id.",
+        "THREAD_ID_INVALID",
+        400
+      )
     }
 
     if (isThreadStoreNotInitializedError(error)) {
-      return createErrorResponse(requestId, error.message, 500)
+      logger.error("Thread store is not initialized.", {
+        error,
+        errorCode: "THREAD_STORE_NOT_INITIALIZED",
+        requestId,
+      })
+      return createErrorResponse(
+        requestId,
+        error.message,
+        "THREAD_STORE_NOT_INITIALIZED",
+        500
+      )
     }
 
-    logger.error("Failed to delete thread.", error)
-    return createErrorResponse(requestId, "Failed to delete thread.", 500)
+    logger.error("Failed to delete thread.", {
+      error,
+      errorCode: "THREAD_DELETE_FAILED",
+      requestId,
+    })
+    return createErrorResponse(
+      requestId,
+      "Failed to delete thread.",
+      "THREAD_DELETE_FAILED",
+      500
+    )
   }
 }

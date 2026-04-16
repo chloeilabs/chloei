@@ -11,11 +11,21 @@ export function createAuthUnavailableResponse(headers) {
     return customResponse
   }
 
+  const responseHeaders = new Headers(headers)
+  const requestId =
+    responseHeaders.get("X-Request-Id")?.trim() ?? "request-auth-unavailable"
+  responseHeaders.set("X-Error-Code", "AUTH_UNAVAILABLE")
+  responseHeaders.set("X-Request-Id", requestId)
+
   return Response.json(
-    { error: "Auth unavailable." },
+    {
+      error: "Auth unavailable.",
+      errorCode: "AUTH_UNAVAILABLE",
+      requestId,
+    },
     {
       status: 503,
-      headers,
+      headers: responseHeaders,
     }
   )
 }

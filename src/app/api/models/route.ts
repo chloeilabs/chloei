@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 
 import { getModels } from "@/lib/actions/api-keys"
 import { createLogger } from "@/lib/logger"
+import { createApiErrorResponse, createApiHeaders } from "@/lib/server/api-response"
 import {
   createAuthUnavailableResponse,
   isAuthConfigured,
@@ -13,11 +14,7 @@ export const runtime = "nodejs"
 export async function GET(request: NextRequest) {
   const requestId = crypto.randomUUID()
   const logger = createLogger(`models:${requestId}`)
-  const headers = {
-    "Cache-Control": "no-store",
-    "X-Content-Type-Options": "nosniff",
-    "X-Request-Id": requestId,
-  }
+  const headers = createApiHeaders({ requestId })
 
   try {
     if (!isAuthConfigured()) {
@@ -27,13 +24,13 @@ export async function GET(request: NextRequest) {
     const session = await getRequestSession(request.headers)
 
     if (!session) {
-      return NextResponse.json(
-        { error: "Unauthorized." },
-        {
-          status: 401,
-          headers,
-        }
-      )
+      return createApiErrorResponse({
+        requestId,
+        error: "Unauthorized.",
+        errorCode: "MODELS_UNAUTHORIZED",
+        status: 401,
+        headers,
+      })
     }
 
     const models = getModels()
@@ -41,13 +38,17 @@ export async function GET(request: NextRequest) {
       headers,
     })
   } catch (error) {
-    logger.error("Failed to fetch model list.", error)
-    return NextResponse.json(
-      { error: "Failed to fetch models." },
-      {
-        status: 500,
-        headers,
-      }
-    )
+    logger.error("Failed to fetch model list.", {
+      error,
+      errorCode: "MODELS_FETCH_FAILED",
+      requestId,
+    })
+    return createApiErrorResponse({
+      requestId,
+      error: "Failed to fetch models.",
+      errorCode: "MODELS_FETCH_FAILED",
+      status: 500,
+      headers,
+    })
   }
 }

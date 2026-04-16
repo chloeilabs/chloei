@@ -1,12 +1,20 @@
 import { getTestMocks } from "./mock-state.mjs"
 
 function defaultJsonErrorResponse(params) {
+  const requestId = params.requestId ?? "request-1"
+  const errorCode = params.errorCode ?? "UNKNOWN_ERROR"
+
   return Response.json(
-    { error: params.error },
+    {
+      error: params.error,
+      errorCode,
+      requestId,
+    },
     {
       status: params.status,
       headers: {
-        "X-Request-Id": params.requestId,
+        "X-Error-Code": errorCode,
+        "X-Request-Id": requestId,
       },
     }
   )

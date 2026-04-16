@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
       return createJsonErrorResponse({
         requestId,
         error: "Unauthorized.",
+        errorCode: "AGENT_UNAUTHORIZED",
         status: 401,
       })
     }
@@ -73,6 +74,7 @@ export async function POST(request: NextRequest) {
       return createJsonErrorResponse({
         requestId,
         error: "Too many requests. Please retry shortly.",
+        errorCode: "AGENT_RATE_LIMITED",
         status: 429,
         retryAfterSeconds: rateLimitDecision.retryAfterSeconds,
         rateLimitDecision,
@@ -86,6 +88,7 @@ export async function POST(request: NextRequest) {
       return createJsonErrorResponse({
         requestId,
         error: "Invalid JSON payload.",
+        errorCode: "AGENT_INVALID_JSON",
         status: 400,
         rateLimitDecision: rateLimitDecision ?? undefined,
       })
@@ -121,9 +124,14 @@ export async function POST(request: NextRequest) {
     )
 
     if (!openRouterApiKey) {
+      logger.error("Missing OPENROUTER_API_KEY on the server.", {
+        errorCode: "AGENT_OPENROUTER_API_KEY_MISSING",
+        requestId,
+      })
       return createJsonErrorResponse({
         requestId,
         error: "Missing OPENROUTER_API_KEY on the server.",
+        errorCode: "AGENT_OPENROUTER_API_KEY_MISSING",
         status: 500,
         rateLimitDecision: rateLimitDecision ?? undefined,
       })
@@ -141,6 +149,7 @@ export async function POST(request: NextRequest) {
       return createJsonErrorResponse({
         requestId,
         error: "Too many concurrent requests. Please retry shortly.",
+        errorCode: "AGENT_CONCURRENCY_LIMITED",
         status: 429,
         retryAfterSeconds: concurrencySlot.retryAfterSeconds,
         rateLimitDecision: rateLimitDecision ?? undefined,
@@ -162,17 +171,28 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     if (isThreadStoreNotInitializedError(error)) {
+      logger.error("Thread store is not initialized.", {
+        error,
+        errorCode: "THREAD_STORE_NOT_INITIALIZED",
+        requestId,
+      })
       return createJsonErrorResponse({
         requestId,
         error: error.message,
+        errorCode: "THREAD_STORE_NOT_INITIALIZED",
         status: 500,
       })
     }
 
-    logger.error("Agent request failed.", error)
+    logger.error("Agent request failed.", {
+      error,
+      errorCode: "AGENT_REQUEST_FAILED",
+      requestId,
+    })
     return createJsonErrorResponse({
       requestId,
       error: "Failed to generate agent response.",
+      errorCode: "AGENT_REQUEST_FAILED",
       status: 500,
     })
   }

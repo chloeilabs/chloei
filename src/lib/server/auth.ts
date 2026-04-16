@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth"
 import { nextCookies } from "better-auth/next-js"
 
+import { createApiErrorResponse } from "./api-response"
 import { DATABASE_URL_ENV_NAME, getAuthDatabase } from "./postgres"
 
 declare global {
@@ -21,6 +22,7 @@ const AUTH_UNAVAILABLE_RESPONSE_HEADERS = {
   "Cache-Control": "no-store",
   "X-Content-Type-Options": "nosniff",
 } as const
+export const AUTH_UNAVAILABLE_ERROR_CODE = "AUTH_UNAVAILABLE" as const
 export const AUTH_REQUIRED_ENV_NAMES = [
   DATABASE_URL_ENV_NAME,
   "BETTER_AUTH_SECRET",
@@ -50,19 +52,22 @@ export function isAuthConfigured(): boolean {
 }
 
 export function createAuthUnavailableResponse(headers?: HeadersInit): Response {
-  const responseHeaders = new Headers(AUTH_UNAVAILABLE_RESPONSE_HEADERS)
+  const mergedHeaders = new Headers(AUTH_UNAVAILABLE_RESPONSE_HEADERS)
 
   for (const [key, value] of new Headers(headers).entries()) {
-    responseHeaders.set(key, value)
+    mergedHeaders.set(key, value)
   }
 
-  return Response.json(
-    { error: AUTH_UNAVAILABLE_MESSAGE },
-    {
-      status: 503,
-      headers: responseHeaders,
-    }
-  )
+  const requestId =
+    mergedHeaders.get("X-Request-Id")?.trim() ?? crypto.randomUUID()
+
+  return createApiErrorResponse({
+    requestId,
+    error: AUTH_UNAVAILABLE_MESSAGE,
+    errorCode: AUTH_UNAVAILABLE_ERROR_CODE,
+    status: 503,
+    headers: mergedHeaders,
+  })
 }
 
 function getRequiredEnv(

@@ -18,6 +18,7 @@ import {
   AGENT_MAX_MESSAGES,
   AGENT_MAX_TOTAL_CHARS,
 } from "./agent-runtime-config"
+import { createApiErrorBody, createApiHeaders } from "./api-response"
 import { startOpenRouterResponseStream } from "./llm/openrouter-responses"
 import { withAiSdkInlineCitationInstruction } from "./llm/system-instruction-augmentations"
 import { type evaluateAndConsumeSlidingWindowRateLimit } from "./rate-limit"
@@ -57,6 +58,7 @@ interface ParsedAgentStreamRequest {
 interface JsonErrorResponseParams {
   requestId: string
   error: string
+  errorCode: string
   status: number
   rateLimitDecision?: AgentRateLimitDecision
   retryAfterSeconds?: number | null
@@ -185,14 +187,6 @@ function getTotalMessageChars(messages: AgentStreamRequest["messages"]): number 
   return messages.reduce((total, message) => total + message.content.length, 0)
 }
 
-function createBaseHeaders(requestId: string): Headers {
-  return new Headers({
-    "Cache-Control": "no-store",
-    "X-Content-Type-Options": "nosniff",
-    "X-Request-Id": requestId,
-  })
-}
-
 function applyRateLimitHeaders(
   headers: Headers,
   rateLimitDecision: AgentRateLimitDecision
@@ -206,7 +200,10 @@ function applyRateLimitHeaders(
 }
 
 export function createJsonErrorResponse(params: JsonErrorResponseParams) {
-  const headers = createBaseHeaders(params.requestId)
+  const headers = createApiHeaders({
+    requestId: params.requestId,
+  })
+  headers.set("X-Error-Code", params.errorCode)
   if (params.rateLimitDecision) {
     applyRateLimitHeaders(headers, params.rateLimitDecision)
   }
@@ -215,7 +212,7 @@ export function createJsonErrorResponse(params: JsonErrorResponseParams) {
   }
 
   return Response.json(
-    { error: params.error },
+    createApiErrorBody(params),
     {
       status: params.status,
       headers,
@@ -232,6 +229,7 @@ export function parseAgentStreamRequest(
     return createJsonErrorResponse({
       requestId: params.requestId,
       error: "Invalid request payload.",
+      errorCode: "AGENT_INVALID_REQUEST",
       status: 400,
       rateLimitDecision: params.rateLimitDecision,
     })
@@ -242,6 +240,7 @@ export function parseAgentStreamRequest(
     return createJsonErrorResponse({
       requestId: params.requestId,
       error: "Conversation payload is too large.",
+      errorCode: "AGENT_PAYLOAD_TOO_LARGE",
       status: 413,
       rateLimitDecision: params.rateLimitDecision,
     })
@@ -252,6 +251,7 @@ export function parseAgentStreamRequest(
     return createJsonErrorResponse({
       requestId: params.requestId,
       error: "The final message must be from the user.",
+      errorCode: "AGENT_FINAL_MESSAGE_INVALID",
       status: 400,
       rateLimitDecision: params.rateLimitDecision,
     })
@@ -264,6 +264,7 @@ export function parseAgentStreamRequest(
     return createJsonErrorResponse({
       requestId: params.requestId,
       error: "Unsupported model selected.",
+      errorCode: "AGENT_UNSUPPORTED_MODEL",
       status: 400,
       rateLimitDecision: params.rateLimitDecision,
     })
@@ -377,12 +378,22 @@ export function createAgentStreamResponse(
         }
       } catch (streamError) {
         const clientAborted = params.request.signal.aborted
+        const streamFailureDetails = {
+          error: streamError,
+          errorCode: "AGENT_STREAM_FAILED",
+          requestId: params.requestId,
+        }
         enqueueEvent({ type: "agent_status", status: "failed" })
 
         if (isAbortError(streamError)) {
           if (!clientAborted) {
             logger.warn(
-              `Agent stream aborted after ${String(params.timeoutMs)}ms timeout.`
+              `Agent stream aborted after ${String(params.timeoutMs)}ms timeout.`,
+              {
+                errorCode: "AGENT_STREAM_TIMEOUT",
+                requestId: params.requestId,
+                timeoutMs: params.timeoutMs,
+              }
             )
           }
 
@@ -395,23 +406,27 @@ export function createAgentStreamResponse(
           isProviderAuthenticationError(streamError) &&
           !streamState.hasMeaningfulText
         ) {
-          logger.error("OpenRouter authentication failed.", streamError)
+          logger.error("OpenRouter authentication failed.", {
+            error: streamError,
+            errorCode: "AGENT_PROVIDER_AUTH_FAILED",
+            requestId: params.requestId,
+          })
           streamState.hasTextChunk = true
           streamState.hasMeaningfulText = true
           enqueueEvent(
             textDeltaEvent("Invalid OPENROUTER_API_KEY on the server.")
           )
         } else if (!streamState.hasMeaningfulText) {
-          logger.error("Agent stream failed.", streamError)
+          logger.error("Agent stream failed.", streamFailureDetails)
           streamState.hasTextChunk = true
           streamState.hasMeaningfulText = true
           enqueueEvent(textDeltaEvent(STREAM_ERROR_FALLBACK_TEXT))
         } else if (!streamState.hasTextChunk) {
-          logger.error("Agent stream failed.", streamError)
+          logger.error("Agent stream failed.", streamFailureDetails)
           streamState.hasTextChunk = true
           enqueueEvent(textDeltaEvent(ASSISTANT_EMPTY_RESPONSE_FALLBACK))
         } else {
-          logger.error("Agent stream failed.", streamError)
+          logger.error("Agent stream failed.", streamFailureDetails)
         }
       } finally {
         settleStream()
@@ -424,7 +439,9 @@ export function createAgentStreamResponse(
     },
   })
 
-  const responseHeaders = createBaseHeaders(params.requestId)
+  const responseHeaders = createApiHeaders({
+    requestId: params.requestId,
+  })
   responseHeaders.set("Content-Type", "application/x-ndjson; charset=utf-8")
   responseHeaders.set("Cache-Control", "no-store, no-transform")
   if (params.rateLimitDecision) {

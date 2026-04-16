@@ -39,6 +39,18 @@ function createRequest(overrides = {}) {
   }
 }
 
+async function assertApiErrorResponse(response, expected) {
+  const body = await response.json()
+
+  assert.equal(response.status, expected.status)
+  assert.equal(response.headers.get("X-Error-Code"), expected.errorCode)
+  assert.equal(body.error, expected.error)
+  assert.equal(body.errorCode, expected.errorCode)
+  assert.equal(typeof body.requestId, "string")
+  assert.ok(body.requestId.length > 0)
+  assert.equal(response.headers.get("X-Request-Id"), body.requestId)
+}
+
 beforeEach(() => {
   recorded = {
     deleted: [],
@@ -52,11 +64,22 @@ beforeEach(() => {
         return true
       },
       createAuthUnavailableResponse(headers) {
+        const responseHeaders = new Headers(headers)
+        const requestId =
+          responseHeaders.get("X-Request-Id")?.trim() ??
+          "request-auth-unavailable"
+        responseHeaders.set("X-Error-Code", "AUTH_UNAVAILABLE")
+        responseHeaders.set("X-Request-Id", requestId)
+
         return Response.json(
-          { error: "Auth unavailable." },
+          {
+            error: "Auth unavailable.",
+            errorCode: "AUTH_UNAVAILABLE",
+            requestId,
+          },
           {
             status: 503,
-            headers,
+            headers: responseHeaders,
           }
         )
       },
@@ -113,9 +136,10 @@ test("threads GET returns unauthorized when no session is available", async () =
 
   const response = await GET(createRequest())
 
-  assert.equal(response.status, 401)
-  assert.deepEqual(await response.json(), {
+  await assertApiErrorResponse(response, {
+    status: 401,
     error: "Unauthorized.",
+    errorCode: "THREADS_UNAUTHORIZED",
   })
 })
 
@@ -135,9 +159,10 @@ test("threads PUT returns 400 for invalid thread payloads", async () => {
     })
   )
 
-  assert.equal(response.status, 400)
-  assert.deepEqual(await response.json(), {
+  await assertApiErrorResponse(response, {
+    status: 400,
     error: "Invalid thread payload.",
+    errorCode: "THREADS_INVALID_PAYLOAD",
   })
 })
 
@@ -173,9 +198,10 @@ test("threads GET surfaces thread-store initialization errors", async () => {
 
   const response = await GET(createRequest())
 
-  assert.equal(response.status, 500)
-  assert.deepEqual(await response.json(), {
+  await assertApiErrorResponse(response, {
+    status: 500,
     error:
       "Thread storage is not initialized. Run `pnpm threads:migrate` to create the thread table.",
+    errorCode: "THREAD_STORE_NOT_INITIALIZED",
   })
 })

@@ -115,6 +115,7 @@ test("agent helper error responses include rate-limit headers", async () => {
   const response = createJsonErrorResponse({
     requestId: "request-1",
     error: "Too many requests.",
+    errorCode: "AGENT_RATE_LIMITED",
     status: 429,
     retryAfterSeconds: 9,
     rateLimitDecision: {
@@ -127,6 +128,7 @@ test("agent helper error responses include rate-limit headers", async () => {
   })
 
   assert.equal(response.status, 429)
+  assert.equal(response.headers.get("X-Error-Code"), "AGENT_RATE_LIMITED")
   assert.equal(response.headers.get("X-Request-Id"), "request-1")
   assert.equal(response.headers.get("Retry-After"), "9")
   assert.equal(response.headers.get("X-RateLimit-Limit"), "5")
@@ -134,6 +136,8 @@ test("agent helper error responses include rate-limit headers", async () => {
   assert.equal(response.headers.get("X-RateLimit-Reset"), "123")
   assert.deepEqual(await response.json(), {
     error: "Too many requests.",
+    errorCode: "AGENT_RATE_LIMITED",
+    requestId: "request-1",
   })
 })
 
@@ -153,6 +157,8 @@ test("agent helper validates total size, last-message role, and default model su
   assert.equal(oversizedResult.status, 413)
   assert.deepEqual(await oversizedResult.json(), {
     error: "Conversation payload is too large.",
+    errorCode: "AGENT_PAYLOAD_TOO_LARGE",
+    requestId: "request-1",
   })
 
   const lastAssistantResult = parseAgentStreamRequest({
@@ -172,6 +178,8 @@ test("agent helper validates total size, last-message role, and default model su
   assert.equal(lastAssistantResult.status, 400)
   assert.deepEqual(await lastAssistantResult.json(), {
     error: "The final message must be from the user.",
+    errorCode: "AGENT_FINAL_MESSAGE_INVALID",
+    requestId: "request-2",
   })
 
   const unsupportedModelResult = parseAgentStreamRequest({
@@ -191,6 +199,8 @@ test("agent helper validates total size, last-message role, and default model su
   assert.equal(unsupportedModelResult.status, 400)
   assert.deepEqual(await unsupportedModelResult.json(), {
     error: "Unsupported model selected.",
+    errorCode: "AGENT_UNSUPPORTED_MODEL",
+    requestId: "request-3",
   })
 })
 
