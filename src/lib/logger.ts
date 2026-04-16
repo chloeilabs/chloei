@@ -1,14 +1,20 @@
 type LogLevel = "info" | "warn" | "error"
 
 interface StructuredLogEntry {
+  commitSha?: string
   details?: unknown
   durationMs?: number
+  deploymentEnv?: string
+  deploymentId?: string
+  deploymentRegion?: string
+  deploymentTargetEnv?: string
   errorCode?: string
   level: LogLevel
   message: string
   method?: string
   model?: string
   outcome?: string
+  projectId?: string
   requestId?: string
   route?: string
   scope: string
@@ -94,6 +100,48 @@ function normalizeLogDetails(details: unknown): unknown {
   return { value: details }
 }
 
+function normalizeEnvValue(value: string | undefined): string | undefined {
+  const trimmedValue = value?.trim()
+  if (trimmedValue === undefined || trimmedValue === "") {
+    return undefined
+  }
+
+  return trimmedValue
+}
+
+function resolveDeploymentMetadata() {
+  if (typeof window !== "undefined") {
+    return undefined
+  }
+
+  const deploymentEnv = normalizeEnvValue(process.env.VERCEL_ENV)
+  const deploymentTargetEnv = normalizeEnvValue(process.env.VERCEL_TARGET_ENV)
+  const deploymentRegion = normalizeEnvValue(process.env.VERCEL_REGION)
+  const deploymentId = normalizeEnvValue(process.env.VERCEL_DEPLOYMENT_ID)
+  const projectId = normalizeEnvValue(process.env.VERCEL_PROJECT_ID)
+  const commitSha = normalizeEnvValue(process.env.VERCEL_GIT_COMMIT_SHA)
+
+  if (
+    deploymentEnv === undefined &&
+    deploymentTargetEnv === undefined &&
+    deploymentRegion === undefined &&
+    deploymentId === undefined &&
+    projectId === undefined &&
+    commitSha === undefined
+  ) {
+    return undefined
+  }
+
+  return {
+    ...(commitSha ? { commitSha } : {}),
+    ...(deploymentEnv ? { deploymentEnv } : {}),
+    ...(deploymentId ? { deploymentId } : {}),
+    ...(deploymentRegion ? { deploymentRegion } : {}),
+    ...(deploymentTargetEnv ? { deploymentTargetEnv } : {}),
+    ...(projectId ? { projectId } : {}),
+  }
+}
+
 function isServerProductionLoggerEnabled(): boolean {
   if (typeof window !== "undefined") {
     return false
@@ -118,6 +166,11 @@ function createStructuredLogEntry(
     message,
     scope,
     timestamp: new Date().toISOString(),
+  }
+  const deploymentMetadata = resolveDeploymentMetadata()
+
+  if (deploymentMetadata) {
+    Object.assign(entry, deploymentMetadata)
   }
 
   if (!isRecord(details)) {

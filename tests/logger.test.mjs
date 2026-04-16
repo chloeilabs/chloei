@@ -88,8 +88,20 @@ test("logger emits structured json on the server in production", () => {
   const recordedCalls = []
   const originalNodeEnv = process.env.NODE_ENV
   const originalStdoutWrite = process.stdout.write
+  const originalVercelEnv = process.env.VERCEL_ENV
+  const originalVercelTargetEnv = process.env.VERCEL_TARGET_ENV
+  const originalVercelRegion = process.env.VERCEL_REGION
+  const originalVercelDeploymentId = process.env.VERCEL_DEPLOYMENT_ID
+  const originalVercelProjectId = process.env.VERCEL_PROJECT_ID
+  const originalVercelGitCommitSha = process.env.VERCEL_GIT_COMMIT_SHA
 
   process.env.NODE_ENV = "production"
+  process.env.VERCEL_ENV = "preview"
+  process.env.VERCEL_TARGET_ENV = "staging"
+  process.env.VERCEL_REGION = "iad1"
+  process.env.VERCEL_DEPLOYMENT_ID = "dpl_123"
+  process.env.VERCEL_PROJECT_ID = "prj_123"
+  process.env.VERCEL_GIT_COMMIT_SHA = "abc123"
   process.stdout.write = (chunk, encoding, callback) => {
     recordedCalls.push(String(chunk))
 
@@ -114,6 +126,12 @@ test("logger emits structured json on the server in production", () => {
   } finally {
     process.stdout.write = originalStdoutWrite
     process.env.NODE_ENV = originalNodeEnv
+    process.env.VERCEL_ENV = originalVercelEnv
+    process.env.VERCEL_TARGET_ENV = originalVercelTargetEnv
+    process.env.VERCEL_REGION = originalVercelRegion
+    process.env.VERCEL_DEPLOYMENT_ID = originalVercelDeploymentId
+    process.env.VERCEL_PROJECT_ID = originalVercelProjectId
+    process.env.VERCEL_GIT_COMMIT_SHA = originalVercelGitCommitSha
   }
 
   assert.equal(recordedCalls.length, 1)
@@ -129,5 +147,11 @@ test("logger emits structured json on the server in production", () => {
   assert.equal(payload.status, 200)
   assert.equal(payload.durationMs, 42)
   assert.equal(payload.outcome, "success")
+  assert.equal(payload.deploymentEnv, "preview")
+  assert.equal(payload.deploymentTargetEnv, "staging")
+  assert.equal(payload.deploymentRegion, "iad1")
+  assert.equal(payload.deploymentId, "dpl_123")
+  assert.equal(payload.projectId, "prj_123")
+  assert.equal(payload.commitSha, "abc123")
   assert.equal(payload.details.requestId, "request-1")
 })
