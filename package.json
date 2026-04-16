@@ -10,11 +10,9 @@
     "migrate": "pnpm auth:migrate && pnpm threads:migrate",
     "start": "next start",
     "threads:migrate": "node threads-migrate.mjs",
-    "cleanup:connectors:dry-run": "node scripts/remove-connectors.mjs --dry-run",
-    "cleanup:connectors:apply": "node scripts/remove-connectors.mjs --apply",
     "test": "node --test tests/*.test.mjs",
-    "lint": "eslint src tests scripts/remove-connectors.mjs auth.ts threads-migrate.mjs eslint.config.js next.config.mjs postcss.config.mjs --max-warnings=0",
-    "lint:fix": "eslint src tests scripts/remove-connectors.mjs auth.ts threads-migrate.mjs eslint.config.js next.config.mjs postcss.config.mjs --fix --max-warnings=0",
+    "lint": "eslint src tests auth.ts threads-migrate.mjs eslint.config.js next.config.mjs postcss.config.mjs --max-warnings=0",
+    "lint:fix": "eslint src tests auth.ts threads-migrate.mjs eslint.config.js next.config.mjs postcss.config.mjs --fix --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "next typegen && tsc --noEmit"

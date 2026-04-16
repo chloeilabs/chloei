@@ -34,8 +34,6 @@ To enable auth locally, provision PostgreSQL and add:
 - `pnpm migrate`: run both Better Auth and thread-storage migrations
 - `pnpm auth:migrate`: apply Better Auth schema changes to PostgreSQL
 - `pnpm threads:migrate`: apply thread storage schema changes to PostgreSQL
-- `pnpm cleanup:connectors:dry-run`: report legacy authenticated-connector cleanup counts
-- `pnpm cleanup:connectors:apply`: delete legacy authenticated-connector data and rewrite config-only threads
 - `pnpm build`: build the production app
 - `pnpm start`: run the production server
 - `pnpm test`: run regression tests
@@ -74,7 +72,6 @@ By default, Chloei enforces safe built-in agent limits even if you leave all opt
 - `src/app/api/models/route.ts`: available-models endpoint
 - `src/components/agent`: chat UI, prompt form, markdown rendering, and session state
 - `src/lib/server`: Better Auth config, PostgreSQL setup, runtime config, rate limiting, and model streaming
-- `scripts/remove-connectors.mjs`: one-off legacy connector cleanup script
 
 ## Notes
 
