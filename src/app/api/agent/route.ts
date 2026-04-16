@@ -30,6 +30,10 @@ import {
   evaluateAndConsumeSlidingWindowRateLimit,
   tryAcquireConcurrencySlot,
 } from "@/lib/server/rate-limit"
+import {
+  createRouteObservation,
+  observeRouteResponse,
+} from "@/lib/server/route-observability"
 import { isThreadStoreNotInitializedError } from "@/lib/server/threads"
 
 export const runtime = "nodejs"
@@ -41,10 +45,23 @@ function resolveRateLimitIdentifier(userId: string): string {
 export async function POST(request: NextRequest) {
   const requestId = resolveRequestId(request)
   const logger = createLogger(`agent:${requestId}`)
+  const observation = createRouteObservation({
+    logger,
+    method: "POST",
+    requestId,
+    route: "/api/agent",
+  })
 
   try {
     if (!isAuthConfigured()) {
-      return createAuthUnavailableResponse({ "X-Request-Id": requestId })
+      return observeRouteResponse(
+        observation,
+        createAuthUnavailableResponse({ "X-Request-Id": requestId }),
+        {
+          errorCode: "AUTH_UNAVAILABLE",
+          outcome: "auth_unavailable",
+        }
+      )
     }
 
     const openRouterApiKey = process.env.OPENROUTER_API_KEY
@@ -53,12 +70,19 @@ export async function POST(request: NextRequest) {
     const session = await getRequestSession(request.headers)
 
     if (!session) {
-      return createJsonErrorResponse({
-        requestId,
-        error: "Unauthorized.",
-        errorCode: "AGENT_UNAUTHORIZED",
-        status: 401,
-      })
+      return observeRouteResponse(
+        observation,
+        createJsonErrorResponse({
+          requestId,
+          error: "Unauthorized.",
+          errorCode: "AGENT_UNAUTHORIZED",
+          status: 401,
+        }),
+        {
+          errorCode: "AGENT_UNAUTHORIZED",
+          outcome: "unauthorized",
+        }
+      )
     }
 
     const clientIdentifier = resolveRateLimitIdentifier(session.user.id)
@@ -71,27 +95,41 @@ export async function POST(request: NextRequest) {
       : null
 
     if (rateLimitDecision && !rateLimitDecision.allowed) {
-      return createJsonErrorResponse({
-        requestId,
-        error: "Too many requests. Please retry shortly.",
-        errorCode: "AGENT_RATE_LIMITED",
-        status: 429,
-        retryAfterSeconds: rateLimitDecision.retryAfterSeconds,
-        rateLimitDecision,
-      })
+      return observeRouteResponse(
+        observation,
+        createJsonErrorResponse({
+          requestId,
+          error: "Too many requests. Please retry shortly.",
+          errorCode: "AGENT_RATE_LIMITED",
+          status: 429,
+          retryAfterSeconds: rateLimitDecision.retryAfterSeconds,
+          rateLimitDecision,
+        }),
+        {
+          errorCode: "AGENT_RATE_LIMITED",
+          outcome: "rate_limited",
+        }
+      )
     }
 
     let body: unknown
     try {
       body = await request.json()
     } catch {
-      return createJsonErrorResponse({
-        requestId,
-        error: "Invalid JSON payload.",
-        errorCode: "AGENT_INVALID_JSON",
-        status: 400,
-        rateLimitDecision: rateLimitDecision ?? undefined,
-      })
+      return observeRouteResponse(
+        observation,
+        createJsonErrorResponse({
+          requestId,
+          error: "Invalid JSON payload.",
+          errorCode: "AGENT_INVALID_JSON",
+          status: 400,
+          rateLimitDecision: rateLimitDecision ?? undefined,
+        }),
+        {
+          errorCode: "AGENT_INVALID_JSON",
+          outcome: "invalid_request",
+        }
+      )
     }
 
     const parsedRequestResult = parseAgentStreamRequest({
@@ -101,7 +139,10 @@ export async function POST(request: NextRequest) {
       rateLimitDecision: rateLimitDecision ?? undefined,
     })
     if (parsedRequestResult instanceof Response) {
-      return parsedRequestResult
+      return observeRouteResponse(observation, parsedRequestResult, {
+        errorCode: parsedRequestResult.headers.get("X-Error-Code") ?? undefined,
+        outcome: "invalid_request",
+      })
     }
     const { parsedRequest, selectedModel } = parsedRequestResult
 
@@ -128,13 +169,20 @@ export async function POST(request: NextRequest) {
         errorCode: "AGENT_OPENROUTER_API_KEY_MISSING",
         requestId,
       })
-      return createJsonErrorResponse({
-        requestId,
-        error: "Missing OPENROUTER_API_KEY on the server.",
-        errorCode: "AGENT_OPENROUTER_API_KEY_MISSING",
-        status: 500,
-        rateLimitDecision: rateLimitDecision ?? undefined,
-      })
+      return observeRouteResponse(
+        observation,
+        createJsonErrorResponse({
+          requestId,
+          error: "Missing OPENROUTER_API_KEY on the server.",
+          errorCode: "AGENT_OPENROUTER_API_KEY_MISSING",
+          status: 500,
+          rateLimitDecision: rateLimitDecision ?? undefined,
+        }),
+        {
+          errorCode: "AGENT_OPENROUTER_API_KEY_MISSING",
+          outcome: "error",
+        }
+      )
     }
 
     const concurrencySlot = AGENT_RATE_LIMIT_ENABLED
@@ -146,29 +194,42 @@ export async function POST(request: NextRequest) {
       : null
 
     if (concurrencySlot && !concurrencySlot.allowed) {
-      return createJsonErrorResponse({
-        requestId,
-        error: "Too many concurrent requests. Please retry shortly.",
-        errorCode: "AGENT_CONCURRENCY_LIMITED",
-        status: 429,
-        retryAfterSeconds: concurrencySlot.retryAfterSeconds,
-        rateLimitDecision: rateLimitDecision ?? undefined,
-      })
+      return observeRouteResponse(
+        observation,
+        createJsonErrorResponse({
+          requestId,
+          error: "Too many concurrent requests. Please retry shortly.",
+          errorCode: "AGENT_CONCURRENCY_LIMITED",
+          status: 429,
+          retryAfterSeconds: concurrencySlot.retryAfterSeconds,
+          rateLimitDecision: rateLimitDecision ?? undefined,
+        }),
+        {
+          errorCode: "AGENT_CONCURRENCY_LIMITED",
+          outcome: "rate_limited",
+        }
+      )
     }
 
-    return createAgentStreamResponse({
-      request,
-      requestId,
-      rateLimitDecision: rateLimitDecision ?? undefined,
-      timeoutMs: AGENT_STREAM_TIMEOUT_MS,
-      selectedModel,
-      openRouterApiKey,
-      tavilyApiKey,
-      fmpApiKey,
-      messages: parsedRequest.messages,
-      systemInstruction,
-      onStreamSettled: concurrencySlot?.release,
-    })
+    return observeRouteResponse(
+      observation,
+      createAgentStreamResponse({
+        request,
+        requestId,
+        rateLimitDecision: rateLimitDecision ?? undefined,
+        timeoutMs: AGENT_STREAM_TIMEOUT_MS,
+        selectedModel,
+        openRouterApiKey,
+        tavilyApiKey,
+        fmpApiKey,
+        messages: parsedRequest.messages,
+        systemInstruction,
+        onStreamSettled: concurrencySlot?.release,
+      }),
+      {
+        outcome: "stream_started",
+      }
+    )
   } catch (error) {
     if (isThreadStoreNotInitializedError(error)) {
       logger.error("Thread store is not initialized.", {
@@ -176,12 +237,19 @@ export async function POST(request: NextRequest) {
         errorCode: "THREAD_STORE_NOT_INITIALIZED",
         requestId,
       })
-      return createJsonErrorResponse({
-        requestId,
-        error: error.message,
-        errorCode: "THREAD_STORE_NOT_INITIALIZED",
-        status: 500,
-      })
+      return observeRouteResponse(
+        observation,
+        createJsonErrorResponse({
+          requestId,
+          error: error.message,
+          errorCode: "THREAD_STORE_NOT_INITIALIZED",
+          status: 500,
+        }),
+        {
+          errorCode: "THREAD_STORE_NOT_INITIALIZED",
+          outcome: "error",
+        }
+      )
     }
 
     logger.error("Agent request failed.", {
@@ -189,11 +257,18 @@ export async function POST(request: NextRequest) {
       errorCode: "AGENT_REQUEST_FAILED",
       requestId,
     })
-    return createJsonErrorResponse({
-      requestId,
-      error: "Failed to generate agent response.",
-      errorCode: "AGENT_REQUEST_FAILED",
-      status: 500,
-    })
+    return observeRouteResponse(
+      observation,
+      createJsonErrorResponse({
+        requestId,
+        error: "Failed to generate agent response.",
+        errorCode: "AGENT_REQUEST_FAILED",
+        status: 500,
+      }),
+      {
+        errorCode: "AGENT_REQUEST_FAILED",
+        outcome: "error",
+      }
+    )
   }
 }

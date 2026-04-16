@@ -277,6 +277,7 @@ export function createAgentStreamResponse(
 ): Response {
   const logger = createLogger(`agent:${params.requestId}`)
   const streamSignal = createTimeoutAbortSignal(params.request, params.timeoutMs)
+  const startedAt = Date.now()
   let streamSettled = false
   const settleStream = () => {
     if (streamSettled) {
@@ -297,6 +298,7 @@ export function createAgentStreamResponse(
         hasStructuredOutput: false,
         sawTerminalAgentStatus: false,
       }
+      let streamOutcome = "completed"
 
       const closeController = () => {
         if (streamClosed) {
@@ -382,6 +384,7 @@ export function createAgentStreamResponse(
         enqueueEvent({ type: "agent_status", status: "failed" })
 
         if (isAbortError(streamError)) {
+          streamOutcome = clientAborted ? "client_aborted" : "timeout"
           if (!clientAborted) {
             logger.warn(
               `Agent stream aborted after ${String(params.timeoutMs)}ms timeout.`,
@@ -402,6 +405,7 @@ export function createAgentStreamResponse(
           isProviderAuthenticationError(streamError) &&
           !streamState.hasMeaningfulText
         ) {
+          streamOutcome = "provider_auth_failed"
           logger.error("OpenRouter authentication failed.", {
             error: streamError,
             errorCode: "AGENT_PROVIDER_AUTH_FAILED",
@@ -413,18 +417,29 @@ export function createAgentStreamResponse(
             textDeltaEvent("Invalid OPENROUTER_API_KEY on the server.")
           )
         } else if (!streamState.hasMeaningfulText) {
+          streamOutcome = "failed"
           logger.error("Agent stream failed.", streamFailureDetails)
           streamState.hasTextChunk = true
           streamState.hasMeaningfulText = true
           enqueueEvent(textDeltaEvent(STREAM_ERROR_FALLBACK_TEXT))
         } else if (!streamState.hasTextChunk) {
+          streamOutcome = "failed"
           logger.error("Agent stream failed.", streamFailureDetails)
           streamState.hasTextChunk = true
           enqueueEvent(textDeltaEvent(ASSISTANT_EMPTY_RESPONSE_FALLBACK))
         } else {
+          streamOutcome = "failed"
           logger.error("Agent stream failed.", streamFailureDetails)
         }
       } finally {
+        logger.info("Agent stream settled.", {
+          requestId: params.requestId,
+          model: params.selectedModel,
+          durationMs: Date.now() - startedAt,
+          outcome: streamOutcome,
+          hadMeaningfulText: streamState.hasMeaningfulText,
+          hadStructuredOutput: streamState.hasStructuredOutput,
+        })
         settleStream()
         closeController()
       }

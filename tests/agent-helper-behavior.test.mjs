@@ -62,6 +62,7 @@ beforeEach(() => {
   recorded = {
     streamParams: [],
     augmentedInstructions: [],
+    loggerInfos: [],
     loggerErrors: [],
     loggerWarnings: [],
     settledCount: 0,
@@ -72,6 +73,9 @@ beforeEach(() => {
     logger: {
       createLogger(scope) {
         return {
+          info(message, details) {
+            recorded.loggerInfos.push({ scope, message, details })
+          },
           warn(message, error) {
             recorded.loggerWarnings.push({ scope, message, error })
           },

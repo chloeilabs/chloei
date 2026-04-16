@@ -90,6 +90,7 @@ beforeEach(() => {
   recorded = {
     authUnavailableHeaders: [],
     jsonErrors: [],
+    loggerInfos: [],
     loggerErrors: [],
     buildInstructionCalls: [],
     streamCalls: [],
@@ -176,6 +177,9 @@ beforeEach(() => {
     logger: {
       createLogger(scope) {
         return {
+          info(message, details) {
+            recorded.loggerInfos.push({ scope, message, details })
+          },
           warn() {},
           error(message, error) {
             recorded.loggerErrors.push({ scope, message, error })

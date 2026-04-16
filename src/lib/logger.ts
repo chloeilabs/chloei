@@ -1,4 +1,20 @@
-type LogLevel = "warn" | "error"
+type LogLevel = "info" | "warn" | "error"
+
+interface StructuredLogEntry {
+  details?: unknown
+  durationMs?: number
+  errorCode?: string
+  level: LogLevel
+  message: string
+  method?: string
+  model?: string
+  outcome?: string
+  requestId?: string
+  route?: string
+  scope: string
+  status?: number
+  timestamp: string
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -78,14 +94,152 @@ function normalizeLogDetails(details: unknown): unknown {
   return { value: details }
 }
 
+function isServerProductionLoggerEnabled(): boolean {
+  if (typeof window !== "undefined") {
+    return false
+  }
+
+  const logFormat = process.env.LOG_FORMAT?.trim().toLowerCase()
+  if (logFormat === "json") {
+    return true
+  }
+
+  return process.env.NODE_ENV === "production"
+}
+
+function createStructuredLogEntry(
+  level: LogLevel,
+  scope: string,
+  message: string,
+  details?: unknown
+): StructuredLogEntry {
+  const entry: StructuredLogEntry = {
+    level,
+    message,
+    scope,
+    timestamp: new Date().toISOString(),
+  }
+
+  if (!isRecord(details)) {
+    if (details !== undefined) {
+      entry.details = details
+    }
+
+    return entry
+  }
+
+  if (typeof details.requestId === "string") {
+    entry.requestId = details.requestId
+  }
+
+  if (typeof details.errorCode === "string") {
+    entry.errorCode = details.errorCode
+  }
+
+  if (typeof details.durationMs === "number") {
+    entry.durationMs = details.durationMs
+  }
+
+  if (typeof details.method === "string") {
+    entry.method = details.method
+  }
+
+  if (typeof details.model === "string") {
+    entry.model = details.model
+  }
+
+  if (typeof details.outcome === "string") {
+    entry.outcome = details.outcome
+  }
+
+  if (typeof details.route === "string") {
+    entry.route = details.route
+  }
+
+  if (typeof details.status === "number") {
+    entry.status = details.status
+  }
+
+  entry.details = details
+  return entry
+}
+
+function serializeLogLine(payload: unknown): string {
+  try {
+    return JSON.stringify(payload)
+  } catch {
+    return JSON.stringify({
+      message: "Failed to serialize log payload.",
+    })
+  }
+}
+
+function writeInfoLine(payload: string) {
+  if (typeof window !== "undefined") {
+    window.console.info(payload)
+    return
+  }
+
+  if (typeof process !== "undefined" && typeof process.stdout.write === "function") {
+    process.stdout.write(`${payload}\n`)
+    return
+  }
+
+  console.warn(payload)
+}
+
+function emitStructuredLog(
+  level: LogLevel,
+  scope: string,
+  message: string,
+  details?: unknown
+) {
+  const entry = createStructuredLogEntry(level, scope, message, details)
+  const serializedEntry = serializeLogLine(entry)
+
+  if (level === "info") {
+    writeInfoLine(serializedEntry)
+    return
+  }
+
+  if (level === "warn") {
+    console.warn(serializedEntry)
+    return
+  }
+
+  console.error(serializedEntry)
+}
+
 function emitLog(
   level: LogLevel,
   scope: string,
   message: string,
   details?: unknown
 ) {
-  const formattedMessage = `[${scope}] ${message}`
   const normalizedDetails = normalizeLogDetails(details)
+
+  if (isServerProductionLoggerEnabled()) {
+    try {
+      emitStructuredLog(level, scope, message, normalizedDetails)
+      return
+    } catch {
+      // Fall back to the human-readable console format if serialization fails.
+    }
+  }
+
+  const formattedMessage = `[${scope}] ${message}`
+
+  if (level === "info") {
+    if (normalizedDetails === undefined) {
+      writeInfoLine(formattedMessage)
+      return
+    }
+
+    writeInfoLine(
+      `${formattedMessage} ${serializeLogLine(normalizedDetails)}`
+    )
+    return
+  }
 
   if (level === "warn") {
     if (normalizedDetails === undefined) {
@@ -107,6 +261,9 @@ function emitLog(
 
 export function createLogger(scope: string) {
   return {
+    info(message: string, details?: unknown) {
+      emitLog("info", scope, message, details)
+    },
     warn(message: string, details?: unknown) {
       emitLog("warn", scope, message, details)
     },

@@ -83,3 +83,51 @@ test("logger preserves request metadata from thrown http errors", () => {
   assert.equal(details.error.errorCode, "THREADS_FETCH_FAILED")
   assert.equal(details.error.requestId, "request-1")
 })
+
+test("logger emits structured json on the server in production", () => {
+  const recordedCalls = []
+  const originalNodeEnv = process.env.NODE_ENV
+  const originalStdoutWrite = process.stdout.write
+
+  process.env.NODE_ENV = "production"
+  process.stdout.write = (chunk, encoding, callback) => {
+    recordedCalls.push(String(chunk))
+
+    if (typeof encoding === "function") {
+      encoding()
+    } else if (typeof callback === "function") {
+      callback()
+    }
+
+    return true
+  }
+
+  try {
+    createLogger("api").info("API request completed.", {
+      requestId: "request-1",
+      route: "/api/models",
+      method: "GET",
+      status: 200,
+      durationMs: 42,
+      outcome: "success",
+    })
+  } finally {
+    process.stdout.write = originalStdoutWrite
+    process.env.NODE_ENV = originalNodeEnv
+  }
+
+  assert.equal(recordedCalls.length, 1)
+
+  const payload = JSON.parse(recordedCalls[0])
+
+  assert.equal(payload.level, "info")
+  assert.equal(payload.scope, "api")
+  assert.equal(payload.message, "API request completed.")
+  assert.equal(payload.requestId, "request-1")
+  assert.equal(payload.route, "/api/models")
+  assert.equal(payload.method, "GET")
+  assert.equal(payload.status, 200)
+  assert.equal(payload.durationMs, 42)
+  assert.equal(payload.outcome, "success")
+  assert.equal(payload.details.requestId, "request-1")
+})

@@ -65,6 +65,7 @@ beforeEach(() => {
     logger: {
       createLogger(scope) {
         return {
+          info() {},
           warn() {},
           error(message, error) {
             recorded.loggerErrors.push({ scope, message, error })
