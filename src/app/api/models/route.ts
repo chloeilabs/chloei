@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 
 import { getModels } from "@/lib/actions/api-keys"
 import { createLogger } from "@/lib/logger"
+import { resolveRequestIdFromHeaders } from "@/lib/request-id"
 import { createApiErrorResponse, createApiHeaders } from "@/lib/server/api-response"
 import {
   createAuthUnavailableResponse,
@@ -12,7 +13,7 @@ import { getRequestSession } from "@/lib/server/auth-session"
 export const runtime = "nodejs"
 
 export async function GET(request: NextRequest) {
-  const requestId = crypto.randomUUID()
+  const requestId = resolveRequestIdFromHeaders(request.headers)
   const logger = createLogger(`models:${requestId}`)
   const headers = createApiHeaders({ requestId })
 

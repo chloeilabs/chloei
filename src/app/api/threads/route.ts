@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { z, ZodError } from "zod"
 
 import { createLogger } from "@/lib/logger"
+import { resolveRequestIdFromHeaders } from "@/lib/request-id"
 import { createApiErrorResponse, createApiHeaders } from "@/lib/server/api-response"
 import {
   createAuthUnavailableResponse,
@@ -62,7 +63,7 @@ async function requireSession(request: NextRequest, requestId: string) {
 }
 
 export async function GET(request: NextRequest) {
-  const requestId = crypto.randomUUID()
+  const requestId = resolveRequestIdFromHeaders(request.headers)
   const logger = createLogger(`threads:${requestId}`)
 
   try {
@@ -107,7 +108,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const requestId = crypto.randomUUID()
+  const requestId = resolveRequestIdFromHeaders(request.headers)
   const logger = createLogger(`threads:${requestId}`)
 
   try {
@@ -163,7 +164,7 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const requestId = crypto.randomUUID()
+  const requestId = resolveRequestIdFromHeaders(request.headers)
   const logger = createLogger(`threads:${requestId}`)
 
   try {

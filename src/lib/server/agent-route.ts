@@ -4,6 +4,7 @@ import { z } from "zod"
 import { asRecord, asString, isAbortError } from "@/lib/cast"
 import { ASSISTANT_EMPTY_RESPONSE_FALLBACK } from "@/lib/constants"
 import { createLogger } from "@/lib/logger"
+import { resolveRequestIdFromHeaders } from "@/lib/request-id"
 import {
   type AgentStreamEvent,
   ALL_MODELS,
@@ -104,12 +105,7 @@ export function resolveUserTimeZone(request: NextRequest): string | undefined {
 }
 
 export function resolveRequestId(request: NextRequest): string {
-  const incomingRequestId = request.headers.get("x-request-id")?.trim()
-  if (incomingRequestId) {
-    return incomingRequestId
-  }
-
-  return crypto.randomUUID()
+  return resolveRequestIdFromHeaders(request.headers)
 }
 
 function createTimeoutAbortSignal(

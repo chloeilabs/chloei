@@ -11,7 +11,12 @@ import {
 } from "react"
 import { toast } from "sonner"
 
+import {
+  createHttpErrorFromResponse,
+  formatHttpErrorDescription,
+} from "@/lib/http-error"
 import { createLogger } from "@/lib/logger"
+import { createRequestHeaders } from "@/lib/request-id"
 import {
   normalizeThread,
   sortThreadsNewestFirst,
@@ -75,24 +80,6 @@ function mergeThreads(existingThreads: Thread[], incomingThreads: Thread[]) {
   return sortThreadsNewestFirst(Array.from(merged.values()))
 }
 
-function getErrorMessage(response: Response, fallbackMessage: string) {
-  return response
-    .json()
-    .then((payload: unknown) => {
-      if (
-        typeof payload === "object" &&
-        payload !== null &&
-        "error" in payload &&
-        typeof payload.error === "string"
-      ) {
-        return payload.error
-      }
-
-      return fallbackMessage
-    })
-    .catch(() => fallbackMessage)
-}
-
 export function ThreadsProvider({
   children,
   initialThreads = [],
@@ -130,19 +117,17 @@ export function ThreadsProvider({
     try {
       const response = await fetch("/api/threads", {
         method: "PUT",
-        headers: {
+        headers: createRequestHeaders({
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify(thread),
         signal: controller.signal,
       })
 
       if (!response.ok) {
-        throw new Error(
-          await getErrorMessage(
-            response,
-            "Failed to save conversation history."
-          )
+        throw await createHttpErrorFromResponse(
+          response,
+          "Failed to save conversation history."
         )
       }
 
@@ -179,11 +164,18 @@ export function ThreadsProvider({
         return
       }
 
-      logger.error("Failed to sync thread.", error)
+      logger.error("Failed to sync thread.", {
+        error,
+        threadId: thread.id,
+      })
       pendingSyncsRef.current.set(thread.id, thread)
       toast.error(
         "Failed to sync conversation history. Recent changes may not appear on other devices yet.",
         {
+          description: formatHttpErrorDescription(
+            error,
+            "Failed to save conversation history."
+          ),
           id: THREAD_SYNC_ERROR_TOAST_ID,
         }
       )
@@ -259,7 +251,12 @@ export function ThreadsProvider({
       }
 
       if (!isAbortError(result.reason)) {
-        logger.error("Failed to sync thread.", result.reason)
+        const syncError: unknown = result.reason
+
+        logger.error("Failed to sync thread.", {
+          error: syncError,
+          threadId: thread.id,
+        })
         pendingSyncsRef.current.set(thread.id, thread)
         failedThreads.push(thread)
       }
@@ -363,18 +360,16 @@ export function ThreadsProvider({
         try {
           const response = await fetch("/api/threads", {
             method: "DELETE",
-            headers: {
+            headers: createRequestHeaders({
               "Content-Type": "application/json",
-            },
+            }),
             body: JSON.stringify({ id }),
           })
 
           if (!response.ok) {
-            throw new Error(
-              await getErrorMessage(
-                response,
-                "Failed to delete conversation history."
-              )
+            throw await createHttpErrorFromResponse(
+              response,
+              "Failed to delete conversation history."
             )
           }
 
@@ -384,13 +379,20 @@ export function ThreadsProvider({
             return
           }
 
-          logger.error("Failed to delete thread.", error)
+          logger.error("Failed to delete thread.", {
+            error,
+            threadId: id,
+          })
 
           if (deletedThread) {
             setThreads((prev) => mergeThreads(prev, [deletedThread]))
           }
 
           toast.error("Failed to delete conversation history.", {
+            description: formatHttpErrorDescription(
+              error,
+              "Failed to delete conversation history."
+            ),
             id: THREAD_DELETE_ERROR_TOAST_ID,
           })
         }

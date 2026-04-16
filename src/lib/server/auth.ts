@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth"
 import { nextCookies } from "better-auth/next-js"
 
+import { resolveRequestIdFromHeaders } from "../request-id"
 import { createApiErrorResponse } from "./api-response"
 import { DATABASE_URL_ENV_NAME, getAuthDatabase } from "./postgres"
 
@@ -58,8 +59,7 @@ export function createAuthUnavailableResponse(headers?: HeadersInit): Response {
     mergedHeaders.set(key, value)
   }
 
-  const requestId =
-    mergedHeaders.get("X-Request-Id")?.trim() ?? crypto.randomUUID()
+  const requestId = resolveRequestIdFromHeaders(mergedHeaders)
 
   return createApiErrorResponse({
     requestId,

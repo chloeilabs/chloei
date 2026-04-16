@@ -1,9 +1,12 @@
 import { useQuery } from "@tanstack/react-query"
 
 import { redirectToSignIn } from "@/lib/auth-client"
+import {
+  createHttpErrorFromResponse,
+  type HttpError,
+} from "@/lib/http-error"
+import { createRequestHeaders } from "@/lib/request-id"
 import { type ModelInfo } from "@/lib/shared"
-
-type HttpError = Error & { status?: number }
 
 function isModelInfo(value: unknown): value is ModelInfo {
   if (typeof value !== "object" || value === null) {
@@ -18,27 +21,23 @@ function isModelInfoArray(value: unknown): value is ModelInfo[] {
   return Array.isArray(value) && value.every(isModelInfo)
 }
 
-function createHttpError(status: number, message: string): HttpError {
-  const error = new Error(message) as HttpError
-  error.status = status
-  return error
-}
-
 export function useModels() {
   return useQuery({
     queryKey: ["models"],
     queryFn: async (): Promise<ModelInfo[]> => {
-      const response = await fetch("/api/models")
+      const response = await fetch("/api/models", {
+        headers: createRequestHeaders(),
+      })
 
       if (response.status === 401) {
         redirectToSignIn()
-        throw createHttpError(401, "Unauthorized.")
+        throw await createHttpErrorFromResponse(response, "Unauthorized.")
       }
 
       if (!response.ok) {
-        throw createHttpError(
-          response.status,
-          `HTTP error! status: ${String(response.status)}`
+        throw await createHttpErrorFromResponse(
+          response,
+          "Failed to fetch models."
         )
       }
 

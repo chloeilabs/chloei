@@ -1,4 +1,5 @@
 import { asRecord, asString } from "@/lib/cast"
+import { parseHttpErrorResponse } from "@/lib/http-error"
 import {
   AGENT_RUN_STATUSES,
   type AgentRunStatus,
@@ -186,22 +187,7 @@ export function parseStreamEventLine(line: string): AgentStreamEvent | null {
 export async function getResponseErrorMessage(
   response: Response
 ): Promise<string> {
-  const bodyText = await response.text().catch(() => "")
-  if (!bodyText) {
-    return `Request failed (${String(response.status)})`
-  }
-
-  try {
-    const record = asRecord(JSON.parse(bodyText))
-    const error = asString(record?.error)
-    if (error) {
-      return error
-    }
-  } catch {
-    // Ignore malformed JSON and fall back to raw text.
-  }
-
-  return bodyText
+  return (await parseHttpErrorResponse(response)).message
 }
 
 export async function readResponseStreamLines(

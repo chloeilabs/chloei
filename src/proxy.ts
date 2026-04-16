@@ -6,6 +6,7 @@ import {
   sanitizeAuthRedirectPath,
 } from "@/lib/auth-redirect"
 import { createLogger } from "@/lib/logger"
+import { resolveRequestIdFromHeaders } from "@/lib/request-id"
 import { createApiErrorResponse } from "@/lib/server/api-response"
 import {
   AUTH_UNAVAILABLE_ERROR_CODE,
@@ -39,8 +40,7 @@ function createAuthUnavailableApiResponse(requestId: string) {
 }
 
 export async function proxy(request: NextRequest) {
-  const requestId =
-    request.headers.get("x-request-id")?.trim() ?? crypto.randomUUID()
+  const requestId = resolveRequestIdFromHeaders(request.headers)
   const logger = createLogger(`proxy:${requestId}`)
   const { pathname } = request.nextUrl
 

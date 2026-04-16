@@ -4,6 +4,13 @@ import { toast } from "sonner"
 import { redirectToSignIn } from "@/lib/auth-client"
 import { isAbortError } from "@/lib/cast"
 import {
+  createHttpError,
+  createHttpErrorFromResponse,
+  formatHttpErrorDescription,
+  getHttpErrorMessage,
+} from "@/lib/http-error"
+import { createRequestHeaders, getRequestIdFromHeaders } from "@/lib/request-id"
+import {
   deriveThreadTitle,
   type Message as AgentMessage,
   type ModelType,
@@ -68,10 +75,10 @@ function getClientTimeZone(): string | undefined {
 function createAgentRequestHeaders(): HeadersInit {
   const timeZone = getClientTimeZone()
 
-  return {
+  return createRequestHeaders({
     "Content-Type": "application/json",
     ...(timeZone ? { "X-User-Timezone": timeZone } : {}),
-  }
+  })
 }
 
 function hasVisibleStructuredOutput(current: AgentStreamAccumulator): boolean {
@@ -347,8 +354,16 @@ export function useAgentSession() {
           return true
         }
 
-        if (!response.ok || !response.body) {
-          throw new Error(await getResponseErrorMessage(response))
+        if (!response.ok) {
+          throw await createHttpErrorFromResponse(response)
+        }
+
+        if (!response.body) {
+          throw createHttpError({
+            message: await getResponseErrorMessage(response),
+            requestId: getRequestIdFromHeaders(response.headers),
+            status: response.status,
+          })
         }
 
         try {
@@ -414,9 +429,10 @@ export function useAgentSession() {
           return true
         }
 
-        const errorMessage =
-          error instanceof Error ? error.message : "Unknown error occurred"
-        toast.error(params.errorTitle, { description: errorMessage })
+        const errorMessage = getHttpErrorMessage(error)
+        toast.error(params.errorTitle, {
+          description: formatHttpErrorDescription(error),
+        })
 
         const fallback = `Sorry, I hit an error: ${errorMessage}`
         const assistantMessage: AgentMessage = {

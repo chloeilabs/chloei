@@ -27,6 +27,14 @@ function normalizeError(error: unknown): Record<string, unknown> {
       normalizedError.statusCode = error.statusCode
     }
 
+    if ("errorCode" in error && error.errorCode !== undefined) {
+      normalizedError.errorCode = error.errorCode
+    }
+
+    if ("requestId" in error && error.requestId !== undefined) {
+      normalizedError.requestId = error.requestId
+    }
+
     if ("cause" in error && error.cause !== undefined) {
       normalizedError.cause =
         error.cause instanceof Error
