@@ -63,6 +63,7 @@ Violating this boundary causes Next.js build errors because server modules (pg, 
 `/api/agent` returns `Content-Type: application/x-ndjson`. Each line is a JSON-encoded `AgentStreamEvent`. The client reads the stream line-by-line in `readResponseStreamLines` and feeds events through `applyAgentStreamEvent` into an `AgentStreamAccumulator`.
 
 Event types (defined in `src/lib/shared/agent/messages.ts`):
+
 - `text_delta` — incremental assistant text
 - `reasoning_delta` — incremental reasoning text (hidden chain-of-thought); encrypted OpenRouter chunks are filtered
 - `agent_status` — `in_progress` | `completed` | `failed` | `cancelled` | `incomplete`
@@ -73,6 +74,7 @@ Event types (defined in `src/lib/shared/agent/messages.ts`):
 Each event also carries optional `interactionId` and `lastEventId` checkpoint fields.
 
 The client-side accumulator (`agent-stream-state.ts`) builds:
+
 - `content` — full assistant text
 - `reasoning` — full reasoning text
 - `toolInvocations` — list of tool calls and their status
@@ -86,11 +88,13 @@ Messages are stored as a JSONB column on the `thread` table (one row per thread,
 `isThreadStoreNotInitializedError` detects Postgres error codes `42P01`/`42703` and returns a 500 with a clear migration message rather than a generic crash.
 
 **Thread API** (`/api/threads`):
+
 - `GET` — list all threads for authenticated user, sorted newest-first (pinned first)
 - `PUT` — upsert a thread (body: full `Thread` object)
 - `DELETE` — delete a thread by id (body: `{ id }`)
 
 **Thread schema** (from `app-migrate.mjs`):
+
 ```sql
 CREATE TABLE thread (
   "userId" text NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
@@ -122,6 +126,7 @@ An `automation` table is also created by the migration but has no active route h
 After assembly, `withAiSdkInlineCitationInstruction` appends inline citation rules and optionally FMP tool rules when `FMP_API_KEY` is set.
 
 **Task modes** (auto-inferred by `inferPromptTaskMode` from message content patterns):
+
 - `general` — default
 - `coding` — code/function/script/debug patterns
 - `research` — latest/sources/cite/verify/news patterns
@@ -133,14 +138,15 @@ After assembly, `withAiSdkInlineCitationInstruction` appends inline citation rul
 
 Three tool categories, each only active when the respective API key is configured:
 
-| Tool | Key | Description |
-|---|---|---|
-| `tavily_search` | `TAVILY_API_KEY` | Live web search (advanced depth, up to 8 results) |
+| Tool             | Key              | Description                                       |
+| ---------------- | ---------------- | ------------------------------------------------- |
+| `tavily_search`  | `TAVILY_API_KEY` | Live web search (advanced depth, up to 8 results) |
 | `tavily_extract` | `TAVILY_API_KEY` | Extract content from specific URLs (up to 5 URLs) |
-| `code_execution` | always on | Run sandboxed JS or Python for arithmetic/logic |
-| FMP MCP tools | `FMP_API_KEY` | Finance data via Financial Modeling Prep MCP |
+| `code_execution` | always on        | Run sandboxed JS or Python for arithmetic/logic   |
+| FMP MCP tools    | `FMP_API_KEY`    | Finance data via Financial Modeling Prep MCP      |
 
 **Code execution** (`src/lib/server/llm/code-execution-tools.ts`):
+
 - Runs in a temp directory, blocked from network/filesystem/subprocess access
 - JavaScript: runs via Node.js `--input-type=module --eval`
 - Python: runs via `python3 -I -c` (override with `PYTHON3_PATH` env var)
@@ -148,6 +154,7 @@ Three tool categories, each only active when the respective API key is configure
 - Timeout: default 4 s, max 8 s; output capped at 12,000 chars
 
 **FMP MCP tools** (`src/lib/server/llm/ai-sdk-fmp-mcp-tools.ts`):
+
 - Connects to `https://financialmodelingprep.com/mcp` per request
 - Curated subset: `search`, `quote`, `company`, `chart`, `statements`
 - Tool definitions are cached in-memory after first discovery
@@ -167,11 +174,11 @@ Both live in `src/lib/server/rate-limit.ts`. All limits are overridable via `AGE
 
 All available models are defined in `src/lib/shared/llm/models.ts` (`AvailableModels`, `ALL_MODELS`). Current models:
 
-| Key | Model ID | Display Name |
-|---|---|---|
-| `OPENROUTER_QWEN_QWEN3_6_PLUS` | `qwen/qwen3.6-plus` | Qwen3.6 Plus |
-| `OPENROUTER_MINIMAX_M2_7` | `minimax/minimax-m2.7` | MiniMax M2.7 |
-| `OPENROUTER_Z_AI_GLM_5_1` | `z-ai/glm-5.1` | GLM 5.1 |
+| Key                            | Model ID               | Display Name |
+| ------------------------------ | ---------------------- | ------------ |
+| `OPENROUTER_QWEN_QWEN3_6_PLUS` | `qwen/qwen3.6-plus`    | Qwen3.6 Plus |
+| `OPENROUTER_MINIMAX_M2_7`      | `minimax/minimax-m2.7` | MiniMax M2.7 |
+| `OPENROUTER_Z_AI_GLM_5_1`      | `z-ai/glm-5.1`         | GLM 5.1      |
 
 Adding a model requires updating `AvailableModels`, `ModelInfos`, and `OPENROUTER_MODELS` in that file. The `/api/models` route reads from this registry (filtered by configured API keys via `getModels()` in `src/lib/actions/api-keys.ts`); the agent validates the requested model against it.
 
@@ -180,6 +187,7 @@ Adding a model requires updating `AvailableModels`, `ModelInfos`, and `OPENROUTE
 Better Auth handles sessions. `getRequestSession` (`src/lib/server/auth-session.ts`) reads the session from request headers. Routes check `isAuthConfigured()` first — if `DATABASE_URL` / `BETTER_AUTH_SECRET` are missing, the app returns a 503 rather than crashing.
 
 **Middleware** (`src/proxy.ts`, exported as Next.js middleware):
+
 - Passes `/api/auth/*` through unconditionally
 - When auth is not configured: allows auth pages, returns 503 on API routes, redirects elsewhere to `/sign-in`
 - When authenticated: redirects auth pages to home (or `redirect` query param path)
@@ -189,6 +197,7 @@ Better Auth handles sessions. `getRequestSession` (`src/lib/server/auth-session.
 ### Logging
 
 `createLogger(scope)` (`src/lib/logger.ts`) returns `{ info, warn, error }`. In production (`NODE_ENV=production` or `LOG_FORMAT=json`), emits newline-delimited JSON with structured fields:
+
 - Always: `level`, `message`, `scope`, `timestamp`
 - When provided: `requestId`, `errorCode`, `durationMs`, `method`, `model`, `outcome`, `route`, `status`
 - Vercel metadata: `commitSha`, `deploymentEnv`, `deploymentId`, `deploymentRegion`, `deploymentTargetEnv`, `projectId`
@@ -310,26 +319,26 @@ OPENROUTER_API_KEY=
 
 All other variables are optional — the code has safe defaults. See `.env.example` for the full list with inline documentation.
 
-| Variable | Purpose |
-|---|---|
-| `AUTH_DATABASE_URL` | Separate DB for Better Auth (falls back to `DATABASE_URL`) |
-| `TAVILY_API_KEY` | Enables Tavily web search + extract tools |
-| `FMP_API_KEY` | Enables Financial Modeling Prep MCP finance tools |
-| `OPENAI_API_KEY` | Enables OpenAI judge for prompt evals |
-| `OPENAI_EVAL_JUDGE_MODEL` | Judge model override (default: `gpt-5.4`) |
-| `PYTHON3_PATH` | Override `python3` binary for code execution |
-| `AGENT_MAX_MESSAGES` | Max messages per request (default: 50) |
-| `AGENT_MAX_MESSAGE_CHARS` | Max chars per message (default: 12,000) |
-| `AGENT_MAX_TOTAL_CHARS` | Max total conversation chars (default: 48,000) |
-| `AGENT_STREAM_TIMEOUT_MS` | Stream timeout (default: 300,000 ms) |
-| `AGENT_TOOL_MAX_STEPS` | Max tool use steps per run (default: 12) |
-| `AGENT_RATE_LIMIT_ENABLED` | Enable/disable rate limiting (default: true) |
-| `AGENT_RATE_LIMIT_WINDOW_MS` | Rate limit window (default: 60,000 ms) |
-| `AGENT_RATE_LIMIT_MAX_REQUESTS` | Max requests per window (default: 60) |
-| `AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT` | Concurrency limit (default: 4) |
-| `AGENT_CONTEXT_DIR` | Absolute path to agent context dir (default: `./agent-context`) |
-| `LOG_FORMAT` | Set to `json` to force structured JSON logs |
-| `BETTER_AUTH_COOKIE_DOMAIN` | Shared cookie domain for cross-subdomain auth |
-| `BETTER_AUTH_TRUSTED_ORIGINS` | Comma-separated list of additional trusted origins |
+| Variable                                   | Purpose                                                         |
+| ------------------------------------------ | --------------------------------------------------------------- |
+| `AUTH_DATABASE_URL`                        | Separate DB for Better Auth (falls back to `DATABASE_URL`)      |
+| `TAVILY_API_KEY`                           | Enables Tavily web search + extract tools                       |
+| `FMP_API_KEY`                              | Enables Financial Modeling Prep MCP finance tools               |
+| `OPENAI_API_KEY`                           | Enables OpenAI judge for prompt evals                           |
+| `OPENAI_EVAL_JUDGE_MODEL`                  | Judge model override (default: `gpt-5.4`)                       |
+| `PYTHON3_PATH`                             | Override `python3` binary for code execution                    |
+| `AGENT_MAX_MESSAGES`                       | Max messages per request (default: 50)                          |
+| `AGENT_MAX_MESSAGE_CHARS`                  | Max chars per message (default: 12,000)                         |
+| `AGENT_MAX_TOTAL_CHARS`                    | Max total conversation chars (default: 48,000)                  |
+| `AGENT_STREAM_TIMEOUT_MS`                  | Stream timeout (default: 300,000 ms)                            |
+| `AGENT_TOOL_MAX_STEPS`                     | Max tool use steps per run (default: 12)                        |
+| `AGENT_RATE_LIMIT_ENABLED`                 | Enable/disable rate limiting (default: true)                    |
+| `AGENT_RATE_LIMIT_WINDOW_MS`               | Rate limit window (default: 60,000 ms)                          |
+| `AGENT_RATE_LIMIT_MAX_REQUESTS`            | Max requests per window (default: 60)                           |
+| `AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT` | Concurrency limit (default: 4)                                  |
+| `AGENT_CONTEXT_DIR`                        | Absolute path to agent context dir (default: `./agent-context`) |
+| `LOG_FORMAT`                               | Set to `json` to force structured JSON logs                     |
+| `BETTER_AUTH_COOKIE_DOMAIN`                | Shared cookie domain for cross-subdomain auth                   |
+| `BETTER_AUTH_TRUSTED_ORIGINS`              | Comma-separated list of additional trusted origins              |
 
 Vercel tip: `vercel env pull .env.local` is the quickest way to hydrate local development from Vercel project settings.
