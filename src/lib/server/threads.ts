@@ -61,9 +61,7 @@ export async function listThreadsForUser(userId: string): Promise<Thread[]> {
   const result = await sql<StoredThreadRow>`
     SELECT
       id,
-      title,
       model,
-      "isPinned",
       messages,
       "createdAt",
       "updatedAt"
@@ -97,9 +95,7 @@ export async function getThreadForUser(
   const result = await sql<StoredThreadRow>`
     SELECT
       id,
-      title,
       model,
-      "isPinned",
       messages,
       "createdAt",
       "updatedAt"
@@ -131,7 +127,7 @@ export async function upsertThreadForUser(
   thread: Thread
 ): Promise<Thread> {
   const database = getDatabase()
-  const { normalizedThread, title } = prepareThreadForPersistence(thread)
+  const normalizedThread = prepareThreadForPersistence(thread)
   const { createdAt, updatedAt } = normalizedThread
 
   try {
@@ -139,9 +135,7 @@ export async function upsertThreadForUser(
       INSERT INTO thread (
         "userId",
         id,
-        title,
         model,
-        "isPinned",
         messages,
         "createdAt",
         "updatedAt"
@@ -149,18 +143,14 @@ export async function upsertThreadForUser(
       VALUES (
         ${userId},
         ${normalizedThread.id},
-        ${title},
         ${normalizedThread.model ?? null},
-        ${normalizedThread.isPinned ?? false},
         CAST(${JSON.stringify(normalizedThread.messages)} AS jsonb),
         ${new Date(createdAt)},
         ${new Date(updatedAt)}
       )
       ON CONFLICT ("userId", id)
       DO UPDATE SET
-        title = EXCLUDED.title,
         model = EXCLUDED.model,
-        "isPinned" = EXCLUDED."isPinned",
         messages = EXCLUDED.messages,
         "createdAt" = LEAST(thread."createdAt", EXCLUDED."createdAt"),
         "updatedAt" = EXCLUDED."updatedAt"
@@ -172,10 +162,8 @@ export async function upsertThreadForUser(
 
   return {
     ...normalizedThread,
-    title,
     createdAt,
     updatedAt,
-    isPinned: normalizedThread.isPinned ?? false,
   }
 }
 

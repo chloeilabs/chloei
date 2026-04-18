@@ -14,8 +14,9 @@ const threadPayloadUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/thread-payload.ts")
 ).href
 
-const { deriveThreadTitle, normalizeThread, sortThreadsNewestFirst } =
-  await import(sharedThreadsUrl)
+const { deriveThreadTitle, sortThreadsNewestFirst } = await import(
+  sharedThreadsUrl
+)
 const { parseStoredThread, parseThreadPayload, prepareThreadForPersistence } =
   await import(
   threadPayloadUrl
@@ -32,57 +33,45 @@ function createMessage(overrides = {}) {
   }
 }
 
-test("thread helpers derive titles, normalize pinned state, and sort predictably", () => {
+test("thread helpers derive titles and sort predictably", () => {
   assert.equal(
     deriveThreadTitle([createMessage({ content: "   Hello from the first prompt   " })]),
     "Hello from the first prompt"
   )
-
-  const normalized = normalizeThread({
-    id: "thread-1",
-    title: "   ",
-    messages: [createMessage({ content: "   Derived title from content   " })],
-    createdAt: "2026-04-15T10:00:00.000Z",
-    updatedAt: "2026-04-15T10:00:00.000Z",
-  })
-
-  assert.equal(normalized.title, "Derived title from content")
-  assert.equal(normalized.isPinned, false)
+  assert.equal(
+    deriveThreadTitle([
+      createMessage({ content: "   Derived title from content   " }),
+    ]),
+    "Derived title from content"
+  )
 
   const sortedIds = sortThreadsNewestFirst([
     {
       id: "b",
-      title: "Older pinned",
       messages: [createMessage()],
-      isPinned: true,
       createdAt: "2026-04-15T08:00:00.000Z",
       updatedAt: "2026-04-15T08:00:00.000Z",
     },
     {
       id: "a",
-      title: "Newest unpinned",
       messages: [createMessage()],
-      isPinned: false,
       createdAt: "2026-04-15T12:00:00.000Z",
       updatedAt: "2026-04-15T12:00:00.000Z",
     },
     {
       id: "c",
-      title: "Newest pinned",
       messages: [createMessage()],
-      isPinned: true,
       createdAt: "2026-04-15T09:00:00.000Z",
       updatedAt: "2026-04-15T09:00:00.000Z",
     },
   ]).map((thread) => thread.id)
 
-  assert.deepEqual(sortedIds, ["c", "b", "a"])
+  assert.deepEqual(sortedIds, ["a", "c", "b"])
 })
 
 test("parseThreadPayload sanitizes invalid metadata and converts legacy activity entries", () => {
   const parsed = parseThreadPayload({
     id: "thread-legacy",
-    title: "   ",
     model: "not-a-model",
     messages: [
       {
@@ -146,9 +135,8 @@ test("parseThreadPayload sanitizes invalid metadata and converts legacy activity
     updatedAt: "2026-04-15T11:05:00.000Z",
   })
 
-  assert.equal(parsed.title, "Summarize this thread")
+  assert.equal(deriveThreadTitle(parsed.messages), "Summarize this thread")
   assert.equal(parsed.model, undefined)
-  assert.equal(parsed.isPinned, false)
   assert.equal(parsed.messages[0]?.metadata?.selectedModel, undefined)
   assert.equal(parsed.messages[0]?.metadata?.interactionId, undefined)
   assert.equal(parsed.messages[0]?.metadata?.lastEventId, "last-event-1")
@@ -179,12 +167,10 @@ test("parseThreadPayload sanitizes invalid metadata and converts legacy activity
   ])
 })
 
-test("prepareThreadForPersistence aligns createdAt with the first message and trims the persisted title", () => {
-  const { normalizedThread, title } = prepareThreadForPersistence({
+test("prepareThreadForPersistence aligns createdAt with the first message", () => {
+  const normalizedThread = prepareThreadForPersistence({
     id: "thread-persist",
-    title: "   Explicit title that should be trimmed   ",
     model: "qwen/qwen3.6-plus",
-    isPinned: true,
     messages: [
       createMessage({
         createdAt: "2026-04-15T09:59:00.000Z",
@@ -195,16 +181,12 @@ test("prepareThreadForPersistence aligns createdAt with the first message and tr
   })
 
   assert.equal(normalizedThread.createdAt, "2026-04-15T09:59:00.000Z")
-  assert.equal(title, "Explicit title that should be trimmed")
-  assert.equal(normalizedThread.isPinned, true)
 })
 
 test("parseStoredThread normalizes stored rows with Date timestamps", () => {
   const parsed = parseStoredThread({
     id: "stored-thread-1",
-    title: "   ",
     model: null,
-    isPinned: null,
     messages: [
       createMessage({
         content: "  Persisted title from the first message  ",
@@ -215,9 +197,11 @@ test("parseStoredThread normalizes stored rows with Date timestamps", () => {
     updatedAt: new Date("2026-04-15T12:05:00.000Z"),
   })
 
-  assert.equal(parsed.title, "Persisted title from the first message")
+  assert.equal(
+    deriveThreadTitle(parsed.messages),
+    "Persisted title from the first message"
+  )
   assert.equal(parsed.model, undefined)
-  assert.equal(parsed.isPinned, false)
   assert.equal(parsed.createdAt, "2026-04-15T09:00:00.000Z")
   assert.equal(parsed.updatedAt, "2026-04-15T12:05:00.000Z")
 })
@@ -227,9 +211,7 @@ test("parseStoredThread throws when stored row timestamps are invalid", () => {
     () =>
       parseStoredThread({
         id: "stored-thread-2",
-        title: "Bad timestamp",
         model: null,
-        isPinned: false,
         messages: [createMessage()],
         createdAt: "not-a-date",
         updatedAt: "2026-04-15T12:05:00.000Z",

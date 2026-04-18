@@ -44,9 +44,7 @@ function createStoredMessage(overrides = {}) {
 function createStoredRow(overrides = {}) {
   return {
     id: "thread-1",
-    title: "Stored title",
     model: "qwen/qwen3.6-plus",
-    isPinned: false,
     messages: [createStoredMessage()],
     createdAt: "2026-04-15T10:00:00.000Z",
     updatedAt: "2026-04-15T10:05:00.000Z",
@@ -95,9 +93,7 @@ test("listThreadsForUser sorts valid threads and skips invalid rows", async () =
         return {
           rows: [
             createStoredRow({
-              id: "unpinned-newer",
-              title: "Unpinned newer",
-              isPinned: false,
+              id: "newer-thread",
               updatedAt: "2026-04-15T12:05:00.000Z",
             }),
             createStoredRow({
@@ -112,9 +108,7 @@ test("listThreadsForUser sorts valid threads and skips invalid rows", async () =
               ],
             }),
             createStoredRow({
-              id: "pinned-older",
-              title: "Pinned older",
-              isPinned: true,
+              id: "older-thread",
               updatedAt: "2026-04-15T11:00:00.000Z",
             }),
           ],
@@ -127,7 +121,7 @@ test("listThreadsForUser sorts valid threads and skips invalid rows", async () =
 
   assert.deepEqual(
     threads.map((thread) => thread.id),
-    ["pinned-older", "unpinned-newer"]
+    ["newer-thread", "older-thread"]
   )
   assert.equal(recorded.queries[0]?.values[0], "user-1")
   assert.equal(recorded.loggerErrors.length, 1)
@@ -189,7 +183,6 @@ test("thread store wraps missing table errors as initialization failures", async
 test("upsertThreadForUser normalizes the persisted thread and shapes SQL values", async () => {
   const thread = {
     id: "thread-upsert",
-    title: "   ",
     messages: [
       {
         id: "message-upsert",
@@ -206,23 +199,19 @@ test("upsertThreadForUser normalizes the persisted thread and shapes SQL values"
   const savedThread = await upsertThreadForUser("user-1", thread)
 
   assert.equal(savedThread.id, "thread-upsert")
-  assert.equal(savedThread.title, "Derive my title from the first message")
   assert.equal(savedThread.createdAt, "2026-04-15T09:59:00.000Z")
   assert.equal(savedThread.updatedAt, "2026-04-15T12:05:00.000Z")
-  assert.equal(savedThread.isPinned, false)
 
   const query = recorded.queries[0]
   assert.match(query.text, /INSERT INTO thread/)
   assert.match(query.text, /ON CONFLICT \("userId", id\)/)
-  assert.deepEqual(query.values.slice(0, 5), [
+  assert.deepEqual(query.values.slice(0, 3), [
     "user-1",
     "thread-upsert",
-    "Derive my title from the first message",
     null,
-    false,
   ])
   assert.equal(
-    query.values[5],
+    query.values[3],
     JSON.stringify([
       {
         id: "message-upsert",
@@ -233,10 +222,10 @@ test("upsertThreadForUser normalizes the persisted thread and shapes SQL values"
       },
     ])
   )
-  assert(query.values[6] instanceof Date)
-  assert.equal(query.values[6].toISOString(), "2026-04-15T09:59:00.000Z")
-  assert(query.values[7] instanceof Date)
-  assert.equal(query.values[7].toISOString(), "2026-04-15T12:05:00.000Z")
+  assert(query.values[4] instanceof Date)
+  assert.equal(query.values[4].toISOString(), "2026-04-15T09:59:00.000Z")
+  assert(query.values[5] instanceof Date)
+  assert.equal(query.values[5].toISOString(), "2026-04-15T12:05:00.000Z")
 })
 
 test("deleteThreadForUser forwards ids into the delete query", async () => {

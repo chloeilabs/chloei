@@ -18,17 +18,12 @@ const APP_STORAGE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS thread (
   "userId" text NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
   id text NOT NULL,
-  title text NOT NULL,
   model text,
-  "isPinned" boolean NOT NULL DEFAULT false,
   messages jsonb NOT NULL,
   "createdAt" timestamp(3) without time zone NOT NULL,
   "updatedAt" timestamp(3) without time zone NOT NULL,
   PRIMARY KEY ("userId", id)
 );
-
-ALTER TABLE thread
-ADD COLUMN IF NOT EXISTS "isPinned" boolean NOT NULL DEFAULT false;
 
 CREATE INDEX IF NOT EXISTS thread_user_updated_at_idx
 ON thread ("userId", "updatedAt" DESC);
@@ -52,6 +47,12 @@ DROP TABLE IF EXISTS ${LEGACY_EVENT_TABLE};
 
 ALTER TABLE thread
 DROP COLUMN IF EXISTS "${LEGACY_THREAD_CONFIG_COLUMN}";
+
+ALTER TABLE thread
+DROP COLUMN IF EXISTS "isPinned";
+
+ALTER TABLE thread
+DROP COLUMN IF EXISTS title;
 `
 
 if (!databaseUrl) {

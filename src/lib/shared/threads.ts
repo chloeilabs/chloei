@@ -6,10 +6,8 @@ export const THREAD_TITLE_MAX_LENGTH = 50
 
 export interface Thread {
   id: string
-  title: string
   messages: Message[]
   model?: ModelType
-  isPinned?: boolean
   createdAt: string
   updatedAt: string
 }
@@ -26,25 +24,8 @@ export function deriveThreadTitle(messages: Message[]): string {
     : DEFAULT_THREAD_TITLE
 }
 
-export function normalizeThread(thread: Thread): Thread {
-  const nextTitle = thread.title.trim()
-
-  return {
-    ...thread,
-    isPinned: thread.isPinned ?? false,
-    title:
-      nextTitle !== ""
-        ? nextTitle.slice(0, THREAD_TITLE_MAX_LENGTH)
-        : deriveThreadTitle(thread.messages),
-  }
-}
-
 export function sortThreadsNewestFirst(threads: Thread[]): Thread[] {
   return [...threads].sort((left, right) => {
-    if ((left.isPinned ?? false) !== (right.isPinned ?? false)) {
-      return left.isPinned ? -1 : 1
-    }
-
     const updatedDelta =
       getSortTimestamp(right.updatedAt) - getSortTimestamp(left.updatedAt)
 

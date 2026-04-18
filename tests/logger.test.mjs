@@ -15,6 +15,8 @@ const { createHttpError } = await import(httpErrorUrl)
 test("logger normalizes nested errors before emitting", () => {
   const recordedCalls = []
   const originalConsoleError = console.error
+  const originalNodeEnv = process.env.NODE_ENV
+  const originalLogFormat = process.env.LOG_FORMAT
   const rootCause = new Error("Root cause.")
   const error = Object.assign(new Error("Primary failure."), {
     code: "E_RUNTIME",
@@ -22,6 +24,8 @@ test("logger normalizes nested errors before emitting", () => {
     cause: rootCause,
   })
 
+  process.env.NODE_ENV = "test"
+  delete process.env.LOG_FORMAT
   console.error = (...args) => {
     recordedCalls.push(args)
   }
@@ -34,6 +38,8 @@ test("logger normalizes nested errors before emitting", () => {
     })
   } finally {
     console.error = originalConsoleError
+    process.env.NODE_ENV = originalNodeEnv
+    process.env.LOG_FORMAT = originalLogFormat
   }
 
   assert.equal(recordedCalls.length, 1)
@@ -56,6 +62,8 @@ test("logger normalizes nested errors before emitting", () => {
 test("logger preserves request metadata from thrown http errors", () => {
   const recordedCalls = []
   const originalConsoleError = console.error
+  const originalNodeEnv = process.env.NODE_ENV
+  const originalLogFormat = process.env.LOG_FORMAT
   const error = createHttpError({
     message: "Failed to fetch threads.",
     status: 503,
@@ -63,6 +71,8 @@ test("logger preserves request metadata from thrown http errors", () => {
     requestId: "request-1",
   })
 
+  process.env.NODE_ENV = "test"
+  delete process.env.LOG_FORMAT
   console.error = (...args) => {
     recordedCalls.push(args)
   }
@@ -71,6 +81,8 @@ test("logger preserves request metadata from thrown http errors", () => {
     createLogger("runtime").error("API request failed.", error)
   } finally {
     console.error = originalConsoleError
+    process.env.NODE_ENV = originalNodeEnv
+    process.env.LOG_FORMAT = originalLogFormat
   }
 
   assert.equal(recordedCalls.length, 1)

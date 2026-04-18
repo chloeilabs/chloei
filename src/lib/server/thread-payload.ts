@@ -2,14 +2,10 @@ import { z } from "zod"
 
 import {
   AGENT_RUN_STATUSES,
-  DEFAULT_THREAD_TITLE,
-  deriveThreadTitle,
   isModelType,
   type ModelType,
-  normalizeThread,
   SEARCH_TOOL_NAMES,
   type Thread,
-  THREAD_TITLE_MAX_LENGTH,
   TOOL_NAMES,
 } from "@/lib/shared"
 
@@ -165,9 +161,7 @@ const messageSchema = z
 const threadSchema = z
   .object({
     id: z.string().trim().min(1).max(200),
-    title: z.string().max(THREAD_TITLE_MAX_LENGTH),
     model: MODEL_TYPE_SCHEMA.optional(),
-    isPinned: z.boolean().optional(),
     messages: z.array(messageSchema),
     createdAt: ISO_DATETIME_SCHEMA,
     updatedAt: ISO_DATETIME_SCHEMA,
@@ -176,9 +170,7 @@ const threadSchema = z
 
 export interface StoredThreadRow {
   id: string
-  title: string
   model: string | null
-  isPinned: boolean | null
   messages: unknown
   createdAt: Date | string
   updatedAt: Date | string
@@ -199,20 +191,14 @@ function toIsoString(value: Date | string): string {
 }
 
 function normalizeThreadForPersistence(thread: Thread): Thread {
-  const normalized = normalizeThread(thread)
-  const firstMessageCreatedAt = normalized.messages[0]?.createdAt
-  const createdAt = firstMessageCreatedAt ?? normalized.createdAt
+  const firstMessageCreatedAt = thread.messages[0]?.createdAt
+  const createdAt = firstMessageCreatedAt ?? thread.createdAt
 
   return {
-    ...normalized,
-    title:
-      normalized.title.trim() !== ""
-        ? normalized.title.trim().slice(0, THREAD_TITLE_MAX_LENGTH)
-        : deriveThreadTitle(normalized.messages),
-    model: normalized.model ?? undefined,
-    isPinned: normalized.isPinned ?? false,
+    ...thread,
+    model: thread.model ?? undefined,
     createdAt,
-    updatedAt: normalized.updatedAt,
+    updatedAt: thread.updatedAt,
   }
 }
 
@@ -373,7 +359,6 @@ function sanitizeThreadPayload(payload: unknown): unknown {
 
   return {
     id: thread.id,
-    title: thread.title,
     model: sanitizeModelValue(thread.model),
     messages: Array.isArray(thread.messages)
       ? thread.messages.map((message): unknown => {
@@ -400,7 +385,6 @@ function sanitizeThreadPayload(payload: unknown): unknown {
           }
         })
       : thread.messages,
-    isPinned: thread.isPinned,
     createdAt: thread.createdAt,
     updatedAt: thread.updatedAt,
   }
@@ -410,9 +394,7 @@ export function parseStoredThread(row: StoredThreadRow): Thread {
   const parsed = threadSchema.parse(
     sanitizeThreadPayload({
       id: row.id,
-      title: row.title,
       model: row.model ?? undefined,
-      isPinned: row.isPinned ?? false,
       messages: row.messages,
       createdAt: toIsoString(row.createdAt),
       updatedAt: toIsoString(row.updatedAt),
@@ -428,16 +410,5 @@ export function parseThreadPayload(payload: unknown): Thread {
 }
 
 export function prepareThreadForPersistence(thread: Thread) {
-  const normalizedThread = normalizeThreadForPersistence(thread)
-  const title =
-    normalizedThread.title.trim() !== ""
-      ? normalizedThread.title.trim().slice(0, THREAD_TITLE_MAX_LENGTH)
-      : (normalizedThread.messages[0]?.content
-          .trim()
-          .slice(0, THREAD_TITLE_MAX_LENGTH) ?? DEFAULT_THREAD_TITLE)
-
-  return {
-    normalizedThread,
-    title,
-  }
+  return normalizeThreadForPersistence(thread)
 }
