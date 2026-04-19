@@ -3,8 +3,8 @@
 import "./logo-animation.css"
 
 import { AnimatedLogo, type LogoSize } from "./logo-animated"
-import { CleoLogoHoverSvg } from "./logo-hover-svg"
-import { CleoLogoSvg } from "./logo-svg"
+import { ChloeiLogoHoverSvg } from "./logo-hover-svg"
+import { ChloeiLogoSvg } from "./logo-svg"
 
 export function LogoHover({
   forceAnimate,
@@ -21,10 +21,10 @@ export function LogoHover({
       forceAnimate={forceAnimate}
       size={size}
       renderAnimatedLogo={(logoClassName) => (
-        <CleoLogoHoverSvg className={logoClassName} />
+        <ChloeiLogoHoverSvg className={logoClassName} />
       )}
       renderStaticLogo={(logoClassName) => (
-        <CleoLogoSvg className={logoClassName} />
+        <ChloeiLogoSvg className={logoClassName} />
       )}
     />
   )

@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils"
 
-export function CleoLogoBurstSvg({ className }: { className?: string }) {
+export function ChloeiLogoBurstSvg({ className }: { className?: string }) {
   return (
     <svg
       width="100%"
@@ -8,7 +8,7 @@ export function CleoLogoBurstSvg({ className }: { className?: string }) {
       viewBox="0 0 165 11"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className={cn("fill-current", className)}
+      className={cn("size-full fill-current", className)}
       data-animate
     >
       <rect width="1" height="1" transform="matrix(-1 0 0 1 165 5)" />
