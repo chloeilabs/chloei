@@ -123,9 +123,9 @@ function createAgentRequestHeaders(): HeadersInit {
 function hasVisibleStructuredOutput(current: AgentStreamAccumulator): boolean {
   return Boolean(
     current.reasoning.trim() ||
-      current.toolInvocations.length > 0 ||
-      current.activityTimeline.length > 0 ||
-      current.sources.length > 0
+    current.toolInvocations.length > 0 ||
+    current.activityTimeline.length > 0 ||
+    current.sources.length > 0
   )
 }
 
@@ -409,7 +409,6 @@ export function useAgentSession({
   threads,
   deleteThread,
 }: ReturnType<typeof useThreadStore>) {
-
   const [state, setState] = useState(INITIAL_STATE)
   const [queuedSubmission, setQueuedSubmission] =
     useState<QueuedSubmission | null>(null)
@@ -548,7 +547,11 @@ export function useAgentSession({
       })
 
       saveThread(
-        createThreadSnapshot(params.threadId, params.baseMessages, params.model),
+        createThreadSnapshot(
+          params.threadId,
+          params.baseMessages,
+          params.model
+        ),
         {
           immediate: true,
         }
@@ -872,7 +875,11 @@ export function useAgentSession({
 
       if (currentThreadIdRef.current) {
         saveThread(
-          createThreadSnapshot(currentThreadIdRef.current, nextMessages, newModel),
+          createThreadSnapshot(
+            currentThreadIdRef.current,
+            nextMessages,
+            newModel
+          ),
           {
             immediate: true,
           }

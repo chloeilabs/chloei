@@ -7,9 +7,8 @@ for (const envFile of [".env", ".env.local"]) {
   }
 }
 
-const { AUTH_UNAVAILABLE_MESSAGE, getAuthOrNull } = await import(
-  "./src/lib/server/auth"
-)
+const { AUTH_UNAVAILABLE_MESSAGE, getAuthOrNull } =
+  await import("./src/lib/server/auth")
 
 const auth = getAuthOrNull()
 

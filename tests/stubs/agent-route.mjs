@@ -36,12 +36,14 @@ export function createJsonErrorResponse(params) {
 }
 
 export function parseAgentStreamRequest(params) {
-  return getTestMocks().agentRoute?.parseAgentStreamRequest?.(params) ?? {
-    parsedRequest: {
-      messages: params.body?.messages ?? [],
-    },
-    selectedModel: "qwen/qwen3.6-plus",
-  }
+  return (
+    getTestMocks().agentRoute?.parseAgentStreamRequest?.(params) ?? {
+      parsedRequest: {
+        messages: params.body?.messages ?? [],
+      },
+      selectedModel: "qwen/qwen3.6-plus",
+    }
+  )
 }
 
 export function createAgentStreamResponse(params) {

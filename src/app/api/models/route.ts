@@ -3,7 +3,10 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getModels } from "@/lib/actions/api-keys"
 import { createLogger } from "@/lib/logger"
 import { resolveRequestIdFromHeaders } from "@/lib/request-id"
-import { createApiErrorResponse, createApiHeaders } from "@/lib/server/api-response"
+import {
+  createApiErrorResponse,
+  createApiHeaders,
+} from "@/lib/server/api-response"
 import {
   createAuthUnavailableResponse,
   isAuthConfigured,

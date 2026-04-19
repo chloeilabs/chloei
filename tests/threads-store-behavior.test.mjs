@@ -10,13 +10,11 @@ import {
 import { resetTestMocks, setTestMocks } from "./stubs/mock-state.mjs"
 
 const cwd = fileURLToPath(new URL("..", import.meta.url))
-const storeUrl = pathToFileURL(
-  path.join(cwd, "src/lib/server/threads.ts")
-).href
+const storeUrl = pathToFileURL(path.join(cwd, "src/lib/server/threads.ts")).href
 
 setTestModuleStubs({
   "@/lib/logger": toProjectFileUrl("tests/stubs/logger.mjs"),
-  "kysely": toProjectFileUrl("tests/stubs/kysely.mjs"),
+  kysely: toProjectFileUrl("tests/stubs/kysely.mjs"),
   "./postgres": toProjectFileUrl("tests/stubs/postgres.mjs"),
 })
 
@@ -205,11 +203,7 @@ test("upsertThreadForUser normalizes the persisted thread and shapes SQL values"
   const query = recorded.queries[0]
   assert.match(query.text, /INSERT INTO thread/)
   assert.match(query.text, /ON CONFLICT \("userId", id\)/)
-  assert.deepEqual(query.values.slice(0, 3), [
-    "user-1",
-    "thread-upsert",
-    null,
-  ])
+  assert.deepEqual(query.values.slice(0, 3), ["user-1", "thread-upsert", null])
   assert.equal(
     query.values[3],
     JSON.stringify([

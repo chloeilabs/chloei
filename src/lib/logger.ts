@@ -59,9 +59,7 @@ function normalizeError(error: unknown): Record<string, unknown> {
 
     if ("cause" in error && error.cause !== undefined) {
       normalizedError.cause =
-        error.cause instanceof Error
-          ? normalizeError(error.cause)
-          : error.cause
+        error.cause instanceof Error ? normalizeError(error.cause) : error.cause
     }
 
     return normalizedError
@@ -233,7 +231,10 @@ function writeInfoLine(payload: string) {
     return
   }
 
-  if (typeof process !== "undefined" && typeof process.stdout.write === "function") {
+  if (
+    typeof process !== "undefined" &&
+    typeof process.stdout.write === "function"
+  ) {
     process.stdout.write(`${payload}\n`)
     return
   }
@@ -288,9 +289,7 @@ function emitLog(
       return
     }
 
-    writeInfoLine(
-      `${formattedMessage} ${serializeLogLine(normalizedDetails)}`
-    )
+    writeInfoLine(`${formattedMessage} ${serializeLogLine(normalizedDetails)}`)
     return
   }
 

@@ -1,4 +1,6 @@
-function normalizeRequestId(value: string | null | undefined): string | undefined {
+function normalizeRequestId(
+  value: string | null | undefined
+): string | undefined {
   const trimmedValue = value?.trim()
   if (trimmedValue === undefined || trimmedValue === "") {
     return undefined

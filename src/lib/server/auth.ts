@@ -44,7 +44,9 @@ function getConfiguredEnv(name: AuthRequiredEnvName): string | null {
 
 function getMissingAuthConfig(): AuthRequiredEnvName[] {
   return AUTH_REQUIRED_ENV_NAMES.filter((name) =>
-    name === "BETTER_AUTH_URL" ? getBaseAuthUrl() === null : !getConfiguredEnv(name)
+    name === "BETTER_AUTH_URL"
+      ? getBaseAuthUrl() === null
+      : !getConfiguredEnv(name)
   )
 }
 

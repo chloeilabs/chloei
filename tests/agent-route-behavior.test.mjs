@@ -14,10 +14,14 @@ import {
 } from "./stubs/mock-state.mjs"
 
 const cwd = fileURLToPath(new URL("..", import.meta.url))
-const routeUrl = pathToFileURL(path.join(cwd, "src/app/api/agent/route.ts")).href
+const routeUrl = pathToFileURL(
+  path.join(cwd, "src/app/api/agent/route.ts")
+).href
 
 setTestModuleStubs({
-  "@/lib/actions/api-keys": toProjectFileUrl("tests/stubs/actions-api-keys.mjs"),
+  "@/lib/actions/api-keys": toProjectFileUrl(
+    "tests/stubs/actions-api-keys.mjs"
+  ),
   "@/lib/logger": toProjectFileUrl("tests/stubs/logger.mjs"),
   "@/lib/server/agent-context": toProjectFileUrl(
     "tests/stubs/agent-context.mjs"
@@ -30,9 +34,7 @@ setTestModuleStubs({
     "tests/stubs/agent-runtime-config.mjs"
   ),
   "@/lib/server/auth": toProjectFileUrl("tests/stubs/auth.mjs"),
-  "@/lib/server/auth-session": toProjectFileUrl(
-    "tests/stubs/auth-session.mjs"
-  ),
+  "@/lib/server/auth-session": toProjectFileUrl("tests/stubs/auth-session.mjs"),
   "@/lib/server/rate-limit": toProjectFileUrl("tests/stubs/rate-limit.mjs"),
   "@/lib/server/threads": toProjectFileUrl("tests/stubs/threads.mjs"),
   "next/server": toProjectFileUrl("tests/stubs/next-server.mjs"),

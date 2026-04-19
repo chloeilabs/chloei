@@ -64,12 +64,15 @@ test("parseStreamEventLine rejects malformed checkpoint and tool data", () => {
 })
 
 test("getResponseErrorMessage prefers JSON error and falls back to body text", async () => {
-  const jsonResponse = new Response(JSON.stringify({ error: "Unauthorized." }), {
-    status: 401,
-    headers: {
-      "Content-Type": "application/json",
-    },
-  })
+  const jsonResponse = new Response(
+    JSON.stringify({ error: "Unauthorized." }),
+    {
+      status: 401,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
+  )
   const textResponse = new Response("Service unavailable", {
     status: 503,
   })
@@ -79,8 +82,14 @@ test("getResponseErrorMessage prefers JSON error and falls back to body text", a
 
   await assert.doesNotReject(async () => {
     assert.equal(await getResponseErrorMessage(jsonResponse), "Unauthorized.")
-    assert.equal(await getResponseErrorMessage(textResponse), "Service unavailable")
-    assert.equal(await getResponseErrorMessage(emptyResponse), "Request failed (429)")
+    assert.equal(
+      await getResponseErrorMessage(textResponse),
+      "Service unavailable"
+    )
+    assert.equal(
+      await getResponseErrorMessage(emptyResponse),
+      "Request failed (429)"
+    )
   })
 })
 

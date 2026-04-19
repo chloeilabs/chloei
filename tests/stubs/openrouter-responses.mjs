@@ -8,7 +8,6 @@ export function startOpenRouterResponseStream(params) {
   return (
     getTestMocks().openRouterResponses?.startOpenRouterResponseStream?.(
       params
-    ) ??
-    createEmptyStream()
+    ) ?? createEmptyStream()
   )
 }

@@ -1,10 +1,4 @@
-import {
-  Check,
-  ChevronDown,
-  CircleCheck,
-  CircleX,
-  Copy,
-} from "lucide-react"
+import { Check, ChevronDown, CircleCheck, CircleX, Copy } from "lucide-react"
 import { useMemo, useState } from "react"
 
 import { LogoHover } from "@/components/graphics/logo/logo-hover"
@@ -248,11 +242,7 @@ function ToolStatusIcon({ status }: { status: ToolInvocationStatus }) {
   return <CircleX className="size-3.5 shrink-0 text-red-600" />
 }
 
-export function AssistantMessage({
-  message,
-}: {
-  message: Message
-}) {
+export function AssistantMessage({ message }: { message: Message }) {
   const content = useMemo(() => getAssistantContent(message), [message])
   const [activityVisibility, setActivityVisibility] = useState<
     "auto" | "expanded" | "collapsed"
@@ -385,7 +375,7 @@ export function AssistantMessage({
                 return (
                   <div
                     key={entry.id}
-                    className="rounded-none border bg-muted/40 px-2.5 py-1.5 text-xs text-muted-foreground [&_.prose]:w-full [&_.prose]:text-xs [&_.prose]:leading-relaxed [&_.prose>*]:my-0 [&_.prose>*+*]:mt-3 [&_.chloei-markdown]:w-full"
+                    className="rounded-none border bg-muted/40 px-2.5 py-1.5 text-xs text-muted-foreground [&_.chloei-markdown]:w-full [&_.prose]:w-full [&_.prose]:text-xs [&_.prose]:leading-relaxed [&_.prose>*]:my-0 [&_.prose>*+*]:mt-3"
                   >
                     <div className="min-w-0">
                       <MemoizedMarkdown

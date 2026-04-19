@@ -1,10 +1,7 @@
 import { sql } from "kysely"
 
 import { createLogger } from "@/lib/logger"
-import {
-  sortThreadsNewestFirst,
-  type Thread,
-} from "@/lib/shared"
+import { sortThreadsNewestFirst, type Thread } from "@/lib/shared"
 
 import { getDatabase } from "./postgres"
 import {
