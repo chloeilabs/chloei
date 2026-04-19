@@ -48,11 +48,9 @@ DROP TABLE IF EXISTS ${LEGACY_EVENT_TABLE};
 ALTER TABLE thread
 DROP COLUMN IF EXISTS "${LEGACY_THREAD_CONFIG_COLUMN}";
 
-ALTER TABLE thread
-DROP COLUMN IF EXISTS "isPinned";
-
-ALTER TABLE thread
-DROP COLUMN IF EXISTS title;
+-- Finance shares the auth database and stores additional thread metadata in
+-- the shared thread table. Preserve compatible columns when Chloei migrations
+-- rerun so cross-app storage stays stable.
 `
 
 if (!databaseUrl) {
