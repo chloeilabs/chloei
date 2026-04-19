@@ -3,8 +3,8 @@
 import "./logo-animation.css"
 
 import { AnimatedLogo, type LogoSize } from "./logo-animated"
-import { CleoLogoBurstSvg } from "./logo-burst-svg"
-import { CleoLogoSvg } from "./logo-svg"
+import { ChloeiLogoBurstSvg } from "./logo-burst-svg"
+import { ChloeiLogoSvg } from "./logo-svg"
 
 export function LogoBurst({
   forceAnimate,
@@ -21,10 +21,10 @@ export function LogoBurst({
       forceAnimate={forceAnimate}
       size={size}
       renderAnimatedLogo={(logoClassName) => (
-        <CleoLogoBurstSvg className={logoClassName} />
+        <ChloeiLogoBurstSvg className={logoClassName} />
       )}
       renderStaticLogo={(logoClassName) => (
-        <CleoLogoSvg className={logoClassName} />
+        <ChloeiLogoSvg className={logoClassName} />
       )}
     />
   )

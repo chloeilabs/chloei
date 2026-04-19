@@ -1,11 +1,15 @@
 "use client"
 
+import "../../graphics/logo/logo-animation.css"
+
+import { History, SquarePen } from "lucide-react"
 import Link from "next/link"
 import {
   type CSSProperties,
   type RefObject,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   useTransition,
@@ -16,6 +20,7 @@ import { StickToBottom } from "use-stick-to-bottom"
 import { AppLauncher } from "@/components/agent/home/app-launcher"
 import { UserMenu } from "@/components/auth/user-menu"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useIsMobile } from "@/hooks/use-mobile"
 import {
   type AuthViewer,
@@ -26,7 +31,8 @@ import {
 } from "@/lib/shared"
 import { cn } from "@/lib/utils"
 
-import { LogoHover } from "../../graphics/logo/logo-hover"
+import { ChloeiLogoHoverSvg } from "../../graphics/logo/logo-hover-svg"
+import { ChloeiLogoSvg } from "../../graphics/logo/logo-svg"
 import { ScrollToBottom } from "../../task/scroll-to-bottom"
 import { Messages } from "../messages/messages"
 import { PromptForm } from "../prompt-form/prompt-form"
@@ -141,10 +147,14 @@ export function HomePageContent({
   const [isFallbackEnteringConversation, setIsFallbackEnteringConversation] =
     useState(false)
   const [isThreadsOpen, setIsThreadsOpen] = useState(false)
+  const [mirroredHeaderWidth, setMirroredHeaderWidth] = useState<number | null>(
+    null
+  )
   const fallbackTransitionTimeoutRef = useRef<number | null>(null)
   const overflowPinnedTurnIdRef = useRef<string | null>(null)
   const threadsTriggerRef = useRef<HTMLDivElement | null>(null)
   const threadsPanelRef = useRef<HTMLDivElement | null>(null)
+  const headerActionsRef = useRef<HTMLDivElement | null>(null)
   const isMobile = useIsMobile()
   const threadStore = useThreadStore(initialThreads)
   const {
@@ -348,6 +358,36 @@ export function HomePageContent({
     }
   }, [isThreadsOpen])
 
+  useLayoutEffect(() => {
+    const actionsElement = headerActionsRef.current
+
+    if (!actionsElement || isMobile) {
+      return
+    }
+
+    const syncMirroredHeaderWidth = () => {
+      const nextWidth = Math.ceil(actionsElement.getBoundingClientRect().width)
+
+      setMirroredHeaderWidth((currentWidth) =>
+        currentWidth === nextWidth ? currentWidth : nextWidth
+      )
+    }
+
+    syncMirroredHeaderWidth()
+
+    const resizeObserver = new ResizeObserver(() => {
+      syncMirroredHeaderWidth()
+    })
+
+    resizeObserver.observe(actionsElement)
+    window.addEventListener("resize", syncMirroredHeaderWidth)
+
+    return () => {
+      resizeObserver.disconnect()
+      window.removeEventListener("resize", syncMirroredHeaderWidth)
+    }
+  }, [isMobile])
+
   const handleNewChat = useCallback(() => {
     setIsThreadsOpen(false)
     resetConversation()
@@ -356,50 +396,86 @@ export function HomePageContent({
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden">
       <div className="z-10 flex shrink-0 items-center justify-between bg-background p-3">
-        <Link
-          href="/"
-          aria-label="Go to Chloei home"
-          onClick={handleNewChat}
-          className="inline-flex items-center gap-2 rounded-sm px-1 py-0.5 text-foreground transition-colors hover:text-muted-foreground"
+        <div
+          className="flex min-w-0 items-center justify-start"
+          style={
+            !isMobile && mirroredHeaderWidth
+              ? {
+                  width: mirroredHeaderWidth,
+                }
+              : undefined
+          }
         >
-          <LogoHover size="sm" className="shrink-0" />
-          <span className="hidden font-departureMono text-[13px] font-normal tracking-normal sm:inline">
-            Chloei
-          </span>
-        </Link>
+          <Button
+            asChild
+            variant="ghost"
+            size="iconSm"
+            aria-label="Go to Chloei home"
+          >
+            <Link href="/" onClick={handleNewChat}>
+              <span className="relative block size-4 shrink-0 overflow-hidden">
+                <span className="absolute inset-0 transition-opacity duration-100 group-hover/button:opacity-0 group-focus-visible/button:opacity-0">
+                  <ChloeiLogoSvg className="size-full" />
+                </span>
+                <span className="absolute inset-0 opacity-0 transition-opacity duration-100 group-hover/button:opacity-100 group-focus-visible/button:opacity-100">
+                  <span className="block h-4 w-[240px]">
+                    <ChloeiLogoHoverSvg className="logo-sm size-full [animation-play-state:paused] group-hover/button:[animation-play-state:running] group-focus-visible/button:[animation-play-state:running]" />
+                  </span>
+                </span>
+              </span>
+            </Link>
+          </Button>
+        </div>
 
-        <div className="flex items-center gap-1.5">
+        <div ref={headerActionsRef} className="flex items-center gap-1">
           {hasMessages ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="font-departureMono text-[13px] font-normal tracking-normal"
-              onClick={handleNewChat}
-              aria-label="Start a new chat"
-            >
-              New chat
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="iconSm"
+                  className="text-muted-foreground hover:text-foreground"
+                  onClick={handleNewChat}
+                  aria-label="Start a new chat"
+                >
+                  <SquarePen className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" align="end">
+                New chat
+              </TooltipContent>
+            </Tooltip>
           ) : null}
 
           <div ref={threadsTriggerRef}>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="font-departureMono text-[13px] font-normal tracking-normal"
-              onClick={() => {
-                setIsThreadsOpen((open) => !open)
-              }}
-              aria-label="Open threads"
-              aria-expanded={isThreadsOpen}
-            >
-              Threads
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="iconSm"
+                  className="text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    setIsThreadsOpen((open) => !open)
+                  }}
+                  aria-label="Open threads"
+                  aria-expanded={isThreadsOpen}
+                >
+                  <History className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" align="end">
+                Threads
+              </TooltipContent>
+            </Tooltip>
           </div>
 
-          <AppLauncher className="size-7" />
-          <UserMenu viewer={viewer} className="size-7" />
+          <AppLauncher className="size-7 text-muted-foreground hover:text-foreground" />
+          <UserMenu
+            viewer={viewer}
+            className="size-7 text-muted-foreground hover:text-foreground"
+          />
         </div>
       </div>
 
@@ -427,9 +503,8 @@ export function HomePageContent({
           <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center gap-10 px-4 pt-[20vh] sm:px-6">
             <div
               style={homeHeroTransitionStyle}
-              className="flex items-center gap-4 font-departureMono text-2xl font-medium tracking-tighter select-none"
+              className="text-center font-departureMono text-2xl font-medium tracking-tighter select-none"
             >
-              <LogoHover size="lg" />
               Welcome to <span className="text-muted-foreground">Chloei</span>
             </div>
 
