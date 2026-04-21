@@ -23,6 +23,17 @@
   animation: crafting-dot-pulse 1.4s ease-in-out infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .shimmer {
+    animation: none;
+    background-position: 50% 0;
+  }
+
+  .crafting-dot-pulse {
+    animation: none;
+  }
+}
+
 @keyframes shimmer {
   0% {
     background-position: 200% 0;

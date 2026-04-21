@@ -23,6 +23,9 @@ test("normalizeThinkingEntry strips leading reasoning labels", () => {
     normalizeThinkingEntry("Reasoning: The user wants current AI news."),
     "The user wants current AI news."
   )
+
+  assert.equal(normalizeThinkingEntry("THINKING:"), "")
+  assert.equal(normalizeThinkingEntry("Reasoning"), "")
 })
 
 test("normalizeAssistantActivityTimeline preserves streamed event order", () => {
