@@ -43,3 +43,21 @@ test("sanitizer handles a single-chunk label+content", () => {
     "check the latest figures."
   )
 })
+
+test("sanitizer does not mangle prose that happens to start with Thinking/Reasoning", () => {
+  const sanitize = createInitialReasoningChunkSanitizer()
+
+  assert.equal(
+    sanitize("Thinking about the latest figures."),
+    "Thinking about the latest figures."
+  )
+})
+
+test("sanitizer strips a label followed by a newline instead of a colon", () => {
+  const sanitize = createInitialReasoningChunkSanitizer()
+
+  assert.equal(
+    sanitize("Thinking\nThe user wants current AI news."),
+    "The user wants current AI news."
+  )
+})

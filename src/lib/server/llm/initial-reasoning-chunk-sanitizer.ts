@@ -8,13 +8,17 @@ export function createInitialReasoningChunkSanitizer() {
     }
 
     const combined = `${bufferedPrefix}${text}`.replace(/\r\n/g, "\n")
-    const labelWithContentPattern =
-      /^\s*(?:thinking|reasoning)\s*:?(?:\n+|\s+)([\s\S]*)$/i
+    const inlineLabelWithContentPattern =
+      /^\s*(?:thinking|reasoning)\s*:\s*([\s\S]+)$/i
+    const multilineLabelWithContentPattern =
+      /^\s*(?:thinking|reasoning)\s*\n+([\s\S]+)$/i
     const labelOnlyPattern = /^\s*(?:thinking|reasoning)\s*:?\s*$/i
     const partialLabelPattern =
       /^\s*(?:t|th|thi|thin|think|thinki|thinkin|thinking|r|re|rea|reas|reaso|reason|reasoni|reasonin|reasoning)\s*:?\s*$/i
 
-    const labelWithContentMatch = labelWithContentPattern.exec(combined)
+    const labelWithContentMatch =
+      inlineLabelWithContentPattern.exec(combined) ??
+      multilineLabelWithContentPattern.exec(combined)
     if (labelWithContentMatch) {
       bufferedPrefix = ""
       didResolvePrefix = true

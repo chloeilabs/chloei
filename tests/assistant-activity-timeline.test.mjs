@@ -28,6 +28,18 @@ test("normalizeThinkingEntry strips leading reasoning labels", () => {
   assert.equal(normalizeThinkingEntry("Reasoning"), "")
 })
 
+test("normalizeThinkingEntry preserves prose that starts with Thinking/Reasoning", () => {
+  assert.equal(
+    normalizeThinkingEntry("Thinking about the latest figures."),
+    "Thinking about the latest figures."
+  )
+
+  assert.equal(
+    normalizeThinkingEntry("Reasoning through the trade-offs"),
+    "Reasoning through the trade-offs"
+  )
+})
+
 test("normalizeAssistantActivityTimeline preserves streamed event order", () => {
   const timeline = normalizeAssistantActivityTimeline({
     id: "assistant-1",
