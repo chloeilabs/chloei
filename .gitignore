@@ -38,3 +38,7 @@ npm-debug.log*
 .DS_Store
 *.pem
 .env*.local
+
+# Claude local session state
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
