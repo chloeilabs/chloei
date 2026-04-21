@@ -10,6 +10,6 @@ export function inferPromptTaskMode(messages) {
 export function resolvePromptProvider(model) {
   return (
     getTestMocks().agentPromptSteering?.resolvePromptProvider?.(model) ??
-    "openrouter"
+    "anthropic"
   )
 }

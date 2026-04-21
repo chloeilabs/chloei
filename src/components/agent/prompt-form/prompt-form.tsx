@@ -243,7 +243,7 @@ export function PromptForm({
 
       {!resolvedSelectedModel && (
         <p className="mt-2 text-xs text-muted-foreground">
-          Configure `OPENROUTER_API_KEY` on the server to enable model access.
+          Configure `AI_GATEWAY_API_KEY` on the server to enable model access.
         </p>
       )}
     </form>

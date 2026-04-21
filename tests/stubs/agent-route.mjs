@@ -40,7 +40,7 @@ export function parseAgentStreamRequest(params) {
     parsedRequest: {
       messages: params.body?.messages ?? [],
     },
-    selectedModel: "qwen/qwen3.6-plus",
+    selectedModel: "anthropic/claude-sonnet-4.6",
   }
 }
 

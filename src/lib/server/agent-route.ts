@@ -10,7 +10,6 @@ import {
   ALL_MODELS,
   type ModelInfo,
   type ModelType,
-  OPENROUTER_MODELS,
   resolveDefaultModel,
 } from "@/lib/shared"
 
@@ -20,7 +19,7 @@ import {
   AGENT_MAX_TOTAL_CHARS,
 } from "./agent-runtime-config"
 import { createApiErrorBody, createApiHeaders } from "./api-response"
-import { startOpenRouterResponseStream } from "./llm/openrouter-responses"
+import { startGatewayResponseStream } from "./llm/gateway-responses"
 import { withAiSdkInlineCitationInstruction } from "./llm/system-instruction-augmentations"
 import { type evaluateAndConsumeSlidingWindowRateLimit } from "./rate-limit"
 
@@ -78,9 +77,10 @@ interface CreateAgentStreamResponseParams {
   rateLimitDecision?: AgentRateLimitDecision
   timeoutMs: number
   selectedModel: ModelType
-  openRouterApiKey: string
+  aiGatewayApiKey: string
   tavilyApiKey?: string
   fmpApiKey?: string
+  userTimeZone?: string
   messages: AgentStreamRequest["messages"]
   systemInstruction: string
   onStreamSettled?: () => void
@@ -175,8 +175,8 @@ function isProviderAuthenticationError(error: unknown): boolean {
   return message.includes("api key")
 }
 
-function isOpenRouterModel(model: ModelType): boolean {
-  return (OPENROUTER_MODELS as readonly ModelType[]).includes(model)
+function isSupportedModel(model: ModelType): boolean {
+  return (ALL_MODELS as readonly ModelType[]).includes(model)
 }
 
 function getTotalMessageChars(messages: AgentStreamRequest["messages"]): number {
@@ -256,7 +256,7 @@ export function parseAgentStreamRequest(
   const selectedModel =
     parsed.data.model ?? resolveDefaultModel(params.availableModels)
 
-  if (!isOpenRouterModel(selectedModel)) {
+  if (!isSupportedModel(selectedModel)) {
     return createJsonErrorResponse({
       requestId: params.requestId,
       error: "Unsupported model selected.",
@@ -346,11 +346,12 @@ export function createAgentStreamResponse(
 
         handleEvent({ type: "agent_status", status: "in_progress" })
 
-        const stream = startOpenRouterResponseStream({
+        const stream = startGatewayResponseStream({
           model: params.selectedModel,
-          openRouterApiKey: params.openRouterApiKey,
+          aiGatewayApiKey: params.aiGatewayApiKey,
           tavilyApiKey: params.tavilyApiKey,
           fmpApiKey: params.fmpApiKey,
+          userTimeZone: params.userTimeZone,
           messages: params.messages,
           systemInstruction: withAiSdkInlineCitationInstruction(
             params.systemInstruction,
@@ -406,7 +407,7 @@ export function createAgentStreamResponse(
           !streamState.hasMeaningfulText
         ) {
           streamOutcome = "provider_auth_failed"
-          logger.error("OpenRouter authentication failed.", {
+          logger.error("AI Gateway authentication failed.", {
             error: streamError,
             errorCode: "AGENT_PROVIDER_AUTH_FAILED",
             requestId: params.requestId,
@@ -414,7 +415,7 @@ export function createAgentStreamResponse(
           streamState.hasTextChunk = true
           streamState.hasMeaningfulText = true
           enqueueEvent(
-            textDeltaEvent("Invalid OPENROUTER_API_KEY on the server.")
+            textDeltaEvent("Invalid AI_GATEWAY_API_KEY on the server.")
           )
         } else if (!streamState.hasMeaningfulText) {
           streamOutcome = "failed"

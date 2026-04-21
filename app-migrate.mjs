@@ -18,6 +18,7 @@ const APP_STORAGE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS thread (
   "userId" text NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
   id text NOT NULL,
+  title text NOT NULL DEFAULT 'New Conversation',
   model text,
   messages jsonb NOT NULL,
   "createdAt" timestamp(3) without time zone NOT NULL,
@@ -27,6 +28,21 @@ CREATE TABLE IF NOT EXISTS thread (
 
 CREATE INDEX IF NOT EXISTS thread_user_updated_at_idx
 ON thread ("userId", "updatedAt" DESC);
+
+ALTER TABLE thread
+ADD COLUMN IF NOT EXISTS title text NOT NULL DEFAULT 'New Conversation';
+
+ALTER TABLE thread
+ALTER COLUMN title SET DEFAULT 'New Conversation';
+
+UPDATE thread
+SET title = CASE
+  WHEN NULLIF(BTRIM(COALESCE(messages -> 0 ->> 'content', '')), '') IS NULL
+    THEN 'New Conversation'
+  ELSE LEFT(BTRIM(COALESCE(messages -> 0 ->> 'content', '')), 50)
+END
+WHERE BTRIM(COALESCE(title, '')) = ''
+   OR title = 'New Conversation';
 
 CREATE TABLE IF NOT EXISTS automation (
   id text PRIMARY KEY,

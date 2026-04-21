@@ -19,8 +19,8 @@ const helperUrl = pathToFileURL(
 
 setTestModuleStubs({
   "@/lib/logger": toProjectFileUrl("tests/stubs/logger.mjs"),
-  "./llm/openrouter-responses": toProjectFileUrl(
-    "tests/stubs/openrouter-responses.mjs"
+  "./llm/gateway-responses": toProjectFileUrl(
+    "tests/stubs/gateway-responses.mjs"
   ),
   "./llm/system-instruction-augmentations": toProjectFileUrl(
     "tests/stubs/system-instruction-augmentations.mjs"
@@ -91,8 +91,8 @@ beforeEach(() => {
         return `${instruction}::fmp=${String(options.fmpEnabled)}`
       },
     },
-    openRouterResponses: {
-      startOpenRouterResponseStream(params) {
+    gatewayResponses: {
+      startGatewayResponseStream(params) {
         recorded.streamParams.push(params)
         return (async function* () {})()
       },
@@ -153,7 +153,7 @@ test("agent helper validates total size, last-message role, and default model su
         content: `${String(index).padStart(2, "0")}${"x".repeat(10_998)}`,
       })),
     },
-    availableModels: [{ id: "qwen/qwen3.6-plus" }],
+    availableModels: [{ id: "anthropic/claude-sonnet-4.6" }],
     requestId: "request-1",
   })
 
@@ -174,7 +174,7 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "qwen/qwen3.6-plus" }],
+    availableModels: [{ id: "anthropic/claude-sonnet-4.6" }],
     requestId: "request-2",
   })
 
@@ -210,8 +210,8 @@ test("agent helper validates total size, last-message role, and default model su
 
 test("agent helper streams fallback output when the model yields no content", async () => {
   setTestMocks({
-    openRouterResponses: {
-      startOpenRouterResponseStream(params) {
+    gatewayResponses: {
+      startGatewayResponseStream(params) {
         recorded.streamParams.push(params)
         return createEmptyStream()
       },
@@ -222,8 +222,8 @@ test("agent helper streams fallback output when the model yields no content", as
     request: createRequest(),
     requestId: "request-1",
     timeoutMs: 30_000,
-    selectedModel: "qwen/qwen3.6-plus",
-    openRouterApiKey: "openrouter-key",
+    selectedModel: "anthropic/claude-sonnet-4.6",
+    aiGatewayApiKey: "ai-gateway-key",
     tavilyApiKey: "tavily-key",
     fmpApiKey: "fmp-key",
     messages: [{ role: "user", content: "Hello" }],
@@ -255,8 +255,8 @@ test("agent helper streams fallback output when the model yields no content", as
 
 test("agent helper returns an auth-key fallback when provider auth fails", async () => {
   setTestMocks({
-    openRouterResponses: {
-      startOpenRouterResponseStream(params) {
+    gatewayResponses: {
+      startGatewayResponseStream(params) {
         recorded.streamParams.push(params)
         return (async function* () {
           yield* []
@@ -270,8 +270,8 @@ test("agent helper returns an auth-key fallback when provider auth fails", async
     request: createRequest(),
     requestId: "request-2",
     timeoutMs: 30_000,
-    selectedModel: "qwen/qwen3.6-plus",
-    openRouterApiKey: "openrouter-key",
+    selectedModel: "anthropic/claude-sonnet-4.6",
+    aiGatewayApiKey: "ai-gateway-key",
     messages: [{ role: "user", content: "Hello" }],
     systemInstruction: "system",
   })
@@ -283,12 +283,12 @@ test("agent helper returns an auth-key fallback when provider auth fails", async
     { type: "agent_status", status: "failed" },
     {
       type: "text_delta",
-      delta: "Invalid OPENROUTER_API_KEY on the server.",
+      delta: "Invalid AI_GATEWAY_API_KEY on the server.",
     },
   ])
   assert.equal(recorded.loggerErrors.length, 1)
   assert.equal(
     recorded.loggerErrors[0]?.message,
-    "OpenRouter authentication failed."
+    "AI Gateway authentication failed."
   )
 })

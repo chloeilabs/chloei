@@ -1,6 +1,6 @@
 # Chloei
 
-Chloei is a Next.js 16 chat app backed by OpenRouter. It supports web search, X search, local code execution, optional Tavily retrieval, optional Financial Modeling Prep MCP tools, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
+Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently uses Anthropic Claude Sonnet 4.6, keeps a curated model selector for future expansion, and supports native web search, X search, local code execution, optional Tavily retrieval, optional Financial Modeling Prep MCP tools, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
 
 ## Requirements
 
@@ -16,7 +16,7 @@ pnpm migrate
 pnpm dev
 ```
 
-Add `OPENROUTER_API_KEY` to `.env.local` before starting the app. Add `TAVILY_API_KEY` if you want Tavily search and extract tools. Add `FMP_API_KEY` if you want the curated finance tools. The app runs on [http://localhost:3000](http://localhost:3000).
+Add `AI_GATEWAY_API_KEY` to `.env.local` before starting the app. Add `TAVILY_API_KEY` if you want Tavily search and extract tools. Add `FMP_API_KEY` if you want the curated finance tools. The app runs on [http://localhost:3000](http://localhost:3000).
 
 To enable auth locally, provision PostgreSQL and add:
 
@@ -47,7 +47,7 @@ To enable auth locally, provision PostgreSQL and add:
 
 `.env.example` documents the supported environment variables. Required variables are:
 
-- `OPENROUTER_API_KEY`: required to enable `/api/models` and `/api/agent`
+- `AI_GATEWAY_API_KEY`: required to enable `/api/models` and `/api/agent`
 - `DATABASE_URL`: PostgreSQL connection string for Better Auth
 - `AUTH_DATABASE_URL`: optional Better Auth database override; falls back to `DATABASE_URL`
 - `BETTER_AUTH_SECRET`: Better Auth signing secret
@@ -77,6 +77,7 @@ By default, Chloei enforces safe built-in agent limits even if you leave all opt
 
 - The current model list is defined in `src/lib/shared/llm/models.ts`.
 - `/`, `/api/agent`, and `/api/models` require an authenticated Better Auth session.
+- Native `web_search` is available through AI Gateway alongside Tavily, FMP, and local code execution.
 - FMP MCP uses a single server-owned API key and is intentionally limited to a curated set of finance tools.
 - To share logins with another Chloei app, point both apps at the same Better Auth database and secret, set `BETTER_AUTH_COOKIE_DOMAIN` to the shared parent domain, and include every live subdomain in `BETTER_AUTH_TRUSTED_ORIGINS`.
 - Rate limiting and concurrency protection are in-memory, so they reset on process restart and do not synchronize across instances.

@@ -24,7 +24,7 @@ test("agent route validates model, threadId, and messages", async () => {
   )
 })
 
-test("agent route streams through the extracted OpenRouter helper path", async () => {
+test("agent route streams through the extracted AI Gateway helper path", async () => {
   const helperSource = await readFile(helperPath, "utf8")
   const routeSource = await readFile(routePath, "utf8")
 
@@ -42,8 +42,8 @@ test("agent route streams through the extracted OpenRouter helper path", async (
 
   assert.match(
     helperSource,
-    /const stream = startOpenRouterResponseStream\(\{[\s\S]*messages: params\.messages,[\s\S]*systemInstruction: withAiSdkInlineCitationInstruction\(/,
-    "Expected the helper to stream via startOpenRouterResponseStream."
+    /const stream = startGatewayResponseStream\(\{[\s\S]*messages: params\.messages,[\s\S]*systemInstruction: withAiSdkInlineCitationInstruction\(/,
+    "Expected the helper to stream via startGatewayResponseStream."
   )
 
   assert.match(

@@ -35,7 +35,7 @@ function createStoredMessage(overrides = {}) {
     id: "message-1",
     role: "user",
     content: "Stored thread message",
-    llmModel: "qwen/qwen3.6-plus",
+    llmModel: "anthropic/claude-sonnet-4.6",
     createdAt: "2026-04-15T10:00:00.000Z",
     ...overrides,
   }
@@ -44,7 +44,7 @@ function createStoredMessage(overrides = {}) {
 function createStoredRow(overrides = {}) {
   return {
     id: "thread-1",
-    model: "qwen/qwen3.6-plus",
+    model: "anthropic/claude-sonnet-4.6",
     messages: [createStoredMessage()],
     createdAt: "2026-04-15T10:00:00.000Z",
     updatedAt: "2026-04-15T10:05:00.000Z",
@@ -188,7 +188,7 @@ test("upsertThreadForUser normalizes the persisted thread and shapes SQL values"
         id: "message-upsert",
         role: "user",
         content: "  Derive my title from the first message  ",
-        llmModel: "qwen/qwen3.6-plus",
+        llmModel: "anthropic/claude-sonnet-4.6",
         createdAt: "2026-04-15T09:59:00.000Z",
       },
     ],
@@ -204,28 +204,30 @@ test("upsertThreadForUser normalizes the persisted thread and shapes SQL values"
 
   const query = recorded.queries[0]
   assert.match(query.text, /INSERT INTO thread/)
+  assert.match(query.text, /title/)
   assert.match(query.text, /ON CONFLICT \("userId", id\)/)
-  assert.deepEqual(query.values.slice(0, 3), [
+  assert.deepEqual(query.values.slice(0, 4), [
     "user-1",
     "thread-upsert",
+    "Derive my title from the first message",
     null,
   ])
   assert.equal(
-    query.values[3],
+    query.values[4],
     JSON.stringify([
       {
         id: "message-upsert",
         role: "user",
         content: "  Derive my title from the first message  ",
-        llmModel: "qwen/qwen3.6-plus",
+        llmModel: "anthropic/claude-sonnet-4.6",
         createdAt: "2026-04-15T09:59:00.000Z",
       },
     ])
   )
-  assert(query.values[4] instanceof Date)
-  assert.equal(query.values[4].toISOString(), "2026-04-15T09:59:00.000Z")
   assert(query.values[5] instanceof Date)
-  assert.equal(query.values[5].toISOString(), "2026-04-15T12:05:00.000Z")
+  assert.equal(query.values[5].toISOString(), "2026-04-15T09:59:00.000Z")
+  assert(query.values[6] instanceof Date)
+  assert.equal(query.values[6].toISOString(), "2026-04-15T12:05:00.000Z")
 })
 
 test("deleteThreadForUser forwards ids into the delete query", async () => {

@@ -27,7 +27,7 @@ function createMessage(overrides = {}) {
     id: "message-1",
     role: "user",
     content: "First question about streaming behavior",
-    llmModel: "qwen/qwen3.6-plus",
+    llmModel: "anthropic/claude-sonnet-4.6",
     createdAt: "2026-04-15T10:00:00.000Z",
     ...overrides,
   }
@@ -78,7 +78,7 @@ test("parseThreadPayload sanitizes invalid metadata and converts legacy activity
         id: "assistant-1",
         role: "assistant",
         content: "Summarize this thread",
-        llmModel: "qwen/qwen3.6-plus",
+        llmModel: "anthropic/claude-sonnet-4.6",
         createdAt: "2026-04-15T10:00:00.000Z",
         metadata: {
           selectedModel: "not-a-model",
@@ -167,10 +167,29 @@ test("parseThreadPayload sanitizes invalid metadata and converts legacy activity
   ])
 })
 
+test("parseThreadPayload drops removed model ids from stored thread metadata", () => {
+  const parsed = parseThreadPayload({
+    id: "thread-removed-model",
+    model: "minimax/minimax-m2.7",
+    messages: [
+      createMessage({
+        metadata: {
+          selectedModel: "minimax/minimax-m2.7",
+        },
+      }),
+    ],
+    createdAt: "2026-04-15T11:00:00.000Z",
+    updatedAt: "2026-04-15T11:05:00.000Z",
+  })
+
+  assert.equal(parsed.model, undefined)
+  assert.equal(parsed.messages[0]?.metadata?.selectedModel, undefined)
+})
+
 test("prepareThreadForPersistence aligns createdAt with the first message", () => {
   const normalizedThread = prepareThreadForPersistence({
     id: "thread-persist",
-    model: "qwen/qwen3.6-plus",
+    model: "anthropic/claude-sonnet-4.6",
     messages: [
       createMessage({
         createdAt: "2026-04-15T09:59:00.000Z",

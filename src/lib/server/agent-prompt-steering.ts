@@ -1,6 +1,6 @@
 import type { ModelType } from "@/lib/shared"
 
-export type PromptProvider = "openrouter"
+export type PromptProvider = "anthropic"
 
 export type PromptTaskMode =
   | "general"
@@ -39,12 +39,13 @@ const STRICT_OUTPUT_PATTERN =
   /\b(return only|exactly|exact format|valid json|minified json|last line|single word|one word|single line|one line|two sentences|one sentence|one paragraph|no more than|under \d+ words|no surrounding prose|only one ```|schema|yaml|xml|csv)\b/i
 
 const PROVIDER_OVERLAYS: Record<PromptProvider, string> = {
-  openrouter: `
-Use OpenRouter reasoning mode efficiently.
+  anthropic: `
+Use Claude reasoning mode efficiently.
 - Keep the final answer tighter than the hidden reasoning.
+- Prefer adaptive thinking over unnecessary verbosity.
 - On format-sensitive tasks, do a literal final-format check before finishing.
 - Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
-- Use tools only when they materially improve accuracy or freshness.
+- Use native web search or other tools only when they materially improve accuracy or freshness.
 - After tool use, synthesize and stop. Do not replay raw tool output.
 `.trim(),
 }
@@ -109,8 +110,8 @@ function getLastUserMessage(
 }
 
 export function resolvePromptProvider(model: ModelType): PromptProvider {
-  if (model.includes("/")) {
-    return "openrouter"
+  if (model.startsWith("anthropic/")) {
+    return "anthropic"
   }
 
   throw new Error(`Unsupported model provider for model: ${model}`)

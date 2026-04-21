@@ -2,6 +2,7 @@ import { sql } from "kysely"
 
 import { createLogger } from "@/lib/logger"
 import {
+  deriveThreadTitle,
   sortThreadsNewestFirst,
   type Thread,
 } from "@/lib/shared"
@@ -129,12 +130,14 @@ export async function upsertThreadForUser(
   const database = getDatabase()
   const normalizedThread = prepareThreadForPersistence(thread)
   const { createdAt, updatedAt } = normalizedThread
+  const title = deriveThreadTitle(normalizedThread.messages)
 
   try {
     await sql`
       INSERT INTO thread (
         "userId",
         id,
+        title,
         model,
         messages,
         "createdAt",
@@ -143,6 +146,7 @@ export async function upsertThreadForUser(
       VALUES (
         ${userId},
         ${normalizedThread.id},
+        ${title},
         ${normalizedThread.model ?? null},
         CAST(${JSON.stringify(normalizedThread.messages)} AS jsonb),
         ${new Date(createdAt)},
@@ -150,6 +154,7 @@ export async function upsertThreadForUser(
       )
       ON CONFLICT ("userId", id)
       DO UPDATE SET
+        title = EXCLUDED.title,
         model = EXCLUDED.model,
         messages = EXCLUDED.messages,
         "createdAt" = LEAST(thread."createdAt", EXCLUDED."createdAt"),

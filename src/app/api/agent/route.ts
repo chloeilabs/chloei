@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const openRouterApiKey = process.env.OPENROUTER_API_KEY
+    const aiGatewayApiKey = process.env.AI_GATEWAY_API_KEY
     const tavilyApiKey = process.env.TAVILY_API_KEY
     const fmpApiKey = process.env.FMP_API_KEY
     const session = await getRequestSession(request.headers)
@@ -164,22 +164,22 @@ export async function POST(request: NextRequest) {
       }
     )
 
-    if (!openRouterApiKey) {
-      logger.error("Missing OPENROUTER_API_KEY on the server.", {
-        errorCode: "AGENT_OPENROUTER_API_KEY_MISSING",
+    if (!aiGatewayApiKey) {
+      logger.error("Missing AI_GATEWAY_API_KEY on the server.", {
+        errorCode: "AGENT_AI_GATEWAY_API_KEY_MISSING",
         requestId,
       })
       return observeRouteResponse(
         observation,
         createJsonErrorResponse({
           requestId,
-          error: "Missing OPENROUTER_API_KEY on the server.",
-          errorCode: "AGENT_OPENROUTER_API_KEY_MISSING",
+          error: "Missing AI_GATEWAY_API_KEY on the server.",
+          errorCode: "AGENT_AI_GATEWAY_API_KEY_MISSING",
           status: 500,
           rateLimitDecision: rateLimitDecision ?? undefined,
         }),
         {
-          errorCode: "AGENT_OPENROUTER_API_KEY_MISSING",
+          errorCode: "AGENT_AI_GATEWAY_API_KEY_MISSING",
           outcome: "error",
         }
       )
@@ -219,9 +219,10 @@ export async function POST(request: NextRequest) {
         rateLimitDecision: rateLimitDecision ?? undefined,
         timeoutMs: AGENT_STREAM_TIMEOUT_MS,
         selectedModel,
-        openRouterApiKey,
+        aiGatewayApiKey,
         tavilyApiKey,
         fmpApiKey,
+        userTimeZone,
         messages: parsedRequest.messages,
         systemInstruction,
         onStreamSettled: concurrencySlot?.release,

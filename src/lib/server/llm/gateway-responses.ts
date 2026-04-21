@@ -1,12 +1,18 @@
-import { createOpenRouter } from "@openrouter/ai-sdk-provider"
+import { createGateway } from "@ai-sdk/gateway"
 import { type ModelMessage, stepCountIs, streamText, type ToolSet } from "ai"
 
-import { asRecord, asString } from "@/lib/cast"
 import { createLogger } from "@/lib/logger"
 import { AGENT_TOOL_MAX_STEPS } from "@/lib/server/agent-runtime-config"
 import { type AgentStreamEvent, type ModelType } from "@/lib/shared"
 
 import { createAiSdkFmpMcpToolsContext } from "./ai-sdk-fmp-mcp-tools"
+import {
+  createAiSdkGatewaySearchTools,
+  getAiSdkGatewayProviderOptions,
+  getAiSdkGatewaySearchToolCallMetadata,
+  getAiSdkGatewaySearchToolResultMetadata,
+  isAiSdkGatewaySearchToolName,
+} from "./ai-sdk-gateway-search-tools"
 import {
   createAiSdkTavilyTools,
   getAiSdkTavilyToolCallMetadata,
@@ -20,25 +26,24 @@ import {
   isAiSdkCodeExecutionToolName,
 } from "./code-execution-tools"
 
-const logger = createLogger("fmp-mcp")
+const logger = createLogger("gateway-stream")
 
 interface AgentInputMessage {
   role: "system" | "user" | "assistant"
   content: string
 }
 
-interface StartOpenRouterResponseStreamParams {
+interface StartGatewayResponseStreamParams {
   model: ModelType
-  openRouterApiKey: string
+  aiGatewayApiKey: string
   tavilyApiKey?: string
   fmpApiKey?: string
+  userTimeZone?: string
   messages: AgentInputMessage[]
   systemInstruction: string
   temperature?: number
   signal?: AbortSignal
 }
-
-const OPENROUTER_REASONING_EFFORT = "high" as const
 
 function toModelMessages(messages: AgentInputMessage[]): ModelMessage[] {
   const inputMessages: ModelMessage[] = []
@@ -78,32 +83,15 @@ function getSourceEvent(
   }
 }
 
-function shouldSkipOpenRouterReasoningChunk(
-  text: string,
-  providerMetadata: unknown
-): boolean {
-  if (text.trim() !== "[REDACTED]") {
-    return false
-  }
-
-  const metadataRecord = asRecord(providerMetadata)
-  const openRouterRecord = asRecord(metadataRecord?.openrouter)
-  const reasoningDetails = openRouterRecord?.reasoning_details
-  if (!Array.isArray(reasoningDetails) || reasoningDetails.length === 0) {
-    return false
-  }
-
-  return reasoningDetails.some((detail) => {
-    const detailRecord = asRecord(detail)
-    return asString(detailRecord?.type) === "reasoning.encrypted"
-  })
+function shouldSkipReasoningChunk(text: string): boolean {
+  return text.trim() === "[REDACTED]"
 }
 
-export async function* startOpenRouterResponseStream(
-  params: StartOpenRouterResponseStreamParams
+export async function* startGatewayResponseStream(
+  params: StartGatewayResponseStreamParams
 ): AsyncGenerator<AgentStreamEvent> {
-  const provider = createOpenRouter({
-    apiKey: params.openRouterApiKey,
+  const gatewayProvider = createGateway({
+    apiKey: params.aiGatewayApiKey,
   })
 
   const messages = toModelMessages(params.messages)
@@ -139,25 +127,20 @@ export async function* startOpenRouterResponseStream(
   try {
     const tools = {
       ...createAiSdkCodeExecutionTools(),
+      ...createAiSdkGatewaySearchTools(params.userTimeZone),
       ...createAiSdkTavilyTools(normalizedTavilyApiKey),
       ...(fmpToolsContext?.tools ?? {}),
     } as ToolSet
 
     const result = streamText({
-      model: provider.chat(params.model),
+      model: gatewayProvider(params.model),
       system: params.systemInstruction,
       messages,
       abortSignal: params.signal,
       ...(params.temperature !== undefined
         ? { temperature: params.temperature }
         : {}),
-      providerOptions: {
-        openrouter: {
-          reasoning: {
-            effort: OPENROUTER_REASONING_EFFORT,
-          },
-        },
-      },
+      providerOptions: getAiSdkGatewayProviderOptions(),
       tools,
       stopWhen: stepCountIs(AGENT_TOOL_MAX_STEPS),
     })
@@ -171,10 +154,7 @@ export async function* startOpenRouterResponseStream(
       }
 
       if (part.type === "reasoning-delta") {
-        if (
-          part.text.length > 0 &&
-          !shouldSkipOpenRouterReasoningChunk(part.text, part.providerMetadata)
-        ) {
+        if (part.text.length > 0 && !shouldSkipReasoningChunk(part.text)) {
           yield { type: "reasoning_delta", delta: part.text }
         }
         continue
@@ -194,6 +174,7 @@ export async function* startOpenRouterResponseStream(
 
       if (part.type === "tool-call") {
         const metadata =
+          getAiSdkGatewaySearchToolCallMetadata(part) ??
           getAiSdkCodeExecutionToolCallMetadata(part) ??
           getAiSdkTavilyToolCallMetadata(part) ??
           fmpToolsContext?.getToolCallMetadata(part)
@@ -220,6 +201,7 @@ export async function* startOpenRouterResponseStream(
         }
 
         const metadata =
+          getAiSdkGatewaySearchToolResultMetadata(part) ??
           getAiSdkCodeExecutionToolResultMetadata(part) ??
           getAiSdkTavilyToolResultMetadata(part) ??
           fmpToolsContext?.getToolResultMetadata(part)
@@ -250,7 +232,8 @@ export async function* startOpenRouterResponseStream(
 
       if (
         part.type === "tool-error" &&
-        (isAiSdkCodeExecutionToolName(part.toolName) ||
+        (isAiSdkGatewaySearchToolName(part.toolName) ||
+          isAiSdkCodeExecutionToolName(part.toolName) ||
           isAiSdkTavilyToolName(part.toolName) ||
           fmpToolsContext?.isToolName(part.toolName)) &&
         !finalizedToolCalls.has(part.toolCallId)

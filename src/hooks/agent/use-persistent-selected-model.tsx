@@ -6,7 +6,12 @@ import {
   MODEL_SELECTOR_STORAGE_KEY,
   MODEL_SELECTOR_UPDATED_EVENT,
 } from "@/lib/constants"
-import { isModelType, type ModelInfo, type ModelType } from "@/lib/shared"
+import { type ModelInfo, type ModelType } from "@/lib/shared"
+
+import {
+  parseStoredSelectedModel,
+  resolvePersistedSelectedModel,
+} from "./persistent-selected-model-utils"
 
 function readStoredSelectedModel(): ModelType | null {
   if (typeof window === "undefined") {
@@ -14,7 +19,7 @@ function readStoredSelectedModel(): ModelType | null {
   }
 
   const value = window.localStorage.getItem(MODEL_SELECTOR_STORAGE_KEY)
-  return isModelType(value) ? value : null
+  return parseStoredSelectedModel(value)
 }
 
 function writeStoredSelectedModel(model: ModelType | null) {
@@ -40,10 +45,12 @@ export function usePersistentSelectedModel(
     [availableModels]
   )
 
-  const fallbackModel =
-    initialSelectedModel && availableModelIds.has(initialSelectedModel)
-      ? initialSelectedModel
-      : (availableModels[0]?.id ?? null)
+  const fallbackModel = resolvePersistedSelectedModel({
+    storedModel: null,
+    currentModel: null,
+    initialSelectedModel,
+    availableModels,
+  })
 
   const [selectedModel, setSelectedModel] = useState<ModelType | null>(
     initialSelectedModel ?? null
@@ -52,21 +59,19 @@ export function usePersistentSelectedModel(
   useEffect(() => {
     const syncSelectedModel = () => {
       const storedModel = readStoredSelectedModel()
+      const nextSelectedModel = resolvePersistedSelectedModel({
+        storedModel,
+        currentModel: selectedModel,
+        initialSelectedModel,
+        availableModels,
+      })
 
-      if (storedModel && availableModelIds.has(storedModel)) {
-        setSelectedModel(storedModel)
+      if (nextSelectedModel === selectedModel) {
         return
       }
 
-      setSelectedModel((currentModel) => {
-        if (currentModel && availableModelIds.has(currentModel)) {
-          return currentModel
-        }
-
-        return fallbackModel
-      })
-
-      writeStoredSelectedModel(fallbackModel)
+      setSelectedModel(nextSelectedModel)
+      writeStoredSelectedModel(nextSelectedModel)
     }
 
     syncSelectedModel()
@@ -93,7 +98,7 @@ export function usePersistentSelectedModel(
         handleModelUpdate
       )
     }
-  }, [availableModelIds, fallbackModel])
+  }, [availableModels, fallbackModel, initialSelectedModel, selectedModel])
 
   const persistSelectedModel = useCallback((model: ModelType | null) => {
     setSelectedModel(model)

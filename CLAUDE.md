@@ -42,7 +42,7 @@ Client (useAgentSession)
     → Sliding-window rate limit + concurrency slot (rate-limit.ts)
     → Zod validation (parseAgentStreamRequest)
     → System prompt assembly (buildAgentSystemInstruction)
-    → OpenRouter stream via Vercel AI SDK (startOpenRouterResponseStream)
+    → AI Gateway stream via Vercel AI SDK (startGatewayResponseStream)
     → NDJSON chunks → client
       → parseStreamEventLine / applyAgentStreamEvent
         → React state update → render
@@ -65,7 +65,7 @@ Violating this boundary causes Next.js build errors because server modules (pg, 
 Event types (defined in `src/lib/shared/agent/messages.ts`):
 
 - `text_delta` — incremental assistant text
-- `reasoning_delta` — incremental reasoning text (hidden chain-of-thought); encrypted OpenRouter chunks are filtered
+- `reasoning_delta` — incremental reasoning text; redacted reasoning placeholders are filtered
 - `agent_status` — `in_progress` | `completed` | `failed` | `cancelled` | `incomplete`
 - `tool_call` — tool invocation start with `callId`, `toolName`, `label`, optional `query`
 - `tool_result` — tool invocation result with `callId`, `status: success | error`
@@ -118,7 +118,7 @@ An `automation` table is also created by the migration but has no active route h
 
 1. `OPERATING INSTRUCTIONS` — from `DEFAULT_OPERATING_INSTRUCTION` in `src/lib/shared/llm/system-instructions.ts`
 2. `RUNTIME DATE CONTEXT` — current UTC timestamp + user timezone (from `X-User-Timezone` header)
-3. Provider overlay (`PROVIDER OVERLAY: OPENROUTER`) — OpenRouter-specific reasoning guidance
+3. Provider overlay (`PROVIDER OVERLAY: ANTHROPIC`) — Claude-specific reasoning guidance
 4. Task mode overlay (`TASK MODE OVERLAY: <MODE>`) — mode-specific guidance (see below)
 5. `SHARED CONTEXT FILE: SOUL.md` — from `DEFAULT_SOUL_FALLBACK_INSTRUCTION` in `src/lib/shared`
 6. `AUTH USER CONTEXT` — authenticated user id, name, email
@@ -138,12 +138,13 @@ After assembly, `withAiSdkInlineCitationInstruction` appends inline citation rul
 
 Three tool categories, each only active when the respective API key is configured:
 
-| Tool             | Key              | Description                                       |
-| ---------------- | ---------------- | ------------------------------------------------- |
-| `tavily_search`  | `TAVILY_API_KEY` | Live web search (advanced depth, up to 8 results) |
-| `tavily_extract` | `TAVILY_API_KEY` | Extract content from specific URLs (up to 5 URLs) |
-| `code_execution` | always on        | Run sandboxed JS or Python for arithmetic/logic   |
-| FMP MCP tools    | `FMP_API_KEY`    | Finance data via Financial Modeling Prep MCP      |
+| Tool                | Key                  | Description                                          |
+| ------------------- | -------------------- | ---------------------------------------------------- |
+| `web_search`        | `AI_GATEWAY_API_KEY` | Anthropic native web search through AI Gateway       |
+| `tavily_search`     | `TAVILY_API_KEY`     | Live web search (advanced depth, up to 8 results)    |
+| `tavily_extract`    | `TAVILY_API_KEY`     | Extract content from specific URLs (up to 5 URLs)    |
+| `code_execution`    | always on            | Run sandboxed JS or Python for arithmetic/logic      |
+| FMP MCP tools       | `FMP_API_KEY`        | Finance data via Financial Modeling Prep MCP         |
 
 **Code execution** (`src/lib/server/llm/code-execution-tools.ts`):
 
@@ -174,13 +175,11 @@ Both live in `src/lib/server/rate-limit.ts`. All limits are overridable via `AGE
 
 All available models are defined in `src/lib/shared/llm/models.ts` (`AvailableModels`, `ALL_MODELS`). Current models:
 
-| Key                            | Model ID               | Display Name |
-| ------------------------------ | ---------------------- | ------------ |
-| `OPENROUTER_QWEN_QWEN3_6_PLUS` | `qwen/qwen3.6-plus`    | Qwen3.6 Plus |
-| `OPENROUTER_MINIMAX_M2_7`      | `minimax/minimax-m2.7` | MiniMax M2.7 |
-| `OPENROUTER_Z_AI_GLM_5_1`      | `z-ai/glm-5.1`         | GLM 5.1      |
+| Key                           | Model ID                       | Display Name       |
+| ----------------------------- | ------------------------------ | ------------------ |
+| `ANTHROPIC_CLAUDE_SONNET_4_6` | `anthropic/claude-sonnet-4.6` | Claude Sonnet 4.6 |
 
-Adding a model requires updating `AvailableModels`, `ModelInfos`, and `OPENROUTER_MODELS` in that file. The `/api/models` route reads from this registry (filtered by configured API keys via `getModels()` in `src/lib/actions/api-keys.ts`); the agent validates the requested model against it.
+Adding a model requires updating `AvailableModels`, `ModelInfos`, and `SUPPORTED_MODELS` in that file. The `/api/models` route reads from this registry (filtered by configured API keys via `getModels()` in `src/lib/actions/api-keys.ts`); the agent validates the requested model against it.
 
 ### Authentication
 
@@ -248,7 +247,8 @@ src/
         ai-sdk-fmp-mcp-tools.ts   # FMP MCP client + curated tool wrappers
         ai-sdk-tavily-tools.ts    # Tavily search/extract tools
         code-execution-tools.ts   # Sandboxed JS/Python execution
-        openrouter-responses.ts   # startOpenRouterResponseStream generator
+        ai-sdk-gateway-search-tools.ts # Native AI Gateway + Anthropic search tools
+        gateway-responses.ts      # startGatewayResponseStream generator
         system-instruction-augmentations.ts  # Citation + FMP rules appended to prompt
       postgres.ts               # getDatabase() Kysely instance
       postgres-url.mjs          # normalizePostgresConnectionString
@@ -314,7 +314,7 @@ Required for a working local instance:
 DATABASE_URL=
 BETTER_AUTH_SECRET=
 BETTER_AUTH_URL=http://localhost:3000
-OPENROUTER_API_KEY=
+AI_GATEWAY_API_KEY=
 ```
 
 All other variables are optional — the code has safe defaults. See `.env.example` for the full list with inline documentation.

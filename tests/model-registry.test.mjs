@@ -7,24 +7,30 @@ import { fileURLToPath } from "node:url"
 const cwd = fileURLToPath(new URL("..", import.meta.url))
 const modelsPath = path.join(cwd, "src/lib/shared/llm/models.ts")
 
-test("shared model registry includes z-ai/glm-5.1 in all required sections", async () => {
+test("shared model registry contains only the supported Claude model", async () => {
   const source = await readFile(modelsPath, "utf8")
 
-  assert.match(
+  assert.doesNotMatch(
     source,
-    /OPENROUTER_Z_AI_GLM_5_1:\s*"z-ai\/glm-5\.1"/,
-    "Expected AvailableModels to include OPENROUTER_Z_AI_GLM_5_1."
+    /qwen\/qwen3\.6-plus|z-ai\/glm-5\.1|Qwen3\.6 Plus|GLM 5\.1/,
+    "Expected legacy model ids to be fully removed from the shared model registry."
   )
 
   assert.match(
     source,
-    /OPENROUTER_MODELS\s*=\s*\[[\s\S]*AvailableModels\.OPENROUTER_Z_AI_GLM_5_1[\s\S]*\]\s*as const/,
-    "Expected OPENROUTER_MODELS to include OPENROUTER_Z_AI_GLM_5_1."
+    /ANTHROPIC_CLAUDE_SONNET_4_6:\s*"anthropic\/claude-sonnet-4\.6"/,
+    "Expected AvailableModels to include ANTHROPIC_CLAUDE_SONNET_4_6."
+  )
+
+  assert.match(
+    source.replace(/\s+/g, " "),
+    /SUPPORTED_MODELS = \[ AvailableModels\.ANTHROPIC_CLAUDE_SONNET_4_6, \] as const/,
+    "Expected SUPPORTED_MODELS to include only the supported model id."
   )
 
   assert.match(
     source,
-    /\[AvailableModels\.OPENROUTER_Z_AI_GLM_5_1\]:\s*\{[\s\S]*name:\s*"GLM 5\.1"/,
-    "Expected ModelInfos to define display metadata for OPENROUTER_Z_AI_GLM_5_1."
+    /\[AvailableModels\.ANTHROPIC_CLAUDE_SONNET_4_6\]:\s*\{[\s\S]*name:\s*"Claude Sonnet 4\.6"/,
+    "Expected ModelInfos to define display metadata for ANTHROPIC_CLAUDE_SONNET_4_6."
   )
 })

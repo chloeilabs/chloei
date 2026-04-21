@@ -40,7 +40,7 @@ setTestModuleStubs({
 
 const { POST } = await import(routeUrl)
 
-const originalOpenRouterApiKey = process.env.OPENROUTER_API_KEY
+const originalAiGatewayApiKey = process.env.AI_GATEWAY_API_KEY
 const originalTavilyApiKey = process.env.TAVILY_API_KEY
 const originalFmpApiKey = process.env.FMP_API_KEY
 
@@ -96,7 +96,7 @@ beforeEach(() => {
     streamCalls: [],
   }
 
-  process.env.OPENROUTER_API_KEY = "openrouter-key"
+  process.env.AI_GATEWAY_API_KEY = "ai-gateway-key"
   process.env.TAVILY_API_KEY = "tavily-key"
   process.env.FMP_API_KEY = "fmp-key"
 
@@ -129,7 +129,7 @@ beforeEach(() => {
           parsedRequest: {
             messages: body.messages,
           },
-          selectedModel: "qwen/qwen3.6-plus",
+          selectedModel: "anthropic/claude-sonnet-4.6",
         }
       },
       createAgentStreamResponse(params) {
@@ -204,7 +204,7 @@ beforeEach(() => {
 })
 
 after(() => {
-  process.env.OPENROUTER_API_KEY = originalOpenRouterApiKey
+  process.env.AI_GATEWAY_API_KEY = originalAiGatewayApiKey
   process.env.TAVILY_API_KEY = originalTavilyApiKey
   process.env.FMP_API_KEY = originalFmpApiKey
 })
@@ -341,7 +341,7 @@ test("agent route passes the resolved prompt context into stream creation", asyn
     context: {
       now: recorded.buildInstructionCalls[0].context.now,
       userTimeZone: "America/Chicago",
-      provider: "provider:qwen/qwen3.6-plus",
+      provider: "provider:anthropic/claude-sonnet-4.6",
       taskMode: "multi-turn",
     },
   })
@@ -349,7 +349,7 @@ test("agent route passes the resolved prompt context into stream creation", asyn
     { role: "user", content: "What changed?" },
     { role: "assistant", content: "Here is the summary." },
   ])
-  assert.equal(recorded.streamCalls[0]?.openRouterApiKey, "openrouter-key")
+  assert.equal(recorded.streamCalls[0]?.aiGatewayApiKey, "ai-gateway-key")
   assert.equal(recorded.streamCalls[0]?.tavilyApiKey, "tavily-key")
   assert.equal(recorded.streamCalls[0]?.fmpApiKey, "fmp-key")
   assert.equal(recorded.streamCalls[0]?.systemInstruction, "system-instruction")

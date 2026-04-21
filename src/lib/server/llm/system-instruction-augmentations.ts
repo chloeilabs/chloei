@@ -13,8 +13,10 @@ const AI_SDK_FMP_TOOLING_INSTRUCTION = `
 <ai_sdk_fmp_tool_rules>
 When FMP MCP tools are available:
 - Prefer FMP for structured financial facts such as quotes, company profile data, historical prices, and financial statements.
-- Prefer Tavily or other web tools for news, explanations, and source-backed claims that need clickable citations.
+- Prefer native \`web_search\` for broad, fresh web discovery.
+- Prefer Tavily for controlled retrieval, extraction, and clickable inline citations from specific pages.
 - Do not invent inline citations or source cards for FMP data unless the tool result itself clearly provides a canonical URL.
+- Use code execution only for calculation or validation.
 - Use the minimum mix of tools needed, then synthesize the answer around the evidence.
 </ai_sdk_fmp_tool_rules>
 `.trim()

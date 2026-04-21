@@ -525,9 +525,6 @@ function appendReasoningToTimeline(
   delta: string,
   nextOrder: () => number
 ): ActivityTimelineEntry[] {
-  const startsMarkdownHeading = (text: string): boolean =>
-    /^(\*\*[^*\n][^*\n]*\*\*|#{1,6}\s)/.test(text)
-
   const mergeReasoningText = (
     currentText: string,
     nextText: string
@@ -538,14 +535,6 @@ function appendReasoningToTimeline(
 
     if (/\s$/.test(currentText) || /^\s/.test(nextText)) {
       return `${currentText}${nextText}`
-    }
-
-    if (startsMarkdownHeading(nextText)) {
-      return `${currentText}\n\n${nextText}`
-    }
-
-    if (/[.!?]$/.test(currentText) && /^[A-Z][a-z]/.test(nextText)) {
-      return `${currentText}\n\n${nextText}`
     }
 
     if (/[A-Za-z0-9)]$/.test(currentText) && /^[A-Za-z0-9(]/.test(nextText)) {
@@ -559,8 +548,6 @@ function appendReasoningToTimeline(
     text
       .replace(/\r\n/g, "\n")
       .replace(/[ \t]+\n/g, "\n")
-      .replace(/([.!?])(?=[A-Z][a-z])/g, "$1\n\n")
-      .replace(/(\*\*[^*\n][^*\n]*\*\*)(?=[A-Z][a-z])/g, "$1\n\n")
       .replace(/\n{3,}/g, "\n\n")
       .trimEnd()
 
