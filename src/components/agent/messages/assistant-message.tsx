@@ -107,6 +107,8 @@ export function AssistantMessage({ message }: { message: Message }) {
   const hasContent = content.trim().length > 0
   const hasActivity = activityTimeline.length > 0
   const showActivitySection = hasActivity
+  const isActivityShimmering =
+    hasRunningActivity || (isAssistantStreaming && !hasContent)
   const isActivityCollapsed =
     activityVisibility === "collapsed" ||
     (activityVisibility === "auto" && !hasActiveActivity)
@@ -137,7 +139,9 @@ export function AssistantMessage({ message }: { message: Message }) {
                 })
               }}
             >
-              <span className="shimmer">Activity</span>
+              <span className={isActivityShimmering ? "shimmer" : undefined}>
+                Activity
+              </span>
               <ChevronDown
                 className={`size-3.5 transition-transform ${
                   isActivityCollapsed ? "-rotate-90" : "rotate-0"
