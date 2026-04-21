@@ -7,13 +7,38 @@ import "./register-ts-path-hooks.mjs"
 
 const cwd = fileURLToPath(new URL("..", import.meta.url))
 const moduleUrl = pathToFileURL(
-  path.join(
-    cwd,
-    "src/components/agent/messages/assistant-activity-timeline.ts"
-  )
+  path.join(cwd, "src/components/agent/messages/assistant-activity-timeline.ts")
 ).href
 
-const { normalizeAssistantActivityTimeline } = await import(moduleUrl)
+const { normalizeAssistantActivityTimeline, normalizeThinkingEntry } =
+  await import(moduleUrl)
+
+test("normalizeThinkingEntry strips leading reasoning labels", () => {
+  assert.equal(
+    normalizeThinkingEntry("THINKING\nThe user wants current AI news."),
+    "The user wants current AI news."
+  )
+
+  assert.equal(
+    normalizeThinkingEntry("Reasoning: The user wants current AI news."),
+    "The user wants current AI news."
+  )
+
+  assert.equal(normalizeThinkingEntry("THINKING:"), "")
+  assert.equal(normalizeThinkingEntry("Reasoning"), "")
+})
+
+test("normalizeThinkingEntry preserves prose that starts with Thinking/Reasoning", () => {
+  assert.equal(
+    normalizeThinkingEntry("Thinking about the latest figures."),
+    "Thinking about the latest figures."
+  )
+
+  assert.equal(
+    normalizeThinkingEntry("Reasoning through the trade-offs"),
+    "Reasoning through the trade-offs"
+  )
+})
 
 test("normalizeAssistantActivityTimeline preserves streamed event order", () => {
   const timeline = normalizeAssistantActivityTimeline({

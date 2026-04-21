@@ -3,6 +3,8 @@
 }
 
 .shimmer {
+  display: inline-block;
+  color: transparent;
   background: linear-gradient(
     90deg,
     #737373 25%,
@@ -19,6 +21,17 @@
 
 .crafting-dot-pulse {
   animation: crafting-dot-pulse 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer {
+    animation: none;
+    background-position: 50% 0;
+  }
+
+  .crafting-dot-pulse {
+    animation: none;
+  }
 }
 
 @keyframes shimmer {

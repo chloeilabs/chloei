@@ -25,6 +25,7 @@ import {
   getAiSdkCodeExecutionToolResultMetadata,
   isAiSdkCodeExecutionToolName,
 } from "./code-execution-tools"
+import { createInitialReasoningChunkSanitizer } from "./initial-reasoning-chunk-sanitizer"
 
 const logger = createLogger("gateway-stream")
 
@@ -107,6 +108,7 @@ export async function* startGatewayResponseStream(
   const seenToolCalls = new Set<string>()
   const finalizedToolCalls = new Set<string>()
   const seenSourceKeys = new Set<string>()
+  const sanitizeInitialReasoningChunk = createInitialReasoningChunkSanitizer()
 
   const createSourceEvent = (
     id: string,
@@ -154,8 +156,9 @@ export async function* startGatewayResponseStream(
       }
 
       if (part.type === "reasoning-delta") {
-        if (part.text.length > 0 && !shouldSkipReasoningChunk(part.text)) {
-          yield { type: "reasoning_delta", delta: part.text }
+        const delta = sanitizeInitialReasoningChunk(part.text)
+        if (delta.length > 0 && !shouldSkipReasoningChunk(delta)) {
+          yield { type: "reasoning_delta", delta }
         }
         continue
       }
