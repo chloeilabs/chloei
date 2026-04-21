@@ -61,3 +61,10 @@ test("sanitizer strips a label followed by a newline instead of a colon", () => 
     "The user wants current AI news."
   )
 })
+
+test("sanitizer buffers a split partial label that arrives after leading whitespace", () => {
+  const sanitize = createInitialReasoningChunkSanitizer()
+
+  assert.equal(sanitize("          \nreasonin"), "")
+  assert.equal(sanitize("g: hello"), "hello")
+})

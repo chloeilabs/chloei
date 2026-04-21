@@ -28,7 +28,7 @@ export function createInitialReasoningChunkSanitizer() {
     if (
       combined.trim().length === 0 ||
       labelOnlyPattern.test(combined) ||
-      (combined.length <= 16 && partialLabelPattern.test(combined))
+      (combined.trim().length <= 10 && partialLabelPattern.test(combined))
     ) {
       bufferedPrefix = combined
       return ""
