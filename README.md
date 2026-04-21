@@ -43,6 +43,15 @@ To enable auth locally, provision PostgreSQL and add:
 - `pnpm format:check`: verify formatting without writing changes
 - `pnpm typecheck`: run TypeScript checks
 
+## Deployment checklist
+
+1. Sync local secrets when needed with `vercel env pull .env.local`, then remove any stale keys the app no longer uses.
+2. Run `pnpm test`, `pnpm lint`, `pnpm typecheck`, and `pnpm build`.
+3. Open a pull request to `main` and wait for the required `checks` and `Vercel` statuses.
+4. Smoke test the preview deployment: sign in, confirm models load, send one prompt, and verify thread persistence.
+5. Merge to `main` after the preview passes, then confirm production is aliased to [chloei.ai](https://chloei.ai).
+6. Run one authenticated production smoke test: sign in, load models, send a prompt, and verify an existing thread still reopens cleanly.
+
 ## Environment
 
 `.env.example` documents the supported environment variables. Required variables are:
