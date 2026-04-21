@@ -87,6 +87,43 @@ function shouldSkipReasoningChunk(text: string): boolean {
   return text.trim() === "[REDACTED]"
 }
 
+function createInitialReasoningChunkSanitizer() {
+  let bufferedPrefix = ""
+  let didResolvePrefix = false
+
+  return (text: string): string => {
+    if (didResolvePrefix) {
+      return text
+    }
+
+    const combined = `${bufferedPrefix}${text}`.replace(/\r\n/g, "\n")
+    const labelWithContentPattern =
+      /^\s*(?:thinking|reasoning)\s*:?(?:\n+|\s+)([\s\S]*)$/i
+    const labelOnlyPattern = /^\s*(?:thinking|reasoning)\s*:?\s*$/i
+    const partialLabelPattern =
+      /^\s*(?:t|th|thi|thin|think|thinki|thinkin|thinking|r|re|rea|reas|reaso|reason|reasoni|reasonin|reasoning)\s*:?\s*$/i
+
+    const labelWithContentMatch = labelWithContentPattern.exec(combined)
+    if (labelWithContentMatch) {
+      bufferedPrefix = ""
+      didResolvePrefix = true
+      return labelWithContentMatch[1] ?? ""
+    }
+
+    if (
+      labelOnlyPattern.test(combined) ||
+      (combined.length <= 16 && partialLabelPattern.test(combined))
+    ) {
+      bufferedPrefix = combined
+      return ""
+    }
+
+    bufferedPrefix = ""
+    didResolvePrefix = true
+    return combined
+  }
+}
+
 export async function* startGatewayResponseStream(
   params: StartGatewayResponseStreamParams
 ): AsyncGenerator<AgentStreamEvent> {
@@ -107,6 +144,7 @@ export async function* startGatewayResponseStream(
   const seenToolCalls = new Set<string>()
   const finalizedToolCalls = new Set<string>()
   const seenSourceKeys = new Set<string>()
+  const sanitizeInitialReasoningChunk = createInitialReasoningChunkSanitizer()
 
   const createSourceEvent = (
     id: string,
@@ -154,8 +192,9 @@ export async function* startGatewayResponseStream(
       }
 
       if (part.type === "reasoning-delta") {
-        if (part.text.length > 0 && !shouldSkipReasoningChunk(part.text)) {
-          yield { type: "reasoning_delta", delta: part.text }
+        const delta = sanitizeInitialReasoningChunk(part.text)
+        if (delta.length > 0 && !shouldSkipReasoningChunk(delta)) {
+          yield { type: "reasoning_delta", delta }
         }
         continue
       }

@@ -1,10 +1,4 @@
-import {
-  Check,
-  ChevronDown,
-  CircleCheck,
-  CircleX,
-  Copy,
-} from "lucide-react"
+import { Check, ChevronDown, CircleCheck, CircleX, Copy } from "lucide-react"
 import { useMemo, useState } from "react"
 
 import { LogoHover } from "@/components/graphics/logo/logo-hover"
@@ -78,11 +72,7 @@ function ToolStatusIcon({ status }: { status: ToolInvocationStatus }) {
   return <CircleX className="size-3.5 shrink-0 text-red-600" />
 }
 
-export function AssistantMessage({
-  message,
-}: {
-  message: Message
-}) {
+export function AssistantMessage({ message }: { message: Message }) {
   const content = useMemo(() => getAssistantContent(message), [message])
   const [activityVisibility, setActivityVisibility] = useState<
     "auto" | "expanded" | "collapsed"
@@ -98,15 +88,28 @@ export function AssistantMessage({
     () => getDedupedSources(message.metadata?.sources),
     [message.metadata?.sources]
   )
+  const hasRunningActivity = useMemo(
+    () =>
+      activityTimeline.some(
+        (entry) =>
+          (entry.kind === "tool" || entry.kind === "search") &&
+          entry.status === "running"
+      ),
+    [activityTimeline]
+  )
   const showSourceFavicon = true
   const { copyToClipboard, isCopied } = useCopyToClipboard()
+  const hasActiveActivity =
+    isAssistantStreaming ||
+    hasRunningActivity ||
+    message.metadata?.agentStatus === "in_progress"
 
   const hasContent = content.trim().length > 0
   const hasActivity = activityTimeline.length > 0
   const showActivitySection = hasActivity
   const isActivityCollapsed =
     activityVisibility === "collapsed" ||
-    (activityVisibility === "auto" && !isAssistantStreaming)
+    (activityVisibility === "auto" && !hasActiveActivity)
 
   if (!hasContent && !hasActivity) {
     return null
@@ -127,14 +130,14 @@ export function AssistantMessage({
               onClick={() => {
                 setActivityVisibility((current) => {
                   if (current === "auto") {
-                    return isAssistantStreaming ? "collapsed" : "expanded"
+                    return hasActiveActivity ? "collapsed" : "expanded"
                   }
 
                   return current === "collapsed" ? "expanded" : "collapsed"
                 })
               }}
             >
-              <span>Activity</span>
+              <span className="shimmer">Activity</span>
               <ChevronDown
                 className={`size-3.5 transition-transform ${
                   isActivityCollapsed ? "-rotate-90" : "rotate-0"

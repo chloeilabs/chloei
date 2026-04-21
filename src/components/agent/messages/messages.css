@@ -3,6 +3,8 @@
 }
 
 .shimmer {
+  display: inline-block;
+  color: transparent;
   background: linear-gradient(
     90deg,
     #737373 25%,

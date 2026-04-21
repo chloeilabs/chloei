@@ -14,6 +14,8 @@ export function normalizeThinkingEntry(text: string): string {
     .replace(/\r\n/g, "\n")
     .replace(/^#{1,6}\s+/gm, "")
     .replace(/\*\*([^*\n][^*\n]*)\*\*/g, "$1")
+    .replace(/^\s*(thinking|reasoning)\s*:?(?:\n+|\s+)/i, "")
+    .replace(/^\s*(thinking|reasoning)\s*:?\s*$/i, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim()
 }
@@ -196,5 +198,9 @@ export function normalizeAssistantActivityTimeline(
     order += 1
   }
 
-  return appendMissingSourcesToTimeline(fallback, dedupedSources, message.createdAt)
+  return appendMissingSourcesToTimeline(
+    fallback,
+    dedupedSources,
+    message.createdAt
+  )
 }
