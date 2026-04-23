@@ -17,10 +17,8 @@ const {
   getAiSdkGatewaySearchToolCallMetadata,
   getAiSdkGatewaySearchToolResultMetadata,
 } = await import(gatewaySearchToolsUrl)
-const {
-  parseStoredSelectedModel,
-  resolvePersistedSelectedModel,
-} = await import(persistentSelectedModelUrl)
+const { parseStoredSelectedModel, resolvePersistedSelectedModel } =
+  await import(persistentSelectedModelUrl)
 
 test("gateway search tools normalize queries from native and gateway search inputs", () => {
   assert.deepEqual(

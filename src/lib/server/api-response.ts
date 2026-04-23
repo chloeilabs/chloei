@@ -25,7 +25,10 @@ export function createApiHeaders(params: CreateApiHeadersParams): Headers {
 }
 
 export function createApiErrorBody(
-  params: Pick<CreateApiErrorResponseParams, "error" | "errorCode" | "requestId">
+  params: Pick<
+    CreateApiErrorResponseParams,
+    "error" | "errorCode" | "requestId"
+  >
 ): ApiErrorResponseBody {
   return {
     error: params.error,

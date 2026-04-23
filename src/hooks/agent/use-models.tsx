@@ -1,10 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 
 import { redirectToSignIn } from "@/lib/auth-client"
-import {
-  createHttpErrorFromResponse,
-  type HttpError,
-} from "@/lib/http-error"
+import { createHttpErrorFromResponse, type HttpError } from "@/lib/http-error"
 import { createRequestHeaders } from "@/lib/request-id"
 import { type ModelInfo } from "@/lib/shared"
 

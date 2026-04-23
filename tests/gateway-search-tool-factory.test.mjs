@@ -10,9 +10,11 @@ import {
 } from "./register-ts-path-hooks.mjs"
 
 const cwd = fileURLToPath(new URL("..", import.meta.url))
-const gatewaySearchToolsUrl = `${pathToFileURL(
-  path.join(cwd, "src/lib/server/llm/ai-sdk-gateway-search-tools.ts")
-).href}?stubbed-anthropic=1`
+const gatewaySearchToolsUrl = `${
+  pathToFileURL(
+    path.join(cwd, "src/lib/server/llm/ai-sdk-gateway-search-tools.ts")
+  ).href
+}?stubbed-anthropic=1`
 const anthropicStubUrl = pathToFileURL(
   path.join(cwd, "tests/stubs/anthropic.mjs")
 ).href
@@ -22,7 +24,9 @@ setTestModuleStubs({
 })
 
 const { createAiSdkGatewaySearchTools } = await import(gatewaySearchToolsUrl)
-const { getAnthropicCalls, resetAnthropicCalls } = await import(anthropicStubUrl)
+const { getAnthropicCalls, resetAnthropicCalls } = await import(
+  anthropicStubUrl
+)
 
 test("gateway search tool factory uses the AI Gateway compatible Anthropic web search tool version", () => {
   resetAnthropicCalls()

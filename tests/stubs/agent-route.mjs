@@ -36,12 +36,14 @@ export function createJsonErrorResponse(params) {
 }
 
 export function parseAgentStreamRequest(params) {
-  return getTestMocks().agentRoute?.parseAgentStreamRequest?.(params) ?? {
-    parsedRequest: {
-      messages: params.body?.messages ?? [],
-    },
-    selectedModel: "anthropic/claude-sonnet-4.6",
-  }
+  return (
+    getTestMocks().agentRoute?.parseAgentStreamRequest?.(params) ?? {
+      parsedRequest: {
+        messages: params.body?.messages ?? [],
+      },
+      selectedModel: "anthropic/claude-sonnet-4.6",
+    }
+  )
 }
 
 export function createAgentStreamResponse(params) {

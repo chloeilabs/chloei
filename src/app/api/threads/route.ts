@@ -3,7 +3,10 @@ import { z, ZodError } from "zod"
 
 import { createLogger } from "@/lib/logger"
 import { resolveRequestIdFromHeaders } from "@/lib/request-id"
-import { createApiErrorResponse, createApiHeaders } from "@/lib/server/api-response"
+import {
+  createApiErrorResponse,
+  createApiHeaders,
+} from "@/lib/server/api-response"
 import {
   createAuthUnavailableResponse,
   isAuthConfigured,

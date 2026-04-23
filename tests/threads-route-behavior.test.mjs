@@ -16,14 +16,14 @@ import {
 } from "./stubs/mock-state.mjs"
 
 const cwd = fileURLToPath(new URL("..", import.meta.url))
-const routeUrl = pathToFileURL(path.join(cwd, "src/app/api/threads/route.ts")).href
+const routeUrl = pathToFileURL(
+  path.join(cwd, "src/app/api/threads/route.ts")
+).href
 
 setTestModuleStubs({
   "@/lib/logger": toProjectFileUrl("tests/stubs/logger.mjs"),
   "@/lib/server/auth": toProjectFileUrl("tests/stubs/auth.mjs"),
-  "@/lib/server/auth-session": toProjectFileUrl(
-    "tests/stubs/auth-session.mjs"
-  ),
+  "@/lib/server/auth-session": toProjectFileUrl("tests/stubs/auth-session.mjs"),
   "@/lib/server/threads": toProjectFileUrl("tests/stubs/threads.mjs"),
   "next/server": toProjectFileUrl("tests/stubs/next-server.mjs"),
 })

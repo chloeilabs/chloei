@@ -60,12 +60,8 @@ export async function parseHttpErrorResponse(
   let message =
     normalizeOptionalString(fallbackMessage) ??
     `Request failed (${String(response.status)})`
-  let errorCode = normalizeOptionalString(
-    response.headers.get("X-Error-Code")
-  )
-  let requestId = normalizeOptionalString(
-    response.headers.get("X-Request-Id")
-  )
+  let errorCode = normalizeOptionalString(response.headers.get("X-Error-Code"))
+  let requestId = normalizeOptionalString(response.headers.get("X-Request-Id"))
 
   if (bodyText) {
     try {

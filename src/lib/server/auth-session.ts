@@ -63,7 +63,9 @@ export async function getCurrentViewer(): Promise<AuthViewer | null> {
   return toViewer(await getCurrentSession())
 }
 
-export async function getViewerById(userId: string): Promise<AuthViewer | null> {
+export async function getViewerById(
+  userId: string
+): Promise<AuthViewer | null> {
   try {
     const database = getAuthDatabase()
     const result = await sql<{
