@@ -336,7 +336,6 @@ All other variables are optional — the code has safe defaults. See `.env.examp
 | `AGENT_RATE_LIMIT_WINDOW_MS`               | Rate limit window (default: 60,000 ms)                          |
 | `AGENT_RATE_LIMIT_MAX_REQUESTS`            | Max requests per window (default: 60)                           |
 | `AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT` | Concurrency limit (default: 4)                                  |
-| `AGENT_CONTEXT_DIR`                        | Absolute path to agent context dir (default: `./agent-context`) |
 | `LOG_FORMAT`                               | Set to `json` to force structured JSON logs                     |
 | `BETTER_AUTH_COOKIE_DOMAIN`                | Shared cookie domain for cross-subdomain auth                   |
 | `BETTER_AUTH_TRUSTED_ORIGINS`              | Comma-separated list of additional trusted origins              |
