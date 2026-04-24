@@ -330,7 +330,7 @@ All other variables are optional — the code has safe defaults. See `.env.examp
 | `AGENT_MAX_MESSAGES`                       | Max messages per request (default: 50)                     |
 | `AGENT_MAX_MESSAGE_CHARS`                  | Max chars per message (default: 12,000)                    |
 | `AGENT_MAX_TOTAL_CHARS`                    | Max total conversation chars (default: 48,000)             |
-| `AGENT_STREAM_TIMEOUT_MS`                  | Stream timeout (default: 300,000 ms)                       |
+| `AGENT_STREAM_TIMEOUT_MS`                  | Stream timeout (default: 800,000 ms)                       |
 | `AGENT_TOOL_MAX_STEPS`                     | Max tool use steps per run (default: 12)                   |
 | `AGENT_RATE_LIMIT_ENABLED`                 | Enable/disable rate limiting (default: true)               |
 | `AGENT_RATE_LIMIT_WINDOW_MS`               | Rate limit window (default: 60,000 ms)                     |
