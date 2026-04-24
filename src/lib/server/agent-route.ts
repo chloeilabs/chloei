@@ -179,7 +179,9 @@ function isSupportedModel(model: ModelType): boolean {
   return (ALL_MODELS as readonly ModelType[]).includes(model)
 }
 
-function getTotalMessageChars(messages: AgentStreamRequest["messages"]): number {
+function getTotalMessageChars(
+  messages: AgentStreamRequest["messages"]
+): number {
   return messages.reduce((total, message) => total + message.content.length, 0)
 }
 
@@ -207,13 +209,10 @@ export function createJsonErrorResponse(params: JsonErrorResponseParams) {
     headers.set("Retry-After", String(params.retryAfterSeconds))
   }
 
-  return Response.json(
-    createApiErrorBody(params),
-    {
-      status: params.status,
-      headers,
-    }
-  )
+  return Response.json(createApiErrorBody(params), {
+    status: params.status,
+    headers,
+  })
 }
 
 export function parseAgentStreamRequest(
@@ -276,7 +275,10 @@ export function createAgentStreamResponse(
   params: CreateAgentStreamResponseParams
 ): Response {
   const logger = createLogger(`agent:${params.requestId}`)
-  const streamSignal = createTimeoutAbortSignal(params.request, params.timeoutMs)
+  const streamSignal = createTimeoutAbortSignal(
+    params.request,
+    params.timeoutMs
+  )
   const startedAt = Date.now()
   let streamSettled = false
   const settleStream = () => {
@@ -334,10 +336,7 @@ export function createAgentStreamResponse(
             streamState.hasStructuredOutput = true
           }
 
-          if (
-            event.type === "agent_status" &&
-            event.status !== "in_progress"
-          ) {
+          if (event.type === "agent_status" && event.status !== "in_progress") {
             streamState.sawTerminalAgentStatus = true
           }
 
@@ -370,7 +369,10 @@ export function createAgentStreamResponse(
           handleEvent({ type: "agent_status", status: "completed" })
         }
 
-        if (!streamState.hasMeaningfulText && !streamState.hasStructuredOutput) {
+        if (
+          !streamState.hasMeaningfulText &&
+          !streamState.hasStructuredOutput
+        ) {
           streamState.hasTextChunk = true
           streamState.hasMeaningfulText = true
           enqueueEvent(textDeltaEvent(ASSISTANT_EMPTY_RESPONSE_FALLBACK))

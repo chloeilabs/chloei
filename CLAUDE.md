@@ -138,13 +138,13 @@ After assembly, `withAiSdkInlineCitationInstruction` appends inline citation rul
 
 Three tool categories, each only active when the respective API key is configured:
 
-| Tool                | Key                  | Description                                          |
-| ------------------- | -------------------- | ---------------------------------------------------- |
-| `web_search`        | `AI_GATEWAY_API_KEY` | Anthropic native web search through AI Gateway       |
-| `tavily_search`     | `TAVILY_API_KEY`     | Live web search (advanced depth, up to 8 results)    |
-| `tavily_extract`    | `TAVILY_API_KEY`     | Extract content from specific URLs (up to 5 URLs)    |
-| `code_execution`    | always on            | Run sandboxed JS or Python for arithmetic/logic      |
-| FMP MCP tools       | `FMP_API_KEY`        | Finance data via Financial Modeling Prep MCP         |
+| Tool             | Key                  | Description                                       |
+| ---------------- | -------------------- | ------------------------------------------------- |
+| `web_search`     | `AI_GATEWAY_API_KEY` | Anthropic native web search through AI Gateway    |
+| `tavily_search`  | `TAVILY_API_KEY`     | Live web search (advanced depth, up to 8 results) |
+| `tavily_extract` | `TAVILY_API_KEY`     | Extract content from specific URLs (up to 5 URLs) |
+| `code_execution` | always on            | Run sandboxed JS or Python for arithmetic/logic   |
+| FMP MCP tools    | `FMP_API_KEY`        | Finance data via Financial Modeling Prep MCP      |
 
 **Code execution** (`src/lib/server/llm/code-execution-tools.ts`):
 
@@ -175,8 +175,8 @@ Both live in `src/lib/server/rate-limit.ts`. All limits are overridable via `AGE
 
 All available models are defined in `src/lib/shared/llm/models.ts` (`AvailableModels`, `ALL_MODELS`). Current models:
 
-| Key                           | Model ID                       | Display Name       |
-| ----------------------------- | ------------------------------ | ------------------ |
+| Key                           | Model ID                      | Display Name      |
+| ----------------------------- | ----------------------------- | ----------------- |
 | `ANTHROPIC_CLAUDE_SONNET_4_6` | `anthropic/claude-sonnet-4.6` | Claude Sonnet 4.6 |
 
 Adding a model requires updating `AvailableModels`, `ModelInfos`, and `SUPPORTED_MODELS` in that file. The `/api/models` route reads from this registry (filtered by configured API keys via `getModels()` in `src/lib/actions/api-keys.ts`); the agent validates the requested model against it.
@@ -319,26 +319,25 @@ AI_GATEWAY_API_KEY=
 
 All other variables are optional — the code has safe defaults. See `.env.example` for the full list with inline documentation.
 
-| Variable                                   | Purpose                                                         |
-| ------------------------------------------ | --------------------------------------------------------------- |
-| `AUTH_DATABASE_URL`                        | Separate DB for Better Auth (falls back to `DATABASE_URL`)      |
-| `TAVILY_API_KEY`                           | Enables Tavily web search + extract tools                       |
-| `FMP_API_KEY`                              | Enables Financial Modeling Prep MCP finance tools               |
-| `OPENAI_API_KEY`                           | Enables OpenAI judge for prompt evals                           |
-| `OPENAI_EVAL_JUDGE_MODEL`                  | Judge model override (default: `gpt-5.4`)                       |
-| `PYTHON3_PATH`                             | Override `python3` binary for code execution                    |
-| `AGENT_MAX_MESSAGES`                       | Max messages per request (default: 50)                          |
-| `AGENT_MAX_MESSAGE_CHARS`                  | Max chars per message (default: 12,000)                         |
-| `AGENT_MAX_TOTAL_CHARS`                    | Max total conversation chars (default: 48,000)                  |
-| `AGENT_STREAM_TIMEOUT_MS`                  | Stream timeout (default: 300,000 ms)                            |
-| `AGENT_TOOL_MAX_STEPS`                     | Max tool use steps per run (default: 12)                        |
-| `AGENT_RATE_LIMIT_ENABLED`                 | Enable/disable rate limiting (default: true)                    |
-| `AGENT_RATE_LIMIT_WINDOW_MS`               | Rate limit window (default: 60,000 ms)                          |
-| `AGENT_RATE_LIMIT_MAX_REQUESTS`            | Max requests per window (default: 60)                           |
-| `AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT` | Concurrency limit (default: 4)                                  |
-| `AGENT_CONTEXT_DIR`                        | Absolute path to agent context dir (default: `./agent-context`) |
-| `LOG_FORMAT`                               | Set to `json` to force structured JSON logs                     |
-| `BETTER_AUTH_COOKIE_DOMAIN`                | Shared cookie domain for cross-subdomain auth                   |
-| `BETTER_AUTH_TRUSTED_ORIGINS`              | Comma-separated list of additional trusted origins              |
+| Variable                                   | Purpose                                                    |
+| ------------------------------------------ | ---------------------------------------------------------- |
+| `AUTH_DATABASE_URL`                        | Separate DB for Better Auth (falls back to `DATABASE_URL`) |
+| `TAVILY_API_KEY`                           | Enables Tavily web search + extract tools                  |
+| `FMP_API_KEY`                              | Enables Financial Modeling Prep MCP finance tools          |
+| `OPENAI_API_KEY`                           | Enables OpenAI judge for prompt evals                      |
+| `OPENAI_EVAL_JUDGE_MODEL`                  | Judge model override (default: `gpt-5.4`)                  |
+| `PYTHON3_PATH`                             | Override `python3` binary for code execution               |
+| `AGENT_MAX_MESSAGES`                       | Max messages per request (default: 50)                     |
+| `AGENT_MAX_MESSAGE_CHARS`                  | Max chars per message (default: 12,000)                    |
+| `AGENT_MAX_TOTAL_CHARS`                    | Max total conversation chars (default: 48,000)             |
+| `AGENT_STREAM_TIMEOUT_MS`                  | Stream timeout (default: 300,000 ms)                       |
+| `AGENT_TOOL_MAX_STEPS`                     | Max tool use steps per run (default: 12)                   |
+| `AGENT_RATE_LIMIT_ENABLED`                 | Enable/disable rate limiting (default: true)               |
+| `AGENT_RATE_LIMIT_WINDOW_MS`               | Rate limit window (default: 60,000 ms)                     |
+| `AGENT_RATE_LIMIT_MAX_REQUESTS`            | Max requests per window (default: 60)                      |
+| `AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT` | Concurrency limit (default: 4)                             |
+| `LOG_FORMAT`                               | Set to `json` to force structured JSON logs                |
+| `BETTER_AUTH_COOKIE_DOMAIN`                | Shared cookie domain for cross-subdomain auth              |
+| `BETTER_AUTH_TRUSTED_ORIGINS`              | Comma-separated list of additional trusted origins         |
 
 Vercel tip: `vercel env pull .env.local` is the quickest way to hydrate local development from Vercel project settings.

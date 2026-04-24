@@ -20,7 +20,11 @@ import { StickToBottom } from "use-stick-to-bottom"
 import { AppLauncher } from "@/components/agent/home/app-launcher"
 import { UserMenu } from "@/components/auth/user-menu"
 import { Button } from "@/components/ui/button"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { useIsMobile } from "@/hooks/use-mobile"
 import {
   type AuthViewer,
@@ -36,10 +40,7 @@ import { ChloeiLogoSvg } from "../../graphics/logo/logo-svg"
 import { ScrollToBottom } from "../../task/scroll-to-bottom"
 import { Messages } from "../messages/messages"
 import { PromptForm } from "../prompt-form/prompt-form"
-import {
-  useAgentSession,
-  useThreadStore,
-} from "./use-agent-session"
+import { useAgentSession, useThreadStore } from "./use-agent-session"
 
 type ViewTransitionStarter = (updateCallback: () => void) => unknown
 
@@ -117,7 +118,8 @@ function ThreadsPanel({
                 }}
                 className={cn(
                   "flex w-full min-w-0 cursor-pointer items-center rounded-md border border-transparent px-3 py-2.5 text-left text-sm text-foreground transition-colors hover:border-border/60 hover:bg-accent/30",
-                  thread.id === currentThreadId && "border-border/70 bg-accent/40"
+                  thread.id === currentThreadId &&
+                    "border-border/70 bg-accent/40"
                 )}
               >
                 <span className="min-w-0 flex-1 truncate">{title}</span>

@@ -18,9 +18,7 @@ const { deriveThreadTitle, sortThreadsNewestFirst } = await import(
   sharedThreadsUrl
 )
 const { parseStoredThread, parseThreadPayload, prepareThreadForPersistence } =
-  await import(
-  threadPayloadUrl
-)
+  await import(threadPayloadUrl)
 
 function createMessage(overrides = {}) {
   return {
@@ -35,7 +33,9 @@ function createMessage(overrides = {}) {
 
 test("thread helpers derive titles and sort predictably", () => {
   assert.equal(
-    deriveThreadTitle([createMessage({ content: "   Hello from the first prompt   " })]),
+    deriveThreadTitle([
+      createMessage({ content: "   Hello from the first prompt   " }),
+    ]),
     "Hello from the first prompt"
   )
   assert.equal(

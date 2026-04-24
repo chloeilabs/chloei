@@ -7,10 +7,7 @@ import {
   setTestModuleStubs,
   toProjectFileUrl,
 } from "./register-ts-path-hooks.mjs"
-import {
-  resetTestMocks,
-  setTestMocks,
-} from "./stubs/mock-state.mjs"
+import { resetTestMocks, setTestMocks } from "./stubs/mock-state.mjs"
 
 const cwd = fileURLToPath(new URL("..", import.meta.url))
 const helperUrl = pathToFileURL(
@@ -106,7 +103,9 @@ test("agent helper resolves request ids and time zones from headers", () => {
     "request-123"
   )
   assert.equal(
-    resolveUserTimeZone(createRequest({ "x-user-timezone": "America/Chicago" })),
+    resolveUserTimeZone(
+      createRequest({ "x-user-timezone": "America/Chicago" })
+    ),
     "America/Chicago"
   )
   assert.equal(
@@ -240,7 +239,8 @@ test("agent helper streams fallback output when the model yields no content", as
     { type: "agent_status", status: "completed" },
     {
       type: "text_delta",
-      delta: "Sorry, I couldn't generate a response from that input. Please retry.",
+      delta:
+        "Sorry, I couldn't generate a response from that input. Please retry.",
     },
   ])
   assert.equal(recorded.settledCount, 1)

@@ -20,5 +20,7 @@ export async function deleteThreadForUser(userId, threadId) {
 }
 
 export function isThreadStoreNotInitializedError(error) {
-  return getTestMocks().threads?.isThreadStoreNotInitializedError?.(error) ?? false
+  return (
+    getTestMocks().threads?.isThreadStoreNotInitializedError?.(error) ?? false
+  )
 }

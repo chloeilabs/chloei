@@ -10,13 +10,11 @@ import {
 import { resetTestMocks, setTestMocks } from "./stubs/mock-state.mjs"
 
 const cwd = fileURLToPath(new URL("..", import.meta.url))
-const storeUrl = pathToFileURL(
-  path.join(cwd, "src/lib/server/threads.ts")
-).href
+const storeUrl = pathToFileURL(path.join(cwd, "src/lib/server/threads.ts")).href
 
 setTestModuleStubs({
   "@/lib/logger": toProjectFileUrl("tests/stubs/logger.mjs"),
-  "kysely": toProjectFileUrl("tests/stubs/kysely.mjs"),
+  kysely: toProjectFileUrl("tests/stubs/kysely.mjs"),
   "./postgres": toProjectFileUrl("tests/stubs/postgres.mjs"),
 })
 
