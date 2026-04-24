@@ -37,6 +37,7 @@ import {
 import { isThreadStoreNotInitializedError } from "@/lib/server/threads"
 
 export const runtime = "nodejs"
+export const maxDuration = 800
 
 function resolveRateLimitIdentifier(userId: string): string {
   return `user:${userId}`
