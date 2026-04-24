@@ -38,7 +38,7 @@ export function ScrollToBottom() {
             isAtBottom
               ? "translate-y-2 opacity-0"
               : "translate-y-0 cursor-pointer opacity-100",
-            "bottom-38"
+            "bottom-[9.5rem]"
           )}
           onClick={() => {
             void handleScrollToBottom()
