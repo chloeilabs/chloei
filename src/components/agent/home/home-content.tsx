@@ -204,9 +204,7 @@ export function HomePageContent({
         return targetScrollTop
       }
 
-      const latestTurnGroup = latestTurnGroups[latestTurnGroups.length - 1] as
-        | HTMLElement
-        | undefined
+      const latestTurnGroup = latestTurnGroups[latestTurnGroups.length - 1]
 
       if (!latestTurnGroup) {
         return targetScrollTop
