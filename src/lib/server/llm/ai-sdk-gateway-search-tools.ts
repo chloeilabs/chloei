@@ -125,6 +125,10 @@ export function getAiSdkGatewayProviderOptions() {
       },
       effort: "high",
     } satisfies AnthropicLanguageModelOptions,
+    openai: {
+      reasoningEffort: "high",
+      reasoningSummary: "detailed",
+    },
   }
 }
 

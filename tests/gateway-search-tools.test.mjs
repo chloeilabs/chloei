@@ -14,6 +14,7 @@ const persistentSelectedModelUrl = pathToFileURL(
 ).href
 
 const {
+  getAiSdkGatewayProviderOptions,
   getAiSdkGatewaySearchToolCallMetadata,
   getAiSdkGatewaySearchToolResultMetadata,
 } = await import(gatewaySearchToolsUrl)
@@ -112,6 +113,23 @@ test("gateway search tools derive sources from result payloads", () => {
     }),
     null
   )
+})
+
+test("gateway provider options request the strongest supported reasoning levels", () => {
+  assert.deepEqual(getAiSdkGatewayProviderOptions(), {
+    anthropic: {
+      sendReasoning: true,
+      thinking: {
+        type: "adaptive",
+        display: "summarized",
+      },
+      effort: "high",
+    },
+    openai: {
+      reasoningEffort: "high",
+      reasoningSummary: "detailed",
+    },
+  })
 })
 
 test("stale stored model ids fall back to the curated Claude model", () => {

@@ -2,11 +2,13 @@ import type { MetadataRoute } from "next"
 
 import { installIconThemeColor } from "@/app/install-icon"
 
+const isProduction = process.env.NODE_ENV === "production"
+
 export default function manifest(): MetadataRoute.Manifest {
   return {
     background_color: installIconThemeColor,
     description: "Multi-provider AI agent.",
-    display: "standalone",
+    display: isProduction ? "standalone" : "browser",
     icons: [
       {
         purpose: "maskable",
