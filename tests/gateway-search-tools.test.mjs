@@ -18,8 +18,11 @@ const {
   getAiSdkGatewaySearchToolCallMetadata,
   getAiSdkGatewaySearchToolResultMetadata,
 } = await import(gatewaySearchToolsUrl)
-const { parseStoredSelectedModel, resolvePersistedSelectedModel } =
-  await import(persistentSelectedModelUrl)
+const {
+  parseStoredSelectedModel,
+  resolvePersistedSelectedModel,
+  serializeStoredSelectedModel,
+} = await import(persistentSelectedModelUrl)
 
 test("gateway search tools normalize queries from native and gateway search inputs", () => {
   assert.deepEqual(
@@ -132,8 +135,18 @@ test("gateway provider options request the strongest supported reasoning levels"
   })
 })
 
-test("stale stored model ids fall back to the curated Claude model", () => {
+test("stale and legacy default model ids fall back to GPT-5.5", () => {
   assert.equal(parseStoredSelectedModel("qwen/qwen3.6-plus"), null)
+  assert.equal(
+    parseStoredSelectedModel("anthropic/claude-sonnet-4.6"),
+    null
+  )
+  assert.equal(
+    parseStoredSelectedModel(
+      JSON.stringify(serializeStoredSelectedModel("anthropic/claude-sonnet-4.6"))
+    ),
+    "anthropic/claude-sonnet-4.6"
+  )
 
   assert.equal(
     resolvePersistedSelectedModel({
@@ -142,11 +155,15 @@ test("stale stored model ids fall back to the curated Claude model", () => {
       initialSelectedModel: null,
       availableModels: [
         {
+          id: "openai/gpt-5.5",
+          name: "GPT-5.5",
+        },
+        {
           id: "anthropic/claude-sonnet-4.6",
           name: "Claude Sonnet 4.6",
         },
       ],
     }),
-    "anthropic/claude-sonnet-4.6"
+    "openai/gpt-5.5"
   )
 })
