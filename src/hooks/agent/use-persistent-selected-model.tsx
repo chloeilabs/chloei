@@ -11,6 +11,7 @@ import { type ModelInfo, type ModelType } from "@/lib/shared"
 import {
   parseStoredSelectedModel,
   resolvePersistedSelectedModel,
+  serializeStoredSelectedModel,
 } from "./persistent-selected-model-utils"
 
 function readStoredSelectedModel(): ModelType | null {
@@ -28,7 +29,10 @@ function writeStoredSelectedModel(model: ModelType | null) {
   }
 
   if (model) {
-    window.localStorage.setItem(MODEL_SELECTOR_STORAGE_KEY, model)
+    window.localStorage.setItem(
+      MODEL_SELECTOR_STORAGE_KEY,
+      JSON.stringify(serializeStoredSelectedModel(model))
+    )
   } else {
     window.localStorage.removeItem(MODEL_SELECTOR_STORAGE_KEY)
   }
@@ -71,7 +75,6 @@ export function usePersistentSelectedModel(
       }
 
       setSelectedModel(nextSelectedModel)
-      writeStoredSelectedModel(nextSelectedModel)
     }
 
     syncSelectedModel()
