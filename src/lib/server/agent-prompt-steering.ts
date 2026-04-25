@@ -1,6 +1,6 @@
 import type { ModelType } from "@/lib/shared"
 
-export type PromptProvider = "anthropic"
+export type PromptProvider = "anthropic" | "openai"
 
 export type PromptTaskMode =
   | "general"
@@ -47,6 +47,14 @@ Use Claude reasoning mode efficiently.
 - Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
 - Use native web search or other tools only when they materially improve accuracy or freshness.
 - After tool use, synthesize and stop. Do not replay raw tool output.
+`.trim(),
+  openai: `
+Use OpenAI reasoning mode efficiently.
+- Keep the final answer tighter than the hidden reasoning.
+- Prefer direct execution and verification over speculative narration.
+- On format-sensitive tasks, do a literal final-format check before finishing.
+- Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
+- After tool use, synthesize the result and stop. Do not replay raw tool traces.
 `.trim(),
 }
 
@@ -112,6 +120,10 @@ function getLastUserMessage(
 export function resolvePromptProvider(model: ModelType): PromptProvider {
   if (model.startsWith("anthropic/")) {
     return "anthropic"
+  }
+
+  if (model.startsWith("openai/")) {
+    return "openai"
   }
 
   throw new Error(`Unsupported model provider for model: ${model}`)
