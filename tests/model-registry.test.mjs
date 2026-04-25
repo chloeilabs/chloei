@@ -30,8 +30,8 @@ test("shared model registry includes the curated Anthropic and OpenAI models", a
 
   assert.match(
     source.replace(/\s+/g, " "),
-    /SUPPORTED_MODELS = \[ AvailableModels\.ANTHROPIC_CLAUDE_SONNET_4_6, AvailableModels\.OPENAI_GPT_5_5, \] as const/,
-    "Expected SUPPORTED_MODELS to include both curated model ids."
+    /SUPPORTED_MODELS = \[ AvailableModels\.OPENAI_GPT_5_5, AvailableModels\.ANTHROPIC_CLAUDE_SONNET_4_6, \] as const/,
+    "Expected SUPPORTED_MODELS to list OPENAI_GPT_5_5 first (default) followed by ANTHROPIC_CLAUDE_SONNET_4_6."
   )
 
   assert.match(
