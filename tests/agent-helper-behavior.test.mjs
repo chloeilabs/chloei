@@ -145,6 +145,89 @@ test("agent helper error responses include rate-limit headers", async () => {
 })
 
 test("agent helper validates total size, last-message role, and default model support", async () => {
+  const defaultModeResult = parseAgentStreamRequest({
+    body: {
+      messages: [
+        {
+          role: "user",
+          content: "Use the default model.",
+        },
+      ],
+    },
+    availableModels: [{ id: "openai/gpt-5.5" }],
+    requestId: "request-default-mode",
+  })
+
+  assert(!(defaultModeResult instanceof Response))
+  assert.equal(defaultModeResult.parsedRequest.runMode, "chat")
+  assert.equal(defaultModeResult.selectedModel, "openai/gpt-5.5")
+
+  const researchModeResult = parseAgentStreamRequest({
+    body: {
+      model: "anthropic/claude-sonnet-4.6",
+      runMode: "research",
+      messages: [
+        {
+          role: "user",
+          content: "Research this with sources.",
+        },
+      ],
+    },
+    availableModels: [
+      { id: "anthropic/claude-sonnet-4.6" },
+      { id: "openai/gpt-5.5" },
+    ],
+    requestId: "request-research-mode",
+  })
+
+  assert(!(researchModeResult instanceof Response))
+  assert.equal(researchModeResult.parsedRequest.runMode, "research")
+  assert.equal(researchModeResult.selectedModel, "openai/gpt-5.5")
+
+  const unavailableResearchModelResult = parseAgentStreamRequest({
+    body: {
+      runMode: "research",
+      messages: [
+        {
+          role: "user",
+          content: "Research this with sources.",
+        },
+      ],
+    },
+    availableModels: [{ id: "anthropic/claude-sonnet-4.6" }],
+    requestId: "request-research-unavailable",
+  })
+
+  assert(unavailableResearchModelResult instanceof Response)
+  assert.equal(unavailableResearchModelResult.status, 400)
+  assert.deepEqual(await unavailableResearchModelResult.json(), {
+    error: "Research mode requires GPT-5.5 model access.",
+    errorCode: "AGENT_RESEARCH_MODEL_UNAVAILABLE",
+    requestId: "request-research-unavailable",
+  })
+
+  const invalidRunModeResult = parseAgentStreamRequest({
+    body: {
+      runMode: "deep",
+      messages: [
+        {
+          role: "user",
+          content: "Use an invalid mode.",
+        },
+      ],
+    },
+    availableModels: [{ id: "openai/gpt-5.5" }],
+    requestId: "request-invalid-mode",
+  })
+
+  assert(invalidRunModeResult instanceof Response)
+  assert.equal(invalidRunModeResult.status, 400)
+  assert.deepEqual(await invalidRunModeResult.json(), {
+    error: "Invalid request payload.",
+    errorCode: "AGENT_INVALID_REQUEST",
+    requestId: "request-invalid-mode",
+  })
+
   const tooManyMessagesResult = parseAgentStreamRequest({
     body: {
       messages: Array.from({ length: 51 }, () => ({
@@ -262,6 +345,7 @@ test("agent helper streams fallback output when the model yields no content", as
     requestId: "request-1",
     timeoutMs: 30_000,
     selectedModel: "anthropic/claude-sonnet-4.6",
+    runMode: "chat",
     aiGatewayApiKey: "ai-gateway-key",
     tavilyApiKey: "tavily-key",
     fmpApiKey: "fmp-key",
@@ -293,6 +377,25 @@ test("agent helper streams fallback output when the model yields no content", as
   })
 })
 
+test("agent helper forwards the deep research runtime profile", async () => {
+  const response = createAgentStreamResponse({
+    request: createRequest(),
+    requestId: "request-research",
+    timeoutMs: 30_000,
+    selectedModel: "openai/gpt-5.5",
+    runMode: "research",
+    aiGatewayApiKey: "ai-gateway-key",
+    runtimeProfile: "deep_research",
+    messages: [{ role: "user", content: "Research with sources" }],
+    systemInstruction: "system",
+  })
+
+  await readNdjsonEvents(response)
+
+  assert.equal(recorded.streamParams[0]?.model, "openai/gpt-5.5")
+  assert.equal(recorded.streamParams[0]?.runtimeProfile, "deep_research")
+})
+
 test("agent helper returns an auth-key fallback when provider auth fails", async () => {
   setTestMocks({
     gatewayResponses: {
@@ -311,6 +414,7 @@ test("agent helper returns an auth-key fallback when provider auth fails", async
     requestId: "request-2",
     timeoutMs: 30_000,
     selectedModel: "anthropic/claude-sonnet-4.6",
+    runMode: "chat",
     aiGatewayApiKey: "ai-gateway-key",
     messages: [{ role: "user", content: "Hello" }],
     systemInstruction: "system",

@@ -4,10 +4,13 @@ import { toast } from "sonner"
 
 import { useModels } from "@/hooks/agent/use-models"
 import {
+  type AgentRunMode,
   AvailableModels,
+  getModelSelectorModels,
+  isModelSelectorModel,
   type Message,
   type ModelType,
-  resolveDefaultModel,
+  resolveDefaultModelSelectorModel,
 } from "@/lib/shared"
 import { cn } from "@/lib/utils"
 
@@ -15,6 +18,7 @@ import { Button } from "../../ui/button"
 import { Textarea } from "../../ui/textarea"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip"
 import { ModelSelector } from "../prompt-form/model-selector"
+import { ResearchModeToggle } from "../prompt-form/research-mode-toggle"
 import {
   agentShellFrameClass,
   agentShellHighlightClass,
@@ -47,25 +51,32 @@ export function UserMessage({
     messageId: string
     newContent: string
     newModel: ModelType
+    newRunMode: AgentRunMode
   }) => Promise<void> | void
 }) {
   const { data: availableModels = [] } = useModels()
+  const modelSelectorModels = useMemo(
+    () => getModelSelectorModels(availableModels),
+    [availableModels]
+  )
   const initialModel = useMemo(() => {
     const selectedModel = message.metadata?.selectedModel
-    if (isModelType(selectedModel)) {
+    if (isModelType(selectedModel) && isModelSelectorModel(selectedModel)) {
       return selectedModel
     }
 
-    if (isModelType(message.llmModel)) {
+    if (isModelType(message.llmModel) && isModelSelectorModel(message.llmModel)) {
       return message.llmModel
     }
 
-    return resolveDefaultModel(availableModels)
-  }, [availableModels, message.llmModel, message.metadata?.selectedModel])
+    return resolveDefaultModelSelectorModel(modelSelectorModels)
+  }, [message.llmModel, message.metadata?.selectedModel, modelSelectorModels])
 
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState(message.content)
   const [selectedModel, setSelectedModel] = useState<ModelType>(initialModel)
+  const initialRunMode = message.metadata?.runMode ?? "chat"
+  const [runMode, setRunMode] = useState<AgentRunMode>(initialRunMode)
   const [isEditPending, setIsEditPending] = useState(false)
   const messageContentRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -78,6 +89,10 @@ export function UserMessage({
   useEffect(() => {
     setSelectedModel(initialModel)
   }, [initialModel])
+
+  useEffect(() => {
+    setRunMode(initialRunMode)
+  }, [initialRunMode])
 
   useEffect(() => {
     if (messageContentRef.current) {
@@ -106,7 +121,8 @@ export function UserMessage({
     setIsEditing(false)
     setEditValue(message.content)
     setSelectedModel(initialModel)
-  }, [message.content, initialModel])
+    setRunMode(initialRunMode)
+  }, [message.content, initialModel, initialRunMode])
 
   const handleSubmit = useCallback(async () => {
     const trimmedValue = editValue.trim()
@@ -127,6 +143,7 @@ export function UserMessage({
         messageId: message.id,
         newContent: trimmedValue,
         newModel: selectedModel,
+        newRunMode: runMode,
       })
       setIsEditing(false)
     } catch (error) {
@@ -136,7 +153,14 @@ export function UserMessage({
     } finally {
       setIsEditPending(false)
     }
-  }, [editValue, handleStopEditing, message.id, onEditMessage, selectedModel])
+  }, [
+    editValue,
+    handleStopEditing,
+    message.id,
+    onEditMessage,
+    runMode,
+    selectedModel,
+  ])
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -237,6 +261,11 @@ export function UserMessage({
                 <ModelSelector
                   selectedModel={selectedModel}
                   handleSelectModel={handleSelectModel}
+                />
+                <ResearchModeToggle
+                  runMode={runMode}
+                  onRunModeChange={setRunMode}
+                  disabled={isEditPending}
                 />
               </div>
 

@@ -47,6 +47,12 @@ test("shared model registry includes the curated gateway models", async () => {
   )
 
   assert.match(
+    source.replace(/\s+/g, " "),
+    /MODEL_SELECTOR_MODELS = \[ AvailableModels\.MOONSHOTAI_KIMI_K2_6, AvailableModels\.DEEPSEEK_V4_PRO, \] as const/,
+    "Expected the chat model selector to only expose Kimi K2.6 and DeepSeek V4 Pro."
+  )
+
+  assert.match(
     source,
     /\[AvailableModels\.ANTHROPIC_CLAUDE_SONNET_4_6\]:\s*\{[\s\S]*name:\s*"Claude Sonnet 4\.6"/,
     "Expected ModelInfos to define display metadata for ANTHROPIC_CLAUDE_SONNET_4_6."

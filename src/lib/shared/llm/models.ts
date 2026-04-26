@@ -28,6 +28,34 @@ export const SUPPORTED_MODELS = [
 
 export const ALL_MODELS = [...SUPPORTED_MODELS] as const
 
+export const MODEL_SELECTOR_MODELS = [
+  AvailableModels.MOONSHOTAI_KIMI_K2_6,
+  AvailableModels.DEEPSEEK_V4_PRO,
+] as const
+
+const MODEL_SELECTOR_MODEL_SET: ReadonlySet<ModelType> = new Set(
+  MODEL_SELECTOR_MODELS
+)
+
+export function isModelSelectorModel(value: unknown): value is ModelType {
+  return (
+    typeof value === "string" &&
+    MODEL_SELECTOR_MODEL_SET.has(value as ModelType)
+  )
+}
+
+export function getModelSelectorModels(
+  models: readonly ModelInfo[]
+): ModelInfo[] {
+  return models.filter((model) => isModelSelectorModel(model.id))
+}
+
+export function resolveDefaultModelSelectorModel(
+  models: readonly Pick<ModelInfo, "id">[]
+): ModelType {
+  return models[0]?.id ?? MODEL_SELECTOR_MODELS[0]
+}
+
 export function resolveDefaultModel(
   models: readonly Pick<ModelInfo, "id">[]
 ): ModelType {

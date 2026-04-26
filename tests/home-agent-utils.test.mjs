@@ -13,7 +13,9 @@ const agentRequestLimitsUrl = pathToFileURL(
   path.join(cwd, "src/lib/shared/agent-request-limits.ts")
 ).href
 
-const { toRequestMessages } = await import(homeAgentUtilsUrl)
+const { appendUserMessage, toRequestMessages } = await import(
+  homeAgentUtilsUrl
+)
 const {
   AGENT_REQUEST_MAX_MESSAGE_CHARS,
   AGENT_REQUEST_MAX_MESSAGES,
@@ -70,4 +72,16 @@ test("agent request messages trim oversized existing message content", () => {
     AGENT_REQUEST_MAX_MESSAGE_CHARS
   )
   assert.match(requestMessages[0].content, /truncated/)
+})
+
+test("appended user messages preserve the requested run mode", () => {
+  const messages = appendUserMessage(
+    [],
+    "Research Apple supply chain risk.",
+    "anthropic/claude-sonnet-4.6",
+    "research"
+  )
+
+  assert.equal(messages[0]?.metadata?.selectedModel, "anthropic/claude-sonnet-4.6")
+  assert.equal(messages[0]?.metadata?.runMode, "research")
 })

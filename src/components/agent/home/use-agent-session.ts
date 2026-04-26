@@ -12,6 +12,8 @@ import {
 import { createLogger } from "@/lib/logger"
 import { createRequestHeaders, getRequestIdFromHeaders } from "@/lib/request-id"
 import {
+  type AgentRunMode,
+  AvailableModels,
   type Message as AgentMessage,
   type ModelType,
   sortThreadsNewestFirst,
@@ -56,11 +58,13 @@ interface EditMessageParams {
   messageId: string
   newContent: string
   newModel: ModelType
+  newRunMode: AgentRunMode
 }
 
 interface QueuedSubmission {
   message: string
   model: ModelType
+  runMode: AgentRunMode
 }
 
 interface SaveThreadOptions {
@@ -528,6 +532,7 @@ export function useAgentSession({
       body: Record<string, unknown>
       baseMessages: AgentMessage[]
       model: ModelType
+      runMode: AgentRunMode
       threadId: string
       errorTitle: string
     }) => {
@@ -577,6 +582,7 @@ export function useAgentSession({
           createdAt: assistantCreatedAt,
           metadata: {
             isStreaming: streamFlags.isStreaming,
+            runMode: params.runMode,
             parts: [{ type: "text", text: nextAccumulator.content }],
             ...(nextAccumulator.agentStatus
               ? { agentStatus: nextAccumulator.agentStatus }
@@ -748,6 +754,7 @@ export function useAgentSession({
           createdAt: new Date().toISOString(),
           metadata: {
             isStreaming: false,
+            runMode: params.runMode,
             parts: [{ type: "text", text: fallback }],
             agentStatus: "failed",
           },
@@ -781,21 +788,30 @@ export function useAgentSession({
   )
 
   const runAgentRequest = useCallback(
-    async (nextMessages: AgentMessage[], model: ModelType) => {
+    async (
+      nextMessages: AgentMessage[],
+      model: ModelType,
+      runMode: AgentRunMode = "chat"
+    ) => {
       let activeThreadId = currentThreadIdRef.current
       if (!activeThreadId) {
         activeThreadId = crypto.randomUUID()
         setCurrentThreadId(activeThreadId)
       }
 
+      const effectiveModel =
+        runMode === "research" ? AvailableModels.OPENAI_GPT_5_5 : model
+
       return streamAgentRequest({
         endpoint: "/api/agent",
         threadId: activeThreadId,
         baseMessages: nextMessages,
-        model,
+        model: effectiveModel,
+        runMode,
         errorTitle: "Failed to send message",
         body: {
           model,
+          runMode,
           threadId: activeThreadId,
           messages: toRequestMessages(nextMessages),
         },
@@ -805,7 +821,11 @@ export function useAgentSession({
   )
 
   const handleSubmit = useCallback(
-    async (message: string, model: ModelType) => {
+    async (
+      message: string,
+      model: ModelType,
+      runMode: AgentRunMode = "chat"
+    ) => {
       const trimmedMessage = message.trim()
       if (!trimmedMessage) {
         return
@@ -821,16 +841,17 @@ export function useAgentSession({
       const nextMessages = appendUserMessage(
         messagesRef.current,
         trimmedMessage,
-        model
+        model,
+        runMode
       )
 
-      await runAgentRequest(nextMessages, model)
+      await runAgentRequest(nextMessages, model, runMode)
     },
     [runAgentRequest]
   )
 
   const handleEditMessage = useCallback(
-    ({ messageId, newContent, newModel }: EditMessageParams) => {
+    ({ messageId, newContent, newModel, newRunMode }: EditMessageParams) => {
       const trimmedContent = newContent.trim()
       const currentMessages = messagesRef.current
 
@@ -866,6 +887,7 @@ export function useAgentSession({
         metadata: {
           ...targetMessage.metadata,
           selectedModel: newModel,
+          runMode: newRunMode,
         },
       }
 
@@ -886,13 +908,18 @@ export function useAgentSession({
         )
       }
 
-      void runAgentRequest(nextMessages, newModel)
+      void runAgentRequest(nextMessages, newModel, newRunMode)
     },
     [createThreadSnapshot, runAgentRequest, saveThread]
   )
 
   const handlePromptSubmit = useCallback(
-    (message: string, model: ModelType, queue: boolean) => {
+    (
+      message: string,
+      model: ModelType,
+      queue: boolean,
+      runMode: AgentRunMode = "chat"
+    ) => {
       const trimmedMessage = message.trim()
       if (!trimmedMessage) {
         return
@@ -902,11 +929,12 @@ export function useAgentSession({
         setQueuedSubmission({
           message: trimmedMessage,
           model,
+          runMode,
         })
         return
       }
 
-      void handleSubmit(trimmedMessage, model)
+      void handleSubmit(trimmedMessage, model, runMode)
     },
     [handleSubmit]
   )
@@ -917,7 +945,11 @@ export function useAgentSession({
     }
 
     setQueuedSubmission(null)
-    void handleSubmit(queuedSubmission.message, queuedSubmission.model)
+    void handleSubmit(
+      queuedSubmission.message,
+      queuedSubmission.model,
+      queuedSubmission.runMode
+    )
   }, [streamingState, queuedSubmission, handleSubmit])
 
   return {

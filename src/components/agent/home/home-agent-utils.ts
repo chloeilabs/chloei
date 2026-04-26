@@ -1,5 +1,9 @@
 import { ASSISTANT_EMPTY_RESPONSE_FALLBACK } from "@/lib/constants"
-import type { Message as AgentMessage, ModelType } from "@/lib/shared"
+import type {
+  AgentRunMode,
+  Message as AgentMessage,
+  ModelType,
+} from "@/lib/shared"
 import {
   AGENT_REQUEST_MAX_MESSAGE_CHARS,
   AGENT_REQUEST_MAX_MESSAGES,
@@ -70,7 +74,8 @@ export function toRequestMessages(
 export function appendUserMessage(
   currentMessages: AgentMessage[],
   content: string,
-  model: ModelType
+  model: ModelType,
+  runMode: AgentRunMode = "chat"
 ): AgentMessage[] {
   const userMessage: AgentMessage = {
     id: createClientMessageId(),
@@ -81,6 +86,7 @@ export function appendUserMessage(
     metadata: {
       isStreaming: false,
       selectedModel: model,
+      runMode,
     },
   }
 

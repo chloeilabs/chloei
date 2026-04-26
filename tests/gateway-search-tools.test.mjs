@@ -15,6 +15,7 @@ const persistentSelectedModelUrl = pathToFileURL(
 
 const {
   getAiSdkGatewayProviderOptions,
+  getAiSdkGatewayProviderOptionsForMode,
   getAiSdkGatewaySearchToolCallMetadata,
   getAiSdkGatewaySearchToolResultMetadata,
 } = await import(gatewaySearchToolsUrl)
@@ -138,6 +139,15 @@ test("gateway provider options request the strongest supported reasoning levels"
       reasoningSummary: "detailed",
     },
   })
+
+  assert.deepEqual(
+    getAiSdkGatewayProviderOptionsForMode({ deepResearch: true }).openai,
+    {
+      reasoningEffort: "xhigh",
+      reasoningSummary: "detailed",
+      textVerbosity: "high",
+    }
+  )
 })
 
 test("stale and legacy default model ids fall back to GPT-5.5", () => {

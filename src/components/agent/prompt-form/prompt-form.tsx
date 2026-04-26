@@ -18,7 +18,11 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { useModels } from "@/hooks/agent/use-models"
 import { usePersistentSelectedModel } from "@/hooks/agent/use-persistent-selected-model"
-import { type ModelType } from "@/lib/shared"
+import {
+  type AgentRunMode,
+  getModelSelectorModels,
+  type ModelType,
+} from "@/lib/shared"
 import { cn } from "@/lib/utils"
 
 import { QueuedAction } from "../messages/queued-message"
@@ -30,6 +34,7 @@ import {
   agentSurfaceClass,
 } from "../shared/shell-styles"
 import { ModelSelector } from "./model-selector"
+import { ResearchModeToggle } from "./research-mode-toggle"
 
 export function PromptForm({
   onSubmit,
@@ -47,7 +52,12 @@ export function PromptForm({
   transition,
   viewTransitionName,
 }: {
-  onSubmit?: (message: string, model: ModelType, queue: boolean) => void
+  onSubmit?: (
+    message: string,
+    model: ModelType,
+    queue: boolean,
+    runMode: AgentRunMode
+  ) => void
   onStopStream?: () => void
   isStreaming?: boolean
   isHome?: boolean
@@ -71,13 +81,18 @@ export function PromptForm({
   const shouldShowRefreshAnimation = isHome && !dockToBottomOnHome
 
   const [message, setMessage] = useState("")
+  const [runMode, setRunMode] = useState<AgentRunMode>("chat")
   const trimmedMessage = useMemo(() => message.trim(), [message])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const { data: availableModels = [] } = useModels()
+  const modelSelectorModels = useMemo(
+    () => getModelSelectorModels(availableModels),
+    [availableModels]
+  )
   const { selectedModel, setSelectedModel } = usePersistentSelectedModel(
     initialSelectedModel,
-    availableModels
+    modelSelectorModels
   )
   const formStyle = useMemo<CSSProperties | undefined>(
     () =>
@@ -121,8 +136,12 @@ export function PromptForm({
         }
       }
 
-      onSubmit?.(nextMessage, resolvedSelectedModel, isStreaming)
+      const activeRunMode = runMode
+      onSubmit?.(nextMessage, resolvedSelectedModel, isStreaming, activeRunMode)
       setMessage("")
+      if (activeRunMode === "research") {
+        setRunMode("chat")
+      }
     },
     [
       dismissKeyboardOnSubmit,
@@ -130,6 +149,7 @@ export function PromptForm({
       message,
       onStopStream,
       resolvedSelectedModel,
+      runMode,
       isFormPending,
       onSubmit,
     ]
@@ -216,6 +236,11 @@ export function PromptForm({
               <ModelSelector
                 selectedModel={resolvedSelectedModel}
                 handleSelectModel={handleSelectModel}
+              />
+              <ResearchModeToggle
+                runMode={runMode}
+                onRunModeChange={setRunMode}
+                disabled={isFormPending}
               />
             </div>
 

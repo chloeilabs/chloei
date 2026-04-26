@@ -118,11 +118,15 @@ This request is finance-analysis work.
 - Stay on the finance task. Do not narrate unrelated wording, country-name, or language-usage considerations.
 `.trim(),
   research: `
-This request needs freshness, sources, or verification.
-- Decide what must be verified before answering.
-- Search first, then extract pages only when you need more detail from a specific source.
-- Use explicit dates when recency matters.
-- If evidence is missing or conflicting, say that plainly instead of guessing.
+This request needs deep research, freshness, sources, or verification.
+- Clarify missing scope only when the missing detail would materially change the research plan; otherwise proceed with stated assumptions.
+- Decide what claims need verification before answering, and search before answering freshness-sensitive, source-heavy, or contested claims.
+- Extract or read primary pages when details, dates, numbers, methodology, or quotes matter.
+- Cross-check important claims across sources, especially when sources conflict or one source is promotional.
+- Use explicit calendar dates when recency matters.
+- Use code execution for calculations, tabular analysis, transformations, and arithmetic checks that could change the conclusion.
+- Produce a structured, citation-forward final report with clear findings, evidence, limitations, and source gaps.
+- If live retrieval tools are unavailable or evidence is missing or conflicting, say that plainly instead of guessing.
 `.trim(),
   high_stakes: `
 This request is high-stakes.

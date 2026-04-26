@@ -6,8 +6,11 @@ import { ASSISTANT_EMPTY_RESPONSE_FALLBACK } from "@/lib/constants"
 import { createLogger } from "@/lib/logger"
 import { resolveRequestIdFromHeaders } from "@/lib/request-id"
 import {
+  AGENT_RUN_MODES,
+  type AgentRunMode,
   type AgentStreamEvent,
   ALL_MODELS,
+  AvailableModels,
   type ModelInfo,
   type ModelType,
   resolveDefaultModel,
@@ -43,17 +46,21 @@ const agentMessageSchema = z
 export const agentStreamRequestSchema = z
   .object({
     model: z.string().trim().min(1).max(200).optional(),
+    runMode: z.enum(AGENT_RUN_MODES).optional(),
     threadId: z.string().trim().min(1).max(200).optional(),
     messages: z.array(agentMessageSchema).min(1),
   })
   .strict()
 
 type AgentStreamRequest = z.infer<typeof agentStreamRequestSchema>
+type ParsedAgentStreamRequestData = Omit<AgentStreamRequest, "runMode"> & {
+  runMode: AgentRunMode
+}
 type AgentRateLimitDecision = ReturnType<
   typeof evaluateAndConsumeSlidingWindowRateLimit
 >
 interface ParsedAgentStreamRequest {
-  parsedRequest: AgentStreamRequest
+  parsedRequest: ParsedAgentStreamRequestData
   selectedModel: ModelType
 }
 
@@ -185,6 +192,13 @@ function isSupportedModel(model: unknown): model is ModelType {
   )
 }
 
+function isAvailableModel(
+  models: readonly Pick<ModelInfo, "id">[],
+  targetModel: ModelType
+): boolean {
+  return models.some((model) => model.id === targetModel)
+}
+
 function getTotalMessageChars(
   messages: AgentStreamRequest["messages"]
 ): number {
@@ -281,8 +295,25 @@ export function parseAgentStreamRequest(
     })
   }
 
+  const runMode = parsed.data.runMode ?? "chat"
+
+  if (
+    runMode === "research" &&
+    !isAvailableModel(params.availableModels, AvailableModels.OPENAI_GPT_5_5)
+  ) {
+    return createJsonErrorResponse({
+      requestId: params.requestId,
+      error: "Research mode requires GPT-5.5 model access.",
+      errorCode: "AGENT_RESEARCH_MODEL_UNAVAILABLE",
+      status: 400,
+      rateLimitDecision: params.rateLimitDecision,
+    })
+  }
+
   const selectedModelCandidate =
-    parsed.data.model ?? resolveDefaultModel(params.availableModels)
+    runMode === "research"
+      ? AvailableModels.OPENAI_GPT_5_5
+      : (parsed.data.model ?? resolveDefaultModel(params.availableModels))
 
   if (!isSupportedModel(selectedModelCandidate)) {
     return createJsonErrorResponse({
@@ -295,7 +326,10 @@ export function parseAgentStreamRequest(
   }
 
   return {
-    parsedRequest: parsed.data,
+    parsedRequest: {
+      ...parsed.data,
+      runMode,
+    },
     selectedModel: selectedModelCandidate,
   }
 }

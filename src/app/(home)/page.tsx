@@ -10,7 +10,10 @@ import { getModels } from "@/lib/actions/api-keys"
 import { isAuthConfigured } from "@/lib/server/auth"
 import { getCurrentViewer } from "@/lib/server/auth-session"
 import { listThreadsForUser } from "@/lib/server/threads"
-import { resolveDefaultModel } from "@/lib/shared"
+import {
+  getModelSelectorModels,
+  resolveDefaultModelSelectorModel,
+} from "@/lib/shared"
 
 export default async function Home() {
   if (!isAuthConfigured()) {
@@ -26,12 +29,15 @@ export default async function Home() {
   const queryClient = new QueryClient()
 
   const availableModels = getModels()
+  const modelSelectorModels = getModelSelectorModels(availableModels)
   const initialThreads = await listThreadsForUser(viewer.id)
 
   queryClient.setQueryData(["models"], availableModels)
 
   const resolvedInitialSelectedModel =
-    availableModels.length > 0 ? resolveDefaultModel(availableModels) : null
+    modelSelectorModels.length > 0
+      ? resolveDefaultModelSelectorModel(modelSelectorModels)
+      : null
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
