@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import test from "node:test"
@@ -112,4 +112,49 @@ test("finance code execution blocks unsafe path literals", async () => {
   assert.equal(result.output, undefined)
   assert.equal(result.error?.code, "BLOCKED_PATTERN")
   assert.match(result.error?.message ?? "", /relative workspace paths/)
+})
+
+test("preserved code execution workspace does not overwrite mounted inputs", async () => {
+  const tempRoot = await mkdtemp(path.join(tmpdir(), "chloei-code-test-"))
+  try {
+    const inputSource = path.join(tempRoot, "source.xlsx")
+    await writeFile(inputSource, "original")
+
+    const tools = createAiSdkCodeExecutionTools({
+      backend: "finance",
+      workspaceMode: "preserve",
+      workspaceRoot: tempRoot,
+      inputFiles: [
+        {
+          sourcePath: inputSource,
+          relativePath: "mounted.xlsx",
+        },
+      ],
+    })
+
+    const writeResult = await tools.code_execution.execute({
+      language: "python",
+      code: [
+        "import zipfile",
+        "with zipfile.ZipFile('mounted.xlsx', 'w') as workbook:",
+        "    workbook.writestr('modified.txt', 'changed')",
+      ].join("\n"),
+    })
+
+    assert.equal(writeResult.error, undefined)
+
+    const readResult = await tools.code_execution.execute({
+      language: "python",
+      code: [
+        "import zipfile",
+        "with zipfile.ZipFile('mounted.xlsx') as workbook:",
+        "    print(','.join(workbook.namelist()))",
+      ].join("\n"),
+    })
+
+    assert.equal(readResult.error, undefined)
+    assert.match(readResult.output?.stdout ?? "", /modified\.txt/)
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true })
+  }
 })

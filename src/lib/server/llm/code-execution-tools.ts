@@ -431,9 +431,14 @@ async function copyInputFiles(
     }
 
     const destination = path.join(workspaceDir, relativePath)
+    copied.add(relativePath)
+    const destinationStats = await stat(destination).catch(() => null)
+    if (destinationStats) {
+      continue
+    }
+
     await mkdir(path.dirname(destination), { recursive: true })
     await copyFile(inputFile.sourcePath, destination)
-    copied.add(relativePath)
   }
 
   return copied
