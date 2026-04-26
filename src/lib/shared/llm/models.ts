@@ -1,5 +1,7 @@
 export const AvailableModels = {
   ANTHROPIC_CLAUDE_SONNET_4_6: "anthropic/claude-sonnet-4.6",
+  DEEPSEEK_V4_PRO: "deepseek/deepseek-v4-pro",
+  MOONSHOTAI_KIMI_K2_6: "moonshotai/kimi-k2.6",
   OPENAI_GPT_5_5: "openai/gpt-5.5",
 } as const
 
@@ -20,6 +22,8 @@ export interface ModelInfo {
 export const SUPPORTED_MODELS = [
   AvailableModels.OPENAI_GPT_5_5,
   AvailableModels.ANTHROPIC_CLAUDE_SONNET_4_6,
+  AvailableModels.MOONSHOTAI_KIMI_K2_6,
+  AvailableModels.DEEPSEEK_V4_PRO,
 ] as const
 
 export const ALL_MODELS = [...SUPPORTED_MODELS] as const
@@ -34,6 +38,14 @@ export const ModelInfos: Record<ModelType, ModelInfo> = {
   [AvailableModels.ANTHROPIC_CLAUDE_SONNET_4_6]: {
     id: AvailableModels.ANTHROPIC_CLAUDE_SONNET_4_6,
     name: "Claude Sonnet 4.6",
+  },
+  [AvailableModels.DEEPSEEK_V4_PRO]: {
+    id: AvailableModels.DEEPSEEK_V4_PRO,
+    name: "DeepSeek V4 Pro",
+  },
+  [AvailableModels.MOONSHOTAI_KIMI_K2_6]: {
+    id: AvailableModels.MOONSHOTAI_KIMI_K2_6,
+    name: "Kimi K2.6",
   },
   [AvailableModels.OPENAI_GPT_5_5]: {
     id: AvailableModels.OPENAI_GPT_5_5,
