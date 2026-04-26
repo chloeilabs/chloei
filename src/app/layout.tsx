@@ -1,5 +1,7 @@
 import "./globals.css"
 
+import { Analytics } from "@vercel/analytics/next"
+import { SpeedInsights } from "@vercel/speed-insights/next"
 import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import localFont from "next/font/local"
@@ -151,6 +153,8 @@ export default function RootLayout({
           {children}
           <Toaster />
         </QueryClientProvider>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   )
