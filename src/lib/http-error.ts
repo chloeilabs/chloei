@@ -30,6 +30,16 @@ function normalizeOptionalString(value: string | null | undefined) {
   return trimmedValue
 }
 
+function isHtmlErrorResponse(response: Response, bodyText: string) {
+  const contentType = response.headers.get("Content-Type")?.toLowerCase()
+  if (contentType?.includes("text/html")) {
+    return true
+  }
+
+  const bodyStart = bodyText.trimStart().slice(0, 80).toLowerCase()
+  return bodyStart.startsWith("<!doctype html") || bodyStart.startsWith("<html")
+}
+
 export function createHttpError(params: CreateHttpErrorParams): HttpError {
   const error = new Error(params.message) as HttpError
 
@@ -78,7 +88,9 @@ export async function parseHttpErrorResponse(
       errorCode = responseErrorCode ?? errorCode
       requestId = responseRequestId ?? requestId
     } catch {
-      message = normalizeOptionalString(bodyText) ?? message
+      if (!isHtmlErrorResponse(response, bodyText)) {
+        message = normalizeOptionalString(bodyText) ?? message
+      }
     }
   }
 

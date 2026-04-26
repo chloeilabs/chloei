@@ -2,7 +2,6 @@
   "name": "chloei",
   "version": "0.0.1",
   "private": true,
-  "type": "module",
   "scripts": {
     "auth:migrate": "better-auth migrate -y --config auth.ts",
     "app:migrate": "node app-migrate.mjs",
@@ -14,8 +13,8 @@
     "eval:finance": "node evals/finance/run-finance-evals.mjs",
     "eval:finance:grade": "node evals/finance/grade-finance-evals.mjs",
     "test": "node --test tests/*.test.mjs",
-    "lint": "eslint src tests auth.ts app-migrate.mjs eslint.config.js next.config.mjs postcss.config.mjs --max-warnings=0",
-    "lint:fix": "eslint src tests auth.ts app-migrate.mjs eslint.config.js next.config.mjs postcss.config.mjs --fix --max-warnings=0",
+    "lint": "eslint src tests auth.ts app-migrate.mjs eslint.config.mjs next.config.mjs postcss.config.mjs --max-warnings=0",
+    "lint:fix": "eslint src tests auth.ts app-migrate.mjs eslint.config.mjs next.config.mjs postcss.config.mjs --fix --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "next typegen && tsc --noEmit"

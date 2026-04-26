@@ -19,7 +19,7 @@ const nodeConfigFiles = [
   "agent-worker.mjs",
   "src/lib/server/**/*.mjs",
   "tests/**/*.mjs",
-  "eslint.config.js",
+  "eslint.config.mjs",
   "next.config.mjs",
   "postcss.config.mjs",
   "app-migrate.mjs",
