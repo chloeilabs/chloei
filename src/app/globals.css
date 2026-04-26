@@ -166,7 +166,7 @@
     line-height: 1.75;
   }
 
-  .chloei-markdown.prose :where(h1, h2, h3, h4, h5, h6) {
+  .chloei-markdown.prose :where(h1, h2, h3, h4) {
     letter-spacing: 0;
   }
 
@@ -180,7 +180,7 @@
     line-height: 1.25;
   }
 
-  .chloei-markdown.prose :where(h3, h4, h5, h6) {
+  .chloei-markdown.prose :where(h3) {
     margin-block: 0 0.5rem;
     line-height: 1.35;
   }
@@ -294,10 +294,8 @@
     transition: background-color 140ms ease;
   }
 
-  @media (hover: hover) {
-    .chloei-markdown .chloei-markdown-table tbody tr:hover {
-      background: color-mix(in oklch, var(--muted) 24%, transparent);
-    }
+  .chloei-markdown .chloei-markdown-table tbody tr:hover {
+    background: color-mix(in oklch, var(--muted) 24%, transparent);
   }
 
   .chloei-markdown .chloei-markdown-table th:first-child,
