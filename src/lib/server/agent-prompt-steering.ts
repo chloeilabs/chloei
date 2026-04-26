@@ -1,6 +1,6 @@
 import type { ModelType } from "@/lib/shared"
 
-export type PromptProvider = "anthropic" | "openai"
+export type PromptProvider = "anthropic" | "deepseek" | "moonshotai" | "openai"
 
 export type PromptTaskMode =
   | "general"
@@ -52,6 +52,22 @@ Use Claude reasoning mode efficiently.
 - Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
 - Use native web search or other tools only when they materially improve accuracy or freshness.
 - After tool use, synthesize and stop. Do not replay raw tool output.
+`.trim(),
+  deepseek: `
+Use DeepSeek reasoning mode efficiently.
+- Keep the final answer concise and grounded in the actual task.
+- Prefer direct execution and verification over speculative narration.
+- On format-sensitive tasks, do a literal final-format check before finishing.
+- Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
+- After tool use, synthesize the result and stop. Do not replay raw tool traces.
+`.trim(),
+  moonshotai: `
+Use Kimi reasoning mode efficiently.
+- Keep the final answer concise and grounded in the actual task.
+- Prefer direct execution and verification over speculative narration.
+- On format-sensitive tasks, do a literal final-format check before finishing.
+- Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
+- After tool use, synthesize the result and stop. Do not replay raw tool traces.
 `.trim(),
   openai: `
 Use OpenAI reasoning mode efficiently.
@@ -143,6 +159,14 @@ export function resolvePromptProvider(model: ModelType): PromptProvider {
 
   if (model.startsWith("openai/")) {
     return "openai"
+  }
+
+  if (model.startsWith("deepseek/")) {
+    return "deepseek"
+  }
+
+  if (model.startsWith("moonshotai/")) {
+    return "moonshotai"
   }
 
   throw new Error(`Unsupported model provider for model: ${model}`)

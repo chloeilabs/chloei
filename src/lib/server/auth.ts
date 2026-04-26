@@ -123,7 +123,11 @@ function getTrustedOrigins(baseUrl: string): string[] {
 function normalizeOrigin(value: string): string | null {
   const trimmedValue = value.trim()
 
-  if (!trimmedValue) {
+  if (
+    !trimmedValue ||
+    trimmedValue === "null" ||
+    trimmedValue === "undefined"
+  ) {
     return null
   }
 
@@ -155,7 +159,10 @@ function getAllowedHosts(trustedOrigins: string[]): string[] {
   const allowedHosts = new Set<string>()
 
   for (const origin of trustedOrigins) {
-    allowedHosts.add(new URL(origin).host)
+    const normalizedOrigin = normalizeOrigin(origin)
+    if (normalizedOrigin) {
+      allowedHosts.add(new URL(normalizedOrigin).host)
+    }
   }
 
   return [...allowedHosts]

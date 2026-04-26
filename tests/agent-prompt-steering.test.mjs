@@ -16,12 +16,20 @@ const steeringUrl = pathToFileURL(
 const { AvailableModels } = await import(modelsUrl)
 const { inferPromptTaskMode, resolvePromptProvider } = await import(steeringUrl)
 
-test("prompt steering resolves Anthropic and OpenAI providers", () => {
+test("prompt steering resolves supported model providers", () => {
   assert.equal(
     resolvePromptProvider(AvailableModels.ANTHROPIC_CLAUDE_SONNET_4_6),
     "anthropic"
   )
   assert.equal(resolvePromptProvider(AvailableModels.OPENAI_GPT_5_5), "openai")
+  assert.equal(
+    resolvePromptProvider(AvailableModels.MOONSHOTAI_KIMI_K2_6),
+    "moonshotai"
+  )
+  assert.equal(
+    resolvePromptProvider(AvailableModels.DEEPSEEK_V4_PRO),
+    "deepseek"
+  )
 })
 
 test("prompt steering detects finance analysis without overriding personal advice safety", () => {
