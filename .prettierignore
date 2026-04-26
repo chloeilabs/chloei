@@ -5,3 +5,6 @@ node_modules/
 coverage/
 pnpm-lock.yaml
 .pnpm-store/
+__pycache__/
+evals/finance/cache/
+evals/finance/results/

@@ -36,6 +36,8 @@ test("gateway search tools normalize queries from native and gateway search inpu
       toolName: "web_search",
       label: "Searching Web",
       query: "latest vercel ai gateway updates",
+      operation: "web_search",
+      provider: "ai_gateway",
     }
   )
 
@@ -84,6 +86,9 @@ test("gateway search tools derive sources from result payloads", () => {
           title: "Example News",
         },
       ],
+      operation: "web_search",
+      provider: "ai_gateway",
+      retryable: false,
     }
   )
 
@@ -137,13 +142,12 @@ test("gateway provider options request the strongest supported reasoning levels"
 
 test("stale and legacy default model ids fall back to GPT-5.5", () => {
   assert.equal(parseStoredSelectedModel("qwen/qwen3.6-plus"), null)
-  assert.equal(
-    parseStoredSelectedModel("anthropic/claude-sonnet-4.6"),
-    null
-  )
+  assert.equal(parseStoredSelectedModel("anthropic/claude-sonnet-4.6"), null)
   assert.equal(
     parseStoredSelectedModel(
-      JSON.stringify(serializeStoredSelectedModel("anthropic/claude-sonnet-4.6"))
+      JSON.stringify(
+        serializeStoredSelectedModel("anthropic/claude-sonnet-4.6")
+      )
     ),
     "anthropic/claude-sonnet-4.6"
   )

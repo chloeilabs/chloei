@@ -5,6 +5,7 @@ import {
   isSearchToolName,
   type MessageSource,
   type ToolInvocation,
+  type ToolRunMetadata,
 } from "@/lib/shared"
 
 import { createClientMessageId } from "./home-agent-utils"
@@ -40,6 +41,19 @@ function getSearchQueryFromToolCall(event: ToolCallEvent): string | null {
 
   const normalizedLabel = event.label.trim()
   return normalizedLabel.length > 0 ? normalizedLabel : null
+}
+
+function getToolRunMetadata(
+  event: ToolCallEvent | ToolResultEvent
+): ToolRunMetadata {
+  return {
+    ...(event.operation ? { operation: event.operation } : {}),
+    ...(event.provider ? { provider: event.provider } : {}),
+    ...(event.attempt ? { attempt: event.attempt } : {}),
+    ...(event.durationMs !== undefined ? { durationMs: event.durationMs } : {}),
+    ...(event.errorCode ? { errorCode: event.errorCode } : {}),
+    ...(event.retryable !== undefined ? { retryable: event.retryable } : {}),
+  }
 }
 
 export interface AgentStreamAccumulator {
@@ -234,6 +248,7 @@ function upsertToolInvocationFromCall(
         toolName: event.toolName,
         label: event.label,
         ...(searchQuery ? { query: searchQuery } : {}),
+        ...getToolRunMetadata(event),
         status: "running",
       },
     ]
@@ -257,6 +272,7 @@ function upsertToolInvocationFromCall(
     ...((searchQuery ?? existing.query)
       ? { query: searchQuery ?? existing.query }
       : {}),
+    ...getToolRunMetadata(event),
     status: nextStatus,
   }
 
@@ -292,6 +308,8 @@ function applyToolResultToInvocations(
   const updated = [...current]
   updated[targetIndex] = {
     ...target,
+    ...getToolRunMetadata(event),
+    ...(event.toolName ? { toolName: event.toolName } : {}),
     status: event.status,
   }
   return updated
@@ -342,6 +360,7 @@ function upsertToolTimelineFromCall(
         callId: event.callId,
         toolName: event.toolName,
         query: searchQuery,
+        ...getToolRunMetadata(event),
         status: "running",
       }
 
@@ -363,6 +382,7 @@ function upsertToolTimelineFromCall(
       callId: event.callId,
       toolName: event.toolName,
       query: searchQuery,
+      ...getToolRunMetadata(event),
       status: nextStatus,
     }
 
@@ -396,6 +416,7 @@ function upsertToolTimelineFromCall(
       callId: event.callId,
       toolName: event.toolName,
       label: event.label,
+      ...getToolRunMetadata(event),
       status: "running",
     }
 
@@ -417,6 +438,7 @@ function upsertToolTimelineFromCall(
     callId: event.callId,
     toolName: event.toolName,
     label: event.label,
+    ...getToolRunMetadata(event),
     status: nextStatus,
   }
 
@@ -459,10 +481,19 @@ function applyToolResultToTimeline(
   }
 
   const updated = [...current]
-  updated[targetIndex] = {
-    ...target,
-    status: event.status,
-  }
+  updated[targetIndex] =
+    target.kind === "tool"
+      ? {
+          ...target,
+          ...getToolRunMetadata(event),
+          ...(event.toolName ? { toolName: event.toolName } : {}),
+          status: event.status,
+        }
+      : {
+          ...target,
+          ...getToolRunMetadata(event),
+          status: event.status,
+        }
   return updated
 }
 

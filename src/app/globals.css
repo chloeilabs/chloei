@@ -183,6 +183,50 @@
     white-space: normal;
   }
 
+  .chloei-markdown .chloei-math {
+    font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+    font-variant-numeric: lining-nums tabular-nums;
+    letter-spacing: 0;
+  }
+
+  .chloei-markdown .chloei-math-inline {
+    display: inline;
+    font-size: 1em;
+    line-height: inherit;
+    white-space: nowrap;
+  }
+
+  .chloei-markdown .chloei-math-standalone-inline {
+    display: block;
+    max-width: 100%;
+    margin-block: 0.375rem;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    font-size: 1.125rem;
+    line-height: 1.45;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .chloei-markdown .chloei-math-display {
+    display: block;
+    font-size: 1.0625rem;
+    line-height: 1.45;
+    max-width: 100%;
+    margin-block: 0.625rem;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding-block: 0.25rem;
+    text-align: center;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .chloei-markdown .chloei-math-line {
+    display: block;
+    min-width: max-content;
+  }
+
   @media (max-width: 639px) {
     .chloei-markdown .chloei-markdown-table {
       margin-inline: -0.75rem;

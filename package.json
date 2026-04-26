@@ -11,6 +11,8 @@
     "migrate": "pnpm auth:migrate && pnpm app:migrate",
     "start": "next start",
     "threads:migrate": "pnpm app:migrate",
+    "eval:finance": "node evals/finance/run-finance-evals.mjs",
+    "eval:finance:grade": "node evals/finance/grade-finance-evals.mjs",
     "test": "node --test tests/*.test.mjs",
     "lint": "eslint src tests auth.ts app-migrate.mjs eslint.config.js next.config.mjs postcss.config.mjs --max-warnings=0",
     "lint:fix": "eslint src tests auth.ts app-migrate.mjs eslint.config.js next.config.mjs postcss.config.mjs --fix --max-warnings=0",

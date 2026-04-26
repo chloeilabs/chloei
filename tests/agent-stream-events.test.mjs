@@ -23,6 +23,9 @@ test("parseStreamEventLine parses tool calls with checkpoint fields", () => {
     toolName: "web_search",
     label: "  Tavily search  ",
     query: " latest ai sdk ",
+    operation: "web_search",
+    provider: "ai_gateway",
+    attempt: 1,
     interactionId: "interaction-1",
     lastEventId: "event-1",
   })
@@ -33,8 +36,37 @@ test("parseStreamEventLine parses tool calls with checkpoint fields", () => {
     toolName: "web_search",
     label: "Tavily search",
     query: "latest ai sdk",
+    operation: "web_search",
+    provider: "ai_gateway",
+    attempt: 1,
     interactionId: "interaction-1",
     lastEventId: "event-1",
+  })
+})
+
+test("parseStreamEventLine parses extended tool result metadata", () => {
+  const line = JSON.stringify({
+    type: "tool_result",
+    callId: "call-1",
+    toolName: "finance_data",
+    status: "error",
+    operation: "quote",
+    provider: "fmp",
+    durationMs: 42,
+    errorCode: "HTTP_429",
+    retryable: true,
+  })
+
+  assert.deepEqual(parseStreamEventLine(line), {
+    type: "tool_result",
+    callId: "call-1",
+    toolName: "finance_data",
+    status: "error",
+    operation: "quote",
+    provider: "fmp",
+    durationMs: 42,
+    errorCode: "HTTP_429",
+    retryable: true,
   })
 })
 

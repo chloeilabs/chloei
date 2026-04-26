@@ -70,6 +70,8 @@ interface AiSdkTavilyToolCallMetadata {
   toolName: AiSdkTavilyToolName
   label: string
   query?: string
+  operation?: string
+  provider?: string
 }
 
 interface AiSdkTavilyToolResultMetadata {
@@ -77,6 +79,10 @@ interface AiSdkTavilyToolResultMetadata {
   toolName: AiSdkTavilyToolName
   status: "success" | "error"
   sources: MessageSource[]
+  operation?: string
+  provider?: string
+  errorCode?: string
+  retryable?: boolean
 }
 
 const tavilySearchInputSchema = z.object({
@@ -467,6 +473,8 @@ export function getAiSdkTavilyToolCallMetadata(
     toolName,
     label: getToolLabel(toolName),
     ...(query ? { query } : {}),
+    operation: toolName === TAVILY_SEARCH_TOOL_NAME ? "search" : "extract",
+    provider: "tavily",
   }
 }
 
@@ -491,6 +499,10 @@ export function getAiSdkTavilyToolResultMetadata(
       toolName,
       status: "error",
       sources: [],
+      operation: toolName === TAVILY_SEARCH_TOOL_NAME ? "search" : "extract",
+      provider: "tavily",
+      errorCode: "INVALID_TOOL_OUTPUT",
+      retryable: false,
     }
   }
 
@@ -500,6 +512,10 @@ export function getAiSdkTavilyToolResultMetadata(
       toolName,
       status: "error",
       sources: [],
+      operation: toolName === TAVILY_SEARCH_TOOL_NAME ? "search" : "extract",
+      provider: "tavily",
+      errorCode: payload.error.code,
+      retryable: true,
     }
   }
 
@@ -510,5 +526,8 @@ export function getAiSdkTavilyToolResultMetadata(
     sources: payload.output
       ? toSourcesFromOutput(toolName, payload.output)
       : [],
+    operation: toolName === TAVILY_SEARCH_TOOL_NAME ? "search" : "extract",
+    provider: "tavily",
+    retryable: false,
   }
 }

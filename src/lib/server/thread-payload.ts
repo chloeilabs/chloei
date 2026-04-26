@@ -27,6 +27,15 @@ const messageSourceSchema = z
   })
   .strict()
 
+const toolRunMetadataSchema = {
+  operation: z.string().trim().min(1).max(200).optional(),
+  provider: z.string().trim().min(1).max(200).optional(),
+  attempt: z.number().int().positive().optional(),
+  durationMs: z.number().nonnegative().optional(),
+  errorCode: z.string().trim().min(1).max(200).optional(),
+  retryable: z.boolean().optional(),
+} as const
+
 const toolInvocationSchema = z
   .object({
     id: z.string().trim().min(1).max(200),
@@ -35,6 +44,7 @@ const toolInvocationSchema = z
     label: z.string().trim().min(1).max(500),
     query: z.string().trim().min(1).max(10_000).optional(),
     status: TOOL_INVOCATION_STATUS_SCHEMA,
+    ...toolRunMetadataSchema,
   })
   .strict()
 
@@ -48,6 +58,7 @@ const toolActivityTimelineEntrySchema = z
     toolName: TOOL_NAME_SCHEMA,
     label: z.string().trim().min(1).max(500),
     status: TOOL_INVOCATION_STATUS_SCHEMA,
+    ...toolRunMetadataSchema,
   })
   .strict()
 
@@ -61,6 +72,7 @@ const searchActivityTimelineEntrySchema = z
     toolName: SEARCH_TOOL_NAME_SCHEMA,
     query: z.string().trim().min(1).max(10_000),
     status: TOOL_INVOCATION_STATUS_SCHEMA,
+    ...toolRunMetadataSchema,
   })
   .strict()
 

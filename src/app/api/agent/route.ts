@@ -5,6 +5,7 @@ import { createLogger } from "@/lib/logger"
 import { buildAgentSystemInstruction } from "@/lib/server/agent-context"
 import {
   inferPromptTaskMode,
+  type PromptTaskMode,
   resolvePromptProvider,
 } from "@/lib/server/agent-prompt-steering"
 import {
@@ -41,6 +42,10 @@ export const maxDuration = 800
 
 function resolveRateLimitIdentifier(userId: string): string {
   return `user:${userId}`
+}
+
+function resolveRuntimeProfile(taskMode: PromptTaskMode) {
+  return taskMode === "finance_analysis" ? "finance_analysis" : "chat_default"
 }
 
 export async function POST(request: NextRequest) {
@@ -224,6 +229,7 @@ export async function POST(request: NextRequest) {
         tavilyApiKey,
         fmpApiKey,
         userTimeZone,
+        runtimeProfile: resolveRuntimeProfile(promptTaskMode),
         messages: parsedRequest.messages,
         systemInstruction,
         onStreamSettled: concurrencySlot?.release,

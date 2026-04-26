@@ -6,6 +6,7 @@ const DEFAULT_AGENT_RATE_LIMIT_WINDOW_MS = 60_000
 const DEFAULT_AGENT_RATE_LIMIT_MAX_REQUESTS = 60
 const DEFAULT_AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT = 4
 const DEFAULT_AGENT_TOOL_MAX_STEPS = 12
+const DEFAULT_AGENT_CODE_EXECUTION_BACKEND = "restricted"
 
 function parsePositiveIntFromEnv(
   value: string | undefined,
@@ -40,6 +41,26 @@ function parseBooleanFromEnv(
   }
 
   return fallback
+}
+
+function parseEnumFromEnv<const T extends readonly string[]>(
+  value: string | undefined,
+  allowedValues: T,
+  fallback: T[number]
+): T[number] {
+  const normalized = value?.trim()
+  if (!normalized) {
+    return fallback
+  }
+
+  return allowedValues.includes(normalized) ? normalized : fallback
+}
+
+function parseOptionalStringFromEnv(
+  value: string | undefined
+): string | undefined {
+  const normalized = value?.trim()
+  return normalized && normalized.length > 0 ? normalized : undefined
 }
 
 export const AGENT_MAX_MESSAGES = parsePositiveIntFromEnv(
@@ -85,4 +106,18 @@ export const AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT = parsePositiveIntFromEnv(
 export const AGENT_TOOL_MAX_STEPS = parsePositiveIntFromEnv(
   process.env.AGENT_TOOL_MAX_STEPS,
   DEFAULT_AGENT_TOOL_MAX_STEPS
+)
+
+export const AGENT_CODE_EXECUTION_BACKEND = parseEnumFromEnv(
+  process.env.AGENT_CODE_EXECUTION_BACKEND,
+  ["restricted", "finance"] as const,
+  DEFAULT_AGENT_CODE_EXECUTION_BACKEND
+)
+
+export const AGENT_CODE_EXECUTION_PYTHON_VENV_PATH = parseOptionalStringFromEnv(
+  process.env.AGENT_CODE_EXECUTION_PYTHON_VENV_PATH
+)
+
+export const AGENT_EVAL_RESULTS_DIR = parseOptionalStringFromEnv(
+  process.env.AGENT_EVAL_RESULTS_DIR
 )

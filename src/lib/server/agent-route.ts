@@ -27,6 +27,8 @@ const STREAM_TIMEOUT_FALLBACK_TEXT =
   "Sorry, I couldn't finish the response in time. Please retry."
 const STREAM_ERROR_FALLBACK_TEXT =
   "Sorry, I hit an error while generating a response. Please retry."
+const STRUCTURED_OUTPUT_ONLY_FALLBACK_TEXT =
+  "I gathered tool results, but the model ended before writing a final answer. Please retry or narrow the request; the tool output above is still available for inspection."
 
 const allowedModels = ALL_MODELS
 
@@ -49,6 +51,10 @@ type AgentStreamRequest = z.infer<typeof agentStreamRequestSchema>
 type AgentRateLimitDecision = ReturnType<
   typeof evaluateAndConsumeSlidingWindowRateLimit
 >
+type AgentRuntimeProfileId =
+  | "chat_default"
+  | "finance_analysis"
+  | "gdpval_workspace"
 
 interface ParsedAgentStreamRequest {
   parsedRequest: AgentStreamRequest
@@ -81,6 +87,7 @@ interface CreateAgentStreamResponseParams {
   tavilyApiKey?: string
   fmpApiKey?: string
   userTimeZone?: string
+  runtimeProfile?: AgentRuntimeProfileId
   messages: AgentStreamRequest["messages"]
   systemInstruction: string
   onStreamSettled?: () => void
@@ -351,6 +358,7 @@ export function createAgentStreamResponse(
           tavilyApiKey: params.tavilyApiKey,
           fmpApiKey: params.fmpApiKey,
           userTimeZone: params.userTimeZone,
+          runtimeProfile: params.runtimeProfile,
           messages: params.messages,
           systemInstruction: withAiSdkInlineCitationInstruction(
             params.systemInstruction,
@@ -365,17 +373,30 @@ export function createAgentStreamResponse(
           handleEvent(event)
         }
 
-        if (!streamState.sawTerminalAgentStatus) {
-          handleEvent({ type: "agent_status", status: "completed" })
-        }
-
-        if (
-          !streamState.hasMeaningfulText &&
-          !streamState.hasStructuredOutput
-        ) {
+        const completedWithoutAnswer = !streamState.hasMeaningfulText
+        if (completedWithoutAnswer) {
+          streamOutcome = streamState.hasStructuredOutput
+            ? "incomplete"
+            : streamOutcome
           streamState.hasTextChunk = true
           streamState.hasMeaningfulText = true
-          enqueueEvent(textDeltaEvent(ASSISTANT_EMPTY_RESPONSE_FALLBACK))
+          enqueueEvent(
+            textDeltaEvent(
+              streamState.hasStructuredOutput
+                ? STRUCTURED_OUTPUT_ONLY_FALLBACK_TEXT
+                : ASSISTANT_EMPTY_RESPONSE_FALLBACK
+            )
+          )
+        }
+
+        if (!streamState.sawTerminalAgentStatus) {
+          handleEvent({
+            type: "agent_status",
+            status:
+              completedWithoutAnswer && streamState.hasStructuredOutput
+                ? "incomplete"
+                : "completed",
+          })
         }
       } catch (streamError) {
         const clientAborted = params.request.signal.aborted

@@ -138,13 +138,14 @@ After assembly, `withAiSdkInlineCitationInstruction` appends inline citation rul
 
 Three tool categories, each only active when the respective API key is configured:
 
-| Tool             | Key                  | Description                                       |
-| ---------------- | -------------------- | ------------------------------------------------- |
-| `web_search`     | `AI_GATEWAY_API_KEY` | Anthropic native web search through AI Gateway    |
-| `tavily_search`  | `TAVILY_API_KEY`     | Live web search (advanced depth, up to 8 results) |
-| `tavily_extract` | `TAVILY_API_KEY`     | Extract content from specific URLs (up to 5 URLs) |
-| `code_execution` | always on            | Run sandboxed JS or Python for arithmetic/logic   |
-| FMP MCP tools    | `FMP_API_KEY`        | Finance data via Financial Modeling Prep MCP      |
+| Tool             | Key                    | Description                                         |
+| ---------------- | ---------------------- | --------------------------------------------------- |
+| `web_search`     | `AI_GATEWAY_API_KEY`   | Anthropic native web search through AI Gateway      |
+| `tavily_search`  | `TAVILY_API_KEY`       | Live web search (advanced depth, up to 8 results)   |
+| `tavily_extract` | `TAVILY_API_KEY`       | Extract content from specific URLs (up to 5 URLs)   |
+| `code_execution` | always on              | Run sandboxed JS or Python for arithmetic/logic     |
+| `finance_data`   | optional provider keys | Normalized finance data via FMP, SEC, and FRED      |
+| FMP MCP tools    | `FMP_API_KEY`          | Legacy finance data via Financial Modeling Prep MCP |
 
 **Code execution** (`src/lib/server/llm/code-execution-tools.ts`):
 
@@ -152,7 +153,14 @@ Three tool categories, each only active when the respective API key is configure
 - JavaScript: runs via Node.js `--input-type=module --eval`
 - Python: runs via `python3 -I -c` (override with `PYTHON3_PATH` env var)
 - Allowed Python imports: computation-only (`math`, `collections`, `itertools`, etc.)
+- Finance/eval profiles can opt into the curated Python backend with `AGENT_CODE_EXECUTION_BACKEND=finance` or the runtime profile. It allows deterministic analysis libraries such as pandas, numpy, scipy, openpyxl, xlsxwriter, matplotlib, and statsmodels while preserving network/subprocess/host-filesystem blocks.
 - Timeout: default 4 s, max 8 s; output capped at 12,000 chars
+
+**Finance data** (`src/lib/server/llm/ai-sdk-finance-data-tools.ts`):
+
+- `finance_data` exposes typed operations for provider status, symbol search, quotes, company profiles, historical prices, financial statements, SEC company facts, and FRED series observations.
+- Provider calls return sanitized source URLs and structured error payloads with retryability metadata.
+- Finance-analysis runs prefer `finance_data`; chat-default runs keep FMP MCP enabled for migration compatibility.
 
 **FMP MCP tools** (`src/lib/server/llm/ai-sdk-fmp-mcp-tools.ts`):
 
@@ -324,6 +332,8 @@ All other variables are optional — the code has safe defaults. See `.env.examp
 | `AUTH_DATABASE_URL`                        | Separate DB for Better Auth (falls back to `DATABASE_URL`) |
 | `TAVILY_API_KEY`                           | Enables Tavily web search + extract tools                  |
 | `FMP_API_KEY`                              | Enables Financial Modeling Prep MCP finance tools          |
+| `FRED_API_KEY`                             | Enables FRED macro/rates lookups through `finance_data`    |
+| `SEC_API_USER_AGENT`                       | User agent for SEC public company-facts requests           |
 | `OPENAI_API_KEY`                           | Enables OpenAI judge for prompt evals                      |
 | `OPENAI_EVAL_JUDGE_MODEL`                  | Judge model override (default: `gpt-5.4`)                  |
 | `PYTHON3_PATH`                             | Override `python3` binary for code execution               |
@@ -332,6 +342,9 @@ All other variables are optional — the code has safe defaults. See `.env.examp
 | `AGENT_MAX_TOTAL_CHARS`                    | Max total conversation chars (default: 48,000)             |
 | `AGENT_STREAM_TIMEOUT_MS`                  | Stream timeout (default: 800,000 ms)                       |
 | `AGENT_TOOL_MAX_STEPS`                     | Max tool use steps per run (default: 12)                   |
+| `AGENT_CODE_EXECUTION_BACKEND`             | `restricted` or `finance`                                  |
+| `AGENT_CODE_EXECUTION_PYTHON_VENV_PATH`    | Optional venv/python path for curated finance execution    |
+| `AGENT_EVAL_RESULTS_DIR`                   | Output directory for finance eval results/artifacts        |
 | `AGENT_RATE_LIMIT_ENABLED`                 | Enable/disable rate limiting (default: true)               |
 | `AGENT_RATE_LIMIT_WINDOW_MS`               | Rate limit window (default: 60,000 ms)                     |
 | `AGENT_RATE_LIMIT_MAX_REQUESTS`            | Max requests per window (default: 60)                      |

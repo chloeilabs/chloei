@@ -236,12 +236,12 @@ test("agent helper streams fallback output when the model yields no content", as
 
   assert.deepEqual(events, [
     { type: "agent_status", status: "in_progress" },
-    { type: "agent_status", status: "completed" },
     {
       type: "text_delta",
       delta:
         "Sorry, I couldn't generate a response from that input. Please retry.",
     },
+    { type: "agent_status", status: "completed" },
   ])
   assert.equal(recorded.settledCount, 1)
   assert.equal(recorded.streamParams[0]?.systemInstruction, "system::fmp=true")
