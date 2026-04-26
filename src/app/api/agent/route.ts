@@ -27,6 +27,7 @@ import {
   isAuthConfigured,
 } from "@/lib/server/auth"
 import { getRequestSession } from "@/lib/server/auth-session"
+import type { AgentRuntimeProfileId } from "@/lib/server/llm/agent-runtime"
 import {
   evaluateAndConsumeSlidingWindowRateLimit,
   tryAcquireConcurrencySlot,
@@ -44,7 +45,9 @@ function resolveRateLimitIdentifier(userId: string): string {
   return `user:${userId}`
 }
 
-function resolveRuntimeProfile(taskMode: PromptTaskMode) {
+function resolveRuntimeProfile(
+  taskMode: PromptTaskMode
+): AgentRuntimeProfileId {
   return taskMode === "finance_analysis" ? "finance_analysis" : "chat_default"
 }
 

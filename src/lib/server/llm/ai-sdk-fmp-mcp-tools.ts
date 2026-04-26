@@ -425,6 +425,7 @@ export async function createAiSdkFmpMcpToolsContext(
     ) as ToolSet
     const tools = wrapCuratedTools(remoteTools, remoteToolNames)
     const remoteToolNameSet = new Set(remoteToolNames)
+    const operationByCallId = new Map<string, string>()
 
     return {
       tools,
@@ -438,11 +439,13 @@ export async function createAiSdkFmpMcpToolsContext(
           return null
         }
 
+        const operation = getEndpointFromInput(part.input) ?? part.toolName
+        operationByCallId.set(part.toolCallId, operation)
         return {
           callId: part.toolCallId,
           toolName: FMP_MCP_TOOL_NAME,
           label: getLabelForToolCall(part.toolName, part.input),
-          operation: getEndpointFromInput(part.input) ?? part.toolName,
+          operation,
           provider: "fmp",
         }
       },
@@ -456,7 +459,7 @@ export async function createAiSdkFmpMcpToolsContext(
           toolName: FMP_MCP_TOOL_NAME,
           status: isFmpToolError(part.output) ? "error" : "success",
           sources: [],
-          operation: part.toolName,
+          operation: operationByCallId.get(part.toolCallId) ?? part.toolName,
           provider: "fmp",
           ...(isFmpToolError(part.output)
             ? { errorCode: "FMP_MCP_ERROR", retryable: true }

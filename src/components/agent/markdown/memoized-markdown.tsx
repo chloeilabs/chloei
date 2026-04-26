@@ -1,5 +1,12 @@
 import { marked } from "marked"
-import { isValidElement, memo, type ReactNode, useMemo } from "react"
+import {
+  cloneElement,
+  isValidElement,
+  memo,
+  type ReactElement,
+  type ReactNode,
+  useMemo,
+} from "react"
 import ReactMarkdown, { type Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
 
@@ -55,8 +62,9 @@ function findClosingDelimiter(
 }
 
 function readFenceDelimiter(source: string, index: number): string | null {
-  const lineStart = index === 0 || source[index - 1] === "\n"
-  if (!lineStart) {
+  const lineStart = source.lastIndexOf("\n", index - 1) + 1
+  const prefix = source.slice(lineStart, index)
+  if (!/^(?:[ \t]{0,3}>)*[ \t]{0,3}$/.test(prefix)) {
     return null
   }
 
@@ -72,13 +80,22 @@ function readFenceDelimiter(source: string, index: number): string | null {
 }
 
 function findFenceEnd(source: string, delimiter: string, fromIndex: number) {
-  const closingIndex = source.indexOf(`\n${delimiter}`, fromIndex)
-  if (closingIndex === -1) {
-    return source.length
+  let index = fromIndex
+  while (index < source.length) {
+    const closingIndex = source.indexOf(delimiter, index)
+    if (closingIndex === -1) {
+      return source.length
+    }
+
+    if (readFenceDelimiter(source, closingIndex) === delimiter) {
+      const lineEndIndex = source.indexOf("\n", closingIndex)
+      return lineEndIndex === -1 ? source.length : lineEndIndex
+    }
+
+    index = closingIndex + delimiter.length
   }
 
-  const lineEndIndex = source.indexOf("\n", closingIndex + 1)
-  return lineEndIndex === -1 ? source.length : lineEndIndex
+  return source.length
 }
 
 function replaceMathWithPlaceholders(content: string): {
@@ -421,11 +438,25 @@ function renderChildrenWithMath(
       if (typeof child === "string") {
         renderedChildren.push(...renderTextWithMath(child, placeholders))
       } else {
-        renderedChildren.push(child)
+        renderedChildren.push(renderChildrenWithMath(child, placeholders))
       }
     }
 
     return renderedChildren
+  }
+
+  if (isValidElement<{ children?: ReactNode }>(children)) {
+    const childElement = children as ReactElement<{ children?: ReactNode }>
+    if (childElement.props.children === undefined) {
+      return children
+    }
+
+    return cloneElement(childElement, {
+      children: renderChildrenWithMath(
+        childElement.props.children,
+        placeholders
+      ),
+    })
   }
 
   return children

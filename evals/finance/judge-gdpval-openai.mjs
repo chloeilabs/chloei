@@ -237,11 +237,13 @@ function buildJudgeInput(
     })
   }
 
-  for (const url of task.deliverable_file_urls ?? []) {
-    content.push({
-      type: "input_file",
-      file_url: url,
-    })
+  if (task.gold_sanity) {
+    for (const url of task.deliverable_file_urls ?? []) {
+      content.push({
+        type: "input_file",
+        file_url: url,
+      })
+    }
   }
 
   return content

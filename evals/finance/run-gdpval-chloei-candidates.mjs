@@ -188,7 +188,19 @@ async function loadReferenceFileMap(filePath) {
     return new Map()
   }
 
-  const index = JSON.parse(await readFile(filePath, "utf8"))
+  let index
+  try {
+    index = JSON.parse(await readFile(filePath, "utf8"))
+  } catch (error) {
+    console.warn(
+      JSON.stringify({
+        status: "reference_index_unavailable",
+        filePath,
+        error: getErrorMessage(error),
+      })
+    )
+    return new Map()
+  }
   const files = Array.isArray(index.files) ? index.files : []
   const map = new Map()
   for (const file of files) {

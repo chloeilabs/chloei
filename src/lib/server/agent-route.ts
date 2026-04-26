@@ -19,6 +19,7 @@ import {
   AGENT_MAX_TOTAL_CHARS,
 } from "./agent-runtime-config"
 import { createApiErrorBody, createApiHeaders } from "./api-response"
+import type { AgentRuntimeProfileId } from "./llm/agent-runtime"
 import { startGatewayResponseStream } from "./llm/gateway-responses"
 import { withAiSdkInlineCitationInstruction } from "./llm/system-instruction-augmentations"
 import { type evaluateAndConsumeSlidingWindowRateLimit } from "./rate-limit"
@@ -28,6 +29,8 @@ const STREAM_TIMEOUT_FALLBACK_TEXT =
 const STREAM_ERROR_FALLBACK_TEXT =
   "Sorry, I hit an error while generating a response. Please retry."
 const STRUCTURED_OUTPUT_ONLY_FALLBACK_TEXT =
+  "I produced intermediate output, but the model ended before writing a final answer. Please retry or narrow the request."
+const TOOL_OUTPUT_ONLY_FALLBACK_TEXT =
   "I gathered tool results, but the model ended before writing a final answer. Please retry or narrow the request; the tool output above is still available for inspection."
 
 const allowedModels = ALL_MODELS
@@ -51,11 +54,6 @@ type AgentStreamRequest = z.infer<typeof agentStreamRequestSchema>
 type AgentRateLimitDecision = ReturnType<
   typeof evaluateAndConsumeSlidingWindowRateLimit
 >
-type AgentRuntimeProfileId =
-  | "chat_default"
-  | "finance_analysis"
-  | "gdpval_workspace"
-
 interface ParsedAgentStreamRequest {
   parsedRequest: AgentStreamRequest
   selectedModel: ModelType
@@ -305,6 +303,7 @@ export function createAgentStreamResponse(
         hasTextChunk: false,
         hasMeaningfulText: false,
         hasStructuredOutput: false,
+        hasToolOutput: false,
         sawTerminalAgentStatus: false,
       }
       let streamOutcome = "completed"
@@ -341,6 +340,9 @@ export function createAgentStreamResponse(
             }
           } else if (event.type !== "agent_status") {
             streamState.hasStructuredOutput = true
+            if (event.type === "tool_call" || event.type === "tool_result") {
+              streamState.hasToolOutput = true
+            }
           }
 
           if (event.type === "agent_status" && event.status !== "in_progress") {
@@ -383,7 +385,9 @@ export function createAgentStreamResponse(
           enqueueEvent(
             textDeltaEvent(
               streamState.hasStructuredOutput
-                ? STRUCTURED_OUTPUT_ONLY_FALLBACK_TEXT
+                ? streamState.hasToolOutput
+                  ? TOOL_OUTPUT_ONLY_FALLBACK_TEXT
+                  : STRUCTURED_OUTPUT_ONLY_FALLBACK_TEXT
                 : ASSISTANT_EMPTY_RESPONSE_FALLBACK
             )
           )

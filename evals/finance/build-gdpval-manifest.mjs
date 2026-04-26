@@ -9,6 +9,8 @@ const repoRoot = path.resolve(evalDir, "../..")
 
 const FINANCE_OCCUPATION_PATTERN =
   /\b(accountant|auditor|financial|investment|advisor|securities|commodities|sales agent|financial manager)\b/i
+const FINANCE_INDUSTRY_PATTERN =
+  /\b(finance|financial|bank|banking|insurance|investment|investments|broker|accounting|accountant|mortgage|lending|capital)\b/i
 const FINANCE_PROMPT_PATTERN =
   /\b(finance|financial|revenue|expense|margin|budget|statement|audit|tax|portfolio|investment|valuation|cash flow|spreadsheet|workbook)\b/i
 
@@ -34,7 +36,7 @@ const tasks = rows.filter((row) => {
   const prompt = String(row.prompt ?? row.task ?? "")
 
   return (
-    /finance|insurance|professional/i.test(industry) ||
+    FINANCE_INDUSTRY_PATTERN.test(industry) ||
     FINANCE_OCCUPATION_PATTERN.test(occupation) ||
     FINANCE_PROMPT_PATTERN.test(prompt)
   )

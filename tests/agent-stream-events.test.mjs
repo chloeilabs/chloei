@@ -93,6 +93,19 @@ test("parseStreamEventLine rejects malformed checkpoint and tool data", () => {
     ),
     null
   )
+
+  assert.equal(
+    parseStreamEventLine(
+      JSON.stringify({
+        type: "tool_result",
+        callId: "call-1",
+        toolName: "finance_data",
+        status: "error",
+        operation: "   ",
+      })
+    ),
+    null
+  )
 })
 
 test("getResponseErrorMessage prefers JSON error and falls back to body text", async () => {

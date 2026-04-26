@@ -227,6 +227,13 @@ function resolvePythonCommand(backend: CodeExecutionBackend): string {
   return path.join(venvPath, "bin", "python")
 }
 
+function inferLanguageFromCommand(command: string): CodeExecutionLanguage {
+  const baseName = path.basename(command).toLowerCase()
+  return baseName === "python" || baseName === "python3"
+    ? "python"
+    : "javascript"
+}
+
 function appendWithLimit(
   current: string,
   chunk: Buffer | string
@@ -397,6 +404,7 @@ function validateCodeSafety(args: CodeExecutionToolArgs): string | null {
 async function runProcess(args: {
   command: string
   commandArgs: string[]
+  language?: CodeExecutionLanguage
   timeoutMs: number
   backend: CodeExecutionBackend
   workspaceMode: CodeExecutionWorkspaceMode
@@ -526,8 +534,7 @@ async function runProcess(args: {
 
           finish({
             output: {
-              language:
-                args.command === PYTHON3_COMMAND ? "python" : "javascript",
+              language: args.language ?? inferLanguageFromCommand(args.command),
               exitCode: normalizedExitCode,
               stdout,
               stderr,
@@ -582,6 +589,7 @@ async function executeCode(
     const result = await runProcess({
       command: pythonCommand,
       commandArgs: ["-I", "-c", args.code],
+      language: "python",
       timeoutMs: args.timeoutMs,
       backend: args.backend,
       workspaceMode: args.workspaceMode,
@@ -603,6 +611,7 @@ async function executeCode(
   const result = await runProcess({
     command: process.execPath,
     commandArgs: ["--input-type=module", "--eval", args.code],
+    language: "javascript",
     timeoutMs: args.timeoutMs,
     backend: args.backend,
     workspaceMode: args.workspaceMode,

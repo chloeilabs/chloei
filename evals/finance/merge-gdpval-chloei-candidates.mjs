@@ -41,6 +41,23 @@ function hasUsableOutput(result) {
   )
 }
 
+function normalizeResultOutput(result) {
+  const output = result?.output ?? {}
+  return {
+    ...result,
+    output: {
+      ...output,
+      text: typeof output.text === "string" ? output.text : "",
+      artifacts: Array.isArray(output.artifacts) ? output.artifacts : [],
+      toolCalls: Array.isArray(output.toolCalls) ? output.toolCalls : [],
+      sources: Array.isArray(output.sources) ? output.sources : [],
+      artifactContexts: Array.isArray(output.artifactContexts)
+        ? output.artifactContexts
+        : [],
+    },
+  }
+}
+
 const manifestPath = path.resolve(
   repoRoot,
   getArg("--manifest", "evals/finance/results/gdpval-finance-manifest.json")
@@ -79,7 +96,7 @@ for (const inputPath of inputPaths) {
     if (completedOnly && !hasUsableOutput(result)) {
       continue
     }
-    byTaskId.set(result.taskId, result)
+    byTaskId.set(result.taskId, normalizeResultOutput(result))
   }
 }
 

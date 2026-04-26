@@ -190,10 +190,14 @@
   }
 
   .chloei-markdown .chloei-math-inline {
-    display: inline;
+    display: inline-block;
+    max-width: 100%;
+    overflow-x: auto;
+    vertical-align: text-bottom;
     font-size: 1em;
     line-height: inherit;
     white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
   }
 
   .chloei-markdown .chloei-math-standalone-inline {

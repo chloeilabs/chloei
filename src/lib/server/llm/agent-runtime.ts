@@ -371,13 +371,18 @@ export async function* startAgentRuntimeStream(
         !finalizedToolCalls.has(part.toolCallId)
       ) {
         finalizedToolCalls.add(part.toolCallId)
+        const toolName =
+          isAiSdkGatewaySearchToolName(part.toolName) ||
+          isAiSdkCodeExecutionToolName(part.toolName) ||
+          isAiSdkTavilyToolName(part.toolName) ||
+          isAiSdkFinanceDataToolName(part.toolName)
+            ? part.toolName
+            : "fmp_mcp"
         yield {
           type: "tool_result",
           callId: part.toolCallId,
+          toolName,
           status: "error",
-          ...(isAiSdkFinanceDataToolName(part.toolName)
-            ? { toolName: part.toolName }
-            : {}),
           errorCode: "TOOL_EXECUTION_ERROR",
           retryable: true,
         }

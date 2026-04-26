@@ -9,6 +9,8 @@ import { writeEvalResult } from "./harness.mjs"
 
 const evalDir = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(evalDir, "../..")
+const DEFAULT_DOWNLOAD_TIMEOUT_MS = 120_000
+const DEFAULT_DOWNLOAD_MAX_BYTES = 100 * 1024 * 1024
 
 function getArg(name, fallback) {
   const index = process.argv.indexOf(name)
@@ -21,6 +23,15 @@ function getArg(name, fallback) {
 
 function getFlag(name) {
   return process.argv.includes(name)
+}
+
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback
+  }
+
+  return Math.trunc(parsed)
 }
 
 function getContextRoles(value) {
@@ -88,12 +99,55 @@ async function downloadFile(url, outputPath, { force }) {
     return { downloaded: false }
   }
 
-  const response = await fetch(url)
-  if (!response.ok) {
-    throw new Error(`Download failed ${response.status}: ${url}`)
+  const controller = new AbortController()
+  let timedOut = false
+  const timeout = setTimeout(() => {
+    timedOut = true
+    controller.abort()
+  }, downloadTimeoutMs)
+  const chunks = []
+  let totalBytes = 0
+
+  try {
+    const response = await fetch(url, { signal: controller.signal })
+    if (!response.ok) {
+      throw new Error(`Download failed ${response.status}: ${url}`)
+    }
+
+    const contentLength = Number(response.headers.get("content-length"))
+    if (Number.isFinite(contentLength) && contentLength > downloadMaxBytes) {
+      throw new Error(
+        `Download too large (${String(contentLength)} bytes > ${String(downloadMaxBytes)} bytes): ${url}`
+      )
+    }
+
+    if (!response.body) {
+      throw new Error(`Download response has no body: ${url}`)
+    }
+
+    for await (const chunk of response.body) {
+      const buffer = Buffer.from(chunk)
+      totalBytes += buffer.byteLength
+      if (totalBytes > downloadMaxBytes) {
+        controller.abort()
+        throw new Error(
+          `Download exceeded max size (${String(totalBytes)} bytes > ${String(downloadMaxBytes)} bytes): ${url}`
+        )
+      }
+      chunks.push(buffer)
+    }
+  } catch (error) {
+    if (timedOut) {
+      throw new Error(
+        `Download timed out after ${String(downloadTimeoutMs)}ms: ${url}`
+      )
+    }
+    throw error
+  } finally {
+    clearTimeout(timeout)
   }
 
-  const buffer = Buffer.from(await response.arrayBuffer())
+  const buffer = Buffer.concat(chunks, totalBytes)
   await mkdir(path.dirname(outputPath), { recursive: true })
   await writeFile(outputPath, buffer)
 
@@ -252,6 +306,14 @@ const extractorPath = path.resolve(
 const fileMaxChars = Number(getArg("--file-max-chars", "120000"))
 const taskContextMaxChars = Number(getArg("--task-context-max-chars", "180000"))
 const extractorTimeoutMs = Number(getArg("--extractor-timeout-ms", "180000"))
+const downloadTimeoutMs = parsePositiveInteger(
+  getArg("--download-timeout-ms", String(DEFAULT_DOWNLOAD_TIMEOUT_MS)),
+  DEFAULT_DOWNLOAD_TIMEOUT_MS
+)
+const downloadMaxBytes = parsePositiveInteger(
+  getArg("--download-max-bytes", String(DEFAULT_DOWNLOAD_MAX_BYTES)),
+  DEFAULT_DOWNLOAD_MAX_BYTES
+)
 const xlsxMaxRows = Number(getArg("--xlsx-max-rows", "1000"))
 const xlsxMaxCols = Number(getArg("--xlsx-max-cols", "80"))
 const xlsxFormulaLimit = Number(getArg("--xlsx-formula-limit", "600"))

@@ -6,7 +6,18 @@ import re
 import sys
 import zipfile
 from pathlib import Path
-from xml.etree import ElementTree as ET
+
+try:
+    from defusedxml import ElementTree as SafeElementTree
+except ImportError:
+    from xml.etree import ElementTree as UnsafeElementTree
+
+    class SafeElementTree:
+        @staticmethod
+        def fromstring(value):
+            if re.search(rb"<!\s*(?:DOCTYPE|ENTITY)\b", value, re.IGNORECASE):
+                raise ValueError("Unsafe XML document type or entity declaration.")
+            return UnsafeElementTree.fromstring(value)
 
 
 TEXT_EXTENSIONS = {
@@ -75,7 +86,7 @@ def extract_text_file(path, max_chars):
 def extract_docx(path, max_chars):
     lines = []
     with zipfile.ZipFile(path) as archive:
-        document = ET.fromstring(archive.read("word/document.xml"))
+        document = SafeElementTree.fromstring(archive.read("word/document.xml"))
     body = next((child for child in document if local_name(child.tag) == "body"), None)
     if body is None:
         return "", False
@@ -113,7 +124,7 @@ def extract_pptx(path, max_chars):
             key=slide_sort_key,
         )
         for index, name in enumerate(names, start=1):
-            root = ET.fromstring(archive.read(name))
+            root = SafeElementTree.fromstring(archive.read(name))
             text = xml_text(root, {"t"})
             if text:
                 sections.append(f"## Slide {index}\n{text}")
@@ -302,7 +313,7 @@ def main():
         record["kind"] = kind
         record["text"] = text
         record["truncated"] = truncated
-        if kind in {"image", "unsupported"}:
+        if kind in {"image", "unsupported"} or "extraction unavailable" in text.lower():
             record["status"] = "limited"
     except Exception as exc:
         record["status"] = "error"

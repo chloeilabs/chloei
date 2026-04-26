@@ -43,23 +43,25 @@ function parseInteractionCheckpointFields(
 }
 
 function parseOptionalToolMetadata(record: Record<string, unknown>) {
-  const operation = asString(record.operation)?.trim()
-  if (
-    record.operation !== undefined &&
-    record.operation !== null &&
-    asString(record.operation) === null
-  ) {
-    return null
+  const parseOptionalString = (key: "operation" | "provider" | "errorCode") => {
+    const value = record[key]
+    if (value === undefined || value === null) {
+      return undefined
+    }
+
+    const trimmed = asString(value)?.trim()
+    if (!trimmed) {
+      return null
+    }
+
+    return trimmed
   }
 
-  const provider = asString(record.provider)?.trim()
-  if (
-    record.provider !== undefined &&
-    record.provider !== null &&
-    asString(record.provider) === null
-  ) {
-    return null
-  }
+  const operation = parseOptionalString("operation")
+  if (operation === null) return null
+
+  const provider = parseOptionalString("provider")
+  if (provider === null) return null
 
   const attempt = record.attempt
   if (
@@ -81,14 +83,8 @@ function parseOptionalToolMetadata(record: Record<string, unknown>) {
     return null
   }
 
-  const errorCode = asString(record.errorCode)?.trim()
-  if (
-    record.errorCode !== undefined &&
-    record.errorCode !== null &&
-    asString(record.errorCode) === null
-  ) {
-    return null
-  }
+  const errorCode = parseOptionalString("errorCode")
+  if (errorCode === null) return null
 
   const retryable = record.retryable
   if (

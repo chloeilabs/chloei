@@ -13,7 +13,12 @@ function getArg(name, fallback) {
     return fallback
   }
 
-  return process.argv[index + 1] ?? fallback
+  const value = process.argv[index + 1]
+  if (!value || value.startsWith("-")) {
+    throw new Error(`Missing value for ${name}.`)
+  }
+
+  return value
 }
 
 const inputPath = path.resolve(
