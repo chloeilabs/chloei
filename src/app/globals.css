@@ -294,8 +294,10 @@
     transition: background-color 140ms ease;
   }
 
-  .chloei-markdown .chloei-markdown-table tbody tr:hover {
-    background: color-mix(in oklch, var(--muted) 24%, transparent);
+  @media (hover: hover) {
+    .chloei-markdown .chloei-markdown-table tbody tr:hover {
+      background: color-mix(in oklch, var(--muted) 24%, transparent);
+    }
   }
 
   .chloei-markdown .chloei-markdown-table th:first-child,
