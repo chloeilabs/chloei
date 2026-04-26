@@ -31,7 +31,10 @@ const { getAnthropicCalls, resetAnthropicCalls } = await import(
 test("gateway search tool factory uses the AI Gateway compatible Anthropic web search tool version", () => {
   resetAnthropicCalls()
 
-  const tools = createAiSdkGatewaySearchTools("America/Chicago")
+  const tools = createAiSdkGatewaySearchTools({
+    model: "anthropic/claude-sonnet-4.6",
+    userTimeZone: "America/Chicago",
+  })
 
   assert.deepEqual(getAnthropicCalls(), [
     {
@@ -47,4 +50,16 @@ test("gateway search tool factory uses the AI Gateway compatible Anthropic web s
   ])
   assert.equal(tools.web_search.type, "webSearch_20250305")
   assert.deepEqual(Object.keys(tools), ["web_search"])
+})
+
+test("gateway search tool factory skips the Anthropic web search tool for non-Anthropic models", () => {
+  resetAnthropicCalls()
+
+  const tools = createAiSdkGatewaySearchTools({
+    model: "openai/gpt-5.5",
+    userTimeZone: "America/Chicago",
+  })
+
+  assert.deepEqual(getAnthropicCalls(), [])
+  assert.deepEqual(Object.keys(tools), [])
 })

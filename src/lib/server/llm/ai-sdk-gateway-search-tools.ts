@@ -4,7 +4,7 @@ import {
 } from "@ai-sdk/anthropic"
 
 import { asRecord, asString } from "@/lib/cast"
-import type { MessageSource, ToolName } from "@/lib/shared"
+import type { MessageSource, ModelType, ToolName } from "@/lib/shared"
 
 const WEB_SEARCH_TOOL_NAME = "web_search" as const
 const ANTHROPIC_WEB_SEARCH_MAX_USES = 5
@@ -113,10 +113,21 @@ function getAnthropicWebSearchOptions(userTimeZone?: string) {
   } satisfies Parameters<typeof anthropic.tools.webSearch_20250305>[0]
 }
 
-export function createAiSdkGatewaySearchTools(userTimeZone?: string) {
+interface CreateAiSdkGatewaySearchToolsParams {
+  model: ModelType
+  userTimeZone?: string
+}
+
+export function createAiSdkGatewaySearchTools(
+  params: CreateAiSdkGatewaySearchToolsParams
+) {
+  if (!params.model.startsWith("anthropic/")) {
+    return {}
+  }
+
   return {
     web_search: anthropic.tools.webSearch_20250305(
-      getAnthropicWebSearchOptions(userTimeZone)
+      getAnthropicWebSearchOptions(params.userTimeZone)
     ),
   }
 }

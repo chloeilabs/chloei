@@ -234,7 +234,10 @@ export async function* startAgentRuntimeStream(
             ? params.codeExecutionInputFiles
             : undefined,
       }),
-      ...createAiSdkGatewaySearchTools(params.userTimeZone),
+      ...createAiSdkGatewaySearchTools({
+        model: params.model,
+        userTimeZone: params.userTimeZone,
+      }),
       ...createAiSdkTavilyTools(normalizedTavilyApiKey),
       ...(runtimeProfile.financeDataEnabled
         ? createAiSdkFinanceDataTools({
