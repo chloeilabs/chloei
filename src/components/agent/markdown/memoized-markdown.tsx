@@ -1,5 +1,6 @@
 import { marked } from "marked"
 import {
+  Children,
   cloneElement,
   isValidElement,
   memo,
@@ -25,9 +26,66 @@ function extractTextFromNode(node: React.ReactNode): string {
   return ""
 }
 
-function parseMarkdownIntoBlocks(markdown: string): string[] {
+function isElementType(
+  node: ReactNode,
+  type: string
+): node is ReactElement<{ children?: ReactNode }> {
+  return isValidElement<{ children?: ReactNode }>(node) && node.type === type
+}
+
+function findFirstTableRow(node: ReactNode): ReactNode | null {
+  if (Array.isArray(node)) {
+    const children = node as ReactNode[]
+
+    for (const child of children) {
+      const row = findFirstTableRow(child)
+      if (row) return row
+    }
+
+    return null
+  }
+
+  if (isElementType(node, "tr")) {
+    return node
+  }
+
+  if (isValidElement<{ children?: ReactNode }>(node)) {
+    return findFirstTableRow(node.props.children)
+  }
+
+  return null
+}
+
+function getMarkdownTableColumnCount(children: ReactNode): number | undefined {
+  const firstRow = findFirstTableRow(children)
+  if (!isValidElement<{ children?: ReactNode }>(firstRow)) {
+    return undefined
+  }
+
+  const count = Children.toArray(firstRow.props.children).filter(
+    (child) => isElementType(child, "th") || isElementType(child, "td")
+  ).length
+
+  return count > 0 ? count : undefined
+}
+
+interface MarkdownBlock {
+  content: string
+  depth?: number
+  type: string
+}
+
+function parseMarkdownIntoBlocks(markdown: string): MarkdownBlock[] {
   const tokens = marked.lexer(markdown)
-  return tokens.map((token) => token.raw)
+  return tokens.map((token) => {
+    const depth = (token as { depth?: unknown }).depth
+
+    return {
+      content: token.raw,
+      depth: typeof depth === "number" ? depth : undefined,
+      type: token.type,
+    }
+  })
 }
 
 interface MathPlaceholder {
@@ -497,10 +555,12 @@ function isNumericCitationLabel(label: string): boolean {
 
 const MemoizedMarkdownBlock = memo(
   ({
+    className,
     content,
     showSourceFavicon,
     sources,
   }: {
+    className?: string
     content: string
     showSourceFavicon: boolean
     sources: MessageSource[]
@@ -592,13 +652,20 @@ const MemoizedMarkdownBlock = memo(
       },
       table: ({ children }) => (
         <div className="chloei-markdown-table">
-          <table>{children}</table>
+          <table data-column-count={getMarkdownTableColumnCount(children)}>
+            {children}
+          </table>
         </div>
       ),
     }
 
     return (
-      <div className="chloei-markdown prose prose-sm max-w-none min-w-0 text-foreground prose-neutral prose-invert prose-headings:font-medium prose-h1:text-2xl prose-code:rounded-sm prose-code:border prose-code:bg-card prose-code:px-1 prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-pre:bg-background prose-pre:p-0 prose-ol:list-decimal prose-ul:list-disc prose-li:marker:text-muted-foreground">
+      <div
+        className={cn(
+          "chloei-markdown prose prose-sm max-w-none min-w-0 text-foreground prose-neutral prose-invert prose-headings:font-medium prose-h1:text-2xl prose-code:rounded-sm prose-code:border prose-code:bg-card prose-code:px-1 prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-pre:bg-background prose-pre:p-0 prose-ol:list-decimal prose-ul:list-disc prose-li:marker:text-muted-foreground",
+          className
+        )}
+      >
         <ReactMarkdown components={components} remarkPlugins={[remarkGfm]}>
           {mathContent.content}
         </ReactMarkdown>
@@ -606,12 +673,37 @@ const MemoizedMarkdownBlock = memo(
     )
   },
   (prevProps, nextProps) =>
+    prevProps.className === nextProps.className &&
     prevProps.content === nextProps.content &&
     prevProps.showSourceFavicon === nextProps.showSourceFavicon &&
     prevProps.sources === nextProps.sources
 )
 
 MemoizedMarkdownBlock.displayName = "MemoizedMarkdownBlock"
+
+function getMarkdownBlockClassName(block: MarkdownBlock): string | undefined {
+  if (block.type === "heading") {
+    if (block.depth === 1) {
+      return "chloei-markdown-title"
+    }
+
+    if (block.depth === 2) {
+      return "chloei-markdown-section-heading"
+    }
+
+    return "chloei-markdown-subheading"
+  }
+
+  if (block.type === "hr") {
+    return "chloei-markdown-section-rule"
+  }
+
+  if (block.type === "list") {
+    return "chloei-markdown-list-block"
+  }
+
+  return undefined
+}
 
 export const MemoizedMarkdown = memo(
   ({
@@ -630,10 +722,11 @@ export const MemoizedMarkdown = memo(
     const blocks = useMemo(() => parseMarkdownIntoBlocks(content), [content])
 
     return (
-      <div className={cn("w-full min-w-0 space-y-2", className)}>
+      <div className={cn("w-full min-w-0 space-y-3", className)}>
         {blocks.map((block, index) => (
           <MemoizedMarkdownBlock
-            content={block}
+            className={getMarkdownBlockClassName(block)}
+            content={block.content}
             key={`${id}-block_${String(index)}`}
             showSourceFavicon={showSourceFavicon}
             sources={sources}
