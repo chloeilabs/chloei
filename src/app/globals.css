@@ -257,7 +257,10 @@
   .chloei-markdown .chloei-markdown-table th,
   .chloei-markdown .chloei-markdown-table td {
     vertical-align: top;
+    overflow-wrap: normal;
     white-space: normal;
+    word-break: normal;
+    hyphens: none;
   }
 
   .chloei-markdown .chloei-math {
