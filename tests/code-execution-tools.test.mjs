@@ -63,6 +63,18 @@ test("finance code execution reports workspace spreadsheet artifacts", async () 
     )
     assert.match(result.output?.artifactDirectory ?? "", /workspace$/)
 
+    const persistedResult = await tools.code_execution.execute({
+      language: "python",
+      code: [
+        "import zipfile",
+        "with zipfile.ZipFile('finance_artifact.xlsx') as workbook:",
+        "    print(','.join(workbook.namelist()))",
+      ].join("\n"),
+    })
+
+    assert.equal(persistedResult.error, undefined)
+    assert.match(persistedResult.output?.stdout ?? "", /\[Content_Types\]\.xml/)
+
     assert.deepEqual(
       getAiSdkCodeExecutionToolResultMetadata({
         toolCallId: "call-code",
@@ -84,4 +96,20 @@ test("finance code execution reports workspace spreadsheet artifacts", async () 
   } finally {
     await rm(tempRoot, { recursive: true, force: true })
   }
+})
+
+test("finance code execution blocks unsafe path literals", async () => {
+  const tools = createAiSdkCodeExecutionTools({ backend: "finance" })
+  const result = await tools.code_execution.execute({
+    language: "python",
+    code: [
+      "import zipfile",
+      "with zipfile.ZipFile('../escape.xlsx', 'w') as workbook:",
+      "    workbook.writestr('[Content_Types].xml', '<Types/>')",
+    ].join("\n"),
+  })
+
+  assert.equal(result.output, undefined)
+  assert.equal(result.error?.code, "BLOCKED_PATTERN")
+  assert.match(result.error?.message ?? "", /relative workspace paths/)
 })

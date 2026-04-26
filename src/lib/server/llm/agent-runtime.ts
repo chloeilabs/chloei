@@ -1,3 +1,6 @@
+import { randomUUID } from "node:crypto"
+import path from "node:path"
+
 import { createGateway } from "@ai-sdk/gateway"
 import { type ModelMessage, stepCountIs, streamText, type ToolSet } from "ai"
 
@@ -191,7 +194,7 @@ export async function* startAgentRuntimeStream(
   ): Extract<AgentStreamEvent, { type: "source" }> | null => {
     const normalizedUrl = url.trim()
     const normalizedTitle = title.trim() || normalizedUrl
-    const key = `${normalizedUrl}::${normalizedTitle}`
+    const key = normalizedUrl
     if (!normalizedUrl || seenSourceKeys.has(key)) {
       return null
     }
@@ -201,6 +204,11 @@ export async function* startAgentRuntimeStream(
   }
 
   try {
+    const codeExecutionWorkspaceRoot =
+      runtimeProfile.id === "gdpval_workspace" && AGENT_EVAL_RESULTS_DIR
+        ? path.join(AGENT_EVAL_RESULTS_DIR, "workspaces", randomUUID())
+        : undefined
+
     if (runtimeProfile.fmpMcpEnabled) {
       try {
         fmpToolsContext =
@@ -219,7 +227,7 @@ export async function* startAgentRuntimeStream(
         workspaceMode: runtimeProfile.codeExecutionWorkspaceMode,
         workspaceRoot:
           runtimeProfile.id === "gdpval_workspace"
-            ? AGENT_EVAL_RESULTS_DIR
+            ? codeExecutionWorkspaceRoot
             : undefined,
         inputFiles:
           runtimeProfile.id === "gdpval_workspace"

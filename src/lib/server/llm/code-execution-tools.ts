@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process"
+import { randomUUID } from "node:crypto"
 import { copyFile, mkdir, mkdtemp, readdir, rm, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -174,6 +175,9 @@ const PYTHON_FINANCE_ALLOWED_IMPORTS = new Set([
   "zipfile",
 ])
 
+const PYTHON_STRING_LITERAL_PATTERN =
+  /(?:^|[^A-Za-z0-9_])(?:[rRuUbBfF]{0,3})(["'])((?:\\.|(?!\1)[^\\\r\n])*)\1/g
+
 function clampTimeoutMs(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return CODE_EXECUTION_DEFAULT_TIMEOUT_MS
@@ -234,6 +238,99 @@ function inferLanguageFromCommand(command: string): CodeExecutionLanguage {
   return baseName === "python" || baseName === "python3"
     ? "python"
     : "javascript"
+}
+
+function isUnsafeWorkspacePathLiteral(value: string): boolean {
+  const normalized = value.trim().replaceAll("\\", "/")
+  if (!normalized) {
+    return false
+  }
+
+  return (
+    normalized.startsWith("/") ||
+    normalized.startsWith("~/") ||
+    normalized.startsWith("file:") ||
+    /^[A-Za-z]:\//.test(normalized) ||
+    normalized.split("/").includes("..")
+  )
+}
+
+function validatePathStringLiterals(code: string): string | null {
+  for (const match of code.matchAll(PYTHON_STRING_LITERAL_PATTERN)) {
+    const literal = match[2] ?? ""
+    if (isUnsafeWorkspacePathLiteral(literal)) {
+      return "Python finance code execution can only access relative workspace paths without parent-directory traversal."
+    }
+  }
+
+  return null
+}
+
+function buildPythonSandboxedCode(
+  code: string,
+  workspaceDir: string,
+  tempDir: string
+): string {
+  const allowedRoots = JSON.stringify([workspaceDir, tempDir])
+
+  return `
+def __chloei_install_sandbox():
+    import builtins as sandbox_builtins
+    import io as sandbox_io
+    import os as sandbox_os
+    import pathlib as sandbox_pathlib
+
+    allowed_roots = tuple(
+        sandbox_os.path.realpath(path) for path in ${allowedRoots}
+    )
+    original_open = sandbox_builtins.open
+    original_io_open = sandbox_io.open
+    original_os_open = sandbox_os.open
+    original_path_open = sandbox_pathlib.Path.open
+
+    def validate_path(path_value):
+        if isinstance(path_value, int):
+            return path_value
+        try:
+            raw_path = sandbox_os.fspath(path_value)
+        except TypeError:
+            return path_value
+        if isinstance(raw_path, bytes):
+            raw_path = sandbox_os.fsdecode(raw_path)
+        if not isinstance(raw_path, str):
+            return path_value
+        if raw_path.startswith("file:"):
+            raise PermissionError("Code execution cannot access file URLs.")
+        candidate = raw_path if sandbox_os.path.isabs(raw_path) else sandbox_os.path.join(sandbox_os.getcwd(), raw_path)
+        real_path = sandbox_os.path.realpath(candidate)
+        for root in allowed_roots:
+            if real_path == root or real_path.startswith(root + sandbox_os.sep):
+                return path_value
+        raise PermissionError("Code execution can only access files inside the workspace.")
+
+    def sandbox_open(path_value, *args, **kwargs):
+        return original_open(validate_path(path_value), *args, **kwargs)
+
+    def sandbox_io_open(path_value, *args, **kwargs):
+        return original_io_open(validate_path(path_value), *args, **kwargs)
+
+    def sandbox_os_open(path_value, *args, **kwargs):
+        return original_os_open(validate_path(path_value), *args, **kwargs)
+
+    def sandbox_path_open(self, *args, **kwargs):
+        validate_path(self)
+        return original_path_open(self, *args, **kwargs)
+
+    sandbox_builtins.open = sandbox_open
+    sandbox_io.open = sandbox_io_open
+    sandbox_os.open = sandbox_os_open
+    sandbox_pathlib.Path.open = sandbox_path_open
+
+__chloei_install_sandbox()
+del __chloei_install_sandbox
+
+${code}
+`.trimStart()
 }
 
 function appendWithLimit(
@@ -400,6 +497,13 @@ function validateCodeSafety(args: CodeExecutionToolArgs): string | null {
     }
   }
 
+  if (args.backend === "finance") {
+    const pathLiteralError = validatePathStringLiterals(args.code)
+    if (pathLiteralError) {
+      return pathLiteralError
+    }
+  }
+
   return validatePythonImports(args.code, args.backend)
 }
 
@@ -420,10 +524,24 @@ async function runProcess(args: {
       ? normalizedWorkspaceRoot
       : tmpdir()
   await mkdir(tempRoot, { recursive: true })
-  const tempDir = await mkdtemp(path.join(tempRoot, "chloei-code-exec-"))
+  const tempDir =
+    args.workspaceMode === "preserve"
+      ? tempRoot
+      : await mkdtemp(path.join(tempRoot, "chloei-code-exec-"))
   const workspaceDir = path.join(tempDir, "workspace")
   await mkdir(workspaceDir, { recursive: true })
   const copiedInputFiles = await copyInputFiles(workspaceDir, args.inputFiles)
+  const commandArgs =
+    args.language === "python" &&
+    args.commandArgs[0] === "-I" &&
+    args.commandArgs[1] === "-c" &&
+    typeof args.commandArgs[2] === "string"
+      ? [
+          "-I",
+          "-c",
+          buildPythonSandboxedCode(args.commandArgs[2], workspaceDir, tempDir),
+        ]
+      : args.commandArgs
 
   let stdout = ""
   let stderr = ""
@@ -436,7 +554,7 @@ async function runProcess(args: {
   try {
     return await new Promise<CodeExecutionToolResultPayload>((resolve) => {
       let settled = false
-      const child = spawn(args.command, args.commandArgs, {
+      const child = spawn(args.command, commandArgs, {
         cwd: workspaceDir,
         env: {
           ...process.env,
@@ -668,6 +786,11 @@ export function createAiSdkCodeExecutionTools(
     options.backend ?? AGENT_CODE_EXECUTION_BACKEND
   )
   const workspaceMode = options.workspaceMode ?? "ephemeral"
+  const workspaceRoot =
+    options.workspaceRoot ??
+    (workspaceMode === "preserve"
+      ? path.join(tmpdir(), `chloei-code-exec-${randomUUID()}`)
+      : undefined)
 
   return {
     code_execution: tool({
@@ -683,7 +806,7 @@ export function createAiSdkCodeExecutionTools(
           timeoutMs: clampTimeoutMs(input.timeoutMs),
           backend,
           workspaceMode,
-          workspaceRoot: options.workspaceRoot,
+          workspaceRoot,
           inputFiles: options.inputFiles,
         }),
     }),
