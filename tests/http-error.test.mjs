@@ -64,6 +64,28 @@ test("http error helpers preserve request ids for user-facing descriptions", asy
   )
 })
 
+test("http error helpers hide html error documents", async () => {
+  const response = new Response(
+    '<!DOCTYPE html><html id="__next_error__"><title>500: This page could not load</title></html>',
+    {
+      status: 500,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "X-Request-Id": "request-html-1",
+      },
+    }
+  )
+
+  const error = await createHttpErrorFromResponse(response)
+
+  assert.equal(getHttpErrorMessage(error), "Request failed (500)")
+  assert.equal(getHttpErrorRequestId(error), "request-html-1")
+  assert.equal(
+    formatHttpErrorDescription(error),
+    "Request failed (500) Reference ID: request-html-1"
+  )
+})
+
 test("http error helpers fall back when responses are empty", async () => {
   const response = new Response(null, {
     status: 429,
