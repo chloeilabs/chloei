@@ -145,6 +145,46 @@ test("agent helper error responses include rate-limit headers", async () => {
 })
 
 test("agent helper validates total size, last-message role, and default model support", async () => {
+  const tooManyMessagesResult = parseAgentStreamRequest({
+    body: {
+      messages: Array.from({ length: 51 }, () => ({
+        role: "user",
+        content: "hello",
+      })),
+    },
+    availableModels: [{ id: "anthropic/claude-sonnet-4.6" }],
+    requestId: "request-too-many",
+  })
+
+  assert(tooManyMessagesResult instanceof Response)
+  assert.equal(tooManyMessagesResult.status, 400)
+  assert.deepEqual(await tooManyMessagesResult.json(), {
+    error: "Conversation has too many messages.",
+    errorCode: "AGENT_TOO_MANY_MESSAGES",
+    requestId: "request-too-many",
+  })
+
+  const oversizedMessageResult = parseAgentStreamRequest({
+    body: {
+      messages: [
+        {
+          role: "user",
+          content: "x".repeat(12_001),
+        },
+      ],
+    },
+    availableModels: [{ id: "anthropic/claude-sonnet-4.6" }],
+    requestId: "request-message-too-large",
+  })
+
+  assert(oversizedMessageResult instanceof Response)
+  assert.equal(oversizedMessageResult.status, 413)
+  assert.deepEqual(await oversizedMessageResult.json(), {
+    error: "A conversation message is too large.",
+    errorCode: "AGENT_MESSAGE_TOO_LARGE",
+    requestId: "request-message-too-large",
+  })
+
   const oversizedResult = parseAgentStreamRequest({
     body: {
       messages: Array.from({ length: 5 }, (_, index) => ({

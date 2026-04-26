@@ -14,8 +14,14 @@ test("agent route validates model, threadId, and messages", async () => {
 
   assert.match(
     source,
-    /const agentStreamRequestSchema = z[\s\S]*model: z\.enum\(allowedModels\)\.optional\(\),[\s\S]*threadId: z\.string\(\)\.trim\(\)\.min\(1\)\.max\(200\)\.optional\(\),[\s\S]*messages: z\.array\(agentMessageSchema\)\.min\(1\)\.max\(AGENT_MAX_MESSAGES\),[\s\S]*\.strict\(\)/,
+    /const agentStreamRequestSchema = z[\s\S]*model: z\.string\(\)\.trim\(\)\.min\(1\)\.max\(200\)\.optional\(\),[\s\S]*threadId: z\.string\(\)\.trim\(\)\.min\(1\)\.max\(200\)\.optional\(\),[\s\S]*messages: z\.array\(agentMessageSchema\)\.min\(1\),[\s\S]*\.strict\(\)/,
     "Expected /api/agent to validate model, threadId, and messages."
+  )
+
+  assert.match(
+    source,
+    /parsed\.data\.messages\.length > AGENT_MAX_MESSAGES/,
+    "Expected /api/agent to report oversized message histories after shape validation."
   )
 
   assert.doesNotMatch(

@@ -33,20 +33,18 @@ const STRUCTURED_OUTPUT_ONLY_FALLBACK_TEXT =
 const TOOL_OUTPUT_ONLY_FALLBACK_TEXT =
   "I gathered tool results, but the model ended before writing a final answer. Please retry or narrow the request; the tool output above is still available for inspection."
 
-const allowedModels = ALL_MODELS
-
 const agentMessageSchema = z
   .object({
     role: z.enum(["user", "assistant"]),
-    content: z.string().trim().min(1).max(AGENT_MAX_MESSAGE_CHARS),
+    content: z.string().trim().min(1),
   })
   .strict()
 
 export const agentStreamRequestSchema = z
   .object({
-    model: z.enum(allowedModels).optional(),
+    model: z.string().trim().min(1).max(200).optional(),
     threadId: z.string().trim().min(1).max(200).optional(),
-    messages: z.array(agentMessageSchema).min(1).max(AGENT_MAX_MESSAGES),
+    messages: z.array(agentMessageSchema).min(1),
   })
   .strict()
 
@@ -180,8 +178,11 @@ function isProviderAuthenticationError(error: unknown): boolean {
   return message.includes("api key")
 }
 
-function isSupportedModel(model: ModelType): boolean {
-  return (ALL_MODELS as readonly ModelType[]).includes(model)
+function isSupportedModel(model: unknown): model is ModelType {
+  return (
+    typeof model === "string" &&
+    (ALL_MODELS as readonly string[]).includes(model)
+  )
 }
 
 function getTotalMessageChars(
@@ -235,6 +236,29 @@ export function parseAgentStreamRequest(
     })
   }
 
+  if (parsed.data.messages.length > AGENT_MAX_MESSAGES) {
+    return createJsonErrorResponse({
+      requestId: params.requestId,
+      error: "Conversation has too many messages.",
+      errorCode: "AGENT_TOO_MANY_MESSAGES",
+      status: 400,
+      rateLimitDecision: params.rateLimitDecision,
+    })
+  }
+
+  const oversizedMessage = parsed.data.messages.find(
+    (message) => message.content.length > AGENT_MAX_MESSAGE_CHARS
+  )
+  if (oversizedMessage) {
+    return createJsonErrorResponse({
+      requestId: params.requestId,
+      error: "A conversation message is too large.",
+      errorCode: "AGENT_MESSAGE_TOO_LARGE",
+      status: 413,
+      rateLimitDecision: params.rateLimitDecision,
+    })
+  }
+
   const totalMessageChars = getTotalMessageChars(parsed.data.messages)
   if (totalMessageChars > AGENT_MAX_TOTAL_CHARS) {
     return createJsonErrorResponse({
@@ -257,10 +281,10 @@ export function parseAgentStreamRequest(
     })
   }
 
-  const selectedModel =
+  const selectedModelCandidate =
     parsed.data.model ?? resolveDefaultModel(params.availableModels)
 
-  if (!isSupportedModel(selectedModel)) {
+  if (!isSupportedModel(selectedModelCandidate)) {
     return createJsonErrorResponse({
       requestId: params.requestId,
       error: "Unsupported model selected.",
@@ -272,7 +296,7 @@ export function parseAgentStreamRequest(
 
   return {
     parsedRequest: parsed.data,
-    selectedModel,
+    selectedModel: selectedModelCandidate,
   }
 }
 

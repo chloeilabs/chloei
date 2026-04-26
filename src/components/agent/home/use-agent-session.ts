@@ -33,12 +33,12 @@ import {
 } from "./agent-stream-state"
 import {
   appendUserMessage,
+  CLIENT_MESSAGE_MAX_CHARS,
   createClientMessageId,
   EMPTY_ASSISTANT_RESPONSE_FALLBACK,
   toRequestMessages,
 } from "./home-agent-utils"
 
-const CLIENT_MESSAGE_MAX_CHARS = 16_000
 const THREAD_SYNC_DEBOUNCE_MS = 800
 const THREAD_SYNC_RETRY_MS = 3_000
 const THREAD_SYNC_ERROR_TOAST_ID = "thread-sync-error"
