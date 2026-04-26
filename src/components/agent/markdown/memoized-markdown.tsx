@@ -1,6 +1,5 @@
 import { marked } from "marked"
 import {
-  Children,
   cloneElement,
   isValidElement,
   memo,
@@ -24,49 +23,6 @@ function extractTextFromNode(node: React.ReactNode): string {
     return extractTextFromNode(node.props.children)
   }
   return ""
-}
-
-function isElementType(
-  node: ReactNode,
-  type: string
-): node is ReactElement<{ children?: ReactNode }> {
-  return isValidElement<{ children?: ReactNode }>(node) && node.type === type
-}
-
-function findFirstTableRow(node: ReactNode): ReactNode | null {
-  if (Array.isArray(node)) {
-    const children = node as ReactNode[]
-
-    for (const child of children) {
-      const row = findFirstTableRow(child)
-      if (row) return row
-    }
-
-    return null
-  }
-
-  if (isElementType(node, "tr")) {
-    return node
-  }
-
-  if (isValidElement<{ children?: ReactNode }>(node)) {
-    return findFirstTableRow(node.props.children)
-  }
-
-  return null
-}
-
-function getMarkdownTableColumnCount(children: ReactNode): number | undefined {
-  const firstRow = findFirstTableRow(children)
-  if (!isValidElement<{ children?: ReactNode }>(firstRow)) {
-    return undefined
-  }
-
-  const count = Children.toArray(firstRow.props.children).filter(
-    (child) => isElementType(child, "th") || isElementType(child, "td")
-  ).length
-
-  return count > 0 ? count : undefined
 }
 
 interface MarkdownBlock {
@@ -652,9 +608,7 @@ const MemoizedMarkdownBlock = memo(
       },
       table: ({ children }) => (
         <div className="chloei-markdown-table">
-          <table data-column-count={getMarkdownTableColumnCount(children)}>
-            {children}
-          </table>
+          <table>{children}</table>
         </div>
       ),
     }

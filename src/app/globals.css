@@ -166,7 +166,7 @@
     line-height: 1.75;
   }
 
-  .chloei-markdown.prose :where(h1, h2, h3, h4, h5, h6) {
+  .chloei-markdown.prose :where(h1, h2, h3, h4) {
     letter-spacing: 0;
   }
 
@@ -180,7 +180,7 @@
     line-height: 1.25;
   }
 
-  .chloei-markdown.prose :where(h3, h4, h5, h6) {
+  .chloei-markdown.prose :where(h3) {
     margin-block: 0 0.5rem;
     line-height: 1.35;
   }
@@ -243,29 +243,19 @@
 
   .chloei-markdown .chloei-markdown-table {
     width: 100%;
-    margin-block: 1.25rem 1.45rem;
-    border-block: 1px solid color-mix(in oklch, var(--border) 86%, transparent);
-    background: color-mix(in oklch, var(--card) 34%, transparent);
     overflow-x: auto;
     overscroll-behavior-x: contain;
     -webkit-overflow-scrolling: touch;
   }
 
   .chloei-markdown .chloei-markdown-table > table {
-    width: 100%;
+    width: max-content;
     min-width: 100%;
-    margin: 0;
-    border-collapse: collapse;
     table-layout: auto;
-    font-size: 0.875rem;
-    line-height: 1.55;
-    font-variant-numeric: tabular-nums;
   }
 
   .chloei-markdown .chloei-markdown-table th,
   .chloei-markdown .chloei-markdown-table td {
-    border-bottom: 1px solid color-mix(in oklch, var(--border) 78%, transparent);
-    padding: 0.72rem 0.9rem;
     vertical-align: top;
     overflow-wrap: normal;
     white-space: normal;
@@ -273,86 +263,9 @@
     hyphens: none;
   }
 
-  .chloei-markdown .chloei-markdown-table th {
-    background: color-mix(in oklch, var(--card) 58%, transparent);
-    color: color-mix(in oklch, var(--foreground) 92%, var(--muted-foreground));
-    font-size: 0.8125rem;
-    font-weight: 650;
-    line-height: 1.35;
-    text-align: left;
-  }
-
-  .chloei-markdown .chloei-markdown-table td {
-    color: color-mix(in oklch, var(--foreground) 88%, var(--muted-foreground));
-  }
-
-  .chloei-markdown .chloei-markdown-table tbody tr:last-child td {
-    border-bottom: 0;
-  }
-
-  .chloei-markdown .chloei-markdown-table tbody tr {
-    transition: background-color 140ms ease;
-  }
-
-  @media (hover: hover) {
-    .chloei-markdown .chloei-markdown-table tbody tr:hover {
-      background: color-mix(in oklch, var(--muted) 24%, transparent);
-    }
-  }
-
   .chloei-markdown .chloei-markdown-table th:first-child,
   .chloei-markdown .chloei-markdown-table td:first-child {
-    padding-left: 0;
-  }
-
-  .chloei-markdown .chloei-markdown-table th:last-child,
-  .chloei-markdown .chloei-markdown-table td:last-child {
-    padding-right: 0;
-  }
-
-  .chloei-markdown
-    .chloei-markdown-table
-    > table[data-column-count="2"]
-    th:first-child,
-  .chloei-markdown
-    .chloei-markdown-table
-    > table[data-column-count="2"]
-    td:first-child {
-    width: 58%;
-  }
-
-  .chloei-markdown
-    .chloei-markdown-table
-    > table[data-column-count="2"]
-    th:nth-child(2),
-  .chloei-markdown
-    .chloei-markdown-table
-    > table[data-column-count="2"]
-    td:nth-child(2) {
-    width: 42%;
-  }
-
-  .chloei-markdown
-    .chloei-markdown-table
-    > table[data-column-count="3"]
-    th:first-child,
-  .chloei-markdown
-    .chloei-markdown-table
-    > table[data-column-count="3"]
-    td:first-child {
-    width: 9.5rem;
     white-space: nowrap;
-  }
-
-  .chloei-markdown
-    .chloei-markdown-table
-    > table[data-column-count="3"]
-    th:nth-child(2),
-  .chloei-markdown
-    .chloei-markdown-table
-    > table[data-column-count="3"]
-    td:nth-child(2) {
-    width: 34%;
   }
 
   .chloei-markdown .chloei-math {
@@ -408,18 +321,16 @@
       margin-inline: -0.75rem;
       padding-inline: 0.75rem;
       padding-bottom: 0.25rem;
-      border-inline: 0;
     }
 
     .chloei-markdown .chloei-markdown-table th,
     .chloei-markdown .chloei-markdown-table td {
       min-width: 10rem;
-      padding-block: 0.66rem;
     }
 
     .chloei-markdown .chloei-markdown-table th:first-child,
     .chloei-markdown .chloei-markdown-table td:first-child {
-      min-width: 7rem;
+      min-width: 5.5rem;
     }
   }
 }
