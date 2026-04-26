@@ -16,6 +16,8 @@ import type { ToolName } from "@/lib/shared"
 const CODE_EXECUTION_TOOL_NAME = "code_execution" as const
 const CODE_EXECUTION_LABEL = "Running code" as const
 
+// Finance/eval prompts run pandas/openpyxl-style calculations and spreadsheet
+// artifact writes, which need a longer cap than lightweight chat snippets.
 const CODE_EXECUTION_DEFAULT_TIMEOUT_MS = 10_000
 const CODE_EXECUTION_MAX_TIMEOUT_MS = 60_000
 const CODE_EXECUTION_MAX_CODE_CHARS = 12_000

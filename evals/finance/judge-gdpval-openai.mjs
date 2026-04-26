@@ -5,8 +5,13 @@ import { fileURLToPath } from "node:url"
 
 import { writeEvalResult } from "./harness.mjs"
 
+await import("./register-ts-hooks.mjs")
+
+const { createLogger } = await import("@/lib/logger")
+
 const evalDir = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(evalDir, "../..")
+const logger = createLogger("evals/finance/judge-gdpval-openai")
 
 function getArg(name, fallback) {
   const index = process.argv.indexOf(name)
@@ -536,7 +541,10 @@ for (let index = 0; index < tasks.length; index += 1) {
 const result = buildOutput()
 
 await writeEvalResult(result, outputPath)
-console.log(JSON.stringify({ outputPath, summary: result.summary }, null, 2))
+logger.info("GDPval judge result written.", {
+  outputPath,
+  summary: result.summary,
+})
 
 if (result.summary.failed > 0) {
   process.exitCode = 1

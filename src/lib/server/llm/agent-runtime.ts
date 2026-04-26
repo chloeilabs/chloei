@@ -127,8 +127,9 @@ function toModelMessages(messages: AgentInputMessage[]): ModelMessage[] {
     }
 
     if (message.role === "system") {
-      inputMessages.push({ role: "system", content })
-      continue
+      throw new Error(
+        "System messages must be provided via systemInstruction, not messages."
+      )
     }
 
     inputMessages.push({
@@ -174,9 +175,9 @@ export async function* startAgentRuntimeStream(
   const runtimeProfile = resolveAgentRuntimeProfile(params.runtimeProfile)
   const normalizedTavilyApiKey = params.tavilyApiKey?.trim()
   const normalizedFmpApiKey = params.fmpApiKey?.trim()
-  const fmpToolsContext = runtimeProfile.fmpMcpEnabled
-    ? await createAiSdkFmpMcpToolsContext(normalizedFmpApiKey)
-    : null
+  let fmpToolsContext: Awaited<
+    ReturnType<typeof createAiSdkFmpMcpToolsContext>
+  > | null = null
 
   const seenToolCalls = new Set<string>()
   const finalizedToolCalls = new Set<string>()
@@ -200,6 +201,18 @@ export async function* startAgentRuntimeStream(
   }
 
   try {
+    if (runtimeProfile.fmpMcpEnabled) {
+      try {
+        fmpToolsContext =
+          await createAiSdkFmpMcpToolsContext(normalizedFmpApiKey)
+      } catch (error) {
+        logger.warn("FMP MCP tools unavailable; continuing without them.", {
+          error,
+          errorCode: "FMP_MCP_INIT_FAILED",
+        })
+      }
+    }
+
     const tools = {
       ...createAiSdkCodeExecutionTools({
         backend: runtimeProfile.codeExecutionBackend,
