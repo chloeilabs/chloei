@@ -48,6 +48,7 @@ const DEFAULT_FALLBACK_TRANSITION_MS = 150
 const MOBILE_FALLBACK_TRANSITION_MS = 110
 const STREAMING_SCROLL_EARLY_TRIGGER_PX = 72
 const STREAMING_SCROLL_PROMPT_BUFFER_PX = 24
+const conversationWidthClass = "max-w-[50rem]"
 
 function ThreadsPanel({
   open,
@@ -500,7 +501,12 @@ export function HomePageContent({
                 : "pointer-events-none absolute inset-0 z-20 animate-[chloei-home-layer-out_140ms_var(--ease-in-out-cubic)_forwards] bg-background")
           )}
         >
-          <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center gap-10 px-4 pt-[20vh] sm:px-6">
+          <div
+            className={cn(
+              "mx-auto flex w-full flex-1 flex-col items-center gap-10 px-4 pt-[20vh] sm:px-6",
+              conversationWidthClass
+            )}
+          >
             <div
               style={homeHeroTransitionStyle}
               className="text-center font-departureMono text-2xl font-medium tracking-tighter select-none"
@@ -536,7 +542,12 @@ export function HomePageContent({
           targetScrollTop={targetThreadScrollTop}
         >
           <StickToBottom.Content className="relative flex min-h-full w-full flex-col">
-            <div className="relative z-0 mx-auto flex w-full max-w-3xl grow flex-col items-center px-4 sm:px-6">
+            <div
+              className={cn(
+                "relative z-0 mx-auto flex w-full grow flex-col items-center px-4 sm:px-6",
+                conversationWidthClass
+              )}
+            >
               <div
                 style={threadPaneTransitionStyle}
                 className="flex w-full grow flex-col"
