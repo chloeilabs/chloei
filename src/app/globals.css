@@ -263,6 +263,11 @@
     hyphens: none;
   }
 
+  .chloei-markdown .chloei-markdown-table th:first-child,
+  .chloei-markdown .chloei-markdown-table td:first-child {
+    white-space: nowrap;
+  }
+
   .chloei-markdown .chloei-math {
     font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
     font-variant-numeric: lining-nums tabular-nums;
