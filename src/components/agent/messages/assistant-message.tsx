@@ -194,7 +194,10 @@ export function AssistantMessage({ message }: { message: Message }) {
                     >
                       <div className="flex flex-wrap gap-1.5">
                         {entry.sources.map((source) => (
-                          <Source href={source.url} key={source.id}>
+                          <Source
+                            href={source.url}
+                            key={`${source.id}:${source.url}`}
+                          >
                             <SourceTrigger
                               label={source.title}
                               showFavicon={showSourceFavicon}

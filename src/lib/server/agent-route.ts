@@ -19,6 +19,7 @@ import {
   AGENT_MAX_TOTAL_CHARS,
 } from "./agent-runtime-config"
 import { createApiErrorBody, createApiHeaders } from "./api-response"
+import type { AgentRuntimeProfileId } from "./llm/agent-runtime"
 import { startGatewayResponseStream } from "./llm/gateway-responses"
 import { withAiSdkInlineCitationInstruction } from "./llm/system-instruction-augmentations"
 import { type evaluateAndConsumeSlidingWindowRateLimit } from "./rate-limit"
@@ -27,6 +28,10 @@ const STREAM_TIMEOUT_FALLBACK_TEXT =
   "Sorry, I couldn't finish the response in time. Please retry."
 const STREAM_ERROR_FALLBACK_TEXT =
   "Sorry, I hit an error while generating a response. Please retry."
+const STRUCTURED_OUTPUT_ONLY_FALLBACK_TEXT =
+  "I produced intermediate output, but the model ended before writing a final answer. Please retry or narrow the request."
+const TOOL_OUTPUT_ONLY_FALLBACK_TEXT =
+  "I gathered tool results, but the model ended before writing a final answer. Please retry or narrow the request; the tool output above is still available for inspection."
 
 const allowedModels = ALL_MODELS
 
@@ -49,7 +54,6 @@ type AgentStreamRequest = z.infer<typeof agentStreamRequestSchema>
 type AgentRateLimitDecision = ReturnType<
   typeof evaluateAndConsumeSlidingWindowRateLimit
 >
-
 interface ParsedAgentStreamRequest {
   parsedRequest: AgentStreamRequest
   selectedModel: ModelType
@@ -81,6 +85,7 @@ interface CreateAgentStreamResponseParams {
   tavilyApiKey?: string
   fmpApiKey?: string
   userTimeZone?: string
+  runtimeProfile?: AgentRuntimeProfileId
   messages: AgentStreamRequest["messages"]
   systemInstruction: string
   onStreamSettled?: () => void
@@ -298,6 +303,7 @@ export function createAgentStreamResponse(
         hasTextChunk: false,
         hasMeaningfulText: false,
         hasStructuredOutput: false,
+        hasToolOutput: false,
         sawTerminalAgentStatus: false,
       }
       let streamOutcome = "completed"
@@ -334,6 +340,9 @@ export function createAgentStreamResponse(
             }
           } else if (event.type !== "agent_status") {
             streamState.hasStructuredOutput = true
+            if (event.type === "tool_call" || event.type === "tool_result") {
+              streamState.hasToolOutput = true
+            }
           }
 
           if (event.type === "agent_status" && event.status !== "in_progress") {
@@ -351,6 +360,7 @@ export function createAgentStreamResponse(
           tavilyApiKey: params.tavilyApiKey,
           fmpApiKey: params.fmpApiKey,
           userTimeZone: params.userTimeZone,
+          runtimeProfile: params.runtimeProfile,
           messages: params.messages,
           systemInstruction: withAiSdkInlineCitationInstruction(
             params.systemInstruction,
@@ -365,17 +375,32 @@ export function createAgentStreamResponse(
           handleEvent(event)
         }
 
-        if (!streamState.sawTerminalAgentStatus) {
-          handleEvent({ type: "agent_status", status: "completed" })
-        }
-
-        if (
-          !streamState.hasMeaningfulText &&
-          !streamState.hasStructuredOutput
-        ) {
+        const completedWithoutAnswer = !streamState.hasMeaningfulText
+        if (completedWithoutAnswer) {
+          streamOutcome = streamState.hasStructuredOutput
+            ? "incomplete"
+            : streamOutcome
           streamState.hasTextChunk = true
           streamState.hasMeaningfulText = true
-          enqueueEvent(textDeltaEvent(ASSISTANT_EMPTY_RESPONSE_FALLBACK))
+          enqueueEvent(
+            textDeltaEvent(
+              streamState.hasStructuredOutput
+                ? streamState.hasToolOutput
+                  ? TOOL_OUTPUT_ONLY_FALLBACK_TEXT
+                  : STRUCTURED_OUTPUT_ONLY_FALLBACK_TEXT
+                : ASSISTANT_EMPTY_RESPONSE_FALLBACK
+            )
+          )
+        }
+
+        if (!streamState.sawTerminalAgentStatus) {
+          handleEvent({
+            type: "agent_status",
+            status:
+              completedWithoutAnswer && streamState.hasStructuredOutput
+                ? "incomplete"
+                : "completed",
+          })
         }
       } catch (streamError) {
         const clientAborted = params.request.signal.aborted

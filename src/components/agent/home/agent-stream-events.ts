@@ -42,6 +42,69 @@ function parseInteractionCheckpointFields(
   return nextFields
 }
 
+function parseOptionalToolMetadata(record: Record<string, unknown>) {
+  const parseOptionalString = (key: "operation" | "provider" | "errorCode") => {
+    const value = record[key]
+    if (value === undefined || value === null) {
+      return undefined
+    }
+
+    const trimmed = asString(value)?.trim()
+    if (!trimmed) {
+      return null
+    }
+
+    return trimmed
+  }
+
+  const operation = parseOptionalString("operation")
+  if (operation === null) return null
+
+  const provider = parseOptionalString("provider")
+  if (provider === null) return null
+
+  const attempt = record.attempt
+  if (
+    attempt !== undefined &&
+    attempt !== null &&
+    (typeof attempt !== "number" || !Number.isInteger(attempt) || attempt < 1)
+  ) {
+    return null
+  }
+
+  const durationMs = record.durationMs
+  if (
+    durationMs !== undefined &&
+    durationMs !== null &&
+    (typeof durationMs !== "number" ||
+      !Number.isFinite(durationMs) ||
+      durationMs < 0)
+  ) {
+    return null
+  }
+
+  const errorCode = parseOptionalString("errorCode")
+  if (errorCode === null) return null
+
+  const retryable = record.retryable
+  if (
+    retryable !== undefined &&
+    retryable !== null &&
+    typeof retryable !== "boolean"
+  ) {
+    return null
+  }
+
+  return {
+    ...(operation ? { operation } : {}),
+    ...(provider ? { provider } : {}),
+    ...(typeof attempt === "number" ? { attempt } : {}),
+    ...(typeof durationMs === "number" ? { durationMs } : {}),
+    ...(errorCode ? { errorCode } : {}),
+    ...(typeof retryable === "boolean" ? { retryable } : {}),
+  }
+}
+
 export function parseStreamEventLine(line: string): AgentStreamEvent | null {
   if (!line) {
     return null
@@ -114,12 +177,18 @@ export function parseStreamEventLine(line: string): AgentStreamEvent | null {
       return null
     }
 
+    const toolMetadata = parseOptionalToolMetadata(record)
+    if (!toolMetadata) {
+      return null
+    }
+
     return {
       type,
       callId: callId ?? null,
       toolName,
       label,
       ...(query ? { query } : {}),
+      ...toolMetadata,
       ...checkpointFields,
     }
   }
@@ -136,10 +205,22 @@ export function parseStreamEventLine(line: string): AgentStreamEvent | null {
       return null
     }
 
+    const toolName = record.toolName
+    if (toolName !== undefined && toolName !== null && !isToolName(toolName)) {
+      return null
+    }
+
+    const toolMetadata = parseOptionalToolMetadata(record)
+    if (!toolMetadata) {
+      return null
+    }
+
     return {
       type,
       callId: callId ?? null,
+      ...(isToolName(toolName) ? { toolName } : {}),
       status,
+      ...toolMetadata,
       ...checkpointFields,
     }
   }

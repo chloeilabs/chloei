@@ -16,6 +16,8 @@ interface AiSdkGatewaySearchToolCallMetadata {
   toolName: AiSdkGatewaySearchToolName
   label: string
   query?: string
+  operation?: string
+  provider?: string
 }
 
 interface AiSdkGatewaySearchToolResultMetadata {
@@ -23,6 +25,10 @@ interface AiSdkGatewaySearchToolResultMetadata {
   toolName: AiSdkGatewaySearchToolName
   status: "success" | "error"
   sources: MessageSource[]
+  operation?: string
+  provider?: string
+  errorCode?: string
+  retryable?: boolean
 }
 
 function getToolName(
@@ -159,6 +165,8 @@ export function getAiSdkGatewaySearchToolCallMetadata(
     toolName,
     label: getToolLabel(),
     ...(query ? { query } : {}),
+    operation: "web_search",
+    provider: "ai_gateway",
   }
 }
 
@@ -182,6 +190,10 @@ export function getAiSdkGatewaySearchToolResultMetadata(
       toolName,
       status: "error",
       sources: [],
+      operation: "web_search",
+      provider: "ai_gateway",
+      errorCode: "WEB_SEARCH_ERROR",
+      retryable: true,
     }
   }
 
@@ -192,5 +204,9 @@ export function getAiSdkGatewaySearchToolResultMetadata(
     toolName,
     status: sources ? "success" : "error",
     sources: sources ?? [],
+    operation: "web_search",
+    provider: "ai_gateway",
+    ...(sources ? {} : { errorCode: "WEB_SEARCH_RESULT_UNAVAILABLE" }),
+    retryable: !sources,
   }
 }

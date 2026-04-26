@@ -68,6 +68,8 @@ Optional variables let you override the built-in safe defaults for message limit
 
 - `TAVILY_API_KEY`: enables Tavily search and extract callable tools for chat requests
 - `FMP_API_KEY`: enables curated Financial Modeling Prep MCP tools for structured finance data
+- `FRED_API_KEY`: enables macro/rates series through the normalized `finance_data` tool
+- `SEC_API_USER_AGENT`: identifies Chloei for SEC public company-facts requests
 
 By default, Chloei enforces safe built-in agent limits even if you leave all optional `AGENT_*` env vars unset.
 
@@ -87,7 +89,8 @@ By default, Chloei enforces safe built-in agent limits even if you leave all opt
 - The current model list is defined in `src/lib/shared/llm/models.ts`.
 - `/`, `/api/agent`, and `/api/models` require an authenticated Better Auth session.
 - Native `web_search` is available through AI Gateway alongside Tavily, FMP, and local code execution.
-- FMP MCP uses a single server-owned API key and is intentionally limited to a curated set of finance tools.
+- `finance_data` normalizes finance operations across FMP, SEC public company facts, and optional FRED macro/rates data. FMP MCP remains available as a migration compatibility path for chat-default runs.
+- Finance eval fixtures and GDPval-style harness scripts live in `evals/finance`.
 - To share logins with another Chloei app, point both apps at the same Better Auth database and secret, set `BETTER_AUTH_COOKIE_DOMAIN` to the shared parent domain, and include every live subdomain in `BETTER_AUTH_TRUSTED_ORIGINS`.
 - Rate limiting and concurrency protection are in-memory, so they reset on process restart and do not synchronize across instances.
 - App storage does not self-initialize on live requests. Vercel deployments in this repo run `pnpm migrate` before `next build`.

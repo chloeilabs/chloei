@@ -16,6 +16,10 @@ node_modules
 # Testing
 coverage
 .artifacts/
+__pycache__/
+evals/finance/cache/
+evals/finance/results/*
+!evals/finance/results/.gitkeep
 
 # Turbo
 .turbo

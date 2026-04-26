@@ -7,6 +7,7 @@ export type PromptTaskMode =
   | "instruction_following"
   | "closed_answer"
   | "coding"
+  | "finance_analysis"
   | "research"
   | "high_stakes"
 
@@ -33,6 +34,10 @@ const RESEARCH_PATTERN =
   /\b(latest|current|today|recent|as of|source|sources|cite|citation|link|look up|lookup|verify|check the web|news|price right now|right now)\b/i
 const HIGH_STAKES_PATTERN =
   /\b(bank|password|phishing|security|medical|doctor|symptom|symptoms|dose|dosage|prescription|pregnant|lawsuit|legal|tax|suicid|self-harm|chest pain|emergency|infection)\b/i
+const FINANCE_ANALYSIS_PATTERN =
+  /\b(stock|stocks|equity|equities|ticker|symbol|quote|quotes|company profile|finance data|financial data|finance provider|finance providers|structured finance|etf|fundamental|valuation|dcf|multiple|ev\/ebitda|ebitda|revenue|gross margin|operating margin|free cash flow|fcf|cash flow|income statement|balance sheet|financial statement|filing|10-k|10-q|earnings|guidance|dividend|buyback|market cap|enterprise value|treasury|yield curve|interest rate|fed funds|cpi|inflation|gdp|macro|fred|fx|foreign exchange|currency pair|commodity|commodities|oil|gold|crypto|bitcoin|ethereum|portfolio return|sharpe|beta|drawdown)\b/i
+const FINANCIAL_ADVICE_PATTERN =
+  /\b(should i buy|should i sell|buy or sell|personal financial advice|retirement account|401k|ira|tax return|tax filing|tax deduction|my portfolio|my savings|my mortgage|my debt)\b/i
 const CLOSED_ANSWER_PATTERN =
   /\b(multiple choice|choose one|which option|final answer|exact answer|boxed|answer:|confidence:|A\)|B\)|C\)|D\))\b/i
 const STRICT_OUTPUT_PATTERN =
@@ -81,6 +86,20 @@ This request is code-centric.
 - If the user requests code only or one code block, obey that literally.
 - Use the code_execution tool for arithmetic, spot checks, or quick validation when it reduces error risk.
 - Do not add prose that would break copy-paste or grading.
+`.trim(),
+  finance_analysis: `
+This request is finance-analysis work.
+- Prefer structured finance tools for market data, company facts, filings, statements, historical prices, macro/rates, FX, and crypto where available.
+- When the user asks what finance providers or capabilities are available, call \`finance_data\` with \`provider_status\` and answer from that status. Do not run representative data probes after a provider is reported unavailable.
+- For ordinary public-company quote/profile requests, use \`finance_data\` with provider \`auto\`: quote resolves to the structured Stooq quote fallback and company_profile resolves to SEC submissions when FMP is unavailable. Do not use Tavily or web search for quote/profile while these structured fallbacks are available.
+- For public-company statements, use \`finance_data\` \`financial_statements\` with provider \`auto\` and the requested \`statementType\` (\`income\`, \`balance_sheet\`, or \`cash_flow\`); when FMP is unavailable this resolves to SEC company facts. If margins, growth rates, free cash flow, leverage ratios, or comparisons are requested, run \`code_execution\` to verify the arithmetic.
+- For 10-K/10-Q prompts asking for cash flow, capex, liabilities, debt, assets, equity, or balance-sheet items, call \`finance_data\` first instead of searching EDGAR pages. The statement result includes SEC company-facts and filing source URLs when available; cite those directly. Use search only for narrative filing excerpts or facts not present in structured data.
+- Use search or extraction for market news, unsupported assets, methodology checks, or source-backed claims that structured tools do not cover.
+- Use code execution for valuation math, return calculations, statement transformations, table joins, chart/statistical checks, and any arithmetic that could change the conclusion.
+- Distinguish reported facts, computed values, assumptions, and interpretation.
+- Do not provide personalized investment, tax, legal, or trade-execution advice. Frame analysis as informational unless the user provided an institutional workflow.
+- When data is unavailable, stale, or provider-specific, say that plainly and do not fill gaps with invented figures.
+- Stay on the finance task. Do not narrate unrelated wording, country-name, or language-usage considerations.
 `.trim(),
   research: `
 This request needs freshness, sources, or verification.
@@ -143,6 +162,10 @@ export function inferPromptTaskMode(
     STRICT_OUTPUT_PATTERN.test(lastUserMessage) ||
     STRICT_OUTPUT_PATTERN.test(fullUserText)
   const highStakes = HIGH_STAKES_PATTERN.test(lastUserMessage)
+  const financialAdvice = FINANCIAL_ADVICE_PATTERN.test(lastUserMessage)
+  const financeAnalysis =
+    FINANCE_ANALYSIS_PATTERN.test(lastUserMessage) ||
+    FINANCE_ANALYSIS_PATTERN.test(fullUserText)
   const research =
     RESEARCH_PATTERN.test(lastUserMessage) ||
     RESEARCH_PATTERN.test(fullUserText)
@@ -150,12 +173,20 @@ export function inferPromptTaskMode(
     CLOSED_ANSWER_PATTERN.test(lastUserMessage) ||
     CLOSED_ANSWER_PATTERN.test(fullUserText)
 
-  if (coding) {
-    return "coding"
+  if (financeAnalysis && !financialAdvice) {
+    return "finance_analysis"
+  }
+
+  if (financialAdvice) {
+    return "high_stakes"
   }
 
   if (highStakes) {
     return "high_stakes"
+  }
+
+  if (coding) {
+    return "coding"
   }
 
   if (research) {

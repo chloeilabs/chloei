@@ -12,6 +12,7 @@ export const TOOL_NAMES = [
   "code_execution",
   "tavily_search",
   "tavily_extract",
+  "finance_data",
   "fmp_mcp",
 ] as const
 export type ToolName = (typeof TOOL_NAMES)[number]
@@ -38,6 +39,15 @@ export interface MessageSource {
   title: string
 }
 
+export interface ToolRunMetadata {
+  operation?: string
+  provider?: string
+  attempt?: number
+  durationMs?: number
+  errorCode?: string
+  retryable?: boolean
+}
+
 export interface ToolInvocation {
   id: string
   callId: string | null
@@ -45,6 +55,12 @@ export interface ToolInvocation {
   label: string
   query?: string
   status: ToolInvocationStatus
+  operation?: string
+  provider?: string
+  attempt?: number
+  durationMs?: number
+  errorCode?: string
+  retryable?: boolean
 }
 
 interface ActivityTimelineBaseEntry {
@@ -59,6 +75,12 @@ export interface ToolActivityTimelineEntry extends ActivityTimelineBaseEntry {
   toolName: ToolName
   label: string
   status: ToolInvocationStatus
+  operation?: string
+  provider?: string
+  attempt?: number
+  durationMs?: number
+  errorCode?: string
+  retryable?: boolean
 }
 
 export interface SearchActivityTimelineEntry extends ActivityTimelineBaseEntry {
@@ -67,6 +89,12 @@ export interface SearchActivityTimelineEntry extends ActivityTimelineBaseEntry {
   toolName: SearchToolName
   query: string
   status: ToolInvocationStatus
+  operation?: string
+  provider?: string
+  attempt?: number
+  durationMs?: number
+  errorCode?: string
+  retryable?: boolean
 }
 
 export interface SourcesActivityTimelineEntry extends ActivityTimelineBaseEntry {
@@ -106,12 +134,25 @@ export interface ToolCallStreamEvent extends InteractionCheckpointFields {
   toolName: ToolName
   label: string
   query?: string
+  operation?: string
+  provider?: string
+  attempt?: number
+  durationMs?: number
+  errorCode?: string
+  retryable?: boolean
 }
 
 export interface ToolResultStreamEvent extends InteractionCheckpointFields {
   type: "tool_result"
   callId: string | null
+  toolName?: ToolName
   status: Extract<ToolInvocationStatus, "success" | "error">
+  operation?: string
+  provider?: string
+  attempt?: number
+  durationMs?: number
+  errorCode?: string
+  retryable?: boolean
 }
 
 export interface SourceStreamEvent extends InteractionCheckpointFields {
