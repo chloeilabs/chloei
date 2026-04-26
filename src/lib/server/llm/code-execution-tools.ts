@@ -431,7 +431,6 @@ async function copyInputFiles(
     }
 
     const destination = path.join(workspaceDir, relativePath)
-    copied.add(relativePath)
     const destinationStats = await stat(destination).catch(() => null)
     if (destinationStats) {
       continue
@@ -439,9 +438,28 @@ async function copyInputFiles(
 
     await mkdir(path.dirname(destination), { recursive: true })
     await copyFile(inputFile.sourcePath, destination)
+    copied.add(relativePath)
   }
 
   return copied
+}
+
+function getMountedInputFilePaths(
+  inputFiles: CodeExecutionInputFile[] | undefined
+): Set<string> {
+  const mounted = new Set<string>()
+  if (!inputFiles?.length) {
+    return mounted
+  }
+
+  for (const inputFile of inputFiles) {
+    const relativePath = normalizeInputFileRelativePath(inputFile.relativePath)
+    if (relativePath) {
+      mounted.add(relativePath)
+    }
+  }
+
+  return mounted
 }
 
 function validatePythonImports(
@@ -535,7 +553,8 @@ async function runProcess(args: {
       : await mkdtemp(path.join(tempRoot, "chloei-code-exec-"))
   const workspaceDir = path.join(tempDir, "workspace")
   await mkdir(workspaceDir, { recursive: true })
-  const copiedInputFiles = await copyInputFiles(workspaceDir, args.inputFiles)
+  const mountedInputFiles = getMountedInputFilePaths(args.inputFiles)
+  await copyInputFiles(workspaceDir, args.inputFiles)
   const commandArgs =
     args.language === "python" &&
     args.commandArgs[0] === "-I" &&
@@ -554,7 +573,7 @@ async function runProcess(args: {
   let timedOut = false
 
   const collectManifest = async (): Promise<CodeExecutionArtifact[]> =>
-    collectArtifactManifest(workspaceDir, copiedInputFiles)
+    collectArtifactManifest(workspaceDir, mountedInputFiles)
 
   try {
     return await new Promise<CodeExecutionToolResultPayload>((resolve) => {

@@ -154,6 +154,12 @@ test("preserved code execution workspace does not overwrite mounted inputs", asy
 
     assert.equal(readResult.error, undefined)
     assert.match(readResult.output?.stdout ?? "", /modified\.txt/)
+    assert.equal(
+      readResult.output?.artifactManifest.some(
+        (artifact) => artifact.path === "mounted.xlsx"
+      ),
+      false
+    )
   } finally {
     await rm(tempRoot, { recursive: true, force: true })
   }
