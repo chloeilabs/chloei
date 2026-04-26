@@ -1,6 +1,7 @@
 import { memo, useMemo } from "react"
 
 import {
+  type AgentRunMode,
   isAssistantMessage,
   isUserMessage,
   type Message,
@@ -65,6 +66,7 @@ function MessagesComponent({
     messageId: string
     newContent: string
     newModel: ModelType
+    newRunMode: AgentRunMode
   }) => Promise<void> | void
 }) {
   const messageGroups = useMemo(() => groupMessages(messages), [messages])

@@ -14,8 +14,8 @@ test("agent route validates model, threadId, and messages", async () => {
 
   assert.match(
     source,
-    /const agentStreamRequestSchema = z[\s\S]*model: z\.string\(\)\.trim\(\)\.min\(1\)\.max\(200\)\.optional\(\),[\s\S]*threadId: z\.string\(\)\.trim\(\)\.min\(1\)\.max\(200\)\.optional\(\),[\s\S]*messages: z\.array\(agentMessageSchema\)\.min\(1\),[\s\S]*\.strict\(\)/,
-    "Expected /api/agent to validate model, threadId, and messages."
+    /const agentStreamRequestSchema = z[\s\S]*model: z\.string\(\)\.trim\(\)\.min\(1\)\.max\(200\)\.optional\(\),[\s\S]*runMode: z\.enum\(AGENT_RUN_MODES\)\.optional\(\),[\s\S]*threadId: z\.string\(\)\.trim\(\)\.min\(1\)\.max\(200\)\.optional\(\),[\s\S]*messages: z\.array\(agentMessageSchema\)\.min\(1\),[\s\S]*\.strict\(\)/,
+    "Expected /api/agent to validate model, runMode, threadId, and messages."
   )
 
   assert.match(
@@ -61,8 +61,8 @@ test("agent route streams through the extracted AI Gateway helper path", async (
 
   assert.match(
     routeSource,
-    /runtimeProfile: resolveRuntimeProfile\(promptTaskMode\)/,
-    "Expected /api/agent to select a runtime profile from the inferred task mode without changing the request body."
+    /runtimeProfile: resolveRuntimeProfile\(\s*promptTaskMode,\s*parsedRequest\.runMode\s*\)/,
+    "Expected /api/agent to select a runtime profile from the inferred task mode and requested run mode."
   )
 })
 
@@ -91,12 +91,12 @@ test("agent runtime reserves the final loop step for synthesis", async () => {
   )
   assert.match(
     runtimeSource,
-    /prepareStep:\s*\(\{\s*stepNumber\s*\}\)[\s\S]*shouldForceFinalSynthesisStep\(stepNumber\)[\s\S]*toolChoice:\s*"none"/,
+    /prepareStep:\s*\(\{\s*stepNumber\s*\}\)[\s\S]*shouldForceFinalSynthesisStep\(stepNumber,\s*runtimeProfile\.toolMaxSteps\)[\s\S]*toolChoice:\s*"none"/,
     "Expected the last permitted model step to disable tools."
   )
   assert.match(
     runtimeSource,
-    /stepNumber\s*>=\s*Math\.max\(0,\s*AGENT_TOOL_MAX_STEPS\s*-\s*1\)/,
-    "Expected final synthesis to happen before stepCountIs stops the loop."
+    /stepNumber\s*>=\s*Math\.max\(0,\s*toolMaxSteps\s*-\s*1\)/,
+    "Expected final synthesis to happen before the profile step budget stops the loop."
   )
 })

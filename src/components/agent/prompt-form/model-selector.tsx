@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -12,7 +12,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { useModels } from "@/hooks/agent/use-models"
-import { ModelInfos, type ModelType } from "@/lib/shared"
+import {
+  getModelSelectorModels,
+  ModelInfos,
+  type ModelType,
+} from "@/lib/shared"
 
 export function ModelSelector({
   selectedModel,
@@ -25,6 +29,10 @@ export function ModelSelector({
   const shouldPreventCloseAutoFocusRef = useRef(false)
 
   const { data: availableModels = [] } = useModels()
+  const modelSelectorModels = useMemo(
+    () => getModelSelectorModels(availableModels),
+    [availableModels]
+  )
 
   const handleModelSelection = (model: ModelType) => {
     shouldPreventCloseAutoFocusRef.current = true
@@ -83,8 +91,8 @@ export function ModelSelector({
         className="flex w-fit flex-col gap-0.5 overflow-hidden rounded-none p-0"
       >
         <div className="flex flex-col gap-0.5 rounded-none p-1.5">
-          {availableModels.length > 0 ? (
-            availableModels.map((model) => (
+          {modelSelectorModels.length > 0 ? (
+            modelSelectorModels.map((model) => (
               <Button
                 key={model.id}
                 size="sm"

@@ -133,6 +133,14 @@ export function createAiSdkGatewaySearchTools(
 }
 
 export function getAiSdkGatewayProviderOptions() {
+  return getAiSdkGatewayProviderOptionsForMode()
+}
+
+export function getAiSdkGatewayProviderOptionsForMode({
+  deepResearch = false,
+}: {
+  deepResearch?: boolean
+} = {}) {
   return {
     anthropic: {
       sendReasoning: true,
@@ -142,10 +150,16 @@ export function getAiSdkGatewayProviderOptions() {
       },
       effort: "high",
     } satisfies AnthropicLanguageModelOptions,
-    openai: {
-      reasoningEffort: "high",
-      reasoningSummary: "detailed",
-    },
+    openai: deepResearch
+      ? {
+          reasoningEffort: "xhigh",
+          reasoningSummary: "detailed",
+          textVerbosity: "high",
+        }
+      : {
+          reasoningEffort: "high",
+          reasoningSummary: "detailed",
+        },
   }
 }
 

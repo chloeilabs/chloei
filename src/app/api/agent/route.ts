@@ -37,6 +37,7 @@ import {
   observeRouteResponse,
 } from "@/lib/server/route-observability"
 import { isThreadStoreNotInitializedError } from "@/lib/server/threads"
+import type { AgentRunMode } from "@/lib/shared"
 
 export const runtime = "nodejs"
 export const maxDuration = 800
@@ -46,8 +47,13 @@ function resolveRateLimitIdentifier(userId: string): string {
 }
 
 function resolveRuntimeProfile(
-  taskMode: PromptTaskMode
+  taskMode: PromptTaskMode,
+  runMode: AgentRunMode
 ): AgentRuntimeProfileId {
+  if (runMode === "research") {
+    return "deep_research"
+  }
+
   return taskMode === "finance_analysis" ? "finance_analysis" : "chat_default"
 }
 
@@ -158,7 +164,10 @@ export async function POST(request: NextRequest) {
     const requestNow = new Date()
     const userTimeZone = resolveUserTimeZone(request)
     const promptProvider = resolvePromptProvider(selectedModel)
-    const promptTaskMode = inferPromptTaskMode(parsedRequest.messages)
+    const promptTaskMode =
+      parsedRequest.runMode === "research"
+        ? "research"
+        : inferPromptTaskMode(parsedRequest.messages)
     const systemInstruction = buildAgentSystemInstruction(
       {
         id: session.user.id,
@@ -232,7 +241,10 @@ export async function POST(request: NextRequest) {
         tavilyApiKey,
         fmpApiKey,
         userTimeZone,
-        runtimeProfile: resolveRuntimeProfile(promptTaskMode),
+        runtimeProfile: resolveRuntimeProfile(
+          promptTaskMode,
+          parsedRequest.runMode
+        ),
         messages: parsedRequest.messages,
         systemInstruction,
         onStreamSettled: concurrencySlot?.release,

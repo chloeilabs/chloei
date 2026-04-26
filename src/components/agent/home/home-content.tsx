@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/tooltip"
 import { useIsMobile } from "@/hooks/use-mobile"
 import {
+  type AgentRunMode,
   type AuthViewer,
   deriveThreadTitle,
   type ModelType,
@@ -267,15 +268,20 @@ export function HomePageContent({
   }, [fallbackTransitionMs])
 
   const handleAnimatedPromptSubmit = useCallback(
-    (message: string, model: ModelType, queue: boolean) => {
+    (
+      message: string,
+      model: ModelType,
+      queue: boolean,
+      runMode: AgentRunMode
+    ) => {
       if (queue) {
-        handlePromptSubmit(message, model, queue)
+        handlePromptSubmit(message, model, queue, runMode)
         return
       }
 
       if (isMobile) {
         startFallbackConversationTransition()
-        handlePromptSubmit(message, model, queue)
+        handlePromptSubmit(message, model, queue, runMode)
         return
       }
 
@@ -290,13 +296,13 @@ export function HomePageContent({
 
       if (!startViewTransition) {
         startFallbackConversationTransition()
-        handlePromptSubmit(message, model, queue)
+        handlePromptSubmit(message, model, queue, runMode)
         return
       }
 
       startViewTransition(() => {
         flushSync(() => {
-          handlePromptSubmit(message, model, queue)
+          handlePromptSubmit(message, model, queue, runMode)
         })
       })
     },

@@ -7,6 +7,7 @@ import { type ModelMessage, stepCountIs, streamText, type ToolSet } from "ai"
 import { createLogger } from "@/lib/logger"
 import {
   AGENT_EVAL_RESULTS_DIR,
+  AGENT_RESEARCH_TOOL_MAX_STEPS,
   AGENT_TOOL_MAX_STEPS,
 } from "@/lib/server/agent-runtime-config"
 import { type AgentStreamEvent, type ModelType } from "@/lib/shared"
@@ -20,7 +21,7 @@ import {
 import { createAiSdkFmpMcpToolsContext } from "./ai-sdk-fmp-mcp-tools"
 import {
   createAiSdkGatewaySearchTools,
-  getAiSdkGatewayProviderOptions,
+  getAiSdkGatewayProviderOptionsForMode,
   getAiSdkGatewaySearchToolCallMetadata,
   getAiSdkGatewaySearchToolResultMetadata,
   isAiSdkGatewaySearchToolName,
@@ -44,6 +45,7 @@ const logger = createLogger("agent-runtime")
 
 export type AgentRuntimeProfileId =
   | "chat_default"
+  | "deep_research"
   | "finance_analysis"
   | "gdpval_workspace"
 
@@ -53,6 +55,7 @@ interface AgentRuntimeProfile {
   codeExecutionWorkspaceMode?: "ephemeral" | "preserve"
   fmpMcpEnabled: boolean
   financeDataEnabled: boolean
+  toolMaxSteps: number
 }
 
 interface AgentInputMessage {
@@ -87,12 +90,20 @@ const AGENT_RUNTIME_PROFILES: Record<
     id: "chat_default",
     fmpMcpEnabled: true,
     financeDataEnabled: true,
+    toolMaxSteps: AGENT_TOOL_MAX_STEPS,
+  },
+  deep_research: {
+    id: "deep_research",
+    fmpMcpEnabled: true,
+    financeDataEnabled: true,
+    toolMaxSteps: AGENT_RESEARCH_TOOL_MAX_STEPS,
   },
   finance_analysis: {
     id: "finance_analysis",
     codeExecutionBackend: "finance",
     fmpMcpEnabled: false,
     financeDataEnabled: true,
+    toolMaxSteps: AGENT_TOOL_MAX_STEPS,
   },
   gdpval_workspace: {
     id: "gdpval_workspace",
@@ -100,6 +111,7 @@ const AGENT_RUNTIME_PROFILES: Record<
     codeExecutionWorkspaceMode: "preserve",
     fmpMcpEnabled: false,
     financeDataEnabled: true,
+    toolMaxSteps: AGENT_TOOL_MAX_STEPS,
   },
 }
 
@@ -116,8 +128,11 @@ function resolveAgentRuntimeProfile(
   return AGENT_RUNTIME_PROFILES[id ?? "chat_default"]
 }
 
-function shouldForceFinalSynthesisStep(stepNumber: number): boolean {
-  return stepNumber >= Math.max(0, AGENT_TOOL_MAX_STEPS - 1)
+function shouldForceFinalSynthesisStep(
+  stepNumber: number,
+  toolMaxSteps: number
+): boolean {
+  return stepNumber >= Math.max(0, toolMaxSteps - 1)
 }
 
 function toModelMessages(messages: AgentInputMessage[]): ModelMessage[] {
@@ -257,16 +272,18 @@ export async function* startAgentRuntimeStream(
       ...(params.temperature !== undefined
         ? { temperature: params.temperature }
         : {}),
-      providerOptions: getAiSdkGatewayProviderOptions(),
+      providerOptions: getAiSdkGatewayProviderOptionsForMode({
+        deepResearch: runtimeProfile.id === "deep_research",
+      }),
       tools,
       prepareStep: ({ stepNumber }) =>
-        shouldForceFinalSynthesisStep(stepNumber)
+        shouldForceFinalSynthesisStep(stepNumber, runtimeProfile.toolMaxSteps)
           ? {
               toolChoice: "none",
               system: `${params.systemInstruction}\n\n${FINAL_SYNTHESIS_STEP_INSTRUCTION}`,
             }
           : undefined,
-      stopWhen: stepCountIs(AGENT_TOOL_MAX_STEPS),
+      stopWhen: stepCountIs(runtimeProfile.toolMaxSteps),
     })
 
     for await (const part of result.fullStream) {
