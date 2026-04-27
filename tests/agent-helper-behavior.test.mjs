@@ -467,8 +467,13 @@ test("agent helper validates file attachments and forces the OpenAI vision model
     requestId: "request-attachments-prior-prompt",
   })
 
-  assert(!(priorAttachmentPayloadsResult instanceof Response))
-  assert.equal(priorAttachmentPayloadsResult.selectedModel, "openai/gpt-5.5")
+  assert(priorAttachmentPayloadsResult instanceof Response)
+  assert.equal(priorAttachmentPayloadsResult.status, 413)
+  assert.deepEqual(await priorAttachmentPayloadsResult.json(), {
+    error: "Attached files are too large.",
+    errorCode: "AGENT_ATTACHMENTS_TOO_LARGE",
+    requestId: "request-attachments-prior-prompt",
+  })
 
   const oversizedAttachmentsResult = parseAgentStreamRequest({
     body: {

@@ -242,19 +242,6 @@ function getMessageAttachments(messages: AgentStreamRequest["messages"]) {
   return messages.flatMap((message) => message.attachments ?? [])
 }
 
-function getLatestUserMessageAttachments(
-  messages: AgentStreamRequest["messages"]
-) {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index]
-    if (message?.role === "user") {
-      return message.attachments ?? []
-    }
-  }
-
-  return []
-}
-
 function hasMessageAttachments(messages: AgentStreamRequest["messages"]) {
   return messages.some((message) => (message.attachments?.length ?? 0) > 0)
 }
@@ -307,11 +294,48 @@ function validateAgentRequestAttachments(
     return null
   }
 
-  const latestUserMessageAttachments = getLatestUserMessageAttachments(
-    params.messages
-  )
+  for (const message of params.messages) {
+    const messageAttachments = message.attachments ?? []
 
-  if (latestUserMessageAttachments.length > AGENT_ATTACHMENT_MAX_FILES) {
+    if (messageAttachments.length > 0 && message.role !== "user") {
+      return createJsonErrorResponse({
+        requestId: params.requestId,
+        error: "Only user messages can include file attachments.",
+        errorCode: "AGENT_ATTACHMENT_ROLE_INVALID",
+        status: 400,
+        rateLimitDecision: params.rateLimitDecision,
+      })
+    }
+
+    if (
+      message.role === "user" &&
+      messageAttachments.length > AGENT_ATTACHMENT_MAX_FILES
+    ) {
+      return createJsonErrorResponse({
+        requestId: params.requestId,
+        error: "Too many file attachments.",
+        errorCode: "AGENT_TOO_MANY_ATTACHMENTS",
+        status: 400,
+        rateLimitDecision: params.rateLimitDecision,
+      })
+    }
+
+    if (
+      message.role === "user" &&
+      getTotalAttachmentBytes(messageAttachments) >
+        AGENT_ATTACHMENT_MAX_TOTAL_BYTES
+    ) {
+      return createJsonErrorResponse({
+        requestId: params.requestId,
+        error: "Attached files are too large.",
+        errorCode: "AGENT_ATTACHMENTS_TOO_LARGE",
+        status: 413,
+        rateLimitDecision: params.rateLimitDecision,
+      })
+    }
+  }
+
+  if (attachments.length > AGENT_ATTACHMENT_MAX_FILES) {
     return createJsonErrorResponse({
       requestId: params.requestId,
       error: "Too many file attachments.",
@@ -321,10 +345,7 @@ function validateAgentRequestAttachments(
     })
   }
 
-  if (
-    getTotalAttachmentBytes(latestUserMessageAttachments) >
-    AGENT_ATTACHMENT_MAX_TOTAL_BYTES
-  ) {
+  if (getTotalAttachmentBytes(attachments) > AGENT_ATTACHMENT_MAX_TOTAL_BYTES) {
     return createJsonErrorResponse({
       requestId: params.requestId,
       error: "Attached files are too large.",
@@ -335,16 +356,6 @@ function validateAgentRequestAttachments(
   }
 
   for (const message of params.messages) {
-    if ((message.attachments?.length ?? 0) > 0 && message.role !== "user") {
-      return createJsonErrorResponse({
-        requestId: params.requestId,
-        error: "Only user messages can include file attachments.",
-        errorCode: "AGENT_ATTACHMENT_ROLE_INVALID",
-        status: 400,
-        rateLimitDecision: params.rateLimitDecision,
-      })
-    }
-
     for (const attachment of message.attachments ?? []) {
       if (attachment.kind !== getAgentAttachmentKind(attachment.mediaType)) {
         return createAttachmentValidationError(params)

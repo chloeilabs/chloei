@@ -1,8 +1,13 @@
+import { Buffer } from "node:buffer"
+
 import { z } from "zod"
 
 import {
   AGENT_ATTACHMENT_MAX_FILE_BYTES,
+  AGENT_ATTACHMENT_MAX_FILES,
   AGENT_ATTACHMENT_MAX_PREVIEW_DATA_URL_CHARS,
+  AGENT_ATTACHMENT_MAX_TOTAL_BYTES,
+  AGENT_ATTACHMENT_MAX_TOTAL_PREVIEW_BYTES,
   AGENT_ATTACHMENT_MIME_TYPES,
   AGENT_IMAGE_DETAIL_VALUES,
   AGENT_RUN_MODES,
@@ -186,10 +191,42 @@ const attachmentMetadataSchema = z
     message: "Only image attachments can include detail.",
   })
 
+function getAttachmentPreviewBytes(
+  attachment: z.infer<typeof attachmentMetadataSchema>
+): number {
+  return attachment.previewDataUrl
+    ? Buffer.byteLength(attachment.previewDataUrl, "utf8")
+    : 0
+}
+
+const attachmentMetadataListSchema = z
+  .array(attachmentMetadataSchema)
+  .max(AGENT_ATTACHMENT_MAX_FILES)
+  .refine(
+    (attachments) =>
+      attachments.reduce(
+        (total, attachment) => total + attachment.sizeBytes,
+        0
+      ) <= AGENT_ATTACHMENT_MAX_TOTAL_BYTES,
+    {
+      message: "Attachment metadata exceeds total size limit.",
+    }
+  )
+  .refine(
+    (attachments) =>
+      attachments.reduce(
+        (total, attachment) => total + getAttachmentPreviewBytes(attachment),
+        0
+      ) <= AGENT_ATTACHMENT_MAX_TOTAL_PREVIEW_BYTES,
+    {
+      message: "Attachment previews exceed total preview size limit.",
+    }
+  )
+
 const messageMetadataSchema = z
   .object({
     parts: z.array(assistantMessagePartSchema).optional(),
-    attachments: z.array(attachmentMetadataSchema).optional(),
+    attachments: attachmentMetadataListSchema.optional(),
     isStreaming: z.boolean().optional(),
     selectedModel: MODEL_TYPE_SCHEMA.optional(),
     runMode: AGENT_RUN_MODE_SCHEMA.optional(),

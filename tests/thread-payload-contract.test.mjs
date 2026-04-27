@@ -147,3 +147,67 @@ test("thread payload preserves attachment metadata and strips request-only data"
     },
   ])
 })
+
+test("thread payload caps attachment metadata and preview persistence", () => {
+  const baseThread = {
+    id: "thread-attachment-limits",
+    model: "openai/gpt-5.5",
+    messages: [
+      {
+        id: "message-1",
+        role: "user",
+        content: "Analyze these files.",
+        llmModel: "openai/gpt-5.5",
+        createdAt: "2026-04-26T00:00:00.000Z",
+        metadata: {
+          attachments: [],
+        },
+      },
+    ],
+    createdAt: "2026-04-26T00:00:00.000Z",
+    updatedAt: "2026-04-26T00:00:00.000Z",
+  }
+  const createAttachment = (index, previewDataUrl = undefined) => ({
+    id: `attachment-${String(index)}`,
+    kind: "image",
+    filename: `chart-${String(index)}.png`,
+    mediaType: "image/png",
+    sizeBytes: 5,
+    detail: "auto",
+    ...(previewDataUrl ? { previewDataUrl } : {}),
+  })
+
+  assert.throws(() =>
+    parseThreadPayload({
+      ...baseThread,
+      messages: [
+        {
+          ...baseThread.messages[0],
+          metadata: {
+            attachments: Array.from({ length: 5 }, (_, index) =>
+              createAttachment(index)
+            ),
+          },
+        },
+      ],
+    })
+  )
+
+  const largePreviewDataUrl = `data:image/jpeg;base64,${"a".repeat(40_000)}`
+  assert.throws(() =>
+    parseThreadPayload({
+      ...baseThread,
+      messages: [
+        {
+          ...baseThread.messages[0],
+          metadata: {
+            attachments: [
+              createAttachment(1, largePreviewDataUrl),
+              createAttachment(2, largePreviewDataUrl),
+            ],
+          },
+        },
+      ],
+    })
+  )
+})

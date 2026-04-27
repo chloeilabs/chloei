@@ -25,6 +25,12 @@ interface AgentRequestMessage {
   attachments?: AgentRequestAttachment[]
 }
 
+interface AgentRequestMessageDraft {
+  id: string
+  role: "user" | "assistant"
+  content: string
+}
+
 interface ToRequestMessagesOptions {
   attachmentsByMessageId?: ReadonlyMap<string, AgentRequestAttachment[]>
 }
@@ -54,7 +60,7 @@ export function toRequestMessages(
   messages: AgentMessage[],
   options: ToRequestMessagesOptions = {}
 ): AgentRequestMessage[] {
-  const requestMessages = messages
+  const requestMessageDrafts: AgentRequestMessageDraft[] = messages
     .filter(
       (
         message
@@ -63,20 +69,17 @@ export function toRequestMessages(
       } => message.role === "user" || message.role === "assistant"
     )
     .map((message) => {
-      const attachments =
-        message.role === "user"
-          ? (options.attachmentsByMessageId?.get(message.id) ?? [])
-          : []
-
       return {
+        id: message.id,
         role: message.role,
         content: trimMessageContent(message.content.trim()),
-        ...(attachments.length > 0 ? { attachments } : {}),
       }
     })
     .filter((message) => message.content.length > 0)
 
-  const boundedMessages = requestMessages.slice(-AGENT_REQUEST_MAX_MESSAGES)
+  const boundedMessages = requestMessageDrafts.slice(
+    -AGENT_REQUEST_MAX_MESSAGES
+  )
 
   while (
     boundedMessages.length > 1 &&
@@ -85,7 +88,22 @@ export function toRequestMessages(
     boundedMessages.shift()
   }
 
-  return boundedMessages
+  const finalUserMessageId = [...boundedMessages]
+    .reverse()
+    .find((message) => message.role === "user")?.id
+
+  return boundedMessages.map((message) => {
+    const attachments =
+      message.role === "user" && message.id === finalUserMessageId
+        ? (options.attachmentsByMessageId?.get(message.id) ?? [])
+        : []
+
+    return {
+      role: message.role,
+      content: message.content,
+      ...(attachments.length > 0 ? { attachments } : {}),
+    }
+  })
 }
 
 export function appendUserMessage(
@@ -93,12 +111,13 @@ export function appendUserMessage(
   content: string,
   model: ModelType,
   runMode: AgentRunMode = "chat",
-  attachments: readonly (AgentAttachmentMetadata | AgentRequestAttachment)[] = []
+  attachments: readonly (
+    | AgentAttachmentMetadata
+    | AgentRequestAttachment
+  )[] = []
 ): AgentMessage[] {
   const attachmentMetadata = attachments.map((attachment) =>
-    "dataUrl" in attachment
-      ? toAgentAttachmentMetadata(attachment)
-      : attachment
+    "dataUrl" in attachment ? toAgentAttachmentMetadata(attachment) : attachment
   )
   const userMessage: AgentMessage = {
     id: createClientMessageId(),
@@ -133,6 +152,7 @@ export function appendUserMessage(
 export function hasUserMessageAttachments(messages: AgentMessage[]): boolean {
   return messages.some(
     (message) =>
-      message.role === "user" && (message.metadata?.attachments?.length ?? 0) > 0
+      message.role === "user" &&
+      (message.metadata?.attachments?.length ?? 0) > 0
   )
 }
