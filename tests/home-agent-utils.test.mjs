@@ -85,3 +85,43 @@ test("appended user messages preserve the requested run mode", () => {
   assert.equal(messages[0]?.metadata?.selectedModel, "anthropic/claude-sonnet-4.6")
   assert.equal(messages[0]?.metadata?.runMode, "research")
 })
+
+test("attached user messages persist metadata but request transient data separately", () => {
+  const attachment = {
+    id: "attachment-1",
+    kind: "image",
+    filename: "chart.png",
+    mediaType: "image/png",
+    sizeBytes: 5,
+    detail: "auto",
+    previewDataUrl: "data:image/jpeg;base64,abc=",
+    dataUrl: "data:image/png;base64,aGVsbG8=",
+  }
+  const messages = appendUserMessage(
+    [],
+    "Analyze this chart.",
+    "anthropic/claude-sonnet-4.6",
+    "chat",
+    [attachment]
+  )
+  const userMessage = messages[0]
+
+  assert.equal(userMessage?.metadata?.attachments?.[0]?.filename, "chart.png")
+  assert.equal(userMessage?.metadata?.attachments?.[0]?.dataUrl, undefined)
+
+  assert.deepEqual(toRequestMessages(messages), [
+    {
+      role: "user",
+      content: "Analyze this chart.",
+    },
+  ])
+
+  const attachmentsByMessageId = new Map([[userMessage.id, [attachment]]])
+  assert.deepEqual(toRequestMessages(messages, { attachmentsByMessageId }), [
+    {
+      role: "user",
+      content: "Analyze this chart.",
+      attachments: [attachment],
+    },
+  ])
+})

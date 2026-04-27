@@ -21,7 +21,7 @@ const serverActionsBodySizeLimit = parseSizeLimitFromEnv(
 )
 const proxyClientMaxBodySize = parseSizeLimitFromEnv(
   process.env.NEXT_PROXY_CLIENT_MAX_BODY_SIZE,
-  "1mb"
+  "12mb"
 )
 
 const securityHeaders = [

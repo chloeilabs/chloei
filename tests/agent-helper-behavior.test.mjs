@@ -330,6 +330,144 @@ test("agent helper validates total size, last-message role, and default model su
   })
 })
 
+test("agent helper validates file attachments and forces the OpenAI vision model", async () => {
+  const imageAttachment = {
+    id: "attachment-1",
+    kind: "image",
+    filename: "chart.png",
+    mediaType: "image/png",
+    sizeBytes: 5,
+    detail: "auto",
+    dataUrl: "data:image/png;base64,aGVsbG8=",
+  }
+
+  const attachmentResult = parseAgentStreamRequest({
+    body: {
+      model: "anthropic/claude-sonnet-4.6",
+      messages: [
+        {
+          role: "user",
+          content: "Analyze this chart.",
+          attachments: [imageAttachment],
+        },
+      ],
+    },
+    availableModels: [
+      { id: "anthropic/claude-sonnet-4.6" },
+      { id: "openai/gpt-5.5" },
+    ],
+    requestId: "request-attachment",
+  })
+
+  assert(!(attachmentResult instanceof Response))
+  assert.equal(attachmentResult.selectedModel, "openai/gpt-5.5")
+  assert.deepEqual(
+    attachmentResult.parsedRequest.messages[0]?.attachments,
+    [imageAttachment]
+  )
+
+  const unavailableAttachmentModelResult = parseAgentStreamRequest({
+    body: {
+      messages: [
+        {
+          role: "user",
+          content: "Analyze this chart.",
+          attachments: [imageAttachment],
+        },
+      ],
+    },
+    availableModels: [{ id: "anthropic/claude-sonnet-4.6" }],
+    requestId: "request-attachment-unavailable",
+  })
+
+  assert(unavailableAttachmentModelResult instanceof Response)
+  assert.equal(unavailableAttachmentModelResult.status, 400)
+  assert.deepEqual(await unavailableAttachmentModelResult.json(), {
+    error: "File attachments require GPT-5.5 model access.",
+    errorCode: "AGENT_ATTACHMENT_MODEL_UNAVAILABLE",
+    requestId: "request-attachment-unavailable",
+  })
+
+  const assistantAttachmentResult = parseAgentStreamRequest({
+    body: {
+      messages: [
+        {
+          role: "assistant",
+          content: "Attached by the wrong role.",
+          attachments: [imageAttachment],
+        },
+      ],
+    },
+    availableModels: [{ id: "openai/gpt-5.5" }],
+    requestId: "request-attachment-role",
+  })
+
+  assert(assistantAttachmentResult instanceof Response)
+  assert.equal(assistantAttachmentResult.status, 400)
+  assert.deepEqual(await assistantAttachmentResult.json(), {
+    error: "Only user messages can include file attachments.",
+    errorCode: "AGENT_ATTACHMENT_ROLE_INVALID",
+    requestId: "request-attachment-role",
+  })
+
+  const badDataUrlResult = parseAgentStreamRequest({
+    body: {
+      messages: [
+        {
+          role: "user",
+          content: "Analyze this chart.",
+          attachments: [
+            {
+              ...imageAttachment,
+              dataUrl: "data:image/jpeg;base64,aGVsbG8=",
+            },
+          ],
+        },
+      ],
+    },
+    availableModels: [{ id: "openai/gpt-5.5" }],
+    requestId: "request-attachment-bad-data-url",
+  })
+
+  assert(badDataUrlResult instanceof Response)
+  assert.equal(badDataUrlResult.status, 400)
+  assert.deepEqual(await badDataUrlResult.json(), {
+    error: "Invalid file attachment payload.",
+    errorCode: "AGENT_ATTACHMENT_INVALID",
+    requestId: "request-attachment-bad-data-url",
+  })
+
+  const largePdfDataUrl = `data:application/pdf;base64,${Buffer.alloc(3 * 1024 * 1024).toString("base64")}`
+  const oversizedAttachmentsResult = parseAgentStreamRequest({
+    body: {
+      messages: [
+        {
+          role: "user",
+          content: "Analyze these PDFs.",
+          attachments: [0, 1, 2].map((index) => ({
+            id: `attachment-large-${String(index)}`,
+            kind: "pdf",
+            filename: `large-${String(index)}.pdf`,
+            mediaType: "application/pdf",
+            sizeBytes: 3 * 1024 * 1024,
+            dataUrl: largePdfDataUrl,
+          })),
+        },
+      ],
+    },
+    availableModels: [{ id: "openai/gpt-5.5" }],
+    requestId: "request-attachments-too-large",
+  })
+
+  assert(oversizedAttachmentsResult instanceof Response)
+  assert.equal(oversizedAttachmentsResult.status, 413)
+  assert.deepEqual(await oversizedAttachmentsResult.json(), {
+    error: "Attached files are too large.",
+    errorCode: "AGENT_ATTACHMENTS_TOO_LARGE",
+    requestId: "request-attachments-too-large",
+  })
+})
+
 test("agent helper streams fallback output when the model yields no content", async () => {
   setTestMocks({
     gatewayResponses: {

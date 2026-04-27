@@ -79,7 +79,9 @@ export function ModelSelector({
         )}
       </Tooltip>
       <PopoverContent
+        side="bottom"
         align="start"
+        sideOffset={2}
         onCloseAutoFocus={(event) => {
           if (!shouldPreventCloseAutoFocusRef.current) {
             return

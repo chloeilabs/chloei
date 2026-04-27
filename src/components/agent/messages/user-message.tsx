@@ -1,9 +1,10 @@
-import { CornerRightUp, Loader2, X } from "lucide-react"
+import { CornerRightUp, FileText, ImageIcon, Loader2, X } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { useModels } from "@/hooks/agent/use-models"
 import {
+  type AgentAttachmentMetadata,
   type AgentRunMode,
   AvailableModels,
   getModelSelectorModels,
@@ -29,10 +30,68 @@ import {
 
 const MAX_CONTENT_HEIGHT = 128
 
+function formatFileSize(sizeBytes: number): string {
+  if (sizeBytes < 1024) {
+    return `${String(sizeBytes)} B`
+  }
+
+  if (sizeBytes < 1024 * 1024) {
+    return `${(sizeBytes / 1024).toFixed(1)} KB`
+  }
+
+  return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
 function isModelType(value: unknown): value is ModelType {
   return (
     typeof value === "string" &&
     Object.values(AvailableModels).includes(value as ModelType)
+  )
+}
+
+function UserAttachmentChip({
+  attachment,
+}: {
+  attachment: AgentAttachmentMetadata
+}) {
+  return (
+    <div
+      className={cn(
+        agentShellFrameClass,
+        "user-message-border max-w-72 shrink-0"
+      )}
+    >
+      <div
+        className={cn(
+          agentSurfaceClass,
+          "flex h-10 min-w-0 items-center gap-2 px-2 text-xs"
+        )}
+      >
+        <div className={agentSurfaceBackgroundClass} />
+        <div className="flex size-7 shrink-0 items-center justify-center overflow-hidden bg-muted text-muted-foreground">
+          {attachment.kind === "image" ? (
+            attachment.previewDataUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={attachment.previewDataUrl}
+                alt=""
+                className="size-full object-cover"
+              />
+            ) : (
+              <ImageIcon className="size-3.5" />
+            )
+          ) : (
+            <FileText className="size-3.5" />
+          )}
+        </div>
+        <div className="min-w-0 leading-tight">
+          <div className="truncate text-foreground">{attachment.filename}</div>
+          <div className="text-muted-foreground">
+            {formatFileSize(attachment.sizeBytes)}
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -81,6 +140,7 @@ export function UserMessage({
   const messageContentRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [isContentOverflowing, setIsContentOverflowing] = useState(false)
+  const attachments = message.metadata?.attachments ?? []
 
   useEffect(() => {
     setEditValue(message.content)
@@ -190,34 +250,20 @@ export function UserMessage({
     <div
       data-message-role="user"
       className={cn(
-        "group/user-message ml-auto flex max-w-[95%] flex-col self-end text-start",
-        agentShellFrameClass,
-        agentShellInteractiveClass,
-        agentShellHighlightClass,
-        !isEditing && !disableEditing && "cursor-pointer",
+        "group/user-message ml-auto flex max-w-[95%] flex-col items-end gap-2 self-end text-start",
         isFirstMessage ? "mt-2" : "",
         className
       )}
-      role="button"
-      tabIndex={disableEditing || isEditPending ? -1 : 0}
-      onClick={() => {
-        if (!isEditing && !disableEditing) {
-          setIsEditing(true)
-        }
-      }}
-      onKeyDown={(e) => {
-        if (
-          (e.key === "Enter" || e.key === " ") &&
-          !isEditing &&
-          !disableEditing
-        ) {
-          e.preventDefault()
-          setIsEditing(true)
-        }
-      }}
     >
       {isEditing ? (
-        <>
+        <div
+          className={cn(
+            "w-full",
+            agentShellFrameClass,
+            agentShellInteractiveClass,
+            agentShellHighlightClass
+          )}
+        >
           <div className="overflow-clip select-none">
             <div className="flex flex-col gap-0.5 p-1.5">
               <div className="flex w-full items-center justify-between gap-1 pl-1.5 text-xs font-medium text-muted-foreground">
@@ -290,25 +336,61 @@ export function UserMessage({
               </div>
             </div>
           </div>
-        </>
-      ) : (
-        <div
-          className={cn(
-            agentSurfaceClass,
-            "w-full overflow-clip px-3 py-2 text-sm"
-          )}
-          style={{
-            maxHeight: `${String(MAX_CONTENT_HEIGHT)}px`,
-          }}
-        >
-          <div className={agentSurfaceBackgroundClass} />
-          {isContentOverflowing && (
-            <div className="absolute bottom-0 left-0 h-1/3 w-full animate-in bg-gradient-to-t from-background via-background/80 to-card/0 fade-in" />
-          )}
-          <div className="whitespace-pre-wrap" ref={messageContentRef}>
-            {message.content}
-          </div>
         </div>
+      ) : (
+        <>
+          {attachments.length > 0 ? (
+            <div className="flex max-w-full flex-wrap justify-end gap-2">
+              {attachments.map((attachment) => (
+                <UserAttachmentChip
+                  key={attachment.id}
+                  attachment={attachment}
+                />
+              ))}
+            </div>
+          ) : null}
+
+          <div
+            className={cn(
+              "max-w-full",
+              agentShellFrameClass,
+              agentShellInteractiveClass,
+              agentShellHighlightClass,
+              !disableEditing && "cursor-pointer"
+            )}
+            role="button"
+            tabIndex={disableEditing || isEditPending ? -1 : 0}
+            onClick={() => {
+              if (!disableEditing) {
+                setIsEditing(true)
+              }
+            }}
+            onKeyDown={(e) => {
+              if ((e.key === "Enter" || e.key === " ") && !disableEditing) {
+                e.preventDefault()
+                setIsEditing(true)
+              }
+            }}
+          >
+            <div
+              className={cn(
+                agentSurfaceClass,
+                "w-full overflow-clip px-3 py-2 text-sm"
+              )}
+              style={{
+                maxHeight: `${String(MAX_CONTENT_HEIGHT)}px`,
+              }}
+            >
+              <div className={agentSurfaceBackgroundClass} />
+              {isContentOverflowing && (
+                <div className="absolute bottom-0 left-0 h-1/3 w-full animate-in bg-gradient-to-t from-background via-background/80 to-card/0 fade-in" />
+              )}
+              <div ref={messageContentRef} className="whitespace-pre-wrap">
+                {message.content}
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </div>
   )

@@ -12,6 +12,7 @@ import {
 import { createLogger } from "@/lib/logger"
 import { createRequestHeaders, getRequestIdFromHeaders } from "@/lib/request-id"
 import {
+  type AgentRequestAttachment,
   type AgentRunMode,
   AvailableModels,
   type Message as AgentMessage,
@@ -65,6 +66,7 @@ interface QueuedSubmission {
   message: string
   model: ModelType
   runMode: AgentRunMode
+  attachments: AgentRequestAttachment[]
 }
 
 interface SaveThreadOptions {
@@ -418,6 +420,9 @@ export function useAgentSession({
     useState<QueuedSubmission | null>(null)
   const submitLockRef = useRef(false)
   const messagesRef = useRef<AgentMessage[]>([])
+  const attachmentPayloadsRef = useRef<Map<string, AgentRequestAttachment[]>>(
+    new Map()
+  )
   const abortControllerRef = useRef<AbortController | null>(null)
   const currentThreadIdRef = useRef(currentThreadId)
 
@@ -461,6 +466,7 @@ export function useAgentSession({
 
     setState(INITIAL_STATE)
     messagesRef.current = []
+    attachmentPayloadsRef.current.clear()
   }, [activeThread, currentThreadId])
 
   useEffect(() => {
@@ -509,6 +515,7 @@ export function useAgentSession({
     setQueuedSubmission(null)
     setState(INITIAL_STATE)
     messagesRef.current = []
+    attachmentPayloadsRef.current.clear()
     currentThreadIdRef.current = null
     submitLockRef.current = false
     setCurrentThreadId(null)
@@ -799,8 +806,16 @@ export function useAgentSession({
         setCurrentThreadId(activeThreadId)
       }
 
+      const requestMessages = toRequestMessages(nextMessages, {
+        attachmentsByMessageId: attachmentPayloadsRef.current,
+      })
+      const hasAttachments = requestMessages.some(
+        (message) => (message.attachments?.length ?? 0) > 0
+      )
       const effectiveModel =
-        runMode === "research" ? AvailableModels.OPENAI_GPT_5_5 : model
+        runMode === "research" || hasAttachments
+          ? AvailableModels.OPENAI_GPT_5_5
+          : model
 
       return streamAgentRequest({
         endpoint: "/api/agent",
@@ -810,10 +825,10 @@ export function useAgentSession({
         runMode,
         errorTitle: "Failed to send message",
         body: {
-          model,
+          model: effectiveModel,
           runMode,
           threadId: activeThreadId,
-          messages: toRequestMessages(nextMessages),
+          messages: requestMessages,
         },
       })
     },
@@ -824,7 +839,8 @@ export function useAgentSession({
     async (
       message: string,
       model: ModelType,
-      runMode: AgentRunMode = "chat"
+      runMode: AgentRunMode = "chat",
+      attachments: AgentRequestAttachment[] = []
     ) => {
       const trimmedMessage = message.trim()
       if (!trimmedMessage) {
@@ -842,8 +858,14 @@ export function useAgentSession({
         messagesRef.current,
         trimmedMessage,
         model,
-        runMode
+        runMode,
+        attachments
       )
+
+      const userMessage = nextMessages[nextMessages.length - 1]
+      if (userMessage?.role === "user" && attachments.length > 0) {
+        attachmentPayloadsRef.current.set(userMessage.id, attachments)
+      }
 
       await runAgentRequest(nextMessages, model, runMode)
     },
@@ -918,7 +940,8 @@ export function useAgentSession({
       message: string,
       model: ModelType,
       queue: boolean,
-      runMode: AgentRunMode = "chat"
+      runMode: AgentRunMode = "chat",
+      attachments: AgentRequestAttachment[] = []
     ) => {
       const trimmedMessage = message.trim()
       if (!trimmedMessage) {
@@ -930,11 +953,12 @@ export function useAgentSession({
           message: trimmedMessage,
           model,
           runMode,
+          attachments,
         })
         return
       }
 
-      void handleSubmit(trimmedMessage, model, runMode)
+      void handleSubmit(trimmedMessage, model, runMode, attachments)
     },
     [handleSubmit]
   )
@@ -948,7 +972,8 @@ export function useAgentSession({
     void handleSubmit(
       queuedSubmission.message,
       queuedSubmission.model,
-      queuedSubmission.runMode
+      queuedSubmission.runMode,
+      queuedSubmission.attachments
     )
   }, [streamingState, queuedSubmission, handleSubmit])
 

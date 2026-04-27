@@ -1,10 +1,16 @@
 import { z } from "zod"
 
 import {
+  AGENT_ATTACHMENT_MAX_FILE_BYTES,
+  AGENT_ATTACHMENT_MAX_PREVIEW_DATA_URL_CHARS,
+  AGENT_ATTACHMENT_MIME_TYPES,
+  AGENT_IMAGE_DETAIL_VALUES,
   AGENT_RUN_MODES,
   AGENT_RUN_STATUSES,
   type AgentRunMode,
+  getAgentAttachmentKind,
   isModelType,
+  isSupportedAgentAttachmentMimeType,
   type ModelType,
   SEARCH_TOOL_NAMES,
   type Thread,
@@ -17,10 +23,12 @@ const SEARCH_TOOL_NAME_SCHEMA = z.enum(SEARCH_TOOL_NAMES)
 const TOOL_INVOCATION_STATUS_SCHEMA = z.enum(["running", "success", "error"])
 const AGENT_RUN_STATUS_SCHEMA = z.enum(AGENT_RUN_STATUSES)
 const AGENT_RUN_MODE_SCHEMA = z.enum(AGENT_RUN_MODES)
+const AGENT_IMAGE_DETAIL_SCHEMA = z.enum(AGENT_IMAGE_DETAIL_VALUES)
 const MODEL_TYPE_SCHEMA = z.custom<ModelType>(
   isModelType,
   "Invalid model type."
 )
+const AGENT_ATTACHMENT_MIME_TYPE_SCHEMA = z.enum(AGENT_ATTACHMENT_MIME_TYPES)
 
 const messageSourceSchema = z
   .object({
@@ -147,9 +155,37 @@ const assistantMessagePartSchema = z
   })
   .strict()
 
+const attachmentMetadataSchema = z
+  .object({
+    id: z.string().trim().min(1).max(200),
+    kind: z.enum(["image", "pdf"]),
+    filename: z.string().trim().min(1).max(500),
+    mediaType: AGENT_ATTACHMENT_MIME_TYPE_SCHEMA,
+    sizeBytes: z
+      .number()
+      .int()
+      .positive()
+      .max(AGENT_ATTACHMENT_MAX_FILE_BYTES),
+    detail: AGENT_IMAGE_DETAIL_SCHEMA.optional(),
+    previewDataUrl: z
+      .string()
+      .trim()
+      .min(1)
+      .max(AGENT_ATTACHMENT_MAX_PREVIEW_DATA_URL_CHARS)
+      .optional(),
+  })
+  .strict()
+  .refine((attachment) => attachment.kind === getAgentAttachmentKind(attachment.mediaType), {
+    message: "Attachment kind must match media type.",
+  })
+  .refine((attachment) => attachment.kind === "image" || !attachment.detail, {
+    message: "Only image attachments can include detail.",
+  })
+
 const messageMetadataSchema = z
   .object({
     parts: z.array(assistantMessagePartSchema).optional(),
+    attachments: z.array(attachmentMetadataSchema).optional(),
     isStreaming: z.boolean().optional(),
     selectedModel: MODEL_TYPE_SCHEMA.optional(),
     runMode: AGENT_RUN_MODE_SCHEMA.optional(),
@@ -258,6 +294,33 @@ function sanitizeToolInvocation(value: unknown) {
   return parsed.success ? parsed.data : null
 }
 
+function sanitizeAttachmentMetadata(value: unknown) {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return null
+  }
+
+  const attachment = value as Record<string, unknown>
+  const mediaType =
+    typeof attachment.mediaType === "string"
+      ? attachment.mediaType.toLowerCase()
+      : attachment.mediaType
+  const parsed = attachmentMetadataSchema.safeParse({
+    id: attachment.id,
+    kind: attachment.kind,
+    filename: attachment.filename,
+    mediaType,
+    sizeBytes: attachment.sizeBytes,
+    detail: attachment.detail,
+    previewDataUrl: attachment.previewDataUrl,
+  })
+
+  if (!parsed.success || !isSupportedAgentAttachmentMimeType(mediaType)) {
+    return null
+  }
+
+  return parsed.data
+}
+
 function convertLegacyActivityTimelineEntry(value: unknown) {
   const legacyCrewStatus =
     legacyCrewStatusActivityTimelineEntrySchema.safeParse(value)
@@ -335,6 +398,12 @@ function sanitizeMessageMetadata(value: unknown) {
         return parsed.success ? [parsed.data] : []
       })
     : undefined
+  const attachments = Array.isArray(metadata.attachments)
+    ? metadata.attachments.flatMap((attachment) => {
+        const sanitized = sanitizeAttachmentMetadata(attachment)
+        return sanitized ? [sanitized] : []
+      })
+    : undefined
   const toolInvocations = Array.isArray(metadata.toolInvocations)
     ? metadata.toolInvocations.flatMap((invocation) => {
         const sanitized = sanitizeToolInvocation(invocation)
@@ -356,6 +425,7 @@ function sanitizeMessageMetadata(value: unknown) {
 
   return {
     ...(parts ? { parts } : {}),
+    ...(attachments ? { attachments } : {}),
     ...(isStreaming !== undefined ? { isStreaming } : {}),
     ...(selectedModel !== undefined ? { selectedModel } : {}),
     ...(runMode !== undefined ? { runMode } : {}),

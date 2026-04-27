@@ -1,8 +1,11 @@
 import { ASSISTANT_EMPTY_RESPONSE_FALLBACK } from "@/lib/constants"
-import type {
-  AgentRunMode,
-  Message as AgentMessage,
-  ModelType,
+import {
+  type AgentAttachmentMetadata,
+  type AgentRequestAttachment,
+  type AgentRunMode,
+  type Message as AgentMessage,
+  type ModelType,
+  toAgentAttachmentMetadata,
 } from "@/lib/shared"
 import {
   AGENT_REQUEST_MAX_MESSAGE_CHARS,
@@ -19,6 +22,11 @@ const TRUNCATED_MESSAGE_SUFFIX =
 interface AgentRequestMessage {
   role: "user" | "assistant"
   content: string
+  attachments?: AgentRequestAttachment[]
+}
+
+interface ToRequestMessagesOptions {
+  attachmentsByMessageId?: ReadonlyMap<string, AgentRequestAttachment[]>
 }
 
 export function createClientMessageId() {
@@ -43,7 +51,8 @@ function trimMessageContent(content: string): string {
 }
 
 export function toRequestMessages(
-  messages: AgentMessage[]
+  messages: AgentMessage[],
+  options: ToRequestMessagesOptions = {}
 ): AgentRequestMessage[] {
   const requestMessages = messages
     .filter(
@@ -53,10 +62,18 @@ export function toRequestMessages(
         role: "user" | "assistant"
       } => message.role === "user" || message.role === "assistant"
     )
-    .map((message) => ({
-      role: message.role,
-      content: trimMessageContent(message.content.trim()),
-    }))
+    .map((message) => {
+      const attachments =
+        message.role === "user"
+          ? (options.attachmentsByMessageId?.get(message.id) ?? [])
+          : []
+
+      return {
+        role: message.role,
+        content: trimMessageContent(message.content.trim()),
+        ...(attachments.length > 0 ? { attachments } : {}),
+      }
+    })
     .filter((message) => message.content.length > 0)
 
   const boundedMessages = requestMessages.slice(-AGENT_REQUEST_MAX_MESSAGES)
@@ -75,8 +92,14 @@ export function appendUserMessage(
   currentMessages: AgentMessage[],
   content: string,
   model: ModelType,
-  runMode: AgentRunMode = "chat"
+  runMode: AgentRunMode = "chat",
+  attachments: readonly (AgentAttachmentMetadata | AgentRequestAttachment)[] = []
 ): AgentMessage[] {
+  const attachmentMetadata = attachments.map((attachment) =>
+    "dataUrl" in attachment
+      ? toAgentAttachmentMetadata(attachment)
+      : attachment
+  )
   const userMessage: AgentMessage = {
     id: createClientMessageId(),
     role: "user",
@@ -87,16 +110,29 @@ export function appendUserMessage(
       isStreaming: false,
       selectedModel: model,
       runMode,
+      ...(attachmentMetadata.length > 0
+        ? { attachments: attachmentMetadata }
+        : {}),
     },
   }
 
   const lastMessage = currentMessages[currentMessages.length - 1]
   const shouldReplaceLastUnansweredMessage =
-    lastMessage?.role === "user" && lastMessage.content.trim() === content
+    lastMessage?.role === "user" &&
+    lastMessage.content.trim() === content &&
+    attachmentMetadata.length === 0 &&
+    (lastMessage.metadata?.attachments?.length ?? 0) === 0
 
   const baseMessages = shouldReplaceLastUnansweredMessage
     ? currentMessages.slice(0, -1)
     : currentMessages
 
   return [...baseMessages, userMessage]
+}
+
+export function hasUserMessageAttachments(messages: AgentMessage[]): boolean {
+  return messages.some(
+    (message) =>
+      message.role === "user" && (message.metadata?.attachments?.length ?? 0) > 0
+  )
 }

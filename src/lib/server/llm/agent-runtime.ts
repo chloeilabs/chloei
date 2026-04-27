@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 import path from "node:path"
 
 import { createGateway } from "@ai-sdk/gateway"
-import { type ModelMessage, stepCountIs, streamText, type ToolSet } from "ai"
+import { stepCountIs, streamText, type ToolSet } from "ai"
 
 import { createLogger } from "@/lib/logger"
 import {
@@ -12,6 +12,10 @@ import {
 } from "@/lib/server/agent-runtime-config"
 import { type AgentStreamEvent, type ModelType } from "@/lib/shared"
 
+import {
+  type AgentInputMessage,
+  toModelMessages,
+} from "./agent-runtime-messages"
 import {
   createAiSdkFinanceDataTools,
   getAiSdkFinanceDataToolCallMetadata,
@@ -56,11 +60,6 @@ interface AgentRuntimeProfile {
   fmpMcpEnabled: boolean
   financeDataEnabled: boolean
   toolMaxSteps: number
-}
-
-interface AgentInputMessage {
-  role: "system" | "user" | "assistant"
-  content: string
 }
 
 export interface StartAgentRuntimeStreamParams {
@@ -133,30 +132,6 @@ function shouldForceFinalSynthesisStep(
   toolMaxSteps: number
 ): boolean {
   return stepNumber >= Math.max(0, toolMaxSteps - 1)
-}
-
-function toModelMessages(messages: AgentInputMessage[]): ModelMessage[] {
-  const inputMessages: ModelMessage[] = []
-
-  for (const message of messages) {
-    const content = message.content.trim()
-    if (!content) {
-      continue
-    }
-
-    if (message.role === "system") {
-      throw new Error(
-        "System messages must be provided via systemInstruction, not messages."
-      )
-    }
-
-    inputMessages.push({
-      role: message.role,
-      content,
-    })
-  }
-
-  return inputMessages
 }
 
 function getSourceEvent(

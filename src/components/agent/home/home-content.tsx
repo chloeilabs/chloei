@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/tooltip"
 import { useIsMobile } from "@/hooks/use-mobile"
 import {
+  type AgentRequestAttachment,
   type AgentRunMode,
   type AuthViewer,
   deriveThreadTitle,
@@ -272,16 +273,17 @@ export function HomePageContent({
       message: string,
       model: ModelType,
       queue: boolean,
-      runMode: AgentRunMode
+      runMode: AgentRunMode,
+      attachments: AgentRequestAttachment[] = []
     ) => {
       if (queue) {
-        handlePromptSubmit(message, model, queue, runMode)
+        handlePromptSubmit(message, model, queue, runMode, attachments)
         return
       }
 
       if (isMobile) {
         startFallbackConversationTransition()
-        handlePromptSubmit(message, model, queue, runMode)
+        handlePromptSubmit(message, model, queue, runMode, attachments)
         return
       }
 
@@ -296,13 +298,13 @@ export function HomePageContent({
 
       if (!startViewTransition) {
         startFallbackConversationTransition()
-        handlePromptSubmit(message, model, queue, runMode)
+        handlePromptSubmit(message, model, queue, runMode, attachments)
         return
       }
 
       startViewTransition(() => {
         flushSync(() => {
-          handlePromptSubmit(message, model, queue, runMode)
+          handlePromptSubmit(message, model, queue, runMode, attachments)
         })
       })
     },
