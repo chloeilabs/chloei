@@ -54,24 +54,37 @@ const ATTACHMENT_MIME_TYPE_SET: ReadonlySet<string> = new Set(
   AGENT_ATTACHMENT_MIME_TYPES
 )
 const IMAGE_DETAIL_SET: ReadonlySet<string> = new Set(AGENT_IMAGE_DETAIL_VALUES)
+const DATA_URL_BASE64_PREFIX_PATTERN = /^data:([^;,]+);base64,/i
+const BASE64_PAYLOAD_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/
 
-export function isSupportedAgentAttachmentMimeType(
+export function isSupportedAgentAttachmentMimeType(value: unknown): boolean {
+  return normalizeAgentAttachmentMimeType(value) !== null
+}
+
+export function normalizeAgentAttachmentMimeType(
   value: unknown
-): value is AgentAttachmentMimeType {
-  return (
-    typeof value === "string" &&
-    ATTACHMENT_MIME_TYPE_SET.has(value.toLowerCase())
-  )
+): AgentAttachmentMimeType | null {
+  if (typeof value !== "string") {
+    return null
+  }
+
+  const normalized = value.toLowerCase()
+  return ATTACHMENT_MIME_TYPE_SET.has(normalized)
+    ? (normalized as AgentAttachmentMimeType)
+    : null
 }
 
 export function isAgentImageDetail(value: unknown): value is AgentImageDetail {
   return typeof value === "string" && IMAGE_DETAIL_SET.has(value)
 }
 
-export function getAgentAttachmentKind(
-  mediaType: AgentAttachmentMimeType
-): AgentAttachmentKind {
-  return IMAGE_MIME_TYPE_SET.has(mediaType) ? "image" : "pdf"
+export function getAgentAttachmentKind(mediaType: string): AgentAttachmentKind {
+  const normalized = normalizeAgentAttachmentMimeType(mediaType)
+  if (!normalized) {
+    throw new Error("Unsupported attachment media type.")
+  }
+
+  return IMAGE_MIME_TYPE_SET.has(normalized) ? "image" : "pdf"
 }
 
 export function getAgentAttachmentAcceptAttribute(): string {
@@ -87,8 +100,46 @@ export function getAgentAttachmentAcceptAttribute(): string {
 }
 
 export function getDataUrlMediaType(dataUrl: string): string | null {
-  const match = /^data:([^;,]+);base64,/i.exec(dataUrl.trim())
+  const match = DATA_URL_BASE64_PREFIX_PATTERN.exec(dataUrl.trim())
   return match?.[1]?.toLowerCase() ?? null
+}
+
+function getDataUrlBase64Payload(dataUrl: string): string | null {
+  const match = DATA_URL_BASE64_PREFIX_PATTERN.exec(dataUrl.trim())
+  if (!match) {
+    return null
+  }
+
+  return dataUrl.trim().slice(match[0].length)
+}
+
+export function isAgentAttachmentPreviewDataUrl(
+  value: unknown
+): value is string {
+  if (typeof value !== "string") {
+    return false
+  }
+
+  const dataUrl = value.trim()
+  if (
+    dataUrl.length === 0 ||
+    dataUrl.length > AGENT_ATTACHMENT_MAX_PREVIEW_DATA_URL_CHARS
+  ) {
+    return false
+  }
+
+  const mediaType = getDataUrlMediaType(dataUrl)
+  if (!mediaType || !IMAGE_MIME_TYPE_SET.has(mediaType)) {
+    return false
+  }
+
+  const payload = getDataUrlBase64Payload(dataUrl)
+  return (
+    payload !== null &&
+    payload.length > 0 &&
+    payload.length % 4 === 0 &&
+    BASE64_PAYLOAD_PATTERN.test(payload)
+  )
 }
 
 export function toAgentAttachmentMetadata(

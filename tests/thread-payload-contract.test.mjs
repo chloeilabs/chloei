@@ -109,6 +109,16 @@ test("thread payload preserves attachment metadata and strips request-only data"
               previewDataUrl: "data:image/jpeg;base64,abc=",
               dataUrl: "data:image/png;base64,aGVsbG8=",
             },
+            {
+              id: "attachment-2",
+              kind: "image",
+              filename: "unsafe-preview.png",
+              mediaType: "IMAGE/PNG",
+              sizeBytes: 5,
+              detail: "auto",
+              previewDataUrl: "https://example.com/preview.png",
+              dataUrl: "data:image/png;base64,aGVsbG8=",
+            },
           ],
         },
       },
@@ -126,6 +136,14 @@ test("thread payload preserves attachment metadata and strips request-only data"
       sizeBytes: 5,
       detail: "auto",
       previewDataUrl: "data:image/jpeg;base64,abc=",
+    },
+    {
+      id: "attachment-2",
+      kind: "image",
+      filename: "unsafe-preview.png",
+      mediaType: "image/png",
+      sizeBytes: 5,
+      detail: "auto",
     },
   ])
 })

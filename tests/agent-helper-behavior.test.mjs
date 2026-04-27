@@ -361,10 +361,9 @@ test("agent helper validates file attachments and forces the OpenAI vision model
 
   assert(!(attachmentResult instanceof Response))
   assert.equal(attachmentResult.selectedModel, "openai/gpt-5.5")
-  assert.deepEqual(
-    attachmentResult.parsedRequest.messages[0]?.attachments,
-    [imageAttachment]
-  )
+  assert.deepEqual(attachmentResult.parsedRequest.messages[0]?.attachments, [
+    imageAttachment,
+  ])
 
   const unavailableAttachmentModelResult = parseAgentStreamRequest({
     body: {
@@ -438,6 +437,39 @@ test("agent helper validates file attachments and forces the OpenAI vision model
   })
 
   const largePdfDataUrl = `data:application/pdf;base64,${Buffer.alloc(3 * 1024 * 1024).toString("base64")}`
+  const priorAttachmentPayloadsResult = parseAgentStreamRequest({
+    body: {
+      messages: [
+        {
+          role: "user",
+          content: "Analyze these older PDFs.",
+          attachments: [0, 1, 2].map((index) => ({
+            id: `attachment-prior-${String(index)}`,
+            kind: "pdf",
+            filename: `prior-${String(index)}.pdf`,
+            mediaType: "application/pdf",
+            sizeBytes: 3 * 1024 * 1024,
+            dataUrl: largePdfDataUrl,
+          })),
+        },
+        {
+          role: "assistant",
+          content: "Done.",
+        },
+        {
+          role: "user",
+          content: "Now analyze this chart.",
+          attachments: [imageAttachment],
+        },
+      ],
+    },
+    availableModels: [{ id: "openai/gpt-5.5" }],
+    requestId: "request-attachments-prior-prompt",
+  })
+
+  assert(!(priorAttachmentPayloadsResult instanceof Response))
+  assert.equal(priorAttachmentPayloadsResult.selectedModel, "openai/gpt-5.5")
+
   const oversizedAttachmentsResult = parseAgentStreamRequest({
     body: {
       messages: [

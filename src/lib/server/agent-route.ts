@@ -56,11 +56,7 @@ const agentAttachmentSchema = z
     kind: z.enum(["image", "pdf"]),
     filename: z.string().trim().min(1).max(500),
     mediaType: z.enum(AGENT_ATTACHMENT_MIME_TYPES),
-    sizeBytes: z
-      .number()
-      .int()
-      .positive()
-      .max(AGENT_ATTACHMENT_MAX_FILE_BYTES),
+    sizeBytes: z.number().int().positive().max(AGENT_ATTACHMENT_MAX_FILE_BYTES),
     detail: z.enum(AGENT_IMAGE_DETAIL_VALUES).optional(),
     previewDataUrl: z
       .string()
@@ -76,10 +72,7 @@ const agentMessageSchema = z
   .object({
     role: z.enum(["user", "assistant"]),
     content: z.string().trim().min(1),
-    attachments: z
-      .array(agentAttachmentSchema)
-      .max(AGENT_ATTACHMENT_MAX_FILES)
-      .optional(),
+    attachments: z.array(agentAttachmentSchema).optional(),
   })
   .strict()
 
@@ -249,14 +242,27 @@ function getMessageAttachments(messages: AgentStreamRequest["messages"]) {
   return messages.flatMap((message) => message.attachments ?? [])
 }
 
+function getLatestUserMessageAttachments(
+  messages: AgentStreamRequest["messages"]
+) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]
+    if (message?.role === "user") {
+      return message.attachments ?? []
+    }
+  }
+
+  return []
+}
+
 function hasMessageAttachments(messages: AgentStreamRequest["messages"]) {
   return messages.some((message) => (message.attachments?.length ?? 0) > 0)
 }
 
 function getTotalAttachmentBytes(
-  messages: AgentStreamRequest["messages"]
+  attachments: readonly { sizeBytes: number }[]
 ): number {
-  return getMessageAttachments(messages).reduce(
+  return attachments.reduce(
     (total, attachment) => total + attachment.sizeBytes,
     0
   )
@@ -289,7 +295,10 @@ function createAttachmentValidationError(params: {
 }
 
 function validateAgentRequestAttachments(
-  params: Pick<ParseAgentStreamRequestParams, "requestId" | "rateLimitDecision"> & {
+  params: Pick<
+    ParseAgentStreamRequestParams,
+    "requestId" | "rateLimitDecision"
+  > & {
     messages: AgentStreamRequest["messages"]
   }
 ): Response | null {
@@ -298,7 +307,11 @@ function validateAgentRequestAttachments(
     return null
   }
 
-  if (attachments.length > AGENT_ATTACHMENT_MAX_FILES) {
+  const latestUserMessageAttachments = getLatestUserMessageAttachments(
+    params.messages
+  )
+
+  if (latestUserMessageAttachments.length > AGENT_ATTACHMENT_MAX_FILES) {
     return createJsonErrorResponse({
       requestId: params.requestId,
       error: "Too many file attachments.",
@@ -308,7 +321,10 @@ function validateAgentRequestAttachments(
     })
   }
 
-  if (getTotalAttachmentBytes(params.messages) > AGENT_ATTACHMENT_MAX_TOTAL_BYTES) {
+  if (
+    getTotalAttachmentBytes(latestUserMessageAttachments) >
+    AGENT_ATTACHMENT_MAX_TOTAL_BYTES
+  ) {
     return createJsonErrorResponse({
       requestId: params.requestId,
       error: "Attached files are too large.",

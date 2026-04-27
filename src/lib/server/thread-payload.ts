@@ -9,9 +9,10 @@ import {
   AGENT_RUN_STATUSES,
   type AgentRunMode,
   getAgentAttachmentKind,
+  isAgentAttachmentPreviewDataUrl,
   isModelType,
-  isSupportedAgentAttachmentMimeType,
   type ModelType,
+  normalizeAgentAttachmentMimeType,
   SEARCH_TOOL_NAMES,
   type Thread,
   TOOL_NAMES,
@@ -161,23 +162,26 @@ const attachmentMetadataSchema = z
     kind: z.enum(["image", "pdf"]),
     filename: z.string().trim().min(1).max(500),
     mediaType: AGENT_ATTACHMENT_MIME_TYPE_SCHEMA,
-    sizeBytes: z
-      .number()
-      .int()
-      .positive()
-      .max(AGENT_ATTACHMENT_MAX_FILE_BYTES),
+    sizeBytes: z.number().int().positive().max(AGENT_ATTACHMENT_MAX_FILE_BYTES),
     detail: AGENT_IMAGE_DETAIL_SCHEMA.optional(),
     previewDataUrl: z
       .string()
       .trim()
       .min(1)
       .max(AGENT_ATTACHMENT_MAX_PREVIEW_DATA_URL_CHARS)
+      .refine(isAgentAttachmentPreviewDataUrl, {
+        message: "Attachment preview must be a supported image data URL.",
+      })
       .optional(),
   })
   .strict()
-  .refine((attachment) => attachment.kind === getAgentAttachmentKind(attachment.mediaType), {
-    message: "Attachment kind must match media type.",
-  })
+  .refine(
+    (attachment) =>
+      attachment.kind === getAgentAttachmentKind(attachment.mediaType),
+    {
+      message: "Attachment kind must match media type.",
+    }
+  )
   .refine((attachment) => attachment.kind === "image" || !attachment.detail, {
     message: "Only image attachments can include detail.",
   })
@@ -300,21 +304,29 @@ function sanitizeAttachmentMetadata(value: unknown) {
   }
 
   const attachment = value as Record<string, unknown>
-  const mediaType =
-    typeof attachment.mediaType === "string"
-      ? attachment.mediaType.toLowerCase()
-      : attachment.mediaType
+  const mediaType = normalizeAgentAttachmentMimeType(attachment.mediaType)
+  if (!mediaType) {
+    return null
+  }
+
+  const candidatePreviewDataUrl = attachment.previewDataUrl
+  const previewDataUrl = isAgentAttachmentPreviewDataUrl(
+    candidatePreviewDataUrl
+  )
+    ? candidatePreviewDataUrl.trim()
+    : undefined
+
   const parsed = attachmentMetadataSchema.safeParse({
     id: attachment.id,
     kind: attachment.kind,
     filename: attachment.filename,
     mediaType,
     sizeBytes: attachment.sizeBytes,
-    detail: attachment.detail,
-    previewDataUrl: attachment.previewDataUrl,
+    ...(attachment.detail !== undefined ? { detail: attachment.detail } : {}),
+    ...(previewDataUrl ? { previewDataUrl } : {}),
   })
 
-  if (!parsed.success || !isSupportedAgentAttachmentMimeType(mediaType)) {
+  if (!parsed.success) {
     return null
   }
 

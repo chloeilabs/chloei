@@ -45,8 +45,8 @@ import {
   getAgentAttachmentAcceptAttribute,
   getAgentAttachmentKind,
   getModelSelectorModels,
-  isSupportedAgentAttachmentMimeType,
   type ModelType,
+  normalizeAgentAttachmentMimeType,
 } from "@/lib/shared"
 import { cn } from "@/lib/utils"
 
@@ -138,9 +138,10 @@ async function createImagePreviewDataUrl(
   }
 }
 
-function getNormalizedFileMediaType(file: File): AgentAttachmentMimeType | null {
-  const mediaType = file.type.toLowerCase()
-  return isSupportedAgentAttachmentMimeType(mediaType) ? mediaType : null
+function getNormalizedFileMediaType(
+  file: File
+): AgentAttachmentMimeType | null {
+  return normalizeAgentAttachmentMimeType(file.type)
 }
 
 export function PromptForm({
@@ -192,14 +193,19 @@ export function PromptForm({
   const [pendingAttachments, setPendingAttachments] = useState<
     AgentRequestAttachment[]
   >([])
+  const [isReadingAttachments, setIsReadingAttachments] = useState(false)
   const [isDragActive, setIsDragActive] = useState(false)
   const [isToolsOpen, setIsToolsOpen] = useState(false)
   const [runMode, setRunMode] = useState<AgentRunMode>("chat")
   const trimmedMessage = useMemo(() => message.trim(), [message])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const isReadingAttachmentsRef = useRef(false)
   const shouldPreventToolsCloseAutoFocusRef = useRef(false)
-  const attachmentAccept = useMemo(() => getAgentAttachmentAcceptAttribute(), [])
+  const attachmentAccept = useMemo(
+    () => getAgentAttachmentAcceptAttribute(),
+    []
+  )
   const pendingAttachmentBytes = useMemo(
     () =>
       pendingAttachments.reduce(
@@ -251,7 +257,7 @@ export function PromptForm({
   }, [])
 
   const handleAttachClick = useCallback(() => {
-    if (isFormPending) {
+    if (isFormPending || isReadingAttachmentsRef.current) {
       return
     }
 
@@ -274,7 +280,7 @@ export function PromptForm({
 
   const handleFiles = useCallback(
     async (files: FileList | File[]) => {
-      if (isFormPending) {
+      if (isFormPending || isReadingAttachmentsRef.current) {
         return
       }
 
@@ -287,71 +293,82 @@ export function PromptForm({
       let nextCount = pendingAttachments.length
       let nextTotalBytes = pendingAttachmentBytes
 
-      for (const file of fileArray) {
-        if (nextCount >= AGENT_ATTACHMENT_MAX_FILES) {
-          toast.error("Too many attachments", {
-            description: `Attach up to ${String(AGENT_ATTACHMENT_MAX_FILES)} files per request.`,
-          })
-          break
+      isReadingAttachmentsRef.current = true
+      setIsReadingAttachments(true)
+
+      try {
+        for (const file of fileArray) {
+          if (nextCount >= AGENT_ATTACHMENT_MAX_FILES) {
+            toast.error("Too many attachments", {
+              description: `Attach up to ${String(AGENT_ATTACHMENT_MAX_FILES)} files per request.`,
+            })
+            break
+          }
+
+          const mediaType = getNormalizedFileMediaType(file)
+          if (!mediaType) {
+            toast.error("Unsupported file type", {
+              description:
+                "Attach a PDF, PNG, JPEG, WEBP, or non-animated GIF.",
+            })
+            continue
+          }
+
+          if (file.size <= 0) {
+            toast.error("Empty file", {
+              description: `${file.name || "This file"} has no content.`,
+            })
+            continue
+          }
+
+          if (file.size > AGENT_ATTACHMENT_MAX_FILE_BYTES) {
+            toast.error("File too large", {
+              description: `${file.name || "This file"} must be ${formatFileSize(AGENT_ATTACHMENT_MAX_FILE_BYTES)} or smaller.`,
+            })
+            continue
+          }
+
+          if (nextTotalBytes + file.size > AGENT_ATTACHMENT_MAX_TOTAL_BYTES) {
+            toast.error("Attachments too large", {
+              description: `Keep all attachments under ${formatFileSize(AGENT_ATTACHMENT_MAX_TOTAL_BYTES)} per request.`,
+            })
+            break
+          }
+
+          try {
+            const dataUrl = await readFileAsDataUrl(file)
+            const kind = getAgentAttachmentKind(mediaType)
+            const previewDataUrl =
+              kind === "image"
+                ? await createImagePreviewDataUrl(dataUrl)
+                : undefined
+            nextAttachments.push({
+              id: crypto.randomUUID(),
+              kind,
+              filename: file.name || "attachment",
+              mediaType,
+              sizeBytes: file.size,
+              ...(kind === "image" ? { detail: "auto" } : {}),
+              ...(previewDataUrl ? { previewDataUrl } : {}),
+              dataUrl,
+            })
+            nextCount += 1
+            nextTotalBytes += file.size
+          } catch {
+            toast.error("File could not be read", {
+              description: file.name || "Please try another file.",
+            })
+          }
         }
 
-        const mediaType = getNormalizedFileMediaType(file)
-        if (!mediaType) {
-          toast.error("Unsupported file type", {
-            description: "Attach a PDF, PNG, JPEG, WEBP, or non-animated GIF.",
-          })
-          continue
+        if (nextAttachments.length > 0) {
+          setPendingAttachments((current) => [...current, ...nextAttachments])
         }
-
-        if (file.size <= 0) {
-          toast.error("Empty file", {
-            description: `${file.name || "This file"} has no content.`,
-          })
-          continue
-        }
-
-        if (file.size > AGENT_ATTACHMENT_MAX_FILE_BYTES) {
-          toast.error("File too large", {
-            description: `${file.name || "This file"} must be ${formatFileSize(AGENT_ATTACHMENT_MAX_FILE_BYTES)} or smaller.`,
-          })
-          continue
-        }
-
-        if (nextTotalBytes + file.size > AGENT_ATTACHMENT_MAX_TOTAL_BYTES) {
-          toast.error("Attachments too large", {
-            description: `Keep all attachments under ${formatFileSize(AGENT_ATTACHMENT_MAX_TOTAL_BYTES)} per request.`,
-          })
-          break
-        }
-
-        try {
-          const dataUrl = await readFileAsDataUrl(file)
-          const kind = getAgentAttachmentKind(mediaType)
-          const previewDataUrl =
-            kind === "image" ? await createImagePreviewDataUrl(dataUrl) : undefined
-          nextAttachments.push({
-            id: crypto.randomUUID(),
-            kind,
-            filename: file.name || "attachment",
-            mediaType,
-            sizeBytes: file.size,
-            ...(kind === "image" ? { detail: "auto" } : {}),
-            ...(previewDataUrl ? { previewDataUrl } : {}),
-            dataUrl,
-          })
-          nextCount += 1
-          nextTotalBytes += file.size
-        } catch {
-          toast.error("File could not be read", {
-            description: file.name || "Please try another file.",
-          })
-        }
+      } finally {
+        isReadingAttachmentsRef.current = false
+        setIsReadingAttachments(false)
+        clearFileInput()
       }
-
-      if (nextAttachments.length > 0) {
-        setPendingAttachments((current) => [...current, ...nextAttachments])
-      }
-      clearFileInput()
     },
     [
       clearFileInput,
@@ -376,7 +393,8 @@ export function PromptForm({
       if (
         (!nextMessage && nextAttachments.length === 0) ||
         !resolvedSelectedModel ||
-        isFormPending
+        isFormPending ||
+        isReadingAttachments
       ) {
         return
       }
@@ -412,6 +430,7 @@ export function PromptForm({
       resolvedSelectedModel,
       runMode,
       isFormPending,
+      isReadingAttachments,
       onSubmit,
       pendingAttachments,
       clearFileInput,
@@ -486,6 +505,7 @@ export function PromptForm({
 
   const isSubmitButtonDisabled =
     isFormPending ||
+    isReadingAttachments ||
     !resolvedSelectedModel ||
     (!isStreaming && !trimmedMessage && pendingAttachments.length === 0)
 
@@ -511,10 +531,10 @@ export function PromptForm({
 
       <div
         onDragOver={(event) => {
-          if (isFormPending) {
+          event.preventDefault()
+          if (isFormPending || isReadingAttachments) {
             return
           }
-          event.preventDefault()
           setIsDragActive(true)
         }}
         onDragLeave={(event) => {
@@ -523,11 +543,11 @@ export function PromptForm({
           }
         }}
         onDrop={(event) => {
-          if (isFormPending) {
-            return
-          }
           event.preventDefault()
           setIsDragActive(false)
+          if (isFormPending || isReadingAttachments) {
+            return
+          }
           void handleFiles(event.dataTransfer.files)
         }}
         className={cn(
@@ -535,7 +555,7 @@ export function PromptForm({
           agentShellInteractiveClass,
           agentShellHighlightClass,
           isDragActive && "ring-1 ring-ring/70",
-          isFormPending && "opacity-50"
+          (isFormPending || isReadingAttachments) && "opacity-50"
         )}
       >
         <div className={cn(agentSurfaceClass, "flex min-h-24 flex-col")}>
@@ -587,7 +607,7 @@ export function PromptForm({
                     type="button"
                     variant="ghost"
                     size="iconXs"
-                    disabled={isFormPending}
+                    disabled={isFormPending || isReadingAttachments}
                     className="ml-auto shrink-0 p-0 text-muted-foreground hover:bg-sidebar-border hover:text-foreground"
                     aria-label={`Remove ${attachment.filename}`}
                     onClick={() => {
@@ -631,7 +651,7 @@ export function PromptForm({
                     type="button"
                     variant="ghost"
                     size="iconSm"
-                    disabled={isFormPending}
+                    disabled={isFormPending || isReadingAttachments}
                     aria-label="Tools"
                     className="shrink-0 text-muted-foreground hover:bg-sidebar-border hover:text-foreground"
                   >
@@ -716,7 +736,7 @@ export function PromptForm({
                 disabled={isSubmitButtonDisabled}
                 className="shrink-0 ring-offset-background"
               >
-                {isFormPending ? (
+                {isFormPending || isReadingAttachments ? (
                   <Loader2 className="size-4 animate-spin" />
                 ) : isStreaming &&
                   !trimmedMessage &&
