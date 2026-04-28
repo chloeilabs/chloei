@@ -85,3 +85,129 @@ test("thread payload preserves valid run modes and drops invalid run modes", () 
   assert.equal(parsed.messages[0]?.metadata?.runMode, "research")
   assert.equal(parsed.messages[1]?.metadata?.runMode, undefined)
 })
+
+test("thread payload preserves attachment metadata and strips request-only data", () => {
+  const parsed = parseThreadPayload({
+    id: "thread-attachments",
+    model: "openai/gpt-5.5",
+    messages: [
+      {
+        id: "message-1",
+        role: "user",
+        content: "Analyze this file.",
+        llmModel: "openai/gpt-5.5",
+        createdAt: "2026-04-26T00:00:00.000Z",
+        metadata: {
+          attachments: [
+            {
+              id: "attachment-1",
+              kind: "image",
+              filename: "chart.png",
+              mediaType: "image/png",
+              sizeBytes: 5,
+              detail: "auto",
+              previewDataUrl: "data:image/jpeg;base64,abc=",
+              dataUrl: "data:image/png;base64,aGVsbG8=",
+            },
+            {
+              id: "attachment-2",
+              kind: "image",
+              filename: "unsafe-preview.png",
+              mediaType: "IMAGE/PNG",
+              sizeBytes: 5,
+              detail: "auto",
+              previewDataUrl: "https://example.com/preview.png",
+              dataUrl: "data:image/png;base64,aGVsbG8=",
+            },
+          ],
+        },
+      },
+    ],
+    createdAt: "2026-04-26T00:00:00.000Z",
+    updatedAt: "2026-04-26T00:00:00.000Z",
+  })
+
+  assert.deepEqual(parsed.messages[0]?.metadata?.attachments, [
+    {
+      id: "attachment-1",
+      kind: "image",
+      filename: "chart.png",
+      mediaType: "image/png",
+      sizeBytes: 5,
+      detail: "auto",
+      previewDataUrl: "data:image/jpeg;base64,abc=",
+    },
+    {
+      id: "attachment-2",
+      kind: "image",
+      filename: "unsafe-preview.png",
+      mediaType: "image/png",
+      sizeBytes: 5,
+      detail: "auto",
+    },
+  ])
+})
+
+test("thread payload caps attachment metadata and preview persistence", () => {
+  const baseThread = {
+    id: "thread-attachment-limits",
+    model: "openai/gpt-5.5",
+    messages: [
+      {
+        id: "message-1",
+        role: "user",
+        content: "Analyze these files.",
+        llmModel: "openai/gpt-5.5",
+        createdAt: "2026-04-26T00:00:00.000Z",
+        metadata: {
+          attachments: [],
+        },
+      },
+    ],
+    createdAt: "2026-04-26T00:00:00.000Z",
+    updatedAt: "2026-04-26T00:00:00.000Z",
+  }
+  const createAttachment = (index, previewDataUrl = undefined) => ({
+    id: `attachment-${String(index)}`,
+    kind: "image",
+    filename: `chart-${String(index)}.png`,
+    mediaType: "image/png",
+    sizeBytes: 5,
+    detail: "auto",
+    ...(previewDataUrl ? { previewDataUrl } : {}),
+  })
+
+  assert.throws(() =>
+    parseThreadPayload({
+      ...baseThread,
+      messages: [
+        {
+          ...baseThread.messages[0],
+          metadata: {
+            attachments: Array.from({ length: 5 }, (_, index) =>
+              createAttachment(index)
+            ),
+          },
+        },
+      ],
+    })
+  )
+
+  const largePreviewDataUrl = `data:image/jpeg;base64,${"a".repeat(40_000)}`
+  assert.throws(() =>
+    parseThreadPayload({
+      ...baseThread,
+      messages: [
+        {
+          ...baseThread.messages[0],
+          metadata: {
+            attachments: [
+              createAttachment(1, largePreviewDataUrl),
+              createAttachment(2, largePreviewDataUrl),
+            ],
+          },
+        },
+      ],
+    })
+  )
+})

@@ -1,11 +1,23 @@
+import { Buffer } from "node:buffer"
+
 import { z } from "zod"
 
 import {
+  AGENT_ATTACHMENT_MAX_FILE_BYTES,
+  AGENT_ATTACHMENT_MAX_FILES,
+  AGENT_ATTACHMENT_MAX_PREVIEW_DATA_URL_CHARS,
+  AGENT_ATTACHMENT_MAX_TOTAL_BYTES,
+  AGENT_ATTACHMENT_MAX_TOTAL_PREVIEW_BYTES,
+  AGENT_ATTACHMENT_MIME_TYPES,
+  AGENT_IMAGE_DETAIL_VALUES,
   AGENT_RUN_MODES,
   AGENT_RUN_STATUSES,
   type AgentRunMode,
+  getAgentAttachmentKind,
+  isAgentAttachmentPreviewDataUrl,
   isModelType,
   type ModelType,
+  normalizeAgentAttachmentMimeType,
   SEARCH_TOOL_NAMES,
   type Thread,
   TOOL_NAMES,
@@ -17,10 +29,12 @@ const SEARCH_TOOL_NAME_SCHEMA = z.enum(SEARCH_TOOL_NAMES)
 const TOOL_INVOCATION_STATUS_SCHEMA = z.enum(["running", "success", "error"])
 const AGENT_RUN_STATUS_SCHEMA = z.enum(AGENT_RUN_STATUSES)
 const AGENT_RUN_MODE_SCHEMA = z.enum(AGENT_RUN_MODES)
+const AGENT_IMAGE_DETAIL_SCHEMA = z.enum(AGENT_IMAGE_DETAIL_VALUES)
 const MODEL_TYPE_SCHEMA = z.custom<ModelType>(
   isModelType,
   "Invalid model type."
 )
+const AGENT_ATTACHMENT_MIME_TYPE_SCHEMA = z.enum(AGENT_ATTACHMENT_MIME_TYPES)
 
 const messageSourceSchema = z
   .object({
@@ -147,9 +161,72 @@ const assistantMessagePartSchema = z
   })
   .strict()
 
+const attachmentMetadataSchema = z
+  .object({
+    id: z.string().trim().min(1).max(200),
+    kind: z.enum(["image", "pdf"]),
+    filename: z.string().trim().min(1).max(500),
+    mediaType: AGENT_ATTACHMENT_MIME_TYPE_SCHEMA,
+    sizeBytes: z.number().int().positive().max(AGENT_ATTACHMENT_MAX_FILE_BYTES),
+    detail: AGENT_IMAGE_DETAIL_SCHEMA.optional(),
+    previewDataUrl: z
+      .string()
+      .trim()
+      .min(1)
+      .max(AGENT_ATTACHMENT_MAX_PREVIEW_DATA_URL_CHARS)
+      .refine(isAgentAttachmentPreviewDataUrl, {
+        message: "Attachment preview must be a supported image data URL.",
+      })
+      .optional(),
+  })
+  .strict()
+  .refine(
+    (attachment) =>
+      attachment.kind === getAgentAttachmentKind(attachment.mediaType),
+    {
+      message: "Attachment kind must match media type.",
+    }
+  )
+  .refine((attachment) => attachment.kind === "image" || !attachment.detail, {
+    message: "Only image attachments can include detail.",
+  })
+
+function getAttachmentPreviewBytes(
+  attachment: z.infer<typeof attachmentMetadataSchema>
+): number {
+  return attachment.previewDataUrl
+    ? Buffer.byteLength(attachment.previewDataUrl, "utf8")
+    : 0
+}
+
+const attachmentMetadataListSchema = z
+  .array(attachmentMetadataSchema)
+  .max(AGENT_ATTACHMENT_MAX_FILES)
+  .refine(
+    (attachments) =>
+      attachments.reduce(
+        (total, attachment) => total + attachment.sizeBytes,
+        0
+      ) <= AGENT_ATTACHMENT_MAX_TOTAL_BYTES,
+    {
+      message: "Attachment metadata exceeds total size limit.",
+    }
+  )
+  .refine(
+    (attachments) =>
+      attachments.reduce(
+        (total, attachment) => total + getAttachmentPreviewBytes(attachment),
+        0
+      ) <= AGENT_ATTACHMENT_MAX_TOTAL_PREVIEW_BYTES,
+    {
+      message: "Attachment previews exceed total preview size limit.",
+    }
+  )
+
 const messageMetadataSchema = z
   .object({
     parts: z.array(assistantMessagePartSchema).optional(),
+    attachments: attachmentMetadataListSchema.optional(),
     isStreaming: z.boolean().optional(),
     selectedModel: MODEL_TYPE_SCHEMA.optional(),
     runMode: AGENT_RUN_MODE_SCHEMA.optional(),
@@ -258,6 +335,41 @@ function sanitizeToolInvocation(value: unknown) {
   return parsed.success ? parsed.data : null
 }
 
+function sanitizeAttachmentMetadata(value: unknown) {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return null
+  }
+
+  const attachment = value as Record<string, unknown>
+  const mediaType = normalizeAgentAttachmentMimeType(attachment.mediaType)
+  if (!mediaType) {
+    return null
+  }
+
+  const candidatePreviewDataUrl = attachment.previewDataUrl
+  const previewDataUrl = isAgentAttachmentPreviewDataUrl(
+    candidatePreviewDataUrl
+  )
+    ? candidatePreviewDataUrl.trim()
+    : undefined
+
+  const parsed = attachmentMetadataSchema.safeParse({
+    id: attachment.id,
+    kind: attachment.kind,
+    filename: attachment.filename,
+    mediaType,
+    sizeBytes: attachment.sizeBytes,
+    ...(attachment.detail !== undefined ? { detail: attachment.detail } : {}),
+    ...(previewDataUrl ? { previewDataUrl } : {}),
+  })
+
+  if (!parsed.success) {
+    return null
+  }
+
+  return parsed.data
+}
+
 function convertLegacyActivityTimelineEntry(value: unknown) {
   const legacyCrewStatus =
     legacyCrewStatusActivityTimelineEntrySchema.safeParse(value)
@@ -335,6 +447,12 @@ function sanitizeMessageMetadata(value: unknown) {
         return parsed.success ? [parsed.data] : []
       })
     : undefined
+  const attachments = Array.isArray(metadata.attachments)
+    ? metadata.attachments.flatMap((attachment) => {
+        const sanitized = sanitizeAttachmentMetadata(attachment)
+        return sanitized ? [sanitized] : []
+      })
+    : undefined
   const toolInvocations = Array.isArray(metadata.toolInvocations)
     ? metadata.toolInvocations.flatMap((invocation) => {
         const sanitized = sanitizeToolInvocation(invocation)
@@ -356,6 +474,7 @@ function sanitizeMessageMetadata(value: unknown) {
 
   return {
     ...(parts ? { parts } : {}),
+    ...(attachments ? { attachments } : {}),
     ...(isStreaming !== undefined ? { isStreaming } : {}),
     ...(selectedModel !== undefined ? { selectedModel } : {}),
     ...(runMode !== undefined ? { runMode } : {}),

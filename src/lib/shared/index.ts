@@ -1,3 +1,4 @@
+export * from "./agent/attachments"
 export * from "./agent/messages"
 export * from "./auth"
 export * from "./llm/models"

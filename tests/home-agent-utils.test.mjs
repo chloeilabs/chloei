@@ -13,9 +13,7 @@ const agentRequestLimitsUrl = pathToFileURL(
   path.join(cwd, "src/lib/shared/agent-request-limits.ts")
 ).href
 
-const { appendUserMessage, toRequestMessages } = await import(
-  homeAgentUtilsUrl
-)
+const { appendUserMessage, toRequestMessages } = await import(homeAgentUtilsUrl)
 const {
   AGENT_REQUEST_MAX_MESSAGE_CHARS,
   AGENT_REQUEST_MAX_MESSAGES,
@@ -82,6 +80,99 @@ test("appended user messages preserve the requested run mode", () => {
     "research"
   )
 
-  assert.equal(messages[0]?.metadata?.selectedModel, "anthropic/claude-sonnet-4.6")
+  assert.equal(
+    messages[0]?.metadata?.selectedModel,
+    "anthropic/claude-sonnet-4.6"
+  )
   assert.equal(messages[0]?.metadata?.runMode, "research")
+})
+
+test("attached user messages persist metadata but request transient data separately", () => {
+  const attachment = {
+    id: "attachment-1",
+    kind: "image",
+    filename: "chart.png",
+    mediaType: "image/png",
+    sizeBytes: 5,
+    detail: "auto",
+    previewDataUrl: "data:image/jpeg;base64,abc=",
+    dataUrl: "data:image/png;base64,aGVsbG8=",
+  }
+  const messages = appendUserMessage(
+    [],
+    "Analyze this chart.",
+    "anthropic/claude-sonnet-4.6",
+    "chat",
+    [attachment]
+  )
+  const userMessage = messages[0]
+
+  assert.equal(userMessage?.metadata?.attachments?.[0]?.filename, "chart.png")
+  assert.equal(userMessage?.metadata?.attachments?.[0]?.dataUrl, undefined)
+
+  assert.deepEqual(toRequestMessages(messages), [
+    {
+      role: "user",
+      content: "Analyze this chart.",
+    },
+  ])
+
+  const attachmentsByMessageId = new Map([[userMessage.id, [attachment]]])
+  assert.deepEqual(toRequestMessages(messages, { attachmentsByMessageId }), [
+    {
+      role: "user",
+      content: "Analyze this chart.",
+      attachments: [attachment],
+    },
+  ])
+})
+
+test("agent request messages only resend raw attachments for the final user turn", () => {
+  const attachment = {
+    id: "attachment-1",
+    kind: "image",
+    filename: "chart.png",
+    mediaType: "image/png",
+    sizeBytes: 5,
+    detail: "auto",
+    previewDataUrl: "data:image/jpeg;base64,abc=",
+    dataUrl: "data:image/png;base64,aGVsbG8=",
+  }
+  const messages = [
+    ...appendUserMessage(
+      [],
+      "Analyze this chart.",
+      "anthropic/claude-sonnet-4.6",
+      "chat",
+      [attachment]
+    ),
+    {
+      id: "assistant-1",
+      role: "assistant",
+      content: "The chart is clear.",
+      createdAt: "2026-04-26T00:00:01.000Z",
+    },
+    ...appendUserMessage(
+      [],
+      "Summarize the answer.",
+      "anthropic/claude-sonnet-4.6"
+    ),
+  ]
+  const firstUserMessage = messages[0]
+  const attachmentsByMessageId = new Map([[firstUserMessage.id, [attachment]]])
+
+  assert.deepEqual(toRequestMessages(messages, { attachmentsByMessageId }), [
+    {
+      role: "user",
+      content: "Analyze this chart.",
+    },
+    {
+      role: "assistant",
+      content: "The chart is clear.",
+    },
+    {
+      role: "user",
+      content: "Summarize the answer.",
+    },
+  ])
 })

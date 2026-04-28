@@ -12,6 +12,7 @@ import {
 import { createLogger } from "@/lib/logger"
 import { createRequestHeaders, getRequestIdFromHeaders } from "@/lib/request-id"
 import {
+  type AgentRequestAttachment,
   type AgentRunMode,
   AvailableModels,
   type Message as AgentMessage,
@@ -65,6 +66,7 @@ interface QueuedSubmission {
   message: string
   model: ModelType
   runMode: AgentRunMode
+  attachments: AgentRequestAttachment[]
 }
 
 interface SaveThreadOptions {
@@ -75,6 +77,52 @@ const INITIAL_STATE: AgentSessionState = {
   messages: [],
   isSubmitting: false,
   isStreaming: false,
+}
+
+type AttachmentPayloadsByThread = Map<
+  string,
+  Map<string, AgentRequestAttachment[]>
+>
+
+function getThreadAttachmentPayloads(
+  payloadsByThread: AttachmentPayloadsByThread,
+  threadId: string
+) {
+  let payloads = payloadsByThread.get(threadId)
+
+  if (!payloads) {
+    payloads = new Map<string, AgentRequestAttachment[]>()
+    payloadsByThread.set(threadId, payloads)
+  }
+
+  return payloads
+}
+
+function pruneThreadAttachmentPayloads(
+  payloadsByThread: AttachmentPayloadsByThread,
+  threadId: string,
+  messages: readonly AgentMessage[]
+) {
+  const payloads = payloadsByThread.get(threadId)
+  if (!payloads) {
+    return
+  }
+
+  const messageIds = new Set(
+    messages
+      .filter((message) => message.role === "user")
+      .map((message) => message.id)
+  )
+
+  for (const messageId of payloads.keys()) {
+    if (!messageIds.has(messageId)) {
+      payloads.delete(messageId)
+    }
+  }
+
+  if (payloads.size === 0) {
+    payloadsByThread.delete(threadId)
+  }
 }
 
 function mergeThreads(existingThreads: Thread[], incomingThreads: Thread[]) {
@@ -418,11 +466,17 @@ export function useAgentSession({
     useState<QueuedSubmission | null>(null)
   const submitLockRef = useRef(false)
   const messagesRef = useRef<AgentMessage[]>([])
+  const attachmentPayloadsRef = useRef<AttachmentPayloadsByThread>(new Map())
   const abortControllerRef = useRef<AbortController | null>(null)
   const currentThreadIdRef = useRef(currentThreadId)
 
   const setCurrentThreadId = useCallback(
     (id: string | null) => {
+      const previousThreadId = currentThreadIdRef.current
+      if (previousThreadId && previousThreadId !== id) {
+        attachmentPayloadsRef.current.delete(previousThreadId)
+      }
+
       currentThreadIdRef.current = id
       baseSetCurrentThreadId(id)
     },
@@ -431,9 +485,24 @@ export function useAgentSession({
 
   useEffect(() => {
     if (currentThreadId !== currentThreadIdRef.current) {
+      const previousThreadId = currentThreadIdRef.current
+      if (previousThreadId && previousThreadId !== currentThreadId) {
+        attachmentPayloadsRef.current.delete(previousThreadId)
+      }
+
       currentThreadIdRef.current = currentThreadId
     }
   }, [currentThreadId])
+
+  const ensureCurrentThreadId = useCallback(() => {
+    let activeThreadId = currentThreadIdRef.current
+    if (!activeThreadId) {
+      activeThreadId = crypto.randomUUID()
+      setCurrentThreadId(activeThreadId)
+    }
+
+    return activeThreadId
+  }, [setCurrentThreadId])
 
   const streamingState = state.isSubmitting || state.isStreaming
   const activeThread = currentThreadId
@@ -456,11 +525,17 @@ export function useAgentSession({
         isStreaming: false,
       })
       messagesRef.current = activeThread.messages
+      pruneThreadAttachmentPayloads(
+        attachmentPayloadsRef.current,
+        currentThreadId,
+        activeThread.messages
+      )
       return
     }
 
     setState(INITIAL_STATE)
     messagesRef.current = []
+    attachmentPayloadsRef.current.clear()
   }, [activeThread, currentThreadId])
 
   useEffect(() => {
@@ -509,6 +584,7 @@ export function useAgentSession({
     setQueuedSubmission(null)
     setState(INITIAL_STATE)
     messagesRef.current = []
+    attachmentPayloadsRef.current.clear()
     currentThreadIdRef.current = null
     submitLockRef.current = false
     setCurrentThreadId(null)
@@ -791,16 +867,28 @@ export function useAgentSession({
     async (
       nextMessages: AgentMessage[],
       model: ModelType,
-      runMode: AgentRunMode = "chat"
+      runMode: AgentRunMode = "chat",
+      threadId?: string
     ) => {
-      let activeThreadId = currentThreadIdRef.current
-      if (!activeThreadId) {
-        activeThreadId = crypto.randomUUID()
-        setCurrentThreadId(activeThreadId)
-      }
+      const activeThreadId = threadId ?? ensureCurrentThreadId()
 
+      pruneThreadAttachmentPayloads(
+        attachmentPayloadsRef.current,
+        activeThreadId,
+        nextMessages
+      )
+
+      const requestMessages = toRequestMessages(nextMessages, {
+        attachmentsByMessageId:
+          attachmentPayloadsRef.current.get(activeThreadId),
+      })
+      const hasAttachments = requestMessages.some(
+        (message) => (message.attachments?.length ?? 0) > 0
+      )
       const effectiveModel =
-        runMode === "research" ? AvailableModels.OPENAI_GPT_5_5 : model
+        runMode === "research" || hasAttachments
+          ? AvailableModels.OPENAI_GPT_5_5
+          : model
 
       return streamAgentRequest({
         endpoint: "/api/agent",
@@ -810,21 +898,22 @@ export function useAgentSession({
         runMode,
         errorTitle: "Failed to send message",
         body: {
-          model,
+          model: effectiveModel,
           runMode,
           threadId: activeThreadId,
-          messages: toRequestMessages(nextMessages),
+          messages: requestMessages,
         },
       })
     },
-    [setCurrentThreadId, streamAgentRequest]
+    [ensureCurrentThreadId, streamAgentRequest]
   )
 
   const handleSubmit = useCallback(
     async (
       message: string,
       model: ModelType,
-      runMode: AgentRunMode = "chat"
+      runMode: AgentRunMode = "chat",
+      attachments: AgentRequestAttachment[] = []
     ) => {
       const trimmedMessage = message.trim()
       if (!trimmedMessage) {
@@ -838,16 +927,26 @@ export function useAgentSession({
         return
       }
 
+      const activeThreadId = ensureCurrentThreadId()
       const nextMessages = appendUserMessage(
         messagesRef.current,
         trimmedMessage,
         model,
-        runMode
+        runMode,
+        attachments
       )
 
-      await runAgentRequest(nextMessages, model, runMode)
+      const userMessage = nextMessages[nextMessages.length - 1]
+      if (userMessage?.role === "user" && attachments.length > 0) {
+        getThreadAttachmentPayloads(
+          attachmentPayloadsRef.current,
+          activeThreadId
+        ).set(userMessage.id, attachments)
+      }
+
+      await runAgentRequest(nextMessages, model, runMode, activeThreadId)
     },
-    [runAgentRequest]
+    [ensureCurrentThreadId, runAgentRequest]
   )
 
   const handleEditMessage = useCallback(
@@ -895,20 +994,28 @@ export function useAgentSession({
         throw new Error("Please wait for the current response to finish.")
       }
 
-      if (currentThreadIdRef.current) {
+      const activeThreadId = currentThreadIdRef.current
+      if (activeThreadId) {
+        pruneThreadAttachmentPayloads(
+          attachmentPayloadsRef.current,
+          activeThreadId,
+          nextMessages
+        )
+
         saveThread(
-          createThreadSnapshot(
-            currentThreadIdRef.current,
-            nextMessages,
-            newModel
-          ),
+          createThreadSnapshot(activeThreadId, nextMessages, newModel),
           {
             immediate: true,
           }
         )
       }
 
-      void runAgentRequest(nextMessages, newModel, newRunMode)
+      void runAgentRequest(
+        nextMessages,
+        newModel,
+        newRunMode,
+        activeThreadId ?? undefined
+      )
     },
     [createThreadSnapshot, runAgentRequest, saveThread]
   )
@@ -918,7 +1025,8 @@ export function useAgentSession({
       message: string,
       model: ModelType,
       queue: boolean,
-      runMode: AgentRunMode = "chat"
+      runMode: AgentRunMode = "chat",
+      attachments: AgentRequestAttachment[] = []
     ) => {
       const trimmedMessage = message.trim()
       if (!trimmedMessage) {
@@ -930,11 +1038,12 @@ export function useAgentSession({
           message: trimmedMessage,
           model,
           runMode,
+          attachments,
         })
         return
       }
 
-      void handleSubmit(trimmedMessage, model, runMode)
+      void handleSubmit(trimmedMessage, model, runMode, attachments)
     },
     [handleSubmit]
   )
@@ -948,7 +1057,8 @@ export function useAgentSession({
     void handleSubmit(
       queuedSubmission.message,
       queuedSubmission.model,
-      queuedSubmission.runMode
+      queuedSubmission.runMode,
+      queuedSubmission.attachments
     )
   }, [streamingState, queuedSubmission, handleSubmit])
 
