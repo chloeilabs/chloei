@@ -436,6 +436,56 @@ test("agent helper validates file attachments and forces the OpenAI vision model
     requestId: "request-attachment-bad-data-url",
   })
 
+  const whitespaceOnlyBase64Result = parseAgentStreamRequest({
+    body: {
+      messages: [
+        {
+          role: "user",
+          content: "Analyze this chart.",
+          attachments: [
+            {
+              ...imageAttachment,
+              sizeBytes: 1,
+              dataUrl: "data:image/png;base64,\n \t",
+            },
+          ],
+        },
+      ],
+    },
+    availableModels: [{ id: "openai/gpt-5.5" }],
+    requestId: "request-attachment-empty-base64",
+  })
+
+  assert(whitespaceOnlyBase64Result instanceof Response)
+  assert.equal(whitespaceOnlyBase64Result.status, 400)
+  assert.deepEqual(await whitespaceOnlyBase64Result.json(), {
+    error: "Invalid file attachment payload.",
+    errorCode: "AGENT_ATTACHMENT_INVALID",
+    requestId: "request-attachment-empty-base64",
+  })
+
+  const normalizedBase64Result = parseAgentStreamRequest({
+    body: {
+      messages: [
+        {
+          role: "user",
+          content: "Analyze this chart.",
+          attachments: [
+            {
+              ...imageAttachment,
+              dataUrl: "data:image/png;base64,aGVs\nbG8=",
+            },
+          ],
+        },
+      ],
+    },
+    availableModels: [{ id: "openai/gpt-5.5" }],
+    requestId: "request-attachment-normalized-base64",
+  })
+
+  assert(!(normalizedBase64Result instanceof Response))
+  assert.equal(normalizedBase64Result.selectedModel, "openai/gpt-5.5")
+
   const largePdfDataUrl = `data:application/pdf;base64,${Buffer.alloc(3 * 1024 * 1024).toString("base64")}`
   const priorAttachmentPayloadsResult = parseAgentStreamRequest({
     body: {

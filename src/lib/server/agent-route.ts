@@ -264,8 +264,28 @@ function getBase64Payload(dataUrl: string): string | null {
   return dataUrl.slice(match[0].length)
 }
 
+function normalizeBase64Payload(value: string): string | null {
+  const normalized = value.replace(/\s/g, "")
+  if (normalized.length === 0 || normalized.length % 4 !== 0) {
+    return null
+  }
+
+  if (!BASE64_PATTERN.test(normalized)) {
+    return null
+  }
+
+  try {
+    const decoded = Buffer.from(normalized, "base64")
+    return decoded.length > 0 && decoded.toString("base64") === normalized
+      ? normalized
+      : null
+  } catch {
+    return null
+  }
+}
+
 function isValidBase64Payload(value: string): boolean {
-  return value.length % 4 === 0 && BASE64_PATTERN.test(value)
+  return normalizeBase64Payload(value) !== null
 }
 
 function createAttachmentValidationError(params: {
@@ -370,11 +390,20 @@ function validateAgentRequestAttachments(
       }
 
       const base64Payload = getBase64Payload(attachment.dataUrl)
-      if (!base64Payload || !isValidBase64Payload(base64Payload)) {
+      const normalizedBase64Payload = base64Payload
+        ? normalizeBase64Payload(base64Payload)
+        : null
+      if (
+        !normalizedBase64Payload ||
+        !isValidBase64Payload(normalizedBase64Payload)
+      ) {
         return createAttachmentValidationError(params)
       }
 
-      if (Buffer.byteLength(base64Payload, "base64") !== attachment.sizeBytes) {
+      if (
+        Buffer.byteLength(normalizedBase64Payload, "base64") !==
+        attachment.sizeBytes
+      ) {
         return createAttachmentValidationError(params)
       }
     }
