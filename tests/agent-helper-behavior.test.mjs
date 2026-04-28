@@ -13,6 +13,9 @@ const cwd = fileURLToPath(new URL("..", import.meta.url))
 const helperUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/agent-route.ts")
 ).href
+const attachmentConstantsUrl = pathToFileURL(
+  path.join(cwd, "src/lib/shared/agent/attachments.ts")
+).href
 
 setTestModuleStubs({
   "@/lib/logger": toProjectFileUrl("tests/stubs/logger.mjs"),
@@ -32,6 +35,7 @@ const {
   resolveRequestId,
   resolveUserTimeZone,
 } = await import(helperUrl)
+const { AGENT_ATTACHMENT_MAX_FILES } = await import(attachmentConstantsUrl)
 
 let recorded
 
@@ -436,6 +440,65 @@ test("agent helper validates file attachments and forces the OpenAI vision model
     requestId: "request-attachment-bad-data-url",
   })
 
+  const badPreviewResult = parseAgentStreamRequest({
+    body: {
+      messages: [
+        {
+          role: "user",
+          content: "Analyze this chart.",
+          attachments: [
+            {
+              ...imageAttachment,
+              previewDataUrl: "https://example.com/preview.png",
+            },
+          ],
+        },
+      ],
+    },
+    availableModels: [{ id: "openai/gpt-5.5" }],
+    requestId: "request-attachment-bad-preview",
+  })
+
+  assert(badPreviewResult instanceof Response)
+  assert.equal(badPreviewResult.status, 400)
+  assert.deepEqual(await badPreviewResult.json(), {
+    error: "Invalid request payload.",
+    errorCode: "AGENT_INVALID_REQUEST",
+    requestId: "request-attachment-bad-preview",
+  })
+
+  const pdfPreviewResult = parseAgentStreamRequest({
+    body: {
+      messages: [
+        {
+          role: "user",
+          content: "Analyze this PDF.",
+          attachments: [
+            {
+              id: "attachment-pdf-preview",
+              kind: "pdf",
+              filename: "doc.pdf",
+              mediaType: "application/pdf",
+              sizeBytes: 5,
+              previewDataUrl: "data:image/png;base64,aGVsbG8=",
+              dataUrl: "data:application/pdf;base64,aGVsbG8=",
+            },
+          ],
+        },
+      ],
+    },
+    availableModels: [{ id: "openai/gpt-5.5" }],
+    requestId: "request-attachment-pdf-preview",
+  })
+
+  assert(pdfPreviewResult instanceof Response)
+  assert.equal(pdfPreviewResult.status, 400)
+  assert.deepEqual(await pdfPreviewResult.json(), {
+    error: "Invalid file attachment payload.",
+    errorCode: "AGENT_ATTACHMENT_INVALID",
+    requestId: "request-attachment-pdf-preview",
+  })
+
   const whitespaceOnlyBase64Result = parseAgentStreamRequest({
     body: {
       messages: [
@@ -485,6 +548,67 @@ test("agent helper validates file attachments and forces the OpenAI vision model
 
   assert(!(normalizedBase64Result instanceof Response))
   assert.equal(normalizedBase64Result.selectedModel, "openai/gpt-5.5")
+
+  const tooManyAttachments = Array.from(
+    { length: AGENT_ATTACHMENT_MAX_FILES + 1 },
+    (_, index) => ({
+      ...imageAttachment,
+      id: `attachment-too-many-${String(index)}`,
+      filename: `chart-${String(index)}.png`,
+    })
+  )
+  const tooManyPerTurnResult = parseAgentStreamRequest({
+    body: {
+      messages: [
+        {
+          role: "user",
+          content: "Analyze these charts.",
+          attachments: tooManyAttachments,
+        },
+      ],
+    },
+    availableModels: [{ id: "openai/gpt-5.5" }],
+    requestId: "request-attachments-too-many-per-turn",
+  })
+
+  assert(tooManyPerTurnResult instanceof Response)
+  assert.equal(tooManyPerTurnResult.status, 400)
+  assert.deepEqual(await tooManyPerTurnResult.json(), {
+    error: "Too many file attachments.",
+    errorCode: "AGENT_TOO_MANY_ATTACHMENTS",
+    requestId: "request-attachments-too-many-per-turn",
+  })
+
+  const tooManyCrossConversationResult = parseAgentStreamRequest({
+    body: {
+      messages: [
+        {
+          role: "user",
+          content: "Analyze these charts.",
+          attachments: tooManyAttachments.slice(0, AGENT_ATTACHMENT_MAX_FILES),
+        },
+        {
+          role: "assistant",
+          content: "Done.",
+        },
+        {
+          role: "user",
+          content: "Analyze one more chart.",
+          attachments: [tooManyAttachments[AGENT_ATTACHMENT_MAX_FILES]],
+        },
+      ],
+    },
+    availableModels: [{ id: "openai/gpt-5.5" }],
+    requestId: "request-attachments-too-many-cross-convo",
+  })
+
+  assert(tooManyCrossConversationResult instanceof Response)
+  assert.equal(tooManyCrossConversationResult.status, 400)
+  assert.deepEqual(await tooManyCrossConversationResult.json(), {
+    error: "Too many file attachments.",
+    errorCode: "AGENT_TOO_MANY_ATTACHMENTS",
+    requestId: "request-attachments-too-many-cross-convo",
+  })
 
   const largePdfDataUrl = `data:application/pdf;base64,${Buffer.alloc(3 * 1024 * 1024).toString("base64")}`
   const priorAttachmentPayloadsResult = parseAgentStreamRequest({

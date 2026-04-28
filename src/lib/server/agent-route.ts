@@ -63,6 +63,9 @@ const agentAttachmentSchema = z
       .trim()
       .min(1)
       .max(AGENT_ATTACHMENT_MAX_PREVIEW_DATA_URL_CHARS)
+      .refine(isValidAttachmentPreviewDataUrl, {
+        message: "Attachment preview must be a supported image data URL.",
+      })
       .optional(),
     dataUrl: z.string().trim().min(1).max(AGENT_ATTACHMENT_MAX_DATA_URL_CHARS),
   })
@@ -288,6 +291,24 @@ function isValidBase64Payload(value: string): boolean {
   return normalizeBase64Payload(value) !== null
 }
 
+function isValidAttachmentPreviewDataUrl(dataUrl: string): boolean {
+  const mediaType = getDataUrlMediaType(dataUrl)
+  if (!mediaType) {
+    return false
+  }
+
+  try {
+    if (getAgentAttachmentKind(mediaType) !== "image") {
+      return false
+    }
+  } catch {
+    return false
+  }
+
+  const base64Payload = getBase64Payload(dataUrl)
+  return Boolean(base64Payload && normalizeBase64Payload(base64Payload))
+}
+
 function createAttachmentValidationError(params: {
   requestId: string
   rateLimitDecision?: AgentRateLimitDecision
@@ -382,6 +403,14 @@ function validateAgentRequestAttachments(
       }
 
       if (attachment.kind !== "image" && attachment.detail) {
+        return createAttachmentValidationError(params)
+      }
+
+      if (
+        attachment.previewDataUrl &&
+        (attachment.kind !== "image" ||
+          !isValidAttachmentPreviewDataUrl(attachment.previewDataUrl))
+      ) {
         return createAttachmentValidationError(params)
       }
 
