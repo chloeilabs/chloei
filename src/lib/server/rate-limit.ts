@@ -332,13 +332,20 @@ function tryAcquireMemoryConcurrencySlot(params: {
 }
 
 async function releasePersistentConcurrencySlot(identifier: string) {
-  await sql`
-    UPDATE agent_rate_limit
-    SET
-      "inFlight" = GREATEST("inFlight" - 1, 0),
-      "lastSeenAt" = ${new Date()}
-    WHERE identifier = ${identifier}
-  `.execute(getDatabase())
+  try {
+    await sql`
+      UPDATE agent_rate_limit
+      SET
+        "inFlight" = GREATEST("inFlight" - 1, 0),
+        "lastSeenAt" = ${new Date()}
+      WHERE identifier = ${identifier}
+    `.execute(getDatabase())
+  } catch (error) {
+    logger.warn("Failed to release persistent concurrency slot.", {
+      identifier,
+      error,
+    })
+  }
 }
 
 async function tryAcquirePersistentConcurrencySlot(params: {
