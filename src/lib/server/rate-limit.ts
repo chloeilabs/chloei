@@ -280,10 +280,9 @@ export async function evaluateAndConsumeSlidingWindowRateLimit(params: {
   try {
     return await evaluateAndConsumePersistentSlidingWindowRateLimit(params)
   } catch (error) {
-    logger.warn(
-      "Persistent rate limit store failed; falling back to memory.",
-      { error }
-    )
+    logger.warn("Persistent rate limit store failed; falling back to memory.", {
+      error,
+    })
     return evaluateAndConsumeMemorySlidingWindowRateLimit(params)
   }
 }
