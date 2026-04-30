@@ -1,7 +1,11 @@
 import { sql } from "kysely"
 
+import { createLogger } from "@/lib/logger"
+
 import { AGENT_RATE_LIMIT_STORE } from "./agent-runtime-config"
 import { getDatabase, isPrimaryDatabaseConfigured } from "./postgres"
+
+const logger = createLogger("rate-limit")
 
 interface SlidingWindowRateLimitState {
   hits: number[]
@@ -273,7 +277,15 @@ export async function evaluateAndConsumeSlidingWindowRateLimit(params: {
     return evaluateAndConsumeMemorySlidingWindowRateLimit(params)
   }
 
-  return evaluateAndConsumePersistentSlidingWindowRateLimit(params)
+  try {
+    return await evaluateAndConsumePersistentSlidingWindowRateLimit(params)
+  } catch (error) {
+    logger.warn(
+      "Persistent rate limit store failed; falling back to memory.",
+      { error }
+    )
+    return evaluateAndConsumeMemorySlidingWindowRateLimit(params)
+  }
 }
 
 function tryAcquireMemoryConcurrencySlot(params: {
@@ -408,5 +420,13 @@ export async function tryAcquireConcurrencySlot(params: {
     return tryAcquireMemoryConcurrencySlot(params)
   }
 
-  return tryAcquirePersistentConcurrencySlot(params)
+  try {
+    return await tryAcquirePersistentConcurrencySlot(params)
+  } catch (error) {
+    logger.warn(
+      "Persistent concurrency slot store failed; falling back to memory.",
+      { error }
+    )
+    return tryAcquireMemoryConcurrencySlot(params)
+  }
 }

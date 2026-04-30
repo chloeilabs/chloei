@@ -74,6 +74,7 @@ export function useThreadStore(initialThreads: Thread[] = []) {
   }, [])
 
   const persistThread = useCallback(async (thread: Thread) => {
+    inFlightControllersRef.current.get(thread.id)?.abort()
     const controller = new AbortController()
     inFlightControllersRef.current.set(thread.id, controller)
 

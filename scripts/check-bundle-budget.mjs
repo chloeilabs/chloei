@@ -3,11 +3,26 @@ import path from "node:path"
 
 const projectRoot = process.cwd()
 const chunksDir = path.join(projectRoot, ".next", "static", "chunks")
-const maxTotalBytes = Number(
-  process.env.BUNDLE_MAX_STATIC_CHUNKS_BYTES ?? 14 * 1024 * 1024
+
+function readPositiveBytesEnv(name, fallback) {
+  const raw = process.env[name]
+  if (raw === undefined || raw.trim() === "") {
+    return fallback
+  }
+  const parsed = Number(raw)
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`${name} must be a positive number; got "${raw}".`)
+  }
+  return parsed
+}
+
+const maxTotalBytes = readPositiveBytesEnv(
+  "BUNDLE_MAX_STATIC_CHUNKS_BYTES",
+  14 * 1024 * 1024
 )
-const maxChunkBytes = Number(
-  process.env.BUNDLE_MAX_STATIC_CHUNK_BYTES ?? 1024 * 1024
+const maxChunkBytes = readPositiveBytesEnv(
+  "BUNDLE_MAX_STATIC_CHUNK_BYTES",
+  1024 * 1024
 )
 
 function formatBytes(value) {

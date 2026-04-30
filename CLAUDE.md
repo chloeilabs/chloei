@@ -353,6 +353,7 @@ All other variables are optional — the code has safe defaults. See `.env.examp
 | `AGENT_RATE_LIMIT_ENABLED`                 | Enable/disable rate limiting (default: true)               |
 | `AGENT_RATE_LIMIT_WINDOW_MS`               | Rate limit window (default: 60,000 ms)                     |
 | `AGENT_RATE_LIMIT_MAX_REQUESTS`            | Max requests per window (default: 60)                      |
+| `AGENT_RATE_LIMIT_STORE`                   | `memory` or `postgres` (default: postgres if `DATABASE_URL` is set, else memory) |
 | `AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT` | Concurrency limit (default: 4)                             |
 | `LOG_FORMAT`                               | Set to `json` to force structured JSON logs                |
 | `BETTER_AUTH_COOKIE_DOMAIN`                | Shared cookie domain for cross-subdomain auth              |

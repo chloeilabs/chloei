@@ -604,21 +604,23 @@ export function createAgentStreamResponse(
     params.timeoutMs
   )
   const startedAt = Date.now()
-  let streamSettled = false
-  const settleStream = async () => {
-    if (streamSettled) {
-      return
+  let settlePromise: Promise<void> | null = null
+  const settleStream = () => {
+    if (settlePromise) {
+      return settlePromise
     }
 
-    streamSettled = true
-    try {
-      await params.onStreamSettled?.()
-    } catch (error) {
-      logger.warn("Agent stream settlement callback failed.", {
-        error,
-        requestId: params.requestId,
-      })
-    }
+    settlePromise = (async () => {
+      try {
+        await params.onStreamSettled?.()
+      } catch (error) {
+        logger.warn("Agent stream settlement callback failed.", {
+          error,
+          requestId: params.requestId,
+        })
+      }
+    })()
+    return settlePromise
   }
 
   const encoder = new TextEncoder()
@@ -798,9 +800,9 @@ export function createAgentStreamResponse(
         closeController()
       }
     },
-    cancel() {
+    async cancel() {
       streamClosed = true
-      void settleStream()
+      await settleStream()
     },
   })
 

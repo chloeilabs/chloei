@@ -158,11 +158,12 @@ export async function upsertThreadForUser(
       : Number.NEGATIVE_INFINITY
     const incomingUpdatedAt = Date.parse(normalizedThread.updatedAt)
 
-    if (
-      !existingThread ||
-      !Number.isFinite(existingUpdatedAt) ||
-      !Number.isFinite(incomingUpdatedAt) ||
-      incomingUpdatedAt >= existingUpdatedAt
+    if (!existingThread) {
+      userThreads.set(normalizedThread.id, normalizedThread)
+    } else if (
+      Number.isFinite(incomingUpdatedAt) &&
+      (!Number.isFinite(existingUpdatedAt) ||
+        incomingUpdatedAt >= existingUpdatedAt)
     ) {
       userThreads.set(normalizedThread.id, normalizedThread)
     }
