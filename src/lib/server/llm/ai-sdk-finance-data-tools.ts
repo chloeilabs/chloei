@@ -5,13 +5,23 @@ import { asRecord, asString } from "@/lib/cast"
 import { createLogger } from "@/lib/logger"
 import type { MessageSource, ToolName } from "@/lib/shared"
 
+import {
+  buildFmpStatusUrl,
+  buildFmpUrl,
+  buildFredStatusUrl,
+  buildFredUrl,
+} from "./finance-data/provider-urls"
+import {
+  buildStooqHistoricalPricesUrl,
+  buildStooqQuoteUrl,
+  parseStooqHistoricalPricesCsv,
+  parseStooqQuoteCsv,
+} from "./finance-data/stooq-provider"
+
 const FINANCE_DATA_TOOL_NAME = "finance_data" as const
-const FMP_BASE_URL = "https://financialmodelingprep.com/api/v3"
-const FRED_BASE_URL = "https://api.stlouisfed.org/fred"
 const SEC_COMPANY_FACTS_BASE_URL = "https://data.sec.gov/api/xbrl/companyfacts"
 const SEC_COMPANY_SUBMISSIONS_BASE_URL = "https://data.sec.gov/submissions"
 const SEC_COMPANY_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
-const STOOQ_BASE_URL = "https://stooq.com/q/l/"
 const FINANCE_DATA_MAX_ATTEMPTS = 2
 const FINANCE_DATA_DEFAULT_TIMEOUT_MS = 12_000
 
@@ -314,141 +324,6 @@ function waitForRetryBackoff(attempt: number): Promise<void> {
   })
 }
 
-function getStatementEndpoint(
-  statementType: FinanceDataToolInput["statementType"]
-): string {
-  if (statementType === "balance_sheet") {
-    return "balance-sheet-statement"
-  }
-
-  if (statementType === "cash_flow") {
-    return "cash-flow-statement"
-  }
-
-  return "income-statement"
-}
-
-function buildFmpUrl(input: FinanceDataToolInput, apiKey: string): URL {
-  const operation = input.operation
-  if (operation === "symbol_search") {
-    const url = new URL(`${FMP_BASE_URL}/search`)
-    url.searchParams.set("query", requireField(input, "query"))
-    url.searchParams.set("limit", String(normalizeLimit(input, 10)))
-    url.searchParams.set("apikey", apiKey)
-    return url
-  }
-
-  if (operation === "quote") {
-    const url = new URL(
-      `${FMP_BASE_URL}/quote/${encodeURIComponent(requireField(input, "symbol"))}`
-    )
-    url.searchParams.set("apikey", apiKey)
-    return url
-  }
-
-  if (operation === "company_profile") {
-    const url = new URL(
-      `${FMP_BASE_URL}/profile/${encodeURIComponent(requireField(input, "symbol"))}`
-    )
-    url.searchParams.set("apikey", apiKey)
-    return url
-  }
-
-  if (operation === "historical_prices") {
-    const url = new URL(
-      `${FMP_BASE_URL}/historical-price-full/${encodeURIComponent(requireField(input, "symbol"))}`
-    )
-    if (input.from) {
-      url.searchParams.set("from", input.from)
-    }
-    if (input.to) {
-      url.searchParams.set("to", input.to)
-    }
-    url.searchParams.set("apikey", apiKey)
-    return url
-  }
-
-  if (operation === "financial_statements") {
-    const endpoint = getStatementEndpoint(input.statementType)
-    const url = new URL(
-      `${FMP_BASE_URL}/${endpoint}/${encodeURIComponent(requireField(input, "symbol"))}`
-    )
-    url.searchParams.set("period", input.period ?? "annual")
-    url.searchParams.set("limit", String(normalizeLimit(input, 5)))
-    url.searchParams.set("apikey", apiKey)
-    return url
-  }
-
-  throw new Error(`${operation} is not supported by FMP.`)
-}
-
-function buildFmpStatusUrl(apiKey: string): URL {
-  const url = new URL(`${FMP_BASE_URL}/quote-short/AAPL`)
-  url.searchParams.set("apikey", apiKey)
-  return url
-}
-
-function normalizeStooqSymbol(symbol: string): string {
-  const normalized = normalizeTickerSymbol(symbol).toLowerCase()
-  if (!normalized) {
-    throw new Error("quote requires `symbol`.")
-  }
-
-  return normalized.includes(".") ? normalized : `${normalized}.us`
-}
-
-function buildStooqQuoteUrl(symbol: string): URL {
-  const url = new URL(STOOQ_BASE_URL)
-  url.searchParams.set("s", normalizeStooqSymbol(symbol))
-  url.searchParams.set("f", "sd2t2ohlcvn")
-  url.searchParams.set("h", "")
-  url.searchParams.set("e", "csv")
-  return url
-}
-
-function toStooqDate(value: string): string {
-  return value.replaceAll("-", "")
-}
-
-function buildStooqHistoricalPricesUrl(input: FinanceDataToolInput): URL {
-  const url = new URL("https://stooq.com/q/d/l/")
-  url.searchParams.set("s", normalizeStooqSymbol(requireField(input, "symbol")))
-  url.searchParams.set("i", "d")
-  if (input.from) {
-    url.searchParams.set("d1", toStooqDate(input.from))
-  }
-  if (input.to) {
-    url.searchParams.set("d2", toStooqDate(input.to))
-  }
-  return url
-}
-
-function buildFredUrl(input: FinanceDataToolInput, apiKey: string): URL {
-  const url = new URL(`${FRED_BASE_URL}/series/observations`)
-  url.searchParams.set("series_id", requireField(input, "seriesId"))
-  url.searchParams.set("api_key", apiKey)
-  url.searchParams.set("file_type", "json")
-  url.searchParams.set("sort_order", "desc")
-  url.searchParams.set("limit", String(normalizeLimit(input, 24)))
-  if (input.from) {
-    url.searchParams.set("observation_start", input.from)
-  }
-  if (input.to) {
-    url.searchParams.set("observation_end", input.to)
-  }
-  return url
-}
-
-function buildFredStatusUrl(apiKey: string): URL {
-  const url = new URL(`${FRED_BASE_URL}/series/observations`)
-  url.searchParams.set("series_id", "FEDFUNDS")
-  url.searchParams.set("api_key", apiKey)
-  url.searchParams.set("file_type", "json")
-  url.searchParams.set("sort_order", "desc")
-  url.searchParams.set("limit", "1")
-  return url
-}
-
 function buildSecCompanyFactsUrl(cik: string): URL {
   return new URL(`${SEC_COMPANY_FACTS_BASE_URL}/CIK${normalizeCik(cik)}.json`)
 }
@@ -477,117 +352,6 @@ function buildSecFilingUrl(params: {
 
 function buildSecCompanyTickersUrl(): URL {
   return new URL(SEC_COMPANY_TICKERS_URL)
-}
-
-function parseCsvLine(line: string): string[] {
-  const values: string[] = []
-  let current = ""
-  let quoted = false
-
-  for (const char of line) {
-    if (char === '"') {
-      quoted = !quoted
-      continue
-    }
-
-    if (char === "," && !quoted) {
-      values.push(current)
-      current = ""
-      continue
-    }
-
-    current += char
-  }
-
-  values.push(current)
-  return values
-}
-
-function toNumber(value: string): number | null {
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : null
-}
-
-function parseStooqQuoteCsv(csv: string) {
-  const lines = csv
-    .split(/\r?\n/g)
-    .map((line) => line.trim())
-    .filter(Boolean)
-  const headers = lines[0] ? parseCsvLine(lines[0]) : []
-  const row = lines[1] ? parseCsvLine(lines[1]) : []
-  const record = Object.fromEntries(
-    headers.map((header, index) => [header, row[index] ?? ""])
-  )
-  const close = toNumber(record.Close ?? "")
-
-  if (!record.Symbol || record.Symbol === "N/D" || close === null) {
-    throw Object.assign(new Error("Stooq quote data is unavailable."), {
-      code: "QUOTE_UNAVAILABLE",
-      retryable: true,
-    })
-  }
-
-  return {
-    symbol: record.Symbol,
-    date: record.Date,
-    time: record.Time,
-    open: toNumber(record.Open ?? ""),
-    high: toNumber(record.High ?? ""),
-    low: toNumber(record.Low ?? ""),
-    close,
-    volume: toNumber(record.Volume ?? ""),
-    name: record.Name,
-    delayed: true,
-  }
-}
-
-function parseStooqHistoricalPricesCsv(
-  csv: string,
-  input: FinanceDataToolInput
-) {
-  const lines = csv
-    .split(/\r?\n/g)
-    .map((line) => line.trim())
-    .filter(Boolean)
-  const headers = lines[0] ? parseCsvLine(lines[0]) : []
-  const rows = lines.slice(1).flatMap((line) => {
-    const values = parseCsvLine(line)
-    const record = Object.fromEntries(
-      headers.map((header, index) => [header, values[index] ?? ""])
-    )
-    const close = toNumber(record.Close ?? "")
-    if (!record.Date || close === null) {
-      return []
-    }
-
-    return [
-      {
-        date: record.Date,
-        open: toNumber(record.Open ?? ""),
-        high: toNumber(record.High ?? ""),
-        low: toNumber(record.Low ?? ""),
-        close,
-        volume: toNumber(record.Volume ?? ""),
-      },
-    ]
-  })
-
-  if (rows.length === 0) {
-    throw Object.assign(new Error("Stooq historical prices are unavailable."), {
-      code: "HISTORICAL_PRICES_UNAVAILABLE",
-      retryable: true,
-    })
-  }
-
-  const limit = normalizeLimit(input, 30)
-  return {
-    symbol: normalizeStooqSymbol(requireField(input, "symbol")).toUpperCase(),
-    interval: "1d",
-    rows: rows.slice(-limit),
-    rowCount: Math.min(rows.length, limit),
-    totalRowsAvailable: rows.length,
-    truncated: rows.length > limit,
-  }
 }
 
 export function classifyFinanceDataRetry(params: {

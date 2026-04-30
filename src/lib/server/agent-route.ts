@@ -36,7 +36,6 @@ import { createApiErrorBody, createApiHeaders } from "./api-response"
 import type { AgentRuntimeProfileId } from "./llm/agent-runtime"
 import { startGatewayResponseStream } from "./llm/gateway-responses"
 import { withAiSdkInlineCitationInstruction } from "./llm/system-instruction-augmentations"
-import { type evaluateAndConsumeSlidingWindowRateLimit } from "./rate-limit"
 
 const STREAM_TIMEOUT_FALLBACK_TEXT =
   "Sorry, I couldn't finish the response in time. Please retry."
@@ -92,9 +91,13 @@ type AgentStreamRequest = z.infer<typeof agentStreamRequestSchema>
 type ParsedAgentStreamRequestData = Omit<AgentStreamRequest, "runMode"> & {
   runMode: AgentRunMode
 }
-type AgentRateLimitDecision = ReturnType<
-  typeof evaluateAndConsumeSlidingWindowRateLimit
->
+interface AgentRateLimitDecision {
+  allowed: boolean
+  limit: number
+  remaining: number
+  retryAfterSeconds: number | null
+  resetAtEpochSeconds: number
+}
 interface ParsedAgentStreamRequest {
   parsedRequest: ParsedAgentStreamRequestData
   selectedModel: ModelType
@@ -129,7 +132,7 @@ interface CreateAgentStreamResponseParams {
   runtimeProfile?: AgentRuntimeProfileId
   messages: AgentStreamRequest["messages"]
   systemInstruction: string
-  onStreamSettled?: () => void
+  onStreamSettled?: () => Promise<void> | void
 }
 
 export function resolveUserTimeZone(request: NextRequest): string | undefined {
@@ -601,14 +604,23 @@ export function createAgentStreamResponse(
     params.timeoutMs
   )
   const startedAt = Date.now()
-  let streamSettled = false
+  let settlePromise: Promise<void> | null = null
   const settleStream = () => {
-    if (streamSettled) {
-      return
+    if (settlePromise) {
+      return settlePromise
     }
 
-    streamSettled = true
-    params.onStreamSettled?.()
+    settlePromise = (async () => {
+      try {
+        await params.onStreamSettled?.()
+      } catch (error) {
+        logger.warn("Agent stream settlement callback failed.", {
+          error,
+          requestId: params.requestId,
+        })
+      }
+    })()
+    return settlePromise
   }
 
   const encoder = new TextEncoder()
@@ -784,13 +796,13 @@ export function createAgentStreamResponse(
           hadMeaningfulText: streamState.hasMeaningfulText,
           hadStructuredOutput: streamState.hasStructuredOutput,
         })
-        settleStream()
+        await settleStream()
         closeController()
       }
     },
-    cancel() {
+    async cancel() {
       streamClosed = true
-      settleStream()
+      await settleStream()
     },
   })
 

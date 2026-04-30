@@ -42,7 +42,8 @@ import { ChloeiLogoSvg } from "../../graphics/logo/logo-svg"
 import { ScrollToBottom } from "../../task/scroll-to-bottom"
 import { Messages } from "../messages/messages"
 import { PromptForm } from "../prompt-form/prompt-form"
-import { useAgentSession, useThreadStore } from "./use-agent-session"
+import { useAgentSession } from "./use-agent-session"
+import { useThreadStore } from "./use-thread-store"
 
 type ViewTransitionStarter = (updateCallback: () => void) => unknown
 

@@ -3,6 +3,7 @@ import { nextCookies } from "better-auth/next-js"
 
 import { resolveRequestIdFromHeaders } from "../request-id"
 import { createApiErrorResponse } from "./api-response"
+import { isE2eMockModeEnabled } from "./e2e-test-mode"
 import { DATABASE_URL_ENV_NAME, getAuthDatabase } from "./postgres"
 
 declare global {
@@ -51,6 +52,10 @@ function getMissingAuthConfig(): AuthRequiredEnvName[] {
 }
 
 export function isAuthConfigured(): boolean {
+  if (isE2eMockModeEnabled()) {
+    return true
+  }
+
   return getMissingAuthConfig().length === 0
 }
 
@@ -240,7 +245,7 @@ function createAuth() {
 }
 
 export function getAuthOrNull(): ReturnType<typeof createAuth> | null {
-  if (!isAuthConfigured()) {
+  if (isE2eMockModeEnabled() || !isAuthConfigured()) {
     return null
   }
 

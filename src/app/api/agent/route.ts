@@ -27,6 +27,10 @@ import {
   isAuthConfigured,
 } from "@/lib/server/auth"
 import { getRequestSession } from "@/lib/server/auth-session"
+import {
+  createE2eAgentStreamResponse,
+  isE2eMockModeEnabled,
+} from "@/lib/server/e2e-test-mode"
 import type { AgentRuntimeProfileId } from "@/lib/server/llm/agent-runtime"
 import {
   evaluateAndConsumeSlidingWindowRateLimit,
@@ -82,6 +86,7 @@ export async function POST(request: NextRequest) {
     const aiGatewayApiKey = process.env.AI_GATEWAY_API_KEY
     const tavilyApiKey = process.env.TAVILY_API_KEY
     const fmpApiKey = process.env.FMP_API_KEY
+    const isE2eMockRequest = isE2eMockModeEnabled()
     const session = await getRequestSession(request.headers)
 
     if (!session) {
@@ -101,13 +106,14 @@ export async function POST(request: NextRequest) {
     }
 
     const clientIdentifier = resolveRateLimitIdentifier(session.user.id)
-    const rateLimitDecision = AGENT_RATE_LIMIT_ENABLED
-      ? evaluateAndConsumeSlidingWindowRateLimit({
-          identifier: clientIdentifier,
-          maxRequests: AGENT_RATE_LIMIT_MAX_REQUESTS,
-          windowMs: AGENT_RATE_LIMIT_WINDOW_MS,
-        })
-      : null
+    const rateLimitDecision =
+      AGENT_RATE_LIMIT_ENABLED && !isE2eMockRequest
+        ? await evaluateAndConsumeSlidingWindowRateLimit({
+            identifier: clientIdentifier,
+            maxRequests: AGENT_RATE_LIMIT_MAX_REQUESTS,
+            windowMs: AGENT_RATE_LIMIT_WINDOW_MS,
+          })
+        : null
 
     if (rateLimitDecision && !rateLimitDecision.allowed) {
       return observeRouteResponse(
@@ -182,6 +188,16 @@ export async function POST(request: NextRequest) {
       }
     )
 
+    if (isE2eMockRequest) {
+      return observeRouteResponse(
+        observation,
+        createE2eAgentStreamResponse({ requestId }),
+        {
+          outcome: "stream_started",
+        }
+      )
+    }
+
     if (!aiGatewayApiKey) {
       logger.error("Missing AI_GATEWAY_API_KEY on the server.", {
         errorCode: "AGENT_AI_GATEWAY_API_KEY_MISSING",
@@ -204,7 +220,7 @@ export async function POST(request: NextRequest) {
     }
 
     const concurrencySlot = AGENT_RATE_LIMIT_ENABLED
-      ? tryAcquireConcurrencySlot({
+      ? await tryAcquireConcurrencySlot({
           identifier: clientIdentifier,
           maxConcurrent: AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT,
           windowMs: AGENT_RATE_LIMIT_WINDOW_MS,

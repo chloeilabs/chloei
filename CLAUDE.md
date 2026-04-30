@@ -22,9 +22,11 @@ pnpm lint:fix             # Auto-fix ESLint issues
 pnpm typecheck            # next typegen && tsc --noEmit
 pnpm format               # Prettier (write)
 pnpm format:check         # Prettier (check only)
+pnpm bundle:budget        # Check built static JS chunk budgets
 
 # Tests
 pnpm test                                        # All tests
+pnpm test:smoke:mock                            # Credential-free Playwright smoke
 node --test tests/agent-route-contract.test.mjs  # Single test file
 ```
 
@@ -172,7 +174,7 @@ Three tool categories, each only active when the respective API key is configure
 
 ### Rate Limiting
 
-In-memory only — resets on process restart, does not synchronize across instances. Two independent controls:
+PostgreSQL-backed when `DATABASE_URL` is configured; local/no-database runs fall back to in-memory limits unless `AGENT_RATE_LIMIT_STORE=postgres` is set. Two independent controls:
 
 - **Sliding window**: 60 req / 60 s per user (keyed `user:<userId>`)
 - **Concurrency slots**: max 4 in-flight requests per user
@@ -186,6 +188,9 @@ All available models are defined in `src/lib/shared/llm/models.ts` (`AvailableMo
 | Key                           | Model ID                      | Display Name      |
 | ----------------------------- | ----------------------------- | ----------------- |
 | `ANTHROPIC_CLAUDE_SONNET_4_6` | `anthropic/claude-sonnet-4.6` | Claude Sonnet 4.6 |
+| `OPENAI_GPT_5_5`              | `openai/gpt-5.5`              | GPT-5.5           |
+| `MOONSHOTAI_KIMI_K2_6`        | `moonshotai/kimi-k2.6`        | Kimi K2.6         |
+| `DEEPSEEK_V4_PRO`             | `deepseek/deepseek-v4-pro`    | DeepSeek V4 Pro   |
 
 Adding a model requires updating `AvailableModels`, `ModelInfos`, and `SUPPORTED_MODELS` in that file. The `/api/models` route reads from this registry (filtered by configured API keys via `getModels()` in `src/lib/actions/api-keys.ts`); the agent validates the requested model against it.
 
@@ -327,30 +332,31 @@ AI_GATEWAY_API_KEY=
 
 All other variables are optional — the code has safe defaults. See `.env.example` for the full list with inline documentation.
 
-| Variable                                   | Purpose                                                    |
-| ------------------------------------------ | ---------------------------------------------------------- |
-| `AUTH_DATABASE_URL`                        | Separate DB for Better Auth (falls back to `DATABASE_URL`) |
-| `TAVILY_API_KEY`                           | Enables Tavily web search + extract tools                  |
-| `FMP_API_KEY`                              | Enables Financial Modeling Prep MCP finance tools          |
-| `FRED_API_KEY`                             | Enables FRED macro/rates lookups through `finance_data`    |
-| `SEC_API_USER_AGENT`                       | User agent for SEC public company-facts requests           |
-| `OPENAI_API_KEY`                           | Enables OpenAI judge for prompt evals                      |
-| `OPENAI_EVAL_JUDGE_MODEL`                  | Judge model override (default: `gpt-5.4`)                  |
-| `PYTHON3_PATH`                             | Override `python3` binary for code execution               |
-| `AGENT_MAX_MESSAGES`                       | Max messages per request (default: 50)                     |
-| `AGENT_MAX_MESSAGE_CHARS`                  | Max chars per message (default: 12,000)                    |
-| `AGENT_MAX_TOTAL_CHARS`                    | Max total conversation chars (default: 48,000)             |
-| `AGENT_STREAM_TIMEOUT_MS`                  | Stream timeout (default: 800,000 ms)                       |
-| `AGENT_TOOL_MAX_STEPS`                     | Max tool use steps per run (default: 12)                   |
-| `AGENT_CODE_EXECUTION_BACKEND`             | `restricted` or `finance`                                  |
-| `AGENT_CODE_EXECUTION_PYTHON_VENV_PATH`    | Optional venv/python path for curated finance execution    |
-| `AGENT_EVAL_RESULTS_DIR`                   | Output directory for finance eval results/artifacts        |
-| `AGENT_RATE_LIMIT_ENABLED`                 | Enable/disable rate limiting (default: true)               |
-| `AGENT_RATE_LIMIT_WINDOW_MS`               | Rate limit window (default: 60,000 ms)                     |
-| `AGENT_RATE_LIMIT_MAX_REQUESTS`            | Max requests per window (default: 60)                      |
-| `AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT` | Concurrency limit (default: 4)                             |
-| `LOG_FORMAT`                               | Set to `json` to force structured JSON logs                |
-| `BETTER_AUTH_COOKIE_DOMAIN`                | Shared cookie domain for cross-subdomain auth              |
-| `BETTER_AUTH_TRUSTED_ORIGINS`              | Comma-separated list of additional trusted origins         |
+| Variable                                   | Purpose                                                                          |
+| ------------------------------------------ | -------------------------------------------------------------------------------- |
+| `AUTH_DATABASE_URL`                        | Separate DB for Better Auth (falls back to `DATABASE_URL`)                       |
+| `TAVILY_API_KEY`                           | Enables Tavily web search + extract tools                                        |
+| `FMP_API_KEY`                              | Enables Financial Modeling Prep MCP finance tools                                |
+| `FRED_API_KEY`                             | Enables FRED macro/rates lookups through `finance_data`                          |
+| `SEC_API_USER_AGENT`                       | User agent for SEC public company-facts requests                                 |
+| `OPENAI_API_KEY`                           | Enables OpenAI judge for prompt evals                                            |
+| `OPENAI_EVAL_JUDGE_MODEL`                  | Judge model override (default: `gpt-5.4`)                                        |
+| `PYTHON3_PATH`                             | Override `python3` binary for code execution                                     |
+| `AGENT_MAX_MESSAGES`                       | Max messages per request (default: 50)                                           |
+| `AGENT_MAX_MESSAGE_CHARS`                  | Max chars per message (default: 12,000)                                          |
+| `AGENT_MAX_TOTAL_CHARS`                    | Max total conversation chars (default: 48,000)                                   |
+| `AGENT_STREAM_TIMEOUT_MS`                  | Stream timeout (default: 800,000 ms)                                             |
+| `AGENT_TOOL_MAX_STEPS`                     | Max tool use steps per run (default: 12)                                         |
+| `AGENT_CODE_EXECUTION_BACKEND`             | `restricted` or `finance`                                                        |
+| `AGENT_CODE_EXECUTION_PYTHON_VENV_PATH`    | Optional venv/python path for curated finance execution                          |
+| `AGENT_EVAL_RESULTS_DIR`                   | Output directory for finance eval results/artifacts                              |
+| `AGENT_RATE_LIMIT_ENABLED`                 | Enable/disable rate limiting (default: true)                                     |
+| `AGENT_RATE_LIMIT_WINDOW_MS`               | Rate limit window (default: 60,000 ms)                                           |
+| `AGENT_RATE_LIMIT_MAX_REQUESTS`            | Max requests per window (default: 60)                                            |
+| `AGENT_RATE_LIMIT_STORE`                   | `memory` or `postgres` (default: postgres if `DATABASE_URL` is set, else memory) |
+| `AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT` | Concurrency limit (default: 4)                                                   |
+| `LOG_FORMAT`                               | Set to `json` to force structured JSON logs                                      |
+| `BETTER_AUTH_COOKIE_DOMAIN`                | Shared cookie domain for cross-subdomain auth                                    |
+| `BETTER_AUTH_TRUSTED_ORIGINS`              | Comma-separated list of additional trusted origins                               |
 
 Vercel tip: `vercel env pull .env.local` is the quickest way to hydrate local development from Vercel project settings.

@@ -21,6 +21,7 @@ const nodeConfigFiles = [
   "tests/**/*.mjs",
   "eslint.config.mjs",
   "next.config.mjs",
+  "playwright.config.mjs",
   "postcss.config.mjs",
   "app-migrate.mjs",
 ]

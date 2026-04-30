@@ -124,7 +124,10 @@ export function UserMessage({
       return selectedModel
     }
 
-    if (isModelType(message.llmModel) && isModelSelectorModel(message.llmModel)) {
+    if (
+      isModelType(message.llmModel) &&
+      isModelSelectorModel(message.llmModel)
+    ) {
       return message.llmModel
     }
 

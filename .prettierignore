@@ -3,6 +3,7 @@ node_modules/
 .next/
 .turbo/
 coverage/
+test-results/
 pnpm-lock.yaml
 .pnpm-store/
 __pycache__/
