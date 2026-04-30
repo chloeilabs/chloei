@@ -37,16 +37,13 @@ import { usePersistentSelectedModel } from "@/hooks/agent/use-persistent-selecte
 import {
   AGENT_ATTACHMENT_MAX_FILE_BYTES,
   AGENT_ATTACHMENT_MAX_FILES,
-  AGENT_ATTACHMENT_MAX_PREVIEW_DATA_URL_CHARS,
   AGENT_ATTACHMENT_MAX_TOTAL_BYTES,
-  type AgentAttachmentMimeType,
   type AgentRequestAttachment,
   type AgentRunMode,
   getAgentAttachmentAcceptAttribute,
   getAgentAttachmentKind,
   getModelSelectorModels,
   type ModelType,
-  normalizeAgentAttachmentMimeType,
 } from "@/lib/shared"
 import { cn } from "@/lib/utils"
 
@@ -58,91 +55,15 @@ import {
   agentSurfaceBackgroundClass,
   agentSurfaceClass,
 } from "../shared/shell-styles"
+import {
+  createImagePreviewDataUrl,
+  formatFileSize,
+  getNormalizedFileMediaType,
+  readFileAsDataUrl,
+} from "./attachments"
 import { ModelSelector } from "./model-selector"
 
 const DEFAULT_ATTACHMENT_PROMPT = "Analyze the attached file(s)."
-const IMAGE_PREVIEW_MAX_EDGE = 160
-
-function formatFileSize(sizeBytes: number): string {
-  if (sizeBytes < 1024) {
-    return `${String(sizeBytes)} B`
-  }
-
-  if (sizeBytes < 1024 * 1024) {
-    return `${(sizeBytes / 1024).toFixed(1)} KB`
-  }
-
-  return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      const result = event.target?.result
-      if (typeof result === "string") {
-        resolve(result)
-        return
-      }
-
-      reject(new Error("File could not be read."))
-    }
-    reader.onerror = () => {
-      reject(new Error("File could not be read."))
-    }
-    reader.readAsDataURL(file)
-  })
-}
-
-async function createImagePreviewDataUrl(
-  dataUrl: string
-): Promise<string | undefined> {
-  if (typeof window === "undefined") {
-    return undefined
-  }
-
-  try {
-    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const nextImage = new window.Image()
-      nextImage.onload = () => {
-        resolve(nextImage)
-      }
-      nextImage.onerror = () => {
-        reject(new Error("Image preview failed."))
-      }
-      nextImage.src = dataUrl
-    })
-    const longestEdge = Math.max(image.naturalWidth, image.naturalHeight)
-    if (!longestEdge) {
-      return undefined
-    }
-
-    const scale = Math.min(1, IMAGE_PREVIEW_MAX_EDGE / longestEdge)
-    const width = Math.max(1, Math.round(image.naturalWidth * scale))
-    const height = Math.max(1, Math.round(image.naturalHeight * scale))
-    const canvas = document.createElement("canvas")
-    canvas.width = width
-    canvas.height = height
-    const context = canvas.getContext("2d")
-    if (!context) {
-      return undefined
-    }
-
-    context.drawImage(image, 0, 0, width, height)
-    const previewDataUrl = canvas.toDataURL("image/jpeg", 0.72)
-    return previewDataUrl.length <= AGENT_ATTACHMENT_MAX_PREVIEW_DATA_URL_CHARS
-      ? previewDataUrl
-      : undefined
-  } catch {
-    return undefined
-  }
-}
-
-function getNormalizedFileMediaType(
-  file: File
-): AgentAttachmentMimeType | null {
-  return normalizeAgentAttachmentMimeType(file.type)
-}
 
 export function PromptForm({
   onSubmit,

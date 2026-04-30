@@ -22,9 +22,11 @@ pnpm lint:fix             # Auto-fix ESLint issues
 pnpm typecheck            # next typegen && tsc --noEmit
 pnpm format               # Prettier (write)
 pnpm format:check         # Prettier (check only)
+pnpm bundle:budget        # Check built static JS chunk budgets
 
 # Tests
 pnpm test                                        # All tests
+pnpm test:smoke:mock                            # Credential-free Playwright smoke
 node --test tests/agent-route-contract.test.mjs  # Single test file
 ```
 
@@ -172,7 +174,7 @@ Three tool categories, each only active when the respective API key is configure
 
 ### Rate Limiting
 
-In-memory only — resets on process restart, does not synchronize across instances. Two independent controls:
+PostgreSQL-backed when `DATABASE_URL` is configured; local/no-database runs fall back to in-memory limits unless `AGENT_RATE_LIMIT_STORE=postgres` is set. Two independent controls:
 
 - **Sliding window**: 60 req / 60 s per user (keyed `user:<userId>`)
 - **Concurrency slots**: max 4 in-flight requests per user
@@ -186,6 +188,9 @@ All available models are defined in `src/lib/shared/llm/models.ts` (`AvailableMo
 | Key                           | Model ID                      | Display Name      |
 | ----------------------------- | ----------------------------- | ----------------- |
 | `ANTHROPIC_CLAUDE_SONNET_4_6` | `anthropic/claude-sonnet-4.6` | Claude Sonnet 4.6 |
+| `OPENAI_GPT_5_5`              | `openai/gpt-5.5`              | GPT-5.5           |
+| `MOONSHOTAI_KIMI_K2_6`        | `moonshotai/kimi-k2.6`        | Kimi K2.6         |
+| `DEEPSEEK_V4_PRO`             | `deepseek/deepseek-v4-pro`    | DeepSeek V4 Pro   |
 
 Adding a model requires updating `AvailableModels`, `ModelInfos`, and `SUPPORTED_MODELS` in that file. The `/api/models` route reads from this registry (filtered by configured API keys via `getModels()` in `src/lib/actions/api-keys.ts`); the agent validates the requested model against it.
 

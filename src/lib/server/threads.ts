@@ -7,6 +7,7 @@ import {
   type Thread,
 } from "@/lib/shared"
 
+import { isE2eMockModeEnabled } from "./e2e-test-mode"
 import { getDatabase } from "./postgres"
 import {
   parseStoredThread,
@@ -14,6 +15,10 @@ import {
   type StoredThreadRow,
 } from "./thread-payload"
 export { parseThreadPayload } from "./thread-payload"
+
+declare global {
+  var chloeiE2eThreads: Map<string, Map<string, Thread>> | undefined
+}
 
 const logger = createLogger("thread-store")
 
@@ -58,6 +63,12 @@ export function isThreadStoreNotInitializedError(
 }
 
 export async function listThreadsForUser(userId: string): Promise<Thread[]> {
+  if (isE2eMockModeEnabled()) {
+    return sortThreadsNewestFirst([
+      ...(globalThis.chloeiE2eThreads?.get(userId)?.values() ?? []),
+    ])
+  }
+
   const database = getDatabase()
   const result = await sql<StoredThreadRow>`
     SELECT
@@ -92,6 +103,10 @@ export async function getThreadForUser(
   userId: string,
   threadId: string
 ): Promise<Thread | null> {
+  if (isE2eMockModeEnabled()) {
+    return globalThis.chloeiE2eThreads?.get(userId)?.get(threadId) ?? null
+  }
+
   const database = getDatabase()
   const result = await sql<StoredThreadRow>`
     SELECT
@@ -127,6 +142,34 @@ export async function upsertThreadForUser(
   userId: string,
   thread: Thread
 ): Promise<Thread> {
+  if (isE2eMockModeEnabled()) {
+    const normalizedThread = prepareThreadForPersistence(thread)
+    globalThis.chloeiE2eThreads ??= new Map()
+
+    let userThreads = globalThis.chloeiE2eThreads.get(userId)
+    if (!userThreads) {
+      userThreads = new Map()
+      globalThis.chloeiE2eThreads.set(userId, userThreads)
+    }
+
+    const existingThread = userThreads.get(normalizedThread.id)
+    const existingUpdatedAt = existingThread
+      ? Date.parse(existingThread.updatedAt)
+      : Number.NEGATIVE_INFINITY
+    const incomingUpdatedAt = Date.parse(normalizedThread.updatedAt)
+
+    if (
+      !existingThread ||
+      !Number.isFinite(existingUpdatedAt) ||
+      !Number.isFinite(incomingUpdatedAt) ||
+      incomingUpdatedAt >= existingUpdatedAt
+    ) {
+      userThreads.set(normalizedThread.id, normalizedThread)
+    }
+
+    return userThreads.get(normalizedThread.id) ?? normalizedThread
+  }
+
   const database = getDatabase()
   const normalizedThread = prepareThreadForPersistence(thread)
   const { createdAt, updatedAt } = normalizedThread
@@ -173,6 +216,11 @@ export async function upsertThreadForUser(
 }
 
 export async function deleteThreadForUser(userId: string, threadId: string) {
+  if (isE2eMockModeEnabled()) {
+    globalThis.chloeiE2eThreads?.get(userId)?.delete(threadId)
+    return
+  }
+
   const database = getDatabase()
 
   try {

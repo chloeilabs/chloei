@@ -1,4 +1,5 @@
 import { Check, ChevronDown, CircleCheck, CircleX, Copy } from "lucide-react"
+import dynamic from "next/dynamic"
 import { useMemo, useState } from "react"
 
 import { LogoHover } from "@/components/graphics/logo/logo-hover"
@@ -12,11 +13,23 @@ import {
 import { Button } from "../../ui/button"
 import { Source, SourceContent, SourceTrigger } from "../../ui/source"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip"
-import { MemoizedMarkdown } from "../markdown/memoized-markdown"
 import {
   getDedupedSources,
   normalizeAssistantActivityTimeline,
 } from "./assistant-activity-timeline"
+
+const MemoizedMarkdown = dynamic(
+  () =>
+    import("../markdown/memoized-markdown").then(
+      (module) => module.MemoizedMarkdown
+    ),
+  {
+    loading: () => (
+      <div className="h-5 w-32 animate-pulse rounded-sm bg-muted/50" />
+    ),
+    ssr: false,
+  }
+)
 
 function getAssistantContent(message: Message): string {
   const parts = message.metadata?.parts ?? []

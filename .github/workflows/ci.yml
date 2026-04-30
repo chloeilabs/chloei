@@ -42,8 +42,23 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Check formatting
+        run: pnpm format:check
+
       - name: Test
         run: pnpm test
 
       - name: Typecheck
         run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
+
+      - name: Check bundle budget
+        run: pnpm bundle:budget
+
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Mock smoke test
+        run: pnpm test:smoke:mock

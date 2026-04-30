@@ -4,7 +4,6 @@ import { Check, Copy } from "lucide-react"
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard"
-import { getHighlighter } from "@/lib/editor/highlighter"
 import { createLogger } from "@/lib/logger"
 import { cn } from "@/lib/utils"
 
@@ -90,6 +89,7 @@ export function ShikiCode({
   useEffect(() => {
     async function highlightCode() {
       try {
+        const { getHighlighter } = await import("@/lib/editor/highlighter")
         const highlighter = await getHighlighter()
         const html = highlighter.codeToHtml(children, {
           lang: language ?? className?.replace(/language-/, "") ?? "plaintext",

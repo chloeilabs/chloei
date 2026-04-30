@@ -58,6 +58,16 @@ CREATE TABLE IF NOT EXISTS automation (
 CREATE INDEX IF NOT EXISTS automation_user_updated_at_idx
 ON automation ("userId", "updatedAt" DESC);
 
+CREATE TABLE IF NOT EXISTS agent_rate_limit (
+  identifier text PRIMARY KEY,
+  hits jsonb NOT NULL DEFAULT '[]'::jsonb,
+  "inFlight" integer NOT NULL DEFAULT 0,
+  "lastSeenAt" timestamp(3) without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS agent_rate_limit_last_seen_at_idx
+ON agent_rate_limit ("lastSeenAt");
+
 DROP TABLE IF EXISTS agent_job;
 DROP TABLE IF EXISTS ${LEGACY_EVENT_TABLE};
 

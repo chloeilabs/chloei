@@ -5,6 +5,11 @@ import { createLogger } from "@/lib/logger"
 import type { AuthViewer } from "@/lib/shared"
 
 import { getAuthOrNull } from "./auth"
+import {
+  E2E_MOCK_VIEWER,
+  isE2eAuthenticatedRequest,
+  isE2eMockModeEnabled,
+} from "./e2e-test-mode"
 import { getAuthDatabase } from "./postgres"
 
 const logger = createLogger("auth-session")
@@ -36,6 +41,12 @@ function toViewer(session: AuthSession): AuthViewer | null {
 export async function getRequestSession(
   requestHeaders: Headers
 ): Promise<AuthSession> {
+  if (isE2eAuthenticatedRequest(requestHeaders)) {
+    return {
+      user: E2E_MOCK_VIEWER,
+    }
+  }
+
   const auth = getAuthOrNull()
 
   if (!auth) {
@@ -48,6 +59,14 @@ export async function getRequestSession(
 }
 
 async function getCurrentSession(): Promise<AuthSession> {
+  const requestHeaders = new Headers(await headers())
+
+  if (isE2eAuthenticatedRequest(requestHeaders)) {
+    return {
+      user: E2E_MOCK_VIEWER,
+    }
+  }
+
   const auth = getAuthOrNull()
 
   if (!auth) {
@@ -55,7 +74,7 @@ async function getCurrentSession(): Promise<AuthSession> {
   }
 
   return auth.api.getSession({
-    headers: new Headers(await headers()),
+    headers: requestHeaders,
   })
 }
 
@@ -66,6 +85,10 @@ export async function getCurrentViewer(): Promise<AuthViewer | null> {
 export async function getViewerById(
   userId: string
 ): Promise<AuthViewer | null> {
+  if (isE2eMockModeEnabled() && userId === E2E_MOCK_VIEWER.id) {
+    return E2E_MOCK_VIEWER
+  }
+
   try {
     const database = getAuthDatabase()
     const result = await sql<{

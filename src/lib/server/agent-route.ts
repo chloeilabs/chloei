@@ -36,7 +36,6 @@ import { createApiErrorBody, createApiHeaders } from "./api-response"
 import type { AgentRuntimeProfileId } from "./llm/agent-runtime"
 import { startGatewayResponseStream } from "./llm/gateway-responses"
 import { withAiSdkInlineCitationInstruction } from "./llm/system-instruction-augmentations"
-import { type evaluateAndConsumeSlidingWindowRateLimit } from "./rate-limit"
 
 const STREAM_TIMEOUT_FALLBACK_TEXT =
   "Sorry, I couldn't finish the response in time. Please retry."
@@ -92,9 +91,13 @@ type AgentStreamRequest = z.infer<typeof agentStreamRequestSchema>
 type ParsedAgentStreamRequestData = Omit<AgentStreamRequest, "runMode"> & {
   runMode: AgentRunMode
 }
-type AgentRateLimitDecision = ReturnType<
-  typeof evaluateAndConsumeSlidingWindowRateLimit
->
+interface AgentRateLimitDecision {
+  allowed: boolean
+  limit: number
+  remaining: number
+  retryAfterSeconds: number | null
+  resetAtEpochSeconds: number
+}
 interface ParsedAgentStreamRequest {
   parsedRequest: ParsedAgentStreamRequestData
   selectedModel: ModelType
@@ -129,7 +132,7 @@ interface CreateAgentStreamResponseParams {
   runtimeProfile?: AgentRuntimeProfileId
   messages: AgentStreamRequest["messages"]
   systemInstruction: string
-  onStreamSettled?: () => void
+  onStreamSettled?: () => Promise<void> | void
 }
 
 export function resolveUserTimeZone(request: NextRequest): string | undefined {
@@ -602,13 +605,20 @@ export function createAgentStreamResponse(
   )
   const startedAt = Date.now()
   let streamSettled = false
-  const settleStream = () => {
+  const settleStream = async () => {
     if (streamSettled) {
       return
     }
 
     streamSettled = true
-    params.onStreamSettled?.()
+    try {
+      await params.onStreamSettled?.()
+    } catch (error) {
+      logger.warn("Agent stream settlement callback failed.", {
+        error,
+        requestId: params.requestId,
+      })
+    }
   }
 
   const encoder = new TextEncoder()
@@ -784,13 +794,13 @@ export function createAgentStreamResponse(
           hadMeaningfulText: streamState.hasMeaningfulText,
           hadStructuredOutput: streamState.hasStructuredOutput,
         })
-        settleStream()
+        await settleStream()
         closeController()
       }
     },
     cancel() {
       streamClosed = true
-      settleStream()
+      void settleStream()
     },
   })
 

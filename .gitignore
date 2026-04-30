@@ -15,6 +15,7 @@ node_modules
 
 # Testing
 coverage
+test-results/
 .artifacts/
 __pycache__/
 evals/finance/cache/

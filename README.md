@@ -1,6 +1,6 @@
 # Chloei
 
-Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently exposes a curated model selector with Anthropic Claude Sonnet 4.6 and OpenAI GPT-5.5, and supports native web search, X search, local code execution, optional Tavily retrieval, optional Financial Modeling Prep MCP tools, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
+Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently exposes a curated model selector with Kimi K2.6 and DeepSeek V4 Pro, uses GPT-5.5 for research and file-attachment runs, and supports native web search, local code execution, optional Tavily retrieval, optional Financial Modeling Prep MCP tools, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
 
 ## Requirements
 
@@ -35,8 +35,11 @@ To enable auth locally, provision PostgreSQL and add:
 - `pnpm auth:migrate`: apply Better Auth schema changes to PostgreSQL
 - `pnpm app:migrate`: apply app storage schema changes to PostgreSQL
 - `pnpm build`: build the production app
+- `pnpm bundle:budget`: check built static JavaScript chunks against bundle budgets
 - `pnpm start`: run the production server
 - `pnpm test`: run regression tests
+- `pnpm test:smoke`: run opt-in Playwright browser smoke tests against `SMOKE_BASE_URL`
+- `pnpm test:smoke:mock`: run the credential-free mocked Playwright smoke test used by CI
 - `pnpm lint`: run blocking ESLint checks
 - `pnpm lint:fix`: apply autofixable ESLint changes
 - `pnpm format`: write Prettier formatting changes
@@ -64,7 +67,7 @@ To enable auth locally, provision PostgreSQL and add:
 - `BETTER_AUTH_TRUSTED_ORIGINS`: optional comma-separated list of additional allowed origins
 - `BETTER_AUTH_COOKIE_DOMAIN`: optional shared parent cookie domain for cross-subdomain sessions; keep this production-only when preview deployments use `vercel.app` hosts
 
-Optional variables let you override the built-in safe defaults for message limits, response timeout, rate limiting, concurrent requests per client, and Next.js request body limits.
+Optional variables let you override the built-in safe defaults for message limits, response timeout, rate limiting, concurrent requests per client, rate-limit storage, and Next.js request body limits.
 
 - `TAVILY_API_KEY`: enables Tavily search and extract callable tools for chat requests
 - `FMP_API_KEY`: enables curated Financial Modeling Prep MCP tools for structured finance data
@@ -72,6 +75,7 @@ Optional variables let you override the built-in safe defaults for message limit
 - `SEC_API_USER_AGENT`: identifies Chloei for SEC public company-facts requests
 
 By default, Chloei enforces safe built-in agent limits even if you leave all optional `AGENT_*` env vars unset.
+`AGENT_RATE_LIMIT_STORE` defaults to `auto`, which uses PostgreSQL when `DATABASE_URL` is configured and falls back to process memory for local/no-database runs. Set it to `postgres` to require shared rate limits or `memory` for local-only limits.
 
 ## Important paths
 
@@ -92,5 +96,11 @@ By default, Chloei enforces safe built-in agent limits even if you leave all opt
 - `finance_data` normalizes finance operations across FMP, SEC public company facts, and optional FRED macro/rates data. FMP MCP remains available as a migration compatibility path for chat-default runs.
 - Finance eval fixtures and GDPval-style harness scripts live in `evals/finance`.
 - To share logins with another Chloei app, point both apps at the same Better Auth database and secret, set `BETTER_AUTH_COOKIE_DOMAIN` to the shared parent domain, and include every live subdomain in `BETTER_AUTH_TRUSTED_ORIGINS`.
-- Rate limiting and concurrency protection are in-memory, so they reset on process restart and do not synchronize across instances.
+- Rate limiting and concurrency protection are PostgreSQL-backed when `DATABASE_URL` is configured. Local/no-database runs fall back to in-memory limits unless `AGENT_RATE_LIMIT_STORE=postgres` is set.
 - App storage does not self-initialize on live requests. Vercel deployments in this repo run `pnpm migrate` before `next build`.
+
+## Browser smoke tests
+
+`pnpm test:smoke` runs Playwright against `SMOKE_BASE_URL` or starts the local dev server at `http://localhost:3000`. Set `SMOKE_EMAIL` and `SMOKE_PASSWORD` for an existing test account before running the live authenticated smoke test. Optional `SMOKE_PROMPT` and `SMOKE_EXPECTED_TEXT` let you tune the live prompt assertion.
+
+`pnpm test:smoke:mock` runs a CI-safe authenticated chat flow with `E2E_MOCK_AUTH=1`, in-memory thread storage, and a deterministic mock agent response. It does not require Better Auth credentials, PostgreSQL, or AI provider API keys.

@@ -46,6 +46,19 @@ const securityHeaders = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  outputFileTracingExcludes: {
+    "/api/agent": [
+      "./CLAUDE.md",
+      "./README.md",
+      "./app-migrate.mjs",
+      "./auth.ts",
+      "./components.json",
+      "./eslint.config.mjs",
+      "./evals/**/*",
+      "./next.config.mjs",
+      "./tests/**/*",
+    ],
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: serverActionsBodySizeLimit,
