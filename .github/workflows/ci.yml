@@ -53,6 +53,9 @@ jobs:
 
       - name: Build
         run: pnpm build
+        env:
+          E2E_MOCK_AUTH: "1"
+          E2E_MOCK_AUTH_ALLOW_NEXT_START: "1"
 
       - name: Check bundle budget
         run: pnpm bundle:budget
