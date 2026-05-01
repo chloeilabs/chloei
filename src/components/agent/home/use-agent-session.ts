@@ -20,6 +20,14 @@ import {
 } from "@/lib/shared"
 
 import {
+  type AttachmentPayloadsByThread,
+  createAssistantMessageFromAccumulator,
+  getThreadAttachmentPayloads,
+  hasVisibleStructuredOutput,
+  pruneThreadAttachmentPayloads,
+  upsertAgentMessage,
+} from "./agent-session-state"
+import {
   getResponseErrorMessage,
   parseStreamEventLine,
   readResponseStreamLines,
@@ -67,52 +75,6 @@ const INITIAL_STATE: AgentSessionState = {
   isStreaming: false,
 }
 
-type AttachmentPayloadsByThread = Map<
-  string,
-  Map<string, AgentRequestAttachment[]>
->
-
-function getThreadAttachmentPayloads(
-  payloadsByThread: AttachmentPayloadsByThread,
-  threadId: string
-) {
-  let payloads = payloadsByThread.get(threadId)
-
-  if (!payloads) {
-    payloads = new Map<string, AgentRequestAttachment[]>()
-    payloadsByThread.set(threadId, payloads)
-  }
-
-  return payloads
-}
-
-function pruneThreadAttachmentPayloads(
-  payloadsByThread: AttachmentPayloadsByThread,
-  threadId: string,
-  messages: readonly AgentMessage[]
-) {
-  const payloads = payloadsByThread.get(threadId)
-  if (!payloads) {
-    return
-  }
-
-  const messageIds = new Set(
-    messages
-      .filter((message) => message.role === "user")
-      .map((message) => message.id)
-  )
-
-  for (const messageId of payloads.keys()) {
-    if (!messageIds.has(messageId)) {
-      payloads.delete(messageId)
-    }
-  }
-
-  if (payloads.size === 0) {
-    payloadsByThread.delete(threadId)
-  }
-}
-
 function getClientTimeZone(): string | undefined {
   try {
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone.trim()
@@ -129,15 +91,6 @@ function createAgentRequestHeaders(): HeadersInit {
     "Content-Type": "application/json",
     ...(timeZone ? { "X-User-Timezone": timeZone } : {}),
   })
-}
-
-function hasVisibleStructuredOutput(current: AgentStreamAccumulator): boolean {
-  return Boolean(
-    current.reasoning.trim() ||
-    current.toolInvocations.length > 0 ||
-    current.activityTimeline.length > 0 ||
-    current.sources.length > 0
-  )
 }
 
 export function useAgentSession({
@@ -336,45 +289,18 @@ export function useAgentSession({
           return
         }
 
-        const assistantMessage: AgentMessage = {
+        const assistantMessage = createAssistantMessageFromAccumulator({
           id: assistantId,
-          role: "assistant",
-          content: nextAccumulator.content,
-          llmModel: params.model,
           createdAt: assistantCreatedAt,
-          metadata: {
-            isStreaming: streamFlags.isStreaming,
-            runMode: params.runMode,
-            parts: [{ type: "text", text: nextAccumulator.content }],
-            ...(nextAccumulator.agentStatus
-              ? { agentStatus: nextAccumulator.agentStatus }
-              : {}),
-            ...(nextAccumulator.reasoning.trim().length > 0
-              ? { reasoning: nextAccumulator.reasoning }
-              : {}),
-            ...(nextAccumulator.toolInvocations.length > 0
-              ? { toolInvocations: nextAccumulator.toolInvocations }
-              : {}),
-            ...(nextAccumulator.activityTimeline.length > 0
-              ? { activityTimeline: nextAccumulator.activityTimeline }
-              : {}),
-            ...(nextAccumulator.sources.length > 0
-              ? { sources: nextAccumulator.sources }
-              : {}),
-          },
-        }
-
-        const currentMessages = messagesRef.current
-        const existingIndex = currentMessages.findIndex(
-          (message) => message.id === assistantId
+          accumulator: nextAccumulator,
+          model: params.model,
+          runMode: params.runMode,
+          isStreaming: streamFlags.isStreaming,
+        })
+        const updatedMessages = upsertAgentMessage(
+          messagesRef.current,
+          assistantMessage
         )
-
-        const updatedMessages =
-          existingIndex === -1
-            ? [...currentMessages, assistantMessage]
-            : currentMessages.map((message) =>
-                message.id === assistantId ? assistantMessage : message
-              )
 
         messagesRef.current = updatedMessages
 

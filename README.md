@@ -36,6 +36,7 @@ To enable auth locally, provision PostgreSQL and add:
 - `pnpm app:migrate`: apply app storage schema changes to PostgreSQL
 - `pnpm build`: build the production app
 - `pnpm bundle:budget`: check built static JavaScript chunks against bundle budgets
+- `pnpm bundle:report`: report built static JavaScript chunk headroom and largest first-load routes
 - `pnpm start`: run the production server
 - `pnpm test`: run regression tests
 - `pnpm test:smoke`: run opt-in Playwright browser smoke tests against `SMOKE_BASE_URL`
