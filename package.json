@@ -2,7 +2,6 @@
   "name": "chloei",
   "version": "0.0.1",
   "private": true,
-  "type": "module",
   "scripts": {
     "auth:migrate": "better-auth migrate -y --config auth.ts",
     "app:migrate": "node app-migrate.mjs",
