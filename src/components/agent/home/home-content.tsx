@@ -3,6 +3,7 @@
 import "../../graphics/logo/logo-animation.css"
 
 import { History, SquarePen } from "lucide-react"
+import dynamic from "next/dynamic"
 import Link from "next/link"
 import {
   type CSSProperties,
@@ -40,7 +41,6 @@ import { cn } from "@/lib/utils"
 import { ChloeiLogoHoverSvg } from "../../graphics/logo/logo-hover-svg"
 import { ChloeiLogoSvg } from "../../graphics/logo/logo-svg"
 import { ScrollToBottom } from "../../task/scroll-to-bottom"
-import { Messages } from "../messages/messages"
 import { PromptForm } from "../prompt-form/prompt-form"
 import { useAgentSession } from "./use-agent-session"
 import { useThreadStore } from "./use-thread-store"
@@ -52,6 +52,13 @@ const MOBILE_FALLBACK_TRANSITION_MS = 110
 const STREAMING_SCROLL_EARLY_TRIGGER_PX = 72
 const STREAMING_SCROLL_PROMPT_BUFFER_PX = 24
 const conversationWidthClass = "max-w-[50rem]"
+
+const Messages = dynamic(
+  () => import("../messages/messages").then((mod) => mod.Messages),
+  {
+    loading: () => null,
+  }
+)
 
 function ThreadsPanel({
   open,

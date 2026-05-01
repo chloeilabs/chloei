@@ -60,6 +60,9 @@ jobs:
       - name: Check bundle budget
         run: pnpm bundle:budget
 
+      - name: Report bundle headroom
+        run: pnpm bundle:report
+
       - name: Install Playwright browser
         run: pnpm exec playwright install --with-deps chromium
 
