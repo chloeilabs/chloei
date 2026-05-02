@@ -14,6 +14,7 @@ export const TOOL_NAMES = [
   "tavily_search",
   "tavily_extract",
   "finance_data",
+  "curated_finance",
   "fmp_mcp",
 ] as const
 export type ToolName = (typeof TOOL_NAMES)[number]
@@ -111,11 +112,19 @@ export interface ReasoningActivityTimelineEntry extends ActivityTimelineBaseEntr
   text: string
 }
 
+export interface HarnessActivityTimelineEntry extends ActivityTimelineBaseEntry {
+  kind: "harness"
+  label: string
+  status: ToolInvocationStatus
+  detail?: string
+}
+
 export type ActivityTimelineEntry =
   | ToolActivityTimelineEntry
   | SearchActivityTimelineEntry
   | SourcesActivityTimelineEntry
   | ReasoningActivityTimelineEntry
+  | HarnessActivityTimelineEntry
 
 interface InteractionCheckpointFields {
   interactionId?: string
@@ -169,6 +178,14 @@ export interface AgentStatusStreamEvent extends InteractionCheckpointFields {
   status: AgentRunStatus
 }
 
+export interface HarnessTraceStreamEvent extends InteractionCheckpointFields {
+  type: "harness_trace"
+  stage: "evidence" | "final_synthesis" | "plan" | "tool_decision" | "verification"
+  label: string
+  detail?: string
+  status?: "error" | "info" | "success" | "warning"
+}
+
 export type AgentStreamEvent =
   | TextDeltaStreamEvent
   | ReasoningDeltaStreamEvent
@@ -176,6 +193,7 @@ export type AgentStreamEvent =
   | ToolResultStreamEvent
   | SourceStreamEvent
   | AgentStatusStreamEvent
+  | HarnessTraceStreamEvent
 
 export interface Message {
   id: string

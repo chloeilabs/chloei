@@ -20,6 +20,11 @@ import {
 import { type AgentStreamEvent, type ModelType } from "@/lib/shared"
 
 import {
+  createAgentHarnessRun,
+  createHarnessTraceEvents,
+  getHarnessPromptContext,
+} from "./agent-harness"
+import {
   type AgentInputMessage,
   toModelMessages,
 } from "./agent-runtime-messages"
@@ -53,7 +58,14 @@ import {
   getAiSdkCodeExecutionToolResultMetadata,
   isAiSdkCodeExecutionToolName,
 } from "./code-execution-tools"
+import {
+  createAiSdkCuratedFinanceTools,
+  getAiSdkCuratedFinanceToolCallMetadata,
+  getAiSdkCuratedFinanceToolResultMetadata,
+  isAiSdkCuratedFinanceToolName,
+} from "./curated-finance-tools"
 import { createInitialReasoningChunkSanitizer } from "./initial-reasoning-chunk-sanitizer"
+import { createToolCallTextSanitizer } from "./tool-call-text-sanitizer"
 
 const logger = createLogger("agent-runtime")
 const aiGatewayDispatcher = new Dispatcher1Wrapper(
@@ -127,7 +139,7 @@ const AGENT_RUNTIME_PROFILES: Record<
   finance_analysis: {
     id: "finance_analysis",
     codeExecutionBackend: "finance",
-    fmpMcpEnabled: false,
+    fmpMcpEnabled: true,
     financeDataEnabled: true,
     toolMaxSteps: AGENT_TOOL_MAX_STEPS,
   },
@@ -199,6 +211,10 @@ function shouldEnableCodeExecutionTools(
   model: ModelType,
   runtimeProfile: AgentRuntimeProfile
 ): boolean {
+  if (model.startsWith("deepseek/") || model.startsWith("moonshotai/")) {
+    return false
+  }
+
   return !(
     model.startsWith("xai/") &&
     (runtimeProfile.id === "chat_default" ||
@@ -423,6 +439,7 @@ export async function* startAgentRuntimeStream(
   const finalizedToolCalls = new Set<string>()
   const seenSourceKeys = new Set<string>()
   const sanitizeInitialReasoningChunk = createInitialReasoningChunkSanitizer()
+  const sanitizeTextChunk = createToolCallTextSanitizer()
 
   const createSourceEvent = (
     id: string,
@@ -445,6 +462,19 @@ export async function* startAgentRuntimeStream(
       runtimeProfile.id === "gdpval_workspace" && AGENT_EVAL_RESULTS_DIR
         ? path.join(AGENT_EVAL_RESULTS_DIR, "workspaces", randomUUID())
         : undefined
+    const harnessRun = createAgentHarnessRun({
+      requestId: params.requestId,
+      model: params.model,
+      messages: params.messages,
+      profile:
+        runtimeProfile.id === "gdpval_workspace"
+          ? "finance_analysis"
+          : runtimeProfile.id,
+      userTimeZone: params.userTimeZone,
+    })
+    for (const event of createHarnessTraceEvents(harnessRun)) {
+      yield event
+    }
     const ambientFinanceToolsEnabled = shouldEnableAmbientFinanceTools(
       params.model,
       runtimeProfile
@@ -656,6 +686,13 @@ export async function* startAgentRuntimeStream(
             secUserAgent: params.secUserAgent ?? process.env.SEC_API_USER_AGENT,
           })
         : {}),
+      ...(runtimeProfile.financeDataEnabled && ambientFinanceToolsEnabled
+        ? createAiSdkCuratedFinanceTools({
+            fmpApiKey: normalizedFmpApiKey,
+            fredApiKey: params.fredApiKey ?? process.env.FRED_API_KEY,
+            secUserAgent: params.secUserAgent ?? process.env.SEC_API_USER_AGENT,
+          })
+        : {}),
       ...(fmpToolsContext?.tools ?? {}),
     } as ToolSet
     const toolNames = Object.keys(tools)
@@ -675,7 +712,7 @@ export async function* startAgentRuntimeStream(
     })
     const systemInstruction = appendFinanceEvidenceToSystemInstruction(
       appendWebEvidenceToSystemInstruction(
-        params.systemInstruction,
+        `${params.systemInstruction}\n\n${getHarnessPromptContext(harnessRun)}`,
         prefetchedWebEvidence
       ),
       prefetchedFinanceEvidence
@@ -740,8 +777,9 @@ export async function* startAgentRuntimeStream(
       }
 
       if (part.type === "text-delta") {
-        if (part.text.length > 0) {
-          yield { type: "text_delta", delta: part.text }
+        const delta = sanitizeTextChunk(part.text)
+        if (delta.length > 0) {
+          yield { type: "text_delta", delta }
         }
         continue
       }
@@ -770,6 +808,7 @@ export async function* startAgentRuntimeStream(
         const metadata =
           getAiSdkGatewaySearchToolCallMetadata(part) ??
           getAiSdkCodeExecutionToolCallMetadata(part) ??
+          getAiSdkCuratedFinanceToolCallMetadata(part) ??
           getAiSdkTavilyToolCallMetadata(part) ??
           getAiSdkFinanceDataToolCallMetadata(part) ??
           fmpToolsContext?.getToolCallMetadata(part)
@@ -807,6 +846,7 @@ export async function* startAgentRuntimeStream(
         const metadata =
           getAiSdkGatewaySearchToolResultMetadata(part) ??
           getAiSdkCodeExecutionToolResultMetadata(part) ??
+          getAiSdkCuratedFinanceToolResultMetadata(part) ??
           getAiSdkTavilyToolResultMetadata(part) ??
           getAiSdkFinanceDataToolResultMetadata(part) ??
           fmpToolsContext?.getToolResultMetadata(part)
@@ -858,6 +898,7 @@ export async function* startAgentRuntimeStream(
         part.type === "tool-error" &&
         (isAiSdkGatewaySearchToolName(part.toolName) ||
           isAiSdkCodeExecutionToolName(part.toolName) ||
+          isAiSdkCuratedFinanceToolName(part.toolName) ||
           isAiSdkTavilyToolName(part.toolName) ||
           isAiSdkFinanceDataToolName(part.toolName) ||
           fmpToolsContext?.isToolName(part.toolName)) &&
@@ -867,6 +908,7 @@ export async function* startAgentRuntimeStream(
         const toolName =
           isAiSdkGatewaySearchToolName(part.toolName) ||
           isAiSdkCodeExecutionToolName(part.toolName) ||
+          isAiSdkCuratedFinanceToolName(part.toolName) ||
           isAiSdkTavilyToolName(part.toolName) ||
           isAiSdkFinanceDataToolName(part.toolName)
             ? part.toolName

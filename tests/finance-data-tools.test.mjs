@@ -64,7 +64,7 @@ test("finance evidence context prefetches quote and profile data", async () => {
     fmpApiKey: "secret-key",
     fetchImpl: async (url) => {
       const requestUrl = String(url)
-      if (requestUrl.includes("financialmodelingprep.com")) {
+      if (requestUrl.includes("financialmodelingprep.com/api/v3/quote/")) {
         assert.match(requestUrl, /apikey=secret-key/)
         return new Response(
           JSON.stringify([
@@ -72,6 +72,24 @@ test("finance evidence context prefetches quote and profile data", async () => {
               symbol: "AAPL",
               price: 280.14,
               marketCap: 4200000000000,
+            },
+          ]),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      }
+
+      if (requestUrl.includes("financialmodelingprep.com/api/v3/profile/")) {
+        assert.match(requestUrl, /apikey=secret-key/)
+        return new Response(
+          JSON.stringify([
+            {
+              symbol: "AAPL",
+              companyName: "Apple Inc.",
+              exchange: "NASDAQ",
+              mktCap: 4200000000000,
             },
           ]),
           {
@@ -142,7 +160,7 @@ test("finance evidence context prefetches quote and profile data", async () => {
   )
   assert.equal(
     result.sources.some((source) => source.title === "SEC company submissions"),
-    true
+    false
   )
   assert.equal(result.context.includes("secret-key"), false)
 })
@@ -349,6 +367,32 @@ test("finance quote auto provider uses Stooq structured fallback", async () => {
   assert.equal(result.output?.provider, "stooq")
   assert.equal(result.output?.data.close, 271.06)
   assert.equal(result.output?.sources[0]?.title, "Stooq")
+})
+
+test("finance quote auto provider prefers configured FMP over Stooq", async () => {
+  const result = await runFinanceDataOperation(
+    {
+      operation: "quote",
+      provider: "auto",
+      symbol: "AAPL",
+    },
+    {
+      fmpApiKey: "secret-key",
+      fetchImpl: async (url) => {
+        const requestUrl = String(url)
+        assert.match(requestUrl, /financialmodelingprep\.com/)
+        assert.doesNotMatch(requestUrl, /stooq\.com/)
+        return new Response(JSON.stringify([{ symbol: "AAPL", price: 280 }]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      },
+    }
+  )
+
+  assert.equal(result.error, undefined)
+  assert.equal(result.output?.provider, "fmp")
+  assert.equal(result.output?.sources[0]?.title, "Financial Modeling Prep")
 })
 
 test("finance sources use unique ids for repeated operations", async () => {

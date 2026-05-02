@@ -1,9 +1,18 @@
 import { spawn } from "node:child_process"
 import { randomUUID } from "node:crypto"
-import { copyFile, mkdir, mkdtemp, readdir, rm, stat } from "node:fs/promises"
+import {
+  copyFile,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  stat,
+} from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
+import type { NetworkPolicy, Sandbox as VercelSandbox } from "@vercel/sandbox"
 import { tool } from "ai"
 import { z } from "zod"
 
@@ -11,6 +20,8 @@ import { asRecord } from "@/lib/cast"
 import {
   AGENT_CODE_EXECUTION_BACKEND,
   AGENT_CODE_EXECUTION_PYTHON_VENV_PATH,
+  AGENT_CODE_EXECUTION_VERCEL_SANDBOX_NETWORK,
+  AGENT_CODE_EXECUTION_VERCEL_SANDBOX_SNAPSHOT_ID,
 } from "@/lib/server/agent-runtime-config"
 import type { ToolName } from "@/lib/shared"
 
@@ -27,7 +38,7 @@ const PYTHON3_COMMAND = process.env.PYTHON3_PATH?.trim() ?? "python3"
 
 type CodeExecutionToolName = Extract<ToolName, typeof CODE_EXECUTION_TOOL_NAME>
 type CodeExecutionLanguage = "javascript" | "python"
-export type CodeExecutionBackend = "restricted" | "finance"
+export type CodeExecutionBackend = "restricted" | "finance" | "vercel_sandbox"
 type CodeExecutionWorkspaceMode = "ephemeral" | "preserve"
 
 interface CodeExecutionToolArgs {
@@ -194,7 +205,10 @@ function normalizeLanguage(value: unknown): CodeExecutionLanguage {
 }
 
 function normalizeBackend(value: unknown): CodeExecutionBackend {
-  return value === "finance" ? "finance" : "restricted"
+  if (value === "finance" || value === "vercel_sandbox") {
+    return value
+  }
+  return "restricted"
 }
 
 function resolveLabel(language: CodeExecutionLanguage | undefined): string {
@@ -468,7 +482,7 @@ function validatePythonImports(
 ): string | null {
   const lines = code.split(/\r?\n/g)
   const allowedImports =
-    backend === "finance"
+    backend === "finance" || backend === "vercel_sandbox"
       ? PYTHON_FINANCE_ALLOWED_IMPORTS
       : PYTHON_ALLOWED_IMPORTS
 
@@ -520,7 +534,7 @@ function validateCodeSafety(args: CodeExecutionToolArgs): string | null {
     }
   }
 
-  if (args.backend === "finance") {
+  if (args.backend === "finance" || args.backend === "vercel_sandbox") {
     const pathLiteralError = validatePathStringLiterals(args.code)
     if (pathLiteralError) {
       return pathLiteralError
@@ -715,6 +729,219 @@ async function runProcess(args: {
   }
 }
 
+function getVercelSandboxNetworkPolicy(): NetworkPolicy {
+  return AGENT_CODE_EXECUTION_VERCEL_SANDBOX_NETWORK === "allow-all"
+    ? "allow-all"
+    : "deny-all"
+}
+
+function getVercelSandboxRuntime(language: CodeExecutionLanguage): string {
+  return language === "python" ? "python3.13" : "node24"
+}
+
+function getVercelSandboxCommand(args: CodeExecutionToolArgs): {
+  command: string
+  commandArgs: string[]
+  scriptPath: string
+} {
+  if (args.language === "python") {
+    return {
+      command: "python3",
+      commandArgs: ["script.py"],
+      scriptPath: "/home/vercel-sandbox/workspace/script.py",
+    }
+  }
+
+  return {
+    command: "node",
+    commandArgs: ["script.mjs"],
+    scriptPath: "/home/vercel-sandbox/workspace/script.mjs",
+  }
+}
+
+async function writeSandboxInputFiles(
+  sandbox: VercelSandbox,
+  inputFiles: CodeExecutionInputFile[] | undefined
+): Promise<Set<string>> {
+  const mounted = new Set<string>()
+  if (!inputFiles?.length) {
+    return mounted
+  }
+
+  for (const inputFile of inputFiles) {
+    const relativePath = normalizeInputFileRelativePath(inputFile.relativePath)
+    if (!relativePath) {
+      continue
+    }
+
+    const destination = `/home/vercel-sandbox/workspace/${relativePath.replaceAll(
+      "\\",
+      "/"
+    )}`
+    await sandbox.fs.mkdir(path.posix.dirname(destination), { recursive: true })
+    await sandbox.fs.writeFile(destination, await readFile(inputFile.sourcePath))
+    mounted.add(relativePath.replaceAll("\\", "/"))
+  }
+
+  return mounted
+}
+
+async function collectSandboxArtifactManifest(
+  sandbox: VercelSandbox,
+  rootDir: string,
+  excludedPaths: ReadonlySet<string>
+): Promise<CodeExecutionArtifact[]> {
+  const artifacts: CodeExecutionArtifact[] = []
+
+  async function walk(directory: string) {
+    const entries = await sandbox.fs
+      .readdir(directory, { withFileTypes: true })
+      .catch(() => [])
+
+    for (const entry of entries) {
+      if (artifacts.length >= 50 || entry.name === "__pycache__") {
+        continue
+      }
+
+      const fullPath = path.posix.join(directory, entry.name)
+      if (entry.isDirectory()) {
+        await walk(fullPath)
+        continue
+      }
+
+      if (!entry.isFile()) {
+        continue
+      }
+
+      const relativePath = path.posix.relative(rootDir, fullPath)
+      if (excludedPaths.has(relativePath) || relativePath === "script.py" || relativePath === "script.mjs") {
+        continue
+      }
+
+      const fileStats = await sandbox.fs.stat(fullPath).catch(() => null)
+      if (!fileStats) {
+        continue
+      }
+
+      artifacts.push({
+        path: relativePath,
+        sizeBytes: fileStats.size,
+      })
+    }
+  }
+
+  await walk(rootDir)
+  return artifacts.sort((a, b) => a.path.localeCompare(b.path))
+}
+
+async function runVercelSandbox(
+  args: CodeExecutionToolArgs
+): Promise<CodeExecutionToolResultPayload> {
+  const startedAt = Date.now()
+  const workspaceDir = "/home/vercel-sandbox/workspace"
+  const sandboxArgs = getVercelSandboxCommand(args)
+  const signal = AbortSignal.timeout(args.timeoutMs)
+  const { Sandbox } = await import("@vercel/sandbox")
+  const sandbox = await Sandbox.create({
+    ...(AGENT_CODE_EXECUTION_VERCEL_SANDBOX_SNAPSHOT_ID
+      ? {
+          source: {
+            type: "snapshot" as const,
+            snapshotId: AGENT_CODE_EXECUTION_VERCEL_SANDBOX_SNAPSHOT_ID,
+          },
+        }
+      : { runtime: getVercelSandboxRuntime(args.language) }),
+    networkPolicy: getVercelSandboxNetworkPolicy(),
+    timeout: Math.max(args.timeoutMs + 5_000, 30_000),
+    resources: { vcpus: 2 },
+    signal,
+  })
+
+  try {
+    await sandbox.fs.mkdir(workspaceDir, { recursive: true, signal })
+    const mountedInputFiles = await writeSandboxInputFiles(
+      sandbox,
+      args.inputFiles
+    )
+    const script =
+      args.language === "python"
+        ? buildPythonSandboxedCode(args.code, workspaceDir, "/tmp")
+        : args.code
+    await sandbox.fs.writeFile(sandboxArgs.scriptPath, script, { signal })
+
+    const command = await sandbox.runCommand({
+      cmd: sandboxArgs.command,
+      args: sandboxArgs.commandArgs,
+      cwd: workspaceDir,
+      env: {
+        MPLBACKEND: "Agg",
+        PYTHONNOUSERSITE: "1",
+      },
+      signal,
+    })
+    const [stdout, stderr] = await Promise.all([
+      command.stdout({ signal }),
+      command.stderr({ signal }),
+    ])
+    const durationMs = Date.now() - startedAt
+    const combinedOutput = buildCombinedOutput(stdout, stderr)
+    const truncated =
+      stdout.length > CODE_EXECUTION_MAX_OUTPUT_CHARS ||
+      stderr.length > CODE_EXECUTION_MAX_OUTPUT_CHARS
+    const artifactManifest = await collectSandboxArtifactManifest(
+      sandbox,
+      workspaceDir,
+      mountedInputFiles
+    )
+    const outputBase = {
+      language: args.language,
+      exitCode: command.exitCode,
+      stdout: stdout.slice(0, CODE_EXECUTION_MAX_OUTPUT_CHARS),
+      stderr: stderr.slice(0, CODE_EXECUTION_MAX_OUTPUT_CHARS),
+      combinedOutput: combinedOutput.slice(0, CODE_EXECUTION_MAX_OUTPUT_CHARS),
+      durationMs,
+      truncated,
+      backend: args.backend,
+      artifactManifest,
+      artifactDirectory: `vercel-sandbox://${sandbox.sandboxId}${workspaceDir}`,
+    }
+
+    if (outputBase.exitCode !== 0) {
+      return {
+        error: {
+          ...outputBase,
+          message: `Code execution exited with status ${String(outputBase.exitCode)}.`,
+          code: "EXIT_NON_ZERO",
+        },
+      }
+    }
+
+    return {
+      output: outputBase,
+    }
+  } catch (error) {
+    return {
+      error: {
+        message:
+          error instanceof Error
+            ? error.message
+            : "Vercel Sandbox code execution failed.",
+        code:
+          error instanceof DOMException && error.name === "TimeoutError"
+            ? "TIMEOUT"
+            : "VERCEL_SANDBOX_ERROR",
+        timedOut: error instanceof DOMException && error.name === "TimeoutError",
+        language: args.language,
+        backend: args.backend,
+        durationMs: Date.now() - startedAt,
+        artifactManifest: [],
+      },
+    }
+  } finally {
+    await sandbox.stop({ blocking: false }).catch(() => undefined)
+  }
+}
+
 async function executeCode(
   args: CodeExecutionToolArgs
 ): Promise<CodeExecutionToolResultPayload> {
@@ -726,6 +953,10 @@ async function executeCode(
         code: "BLOCKED_PATTERN",
       },
     }
+  }
+
+  if (args.backend === "vercel_sandbox") {
+    return runVercelSandbox(args)
   }
 
   if (args.language === "python") {

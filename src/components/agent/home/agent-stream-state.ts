@@ -28,6 +28,10 @@ type ReasoningActivityTimelineEntry = Extract<
   ActivityTimelineEntry,
   { kind: "reasoning" }
 >
+type HarnessActivityTimelineEntry = Extract<
+  ActivityTimelineEntry,
+  { kind: "harness" }
+>
 
 function getSearchQueryFromToolCall(event: ToolCallEvent): string | null {
   if (!isSearchToolName(event.toolName)) {
@@ -153,6 +157,19 @@ export function applyAgentStreamEvent(
     }
   }
 
+  if (event.type === "harness_trace") {
+    return {
+      ...current,
+      ...checkpointFields,
+      activityTimeline: appendHarnessTraceToTimeline(
+        current.activityTimeline,
+        event,
+        nextOrder
+      ),
+      nextActivityOrder,
+    }
+  }
+
   if (event.type === "tool_call") {
     return {
       ...current,
@@ -182,6 +199,37 @@ export function applyAgentStreamEvent(
       event
     ),
   }
+}
+
+function getHarnessTimelineStatus(
+  status: Extract<AgentStreamEvent, { type: "harness_trace" }>["status"]
+): HarnessActivityTimelineEntry["status"] {
+  if (status === "error") {
+    return "error"
+  }
+  if (status === "success") {
+    return "success"
+  }
+  return "running"
+}
+
+function appendHarnessTraceToTimeline(
+  current: ActivityTimelineEntry[],
+  event: Extract<AgentStreamEvent, { type: "harness_trace" }>,
+  nextOrder: () => number
+): ActivityTimelineEntry[] {
+  return [
+    ...current,
+    {
+      id: createClientMessageId(),
+      kind: "harness",
+      order: nextOrder(),
+      createdAt: new Date().toISOString(),
+      label: event.label,
+      status: getHarnessTimelineStatus(event.status),
+      ...(event.detail ? { detail: event.detail } : {}),
+    },
+  ]
 }
 
 export function finalizeAgentStreamAccumulator(

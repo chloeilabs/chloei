@@ -262,6 +262,45 @@ export function parseStreamEventLine(line: string): AgentStreamEvent | null {
     }
   }
 
+  if (type === "harness_trace") {
+    const stage = asString(record.stage)?.trim()
+    if (
+      stage !== "evidence" &&
+      stage !== "final_synthesis" &&
+      stage !== "plan" &&
+      stage !== "tool_decision" &&
+      stage !== "verification"
+    ) {
+      return null
+    }
+
+    const label = asString(record.label)?.trim()
+    if (!label) {
+      return null
+    }
+
+    const detail = asString(record.detail)?.trim()
+    const status = asString(record.status)?.trim()
+    if (
+      status !== undefined &&
+      status !== "error" &&
+      status !== "info" &&
+      status !== "success" &&
+      status !== "warning"
+    ) {
+      return null
+    }
+
+    return {
+      type,
+      stage,
+      label,
+      ...(detail ? { detail } : {}),
+      ...(status ? { status } : {}),
+      ...checkpointFields,
+    }
+  }
+
   return null
 }
 

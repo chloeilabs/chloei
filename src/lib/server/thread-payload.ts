@@ -113,11 +113,24 @@ const reasoningActivityTimelineEntrySchema = z
   })
   .strict()
 
+const harnessActivityTimelineEntrySchema = z
+  .object({
+    id: z.string().trim().min(1).max(200),
+    kind: z.literal("harness"),
+    order: z.number().int().nonnegative(),
+    createdAt: ISO_DATETIME_SCHEMA,
+    label: z.string().trim().min(1).max(500),
+    status: TOOL_INVOCATION_STATUS_SCHEMA,
+    detail: z.string().trim().min(1).max(10_000).optional(),
+  })
+  .strict()
+
 const activityTimelineEntrySchema = z.union([
   toolActivityTimelineEntrySchema,
   searchActivityTimelineEntrySchema,
   sourcesActivityTimelineEntrySchema,
   reasoningActivityTimelineEntrySchema,
+  harnessActivityTimelineEntrySchema,
 ])
 
 const legacyCrewStatusActivityTimelineEntrySchema = z

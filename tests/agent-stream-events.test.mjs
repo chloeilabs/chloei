@@ -70,6 +70,24 @@ test("parseStreamEventLine parses extended tool result metadata", () => {
   })
 })
 
+test("parseStreamEventLine parses harness trace events", () => {
+  const line = JSON.stringify({
+    type: "harness_trace",
+    stage: "verification",
+    label: "Evidence verified",
+    detail: "FMP quote and SEC facts checked.",
+    status: "success",
+  })
+
+  assert.deepEqual(parseStreamEventLine(line), {
+    type: "harness_trace",
+    stage: "verification",
+    label: "Evidence verified",
+    detail: "FMP quote and SEC facts checked.",
+    status: "success",
+  })
+})
+
 test("parseStreamEventLine rejects malformed checkpoint and tool data", () => {
   assert.equal(
     parseStreamEventLine(

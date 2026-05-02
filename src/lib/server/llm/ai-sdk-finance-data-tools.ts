@@ -52,6 +52,14 @@ type FinanceDataOperation =
   | "sec_company_facts"
   | "fred_series"
 
+const FMP_AUTO_OPERATIONS: ReadonlySet<FinanceDataOperation> = new Set([
+  "symbol_search",
+  "quote",
+  "company_profile",
+  "historical_prices",
+  "financial_statements",
+])
+
 interface FinanceDataToolConfig {
   fmpApiKey?: string
   fredApiKey?: string
@@ -224,7 +232,8 @@ function normalizeProvider(value: unknown): FinanceDataProvider {
 }
 
 function resolveProvider(
-  input: FinanceDataToolInput
+  input: FinanceDataToolInput,
+  config: FinanceDataToolConfig = {}
 ): ResolvedFinanceDataProvider | "local" {
   if (input.operation === "provider_status") {
     return "local"
@@ -241,6 +250,10 @@ function resolveProvider(
 
   if (input.operation === "fred_series") {
     return "fred"
+  }
+
+  if (config.fmpApiKey?.trim() && FMP_AUTO_OPERATIONS.has(input.operation)) {
+    return "fmp"
   }
 
   if (input.operation === "quote") {
@@ -685,7 +698,7 @@ export async function runFinanceDataOperation(
 ): Promise<FinanceDataToolResultPayload> {
   const startedAt = Date.now()
   const fetchImpl = config.fetchImpl ?? fetch
-  const provider = resolveProvider(input)
+  const provider = resolveProvider(input, config)
 
   if (provider === "local") {
     const status = await getFinanceProviderStatus(config, fetchImpl)

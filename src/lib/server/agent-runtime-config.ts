@@ -15,6 +15,7 @@ const DEFAULT_AGENT_RATE_LIMIT_STORE = "auto"
 const DEFAULT_AGENT_TOOL_MAX_STEPS = 12
 const DEFAULT_AGENT_RESEARCH_TOOL_MAX_STEPS = 20
 const DEFAULT_AGENT_CODE_EXECUTION_BACKEND = "restricted"
+const DEFAULT_AGENT_CODE_EXECUTION_VERCEL_SANDBOX_NETWORK = "deny-all"
 const DEFAULT_AI_GATEWAY_CLIENT_TIMEOUT_MS = 3_600_000
 
 function parsePositiveIntFromEnv(
@@ -135,13 +136,24 @@ export const AGENT_RESEARCH_TOOL_MAX_STEPS = parsePositiveIntFromEnv(
 
 export const AGENT_CODE_EXECUTION_BACKEND = parseEnumFromEnv(
   process.env.AGENT_CODE_EXECUTION_BACKEND,
-  ["restricted", "finance"] as const,
+  ["restricted", "finance", "vercel_sandbox"] as const,
   DEFAULT_AGENT_CODE_EXECUTION_BACKEND
 )
 
 export const AGENT_CODE_EXECUTION_PYTHON_VENV_PATH = parseOptionalStringFromEnv(
   process.env.AGENT_CODE_EXECUTION_PYTHON_VENV_PATH
 )
+
+export const AGENT_CODE_EXECUTION_VERCEL_SANDBOX_NETWORK = parseEnumFromEnv(
+  process.env.AGENT_CODE_EXECUTION_VERCEL_SANDBOX_NETWORK,
+  ["allow-all", "deny-all"] as const,
+  DEFAULT_AGENT_CODE_EXECUTION_VERCEL_SANDBOX_NETWORK
+)
+
+export const AGENT_CODE_EXECUTION_VERCEL_SANDBOX_SNAPSHOT_ID =
+  parseOptionalStringFromEnv(
+    process.env.AGENT_CODE_EXECUTION_VERCEL_SANDBOX_SNAPSHOT_ID
+  )
 
 export const AGENT_EVAL_RESULTS_DIR = parseOptionalStringFromEnv(
   process.env.AGENT_EVAL_RESULTS_DIR

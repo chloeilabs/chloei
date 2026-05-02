@@ -94,7 +94,9 @@ By default, Chloei enforces safe built-in agent limits even if you leave all opt
 - The current model list is defined in `src/lib/shared/llm/models.ts`.
 - `/`, `/api/agent`, and `/api/models` require an authenticated Better Auth session.
 - Native `web_search` is available through AI Gateway alongside Tavily, FMP, and local code execution.
-- `finance_data` normalizes finance operations across FMP, SEC public company facts, and optional FRED macro/rates data. FMP MCP remains available as a migration compatibility path for chat-default runs.
+- `finance_data` normalizes finance operations across FMP, SEC public company facts, Stooq fallbacks, and optional FRED macro/rates data. When `FMP_API_KEY` is configured, FMP is preferred over Stooq for supported market-data operations. FMP MCP remains available for FMP-specific chat and research runs.
+- `curated_finance` is Chloei's higher-level finance harness tool. It routes tasks such as market data, company snapshots, statements, filing facts, macro series, and identifier resolution through the best available provider while recording evidence and verification metadata.
+- `code_execution` can use the local restricted/finance runner or `AGENT_CODE_EXECUTION_BACKEND=vercel_sandbox` for isolated Vercel Sandbox microVM execution. Use a sandbox snapshot for production finance workloads that need pandas, numpy, scipy, statsmodels, matplotlib, openpyxl, or xlsxwriter.
 - Finance eval fixtures and GDPval-style harness scripts live in `evals/finance`.
 - To share logins with another Chloei app, point both apps at the same Better Auth database and secret, set `BETTER_AUTH_COOKIE_DOMAIN` to the shared parent domain, and include every live subdomain in `BETTER_AUTH_TRUSTED_ORIGINS`.
 - Rate limiting and concurrency protection are PostgreSQL-backed when `DATABASE_URL` is configured. Local/no-database runs fall back to in-memory limits unless `AGENT_RATE_LIMIT_STORE=postgres` is set.

@@ -1,14 +1,13 @@
 import {
   type AuthViewer,
-  DEFAULT_OPERATING_INSTRUCTION,
-  DEFAULT_SOUL_FALLBACK_INSTRUCTION,
 } from "@/lib/shared"
 
 import {
-  createPromptSteeringBlocks,
+  buildSystemPrompt,
   type PromptProvider,
   type PromptTaskMode,
-} from "./agent-prompt-steering"
+  resolveAgentPromptMode,
+} from "./llm/system-prompts"
 
 interface RuntimePromptContext {
   now: Date
@@ -21,12 +20,6 @@ interface AgentContextOverrides {
   operatingInstruction?: string
   providerOverlaysEnabled?: boolean
   taskModeOverlaysEnabled?: boolean
-}
-
-function formatPromptBlock(label: string, body: string): string {
-  return [`--- BEGIN ${label} ---`, body.trim(), `--- END ${label} ---`].join(
-    "\n"
-  )
 }
 
 function formatAuthUserContext(viewer: AuthViewer): string {
@@ -96,57 +89,19 @@ function formatRuntimeDateContext(context: RuntimePromptContext): string {
   ].join("\n")
 }
 
-function composeSystemInstruction(params: {
-  authUserContext: string
-  runtimeContext: RuntimePromptContext
-  operatingInstruction?: string
-  providerOverlaysEnabled?: boolean
-  taskModeOverlaysEnabled?: boolean
-}): string {
-  const blocks = [
-    formatPromptBlock(
-      "OPERATING INSTRUCTIONS",
-      params.operatingInstruction ?? DEFAULT_OPERATING_INSTRUCTION
-    ),
-    formatPromptBlock(
-      "RUNTIME DATE CONTEXT",
-      formatRuntimeDateContext(params.runtimeContext)
-    ),
-  ]
-
-  const promptSteeringBlocks = createPromptSteeringBlocks({
-    provider: params.runtimeContext.provider,
-    taskMode: params.runtimeContext.taskMode,
-    providerOverlaysEnabled: params.providerOverlaysEnabled,
-    taskModeOverlaysEnabled: params.taskModeOverlaysEnabled,
-  })
-
-  for (const block of promptSteeringBlocks) {
-    blocks.push(formatPromptBlock(block.label, block.body))
-  }
-
-  blocks.push(
-    formatPromptBlock(
-      "SHARED CONTEXT FILE: SOUL.md",
-      DEFAULT_SOUL_FALLBACK_INSTRUCTION
-    )
-  )
-
-  blocks.push(formatPromptBlock("AUTH USER CONTEXT", params.authUserContext))
-
-  return blocks.join("\n\n")
-}
-
 export function buildAgentSystemInstruction(
   viewer: AuthViewer,
   runtimeContext: RuntimePromptContext,
   overrides: AgentContextOverrides = {}
 ): string {
-  return composeSystemInstruction({
-    authUserContext: formatAuthUserContext(viewer),
-    runtimeContext,
+  return buildSystemPrompt({
+    mode: resolveAgentPromptMode(runtimeContext.taskMode),
+    provider: runtimeContext.provider,
+    runtimeContext: [formatRuntimeDateContext(runtimeContext)],
+    userContext: formatAuthUserContext(viewer),
+    taskMode: runtimeContext.taskMode,
     operatingInstruction: overrides.operatingInstruction,
     providerOverlaysEnabled: overrides.providerOverlaysEnabled,
-    taskModeOverlaysEnabled: overrides.taskModeOverlaysEnabled,
+    modeOverlaysEnabled: overrides.taskModeOverlaysEnabled,
   })
 }
