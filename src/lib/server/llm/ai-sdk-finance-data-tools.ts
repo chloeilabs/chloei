@@ -1287,37 +1287,80 @@ const FINANCE_EVIDENCE_IGNORED_TICKERS = new Set([
   "GDP",
   "IPO",
   "LLC",
+  "NASDAQ",
+  "NYSE",
   "SEC",
   "USD",
 ])
+const FINANCE_EVIDENCE_MAX_SYMBOLS = 4
 
 function normalizeFinanceEvidenceSymbol(symbol: string): string {
   return symbol.replace(/^\$/, "").replace(/\.$/, "").trim().toUpperCase()
 }
 
+export function inferFinanceDataEvidenceSymbols(query: string): string[] {
+  const candidates: { symbol: string; index: number; order: number }[] = []
+  let order = 0
+  const addCandidate = (symbol: string, index: number) => {
+    const normalized = normalizeFinanceEvidenceSymbol(symbol)
+    if (!normalized || FINANCE_EVIDENCE_IGNORED_TICKERS.has(normalized)) {
+      return
+    }
+
+    candidates.push({ symbol: normalized, index, order })
+    order += 1
+  }
+
+  for (const match of query.matchAll(/\$([A-Z][A-Z0-9.-]{0,9})\b/g)) {
+    if (match[1]) {
+      addCandidate(match[1], match.index)
+    }
+  }
+
+  for (const match of query.matchAll(/\(([$A-Z][A-Z0-9.-]{0,9})\)/g)) {
+    if (match[1]) {
+      addCandidate(match[1], match.index)
+    }
+  }
+
+  for (const match of query.matchAll(
+    /\b(?:ticker|symbol)\s*[:=]?\s*([A-Z][A-Z0-9.-]{0,9})\b/gi
+  )) {
+    if (match[1]) {
+      addCandidate(match[1], match.index)
+    }
+  }
+
+  for (const entry of FINANCE_EVIDENCE_COMMON_SYMBOLS) {
+    for (const pattern of entry.patterns) {
+      const match = pattern.exec(query)
+      if (match?.index !== undefined) {
+        addCandidate(entry.symbol, match.index)
+        break
+      }
+    }
+  }
+
+  for (const match of query.matchAll(/\b[A-Z][A-Z0-9.-]{1,9}\b/g)) {
+    addCandidate(match[0], match.index)
+  }
+
+  const seen = new Set<string>()
+  return candidates
+    .sort((a, b) => a.index - b.index || a.order - b.order)
+    .flatMap((candidate) => {
+      if (seen.has(candidate.symbol)) {
+        return []
+      }
+
+      seen.add(candidate.symbol)
+      return [candidate.symbol]
+    })
+    .slice(0, FINANCE_EVIDENCE_MAX_SYMBOLS)
+}
+
 export function inferFinanceDataEvidenceSymbol(query: string): string | null {
-  const explicitSymbol =
-    /\$([A-Z][A-Z0-9.-]{0,9})\b/.exec(query)?.[1] ??
-    /\(([$A-Z][A-Z0-9.-]{0,9})\)/.exec(query)?.[1] ??
-    /\b(?:ticker|symbol)\s*[:=]?\s*([A-Z][A-Z0-9.-]{0,9})\b/i.exec(query)?.[1]
-
-  if (explicitSymbol) {
-    return normalizeFinanceEvidenceSymbol(explicitSymbol)
-  }
-
-  const commonSymbol = FINANCE_EVIDENCE_COMMON_SYMBOLS.find((entry) =>
-    entry.patterns.some((pattern) => pattern.test(query))
-  )?.symbol
-  if (commonSymbol) {
-    return commonSymbol
-  }
-
-  const uppercaseCandidates = query.match(/\b[A-Z][A-Z0-9.-]{1,9}\b/g) ?? []
-  const ticker = uppercaseCandidates
-    .map(normalizeFinanceEvidenceSymbol)
-    .find((candidate) => !FINANCE_EVIDENCE_IGNORED_TICKERS.has(candidate))
-
-  return ticker ?? null
+  return inferFinanceDataEvidenceSymbols(query)[0] ?? null
 }
 
 function getMarketCapSlug(symbol: string): string | null {
@@ -1498,7 +1541,7 @@ function getUniqueFinanceEvidenceSources(
 
 function formatFinanceEvidenceContext(params: {
   query: string
-  symbol: string | null
+  symbols: readonly string[]
   outputs: readonly FinanceDataToolOutput[]
   supplements: readonly FinanceDataEvidenceSupplement[]
   errors: readonly FinanceDataToolErrorPayload[]
@@ -1514,7 +1557,9 @@ function formatFinanceEvidenceContext(params: {
   const lines = [
     "<finance_data_evidence>",
     `Query: ${params.query}`,
-    `Resolved symbol: ${params.symbol ?? "unresolved"}`,
+    `Resolved symbols: ${
+      params.symbols.length > 0 ? params.symbols.join(", ") : "unresolved"
+    }`,
   ]
 
   for (const output of params.outputs) {
@@ -1571,12 +1616,12 @@ export async function createAiSdkFinanceDataEvidenceContext(
   }
 ): Promise<FinanceDataEvidenceContext> {
   const query = params.query.trim()
-  const symbol = inferFinanceDataEvidenceSymbol(query)
+  const symbols = inferFinanceDataEvidenceSymbols(query)
   const outputs: FinanceDataToolOutput[] = []
   const supplements: FinanceDataEvidenceSupplement[] = []
   const errors: FinanceDataToolErrorPayload[] = []
 
-  if (!symbol) {
+  if (symbols.length === 0) {
     const error: FinanceDataToolErrorPayload = {
       message: "Unable to resolve a ticker symbol from the user prompt.",
       code: "SYMBOL_UNRESOLVED",
@@ -1591,7 +1636,7 @@ export async function createAiSdkFinanceDataEvidenceContext(
     return {
       context: formatFinanceEvidenceContext({
         query,
-        symbol,
+        symbols,
         outputs,
         supplements,
         errors,
@@ -1603,11 +1648,13 @@ export async function createAiSdkFinanceDataEvidenceContext(
     }
   }
 
-  const inputs = getFinanceEvidenceInputs({
-    query,
-    symbol,
-    fmpApiKey: params.fmpApiKey,
-  })
+  const inputs = symbols.flatMap((symbol) =>
+    getFinanceEvidenceInputs({
+      query,
+      symbol,
+      fmpApiKey: params.fmpApiKey,
+    })
+  )
   const results = await Promise.all(
     inputs.map((input) => runFinanceDataOperation(input, params))
   )
@@ -1623,19 +1670,25 @@ export async function createAiSdkFinanceDataEvidenceContext(
   }
 
   if (shouldFetchMarketCapEvidence(query)) {
-    const supplement = await fetchCompaniesMarketCapSupplement({
-      symbol,
-      fetchImpl: params.fetchImpl ?? fetch,
-    })
-    if (supplement) {
-      supplements.push(supplement)
+    const marketCapSupplements = await Promise.all(
+      symbols.map((symbol) =>
+        fetchCompaniesMarketCapSupplement({
+          symbol,
+          fetchImpl: params.fetchImpl ?? fetch,
+        })
+      )
+    )
+    for (const supplement of marketCapSupplements) {
+      if (supplement) {
+        supplements.push(supplement)
+      }
     }
   }
 
   return {
     context: formatFinanceEvidenceContext({
       query,
-      symbol,
+      symbols,
       outputs,
       supplements,
       errors,

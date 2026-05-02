@@ -796,6 +796,10 @@ test("agent helper forwards the deep research runtime profile", async () => {
 
   await readNdjsonEvents(response)
 
+  assert.equal(
+    response.headers.get("X-Agent-Effective-Model"),
+    "openai/gpt-5.5"
+  )
   assert.equal(recorded.streamParams[0]?.model, "openai/gpt-5.5")
   assert.equal(recorded.streamParams[0]?.runtimeProfile, "deep_research")
 })

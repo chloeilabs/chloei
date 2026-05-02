@@ -320,23 +320,29 @@ function toSearchOutput(
   }
 }
 
+function serializeEvidenceField(value: string): string {
+  return JSON.stringify(value)
+}
+
 function formatEvidenceContext(output: TavilySearchToolOutput): string {
   const lines = [
     '<retrieved_web_evidence provider="tavily">',
-    `Query: ${output.query}`,
+    `Query JSON: ${serializeEvidenceField(output.query)}`,
     "Use these results as external evidence for the answer. Cite with the provided Citation Markdown values when making source-backed claims.",
     "",
   ]
 
   output.results.forEach((result, index) => {
     lines.push(
-      `[${String(index + 1)}] ${result.title}`,
-      `URL: ${result.url}`,
-      `Citation Markdown: ${result.citationMarkdown}`,
+      `[${String(index + 1)}] Title JSON: ${serializeEvidenceField(result.title)}`,
+      `URL JSON: ${serializeEvidenceField(result.url)}`,
+      `Citation Markdown JSON: ${serializeEvidenceField(result.citationMarkdown)}`,
       ...(result.publishedDate
-        ? [`Published Date: ${result.publishedDate}`]
+        ? [
+            `Published Date JSON: ${serializeEvidenceField(result.publishedDate)}`,
+          ]
         : []),
-      `Snippet: ${result.content}`,
+      `Snippet JSON: ${serializeEvidenceField(result.content)}`,
       ""
     )
   })

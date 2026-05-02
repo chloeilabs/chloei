@@ -884,6 +884,7 @@ export function createAgentStreamResponse(
   })
   responseHeaders.set("Content-Type", "application/x-ndjson; charset=utf-8")
   responseHeaders.set("Cache-Control", "no-store, no-transform")
+  responseHeaders.set("X-Agent-Effective-Model", params.selectedModel)
   if (params.rateLimitDecision) {
     applyRateLimitHeaders(responseHeaders, params.rateLimitDecision)
   }

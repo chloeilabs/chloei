@@ -233,12 +233,16 @@ function resolveMaxOutputTokens(
 }
 
 function getUsageLogFields(usage: LanguageModelUsage | undefined) {
+  const outputTokenDetails = usage?.outputTokenDetails as
+    | Partial<LanguageModelUsage["outputTokenDetails"]>
+    | undefined
+
   return {
     inputTokens: usage?.inputTokens,
     outputTokens: usage?.outputTokens,
     totalTokens: usage?.totalTokens,
-    textTokens: usage?.outputTokenDetails.textTokens,
-    reasoningTokens: usage?.outputTokenDetails.reasoningTokens,
+    textTokens: outputTokenDetails?.textTokens,
+    reasoningTokens: outputTokenDetails?.reasoningTokens,
   }
 }
 

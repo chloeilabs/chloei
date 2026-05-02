@@ -13,6 +13,7 @@ import { createRequestHeaders, getRequestIdFromHeaders } from "@/lib/request-id"
 import {
   type AgentRequestAttachment,
   type AgentRunMode,
+  isModelType,
   type Message as AgentMessage,
   type ModelType,
   type Thread,
@@ -278,6 +279,7 @@ export function useAgentSession({
 
       const assistantId = createClientMessageId()
       const assistantCreatedAt = new Date().toISOString()
+      let effectiveModel = params.model
       let accumulator = createAgentStreamAccumulator()
 
       const upsertAssistantMessage = (
@@ -292,7 +294,7 @@ export function useAgentSession({
           id: assistantId,
           createdAt: assistantCreatedAt,
           accumulator: nextAccumulator,
-          model: params.model,
+          model: effectiveModel,
           runMode: params.runMode,
           isStreaming: streamFlags.isStreaming,
         })
@@ -304,7 +306,11 @@ export function useAgentSession({
         messagesRef.current = updatedMessages
 
         saveThread(
-          createThreadSnapshot(params.threadId, updatedMessages, params.model),
+          createThreadSnapshot(
+            params.threadId,
+            updatedMessages,
+            effectiveModel
+          ),
           {
             immediate: !streamFlags.isStreaming,
           }
@@ -354,6 +360,13 @@ export function useAgentSession({
 
         if (!response.ok) {
           throw await createHttpErrorFromResponse(response)
+        }
+
+        const responseEffectiveModel = response.headers.get(
+          "x-agent-effective-model"
+        )
+        if (isModelType(responseEffectiveModel)) {
+          effectiveModel = responseEffectiveModel
         }
 
         if (!response.body) {
@@ -437,7 +450,7 @@ export function useAgentSession({
           id: createClientMessageId(),
           role: "assistant",
           content: fallback,
-          llmModel: params.model,
+          llmModel: effectiveModel,
           createdAt: new Date().toISOString(),
           metadata: {
             isStreaming: false,
@@ -451,7 +464,11 @@ export function useAgentSession({
         messagesRef.current = updatedMessages
 
         saveThread(
-          createThreadSnapshot(params.threadId, updatedMessages, params.model),
+          createThreadSnapshot(
+            params.threadId,
+            updatedMessages,
+            effectiveModel
+          ),
           {
             immediate: true,
           }
