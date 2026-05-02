@@ -3,6 +3,7 @@ export const AvailableModels = {
   DEEPSEEK_V4_PRO: "deepseek/deepseek-v4-pro",
   MOONSHOTAI_KIMI_K2_6: "moonshotai/kimi-k2.6",
   OPENAI_GPT_5_5: "openai/gpt-5.5",
+  XAI_GROK_4_3: "xai/grok-4.3",
 } as const
 
 export type ModelType = (typeof AvailableModels)[keyof typeof AvailableModels]
@@ -24,6 +25,7 @@ export const SUPPORTED_MODELS = [
   AvailableModels.ANTHROPIC_CLAUDE_SONNET_4_6,
   AvailableModels.MOONSHOTAI_KIMI_K2_6,
   AvailableModels.DEEPSEEK_V4_PRO,
+  AvailableModels.XAI_GROK_4_3,
 ] as const
 
 export const ALL_MODELS = [...SUPPORTED_MODELS] as const
@@ -31,6 +33,7 @@ export const ALL_MODELS = [...SUPPORTED_MODELS] as const
 export const MODEL_SELECTOR_MODELS = [
   AvailableModels.MOONSHOTAI_KIMI_K2_6,
   AvailableModels.DEEPSEEK_V4_PRO,
+  AvailableModels.XAI_GROK_4_3,
 ] as const
 
 const MODEL_SELECTOR_MODEL_SET: ReadonlySet<ModelType> = new Set(
@@ -78,5 +81,9 @@ export const ModelInfos: Record<ModelType, ModelInfo> = {
   [AvailableModels.OPENAI_GPT_5_5]: {
     id: AvailableModels.OPENAI_GPT_5_5,
     name: "GPT-5.5",
+  },
+  [AvailableModels.XAI_GROK_4_3]: {
+    id: AvailableModels.XAI_GROK_4_3,
+    name: "Grok 4.3",
   },
 }

@@ -150,16 +150,15 @@ export function getAiSdkGatewayProviderOptionsForMode({
       },
       effort: "high",
     } satisfies AnthropicLanguageModelOptions,
-    openai: deepResearch
+    ...(deepResearch
       ? {
-          reasoningEffort: "xhigh",
-          reasoningSummary: "detailed",
-          textVerbosity: "high",
+          openai: {
+            reasoningEffort: "xhigh",
+            reasoningSummary: "detailed",
+            textVerbosity: "high",
+          },
         }
-      : {
-          reasoningEffort: "high",
-          reasoningSummary: "detailed",
-        },
+      : {}),
   }
 }
 

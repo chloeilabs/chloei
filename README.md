@@ -1,6 +1,6 @@
 # Chloei
 
-Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently exposes a curated model selector with Kimi K2.6 and DeepSeek V4 Pro, uses GPT-5.5 for research and file-attachment runs, and supports native web search, local code execution, optional Tavily retrieval, optional Financial Modeling Prep MCP tools, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
+Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently exposes a curated model selector with Kimi K2.6, DeepSeek V4 Pro, and Grok 4.3, uses GPT-5.5 for deep research runs, and supports file attachments, native web search, local code execution, optional Tavily retrieval, optional Financial Modeling Prep MCP tools, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
 
 ## Requirements
 

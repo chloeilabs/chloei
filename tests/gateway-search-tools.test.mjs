@@ -134,10 +134,6 @@ test("gateway provider options request the strongest supported reasoning levels"
       },
       effort: "high",
     },
-    openai: {
-      reasoningEffort: "high",
-      reasoningSummary: "detailed",
-    },
   })
 
   assert.deepEqual(

@@ -15,6 +15,7 @@ const DEFAULT_AGENT_RATE_LIMIT_STORE = "auto"
 const DEFAULT_AGENT_TOOL_MAX_STEPS = 12
 const DEFAULT_AGENT_RESEARCH_TOOL_MAX_STEPS = 20
 const DEFAULT_AGENT_CODE_EXECUTION_BACKEND = "restricted"
+const DEFAULT_AI_GATEWAY_CLIENT_TIMEOUT_MS = 3_600_000
 
 function parsePositiveIntFromEnv(
   value: string | undefined,
@@ -89,6 +90,11 @@ export const AGENT_MAX_TOTAL_CHARS = parsePositiveIntFromEnv(
 export const AGENT_STREAM_TIMEOUT_MS = parsePositiveIntFromEnv(
   process.env.AGENT_STREAM_TIMEOUT_MS,
   DEFAULT_AGENT_STREAM_TIMEOUT_MS
+)
+
+export const AI_GATEWAY_CLIENT_TIMEOUT_MS = parsePositiveIntFromEnv(
+  process.env.AI_GATEWAY_CLIENT_TIMEOUT_MS,
+  DEFAULT_AI_GATEWAY_CLIENT_TIMEOUT_MS
 )
 
 export const AGENT_RATE_LIMIT_ENABLED = parseBooleanFromEnv(

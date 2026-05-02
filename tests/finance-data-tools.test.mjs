@@ -19,8 +19,10 @@ setTestModuleStubs({
 
 const {
   classifyFinanceDataRetry,
+  createAiSdkFinanceDataEvidenceContext,
   getAiSdkFinanceDataToolCallMetadata,
   getAiSdkFinanceDataToolResultMetadata,
+  inferFinanceDataEvidenceSymbols,
   runFinanceDataOperation,
 } = await import(financeToolsUrl)
 
@@ -54,6 +56,208 @@ test("finance data operation returns sanitized provider sources", async () => {
   assert.equal(result.output?.provider, "fmp")
   assert.equal(result.output?.requestUrl.includes("secret-key"), false)
   assert.equal(result.output?.sources[0]?.title, "Financial Modeling Prep")
+})
+
+test("finance evidence context prefetches quote and profile data", async () => {
+  const result = await createAiSdkFinanceDataEvidenceContext({
+    query: "What is Apple's current stock price and market cap? Cite sources.",
+    fmpApiKey: "secret-key",
+    fetchImpl: async (url) => {
+      const requestUrl = String(url)
+      if (requestUrl.includes("financialmodelingprep.com")) {
+        assert.match(requestUrl, /apikey=secret-key/)
+        return new Response(
+          JSON.stringify([
+            {
+              symbol: "AAPL",
+              price: 280.14,
+              marketCap: 4200000000000,
+            },
+          ]),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      }
+
+      if (requestUrl.includes("company_tickers.json")) {
+        return new Response(
+          JSON.stringify({
+            0: {
+              cik_str: 320193,
+              ticker: "AAPL",
+              title: "Apple Inc.",
+            },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      }
+
+      if (requestUrl.includes("CIK0000320193.json")) {
+        return new Response(
+          JSON.stringify({
+            cik: "320193",
+            name: "Apple Inc.",
+            tickers: ["AAPL"],
+            exchanges: ["Nasdaq"],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      }
+
+      if (requestUrl.includes("companiesmarketcap.com/apple/marketcap")) {
+        return new Response(
+          '<meta name="description" content="As of May 2026 Apple has a market cap of $4.112 Trillion USD.">',
+          {
+            status: 200,
+            headers: { "Content-Type": "text/html" },
+          }
+        )
+      }
+
+      throw new Error(`Unexpected URL: ${requestUrl}`)
+    },
+  })
+
+  assert.equal(result.errors.length, 0)
+  assert.equal(result.outputs.length, 2)
+  assert.equal(result.supplements.length, 1)
+  assert.match(result.context, /Resolved symbols: AAPL/)
+  assert.match(result.context, /"marketCap": 4200000000000/)
+  assert.match(result.context, /\$4\.112 Trillion USD/)
+  assert.equal(
+    result.sources.some((source) => source.title === "Financial Modeling Prep"),
+    true
+  )
+  assert.equal(
+    result.sources.some((source) => source.title === "CompaniesMarketCap"),
+    true
+  )
+  assert.equal(
+    result.sources.some((source) => source.title === "SEC company submissions"),
+    true
+  )
+  assert.equal(result.context.includes("secret-key"), false)
+})
+
+test("finance evidence context resolves and fetches multiple symbols", async () => {
+  assert.deepEqual(
+    inferFinanceDataEvidenceSymbols(
+      "Compare Apple and Microsoft stock price and market cap."
+    ),
+    ["AAPL", "MSFT"]
+  )
+
+  const result = await createAiSdkFinanceDataEvidenceContext({
+    query: "Compare Apple and Microsoft stock price and market cap.",
+    fmpApiKey: "secret-key",
+    fetchImpl: async (url) => {
+      const requestUrl = String(url)
+      if (requestUrl.includes("financialmodelingprep.com")) {
+        const symbol = requestUrl.includes("MSFT") ? "MSFT" : "AAPL"
+        return new Response(
+          JSON.stringify([
+            {
+              symbol,
+              price: symbol === "MSFT" ? 510.1 : 280.14,
+              marketCap: symbol === "MSFT" ? 3800000000000 : 4200000000000,
+            },
+          ]),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      }
+
+      if (requestUrl.includes("company_tickers.json")) {
+        return new Response(
+          JSON.stringify({
+            0: {
+              cik_str: 320193,
+              ticker: "AAPL",
+              title: "Apple Inc.",
+            },
+            1: {
+              cik_str: 789019,
+              ticker: "MSFT",
+              title: "Microsoft Corp.",
+            },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      }
+
+      if (requestUrl.includes("CIK0000320193.json")) {
+        return new Response(
+          JSON.stringify({
+            cik: "320193",
+            name: "Apple Inc.",
+            tickers: ["AAPL"],
+            exchanges: ["Nasdaq"],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      }
+
+      if (requestUrl.includes("CIK0000789019.json")) {
+        return new Response(
+          JSON.stringify({
+            cik: "789019",
+            name: "Microsoft Corp.",
+            tickers: ["MSFT"],
+            exchanges: ["Nasdaq"],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      }
+
+      if (requestUrl.includes("companiesmarketcap.com/apple/marketcap")) {
+        return new Response(
+          '<meta name="description" content="As of May 2026 Apple has a market cap of $4.112 Trillion USD.">',
+          {
+            status: 200,
+            headers: { "Content-Type": "text/html" },
+          }
+        )
+      }
+
+      if (requestUrl.includes("companiesmarketcap.com/microsoft/marketcap")) {
+        return new Response(
+          '<meta name="description" content="As of May 2026 Microsoft has a market cap of $3.800 Trillion USD.">',
+          {
+            status: 200,
+            headers: { "Content-Type": "text/html" },
+          }
+        )
+      }
+
+      throw new Error(`Unexpected URL: ${requestUrl}`)
+    },
+  })
+
+  assert.equal(result.errors.length, 0)
+  assert.equal(result.outputs.length, 4)
+  assert.equal(result.supplements.length, 2)
+  assert.match(result.context, /Resolved symbols: AAPL, MSFT/)
+  assert.match(result.context, /"symbol": "AAPL"/)
+  assert.match(result.context, /"symbol": "MSFT"/)
 })
 
 test("finance provider status validates configured provider availability", async () => {

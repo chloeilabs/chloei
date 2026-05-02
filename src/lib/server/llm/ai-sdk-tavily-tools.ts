@@ -85,6 +85,22 @@ interface AiSdkTavilyToolResultMetadata {
   retryable?: boolean
 }
 
+interface CreateAiSdkTavilyEvidenceContextParams {
+  apiKey: string
+  query: string
+  topic?: "general" | "news" | "finance"
+  timeRange?: "day" | "week" | "month" | "year"
+  includeDomains?: string[]
+  excludeDomains?: string[]
+  maxResults?: number
+}
+
+interface AiSdkTavilyEvidenceContext {
+  query: string
+  context: string
+  sources: MessageSource[]
+}
+
 const tavilySearchInputSchema = z.object({
   query: z.string().trim().min(1),
   topic: z.enum(["general", "news", "finance"]).optional(),
@@ -304,6 +320,37 @@ function toSearchOutput(
   }
 }
 
+function serializeEvidenceField(value: string): string {
+  return JSON.stringify(value)
+}
+
+function formatEvidenceContext(output: TavilySearchToolOutput): string {
+  const lines = [
+    '<retrieved_web_evidence provider="tavily">',
+    `Query JSON: ${serializeEvidenceField(output.query)}`,
+    "Use these results as external evidence for the answer. Cite with the provided Citation Markdown values when making source-backed claims.",
+    "",
+  ]
+
+  output.results.forEach((result, index) => {
+    lines.push(
+      `[${String(index + 1)}] Title JSON: ${serializeEvidenceField(result.title)}`,
+      `URL JSON: ${serializeEvidenceField(result.url)}`,
+      `Citation Markdown JSON: ${serializeEvidenceField(result.citationMarkdown)}`,
+      ...(result.publishedDate
+        ? [
+            `Published Date JSON: ${serializeEvidenceField(result.publishedDate)}`,
+          ]
+        : []),
+      `Snippet JSON: ${serializeEvidenceField(result.content)}`,
+      ""
+    )
+  })
+
+  lines.push("</retrieved_web_evidence>")
+  return lines.join("\n")
+}
+
 function toExtractOutput(
   response: TavilyExtractResponse
 ): TavilyExtractToolOutput {
@@ -445,6 +492,39 @@ export function createAiSdkTavilyTools(apiKey?: string) {
         }
       },
     }),
+  }
+}
+
+export async function createAiSdkTavilyEvidenceContext(
+  params: CreateAiSdkTavilyEvidenceContextParams
+): Promise<AiSdkTavilyEvidenceContext> {
+  const client = createTavilyClient(params.apiKey)
+  const maxResults = Math.min(
+    TAVILY_SEARCH_MAX_RESULTS,
+    Math.max(1, params.maxResults ?? TAVILY_SEARCH_DEFAULT_MAX_RESULTS)
+  )
+  const options: TavilySearchOptions = {
+    searchDepth: "advanced",
+    includeFavicon: true,
+    includeRawContent: false,
+    topic: params.topic ?? "general",
+    maxResults,
+    ...(params.timeRange ? { timeRange: params.timeRange } : {}),
+    ...(params.includeDomains && params.includeDomains.length > 0
+      ? { includeDomains: params.includeDomains }
+      : {}),
+    ...(params.excludeDomains && params.excludeDomains.length > 0
+      ? { excludeDomains: params.excludeDomains }
+      : {}),
+  }
+
+  const response = await client.search(params.query, options)
+  const output = toSearchOutput(response)
+
+  return {
+    query: output.query,
+    context: formatEvidenceContext(output),
+    sources: toSourcesFromOutput(TAVILY_SEARCH_TOOL_NAME, output),
   }
 }
 

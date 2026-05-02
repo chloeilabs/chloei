@@ -49,14 +49,14 @@ test("agent route streams through the extracted AI Gateway helper path", async (
 
   assert.match(
     helperSource,
-    /const stream = startGatewayResponseStream\(\{[\s\S]*messages: params\.messages,[\s\S]*systemInstruction: withAiSdkInlineCitationInstruction\(/,
+    /const stream = startGatewayResponseStream\(\{[\s\S]*requestId: params\.requestId,[\s\S]*messages: params\.messages,[\s\S]*systemInstruction: withAiSdkInlineCitationInstruction\(/,
     "Expected the helper to stream via startGatewayResponseStream."
   )
 
   assert.match(
     helperSource,
-    /withAiSdkInlineCitationInstruction\(\s*params\.systemInstruction,\s*\{\s*fmpEnabled: Boolean\(params\.fmpApiKey\?\.trim\(\)\),\s*\}\s*\)/,
-    "Expected the helper to pass only the remaining augmentation options."
+    /withAiSdkInlineCitationInstruction\(\s*params\.systemInstruction,\s*\{[\s\S]*financeEnabled: shouldIncludeFinanceToolingInstruction\([\s\S]*fmpEnabled: Boolean\(params\.fmpApiKey\?\.trim\(\)\),[\s\S]*\}\s*\)/,
+    "Expected the helper to pass model-aware augmentation options."
   )
 
   assert.match(
@@ -98,5 +98,90 @@ test("agent runtime reserves the final loop step for synthesis", async () => {
     runtimeSource,
     /stepNumber\s*>=\s*Math\.max\(0,\s*toolMaxSteps\s*-\s*1\)/,
     "Expected final synthesis to happen before the profile step budget stops the loop."
+  )
+})
+
+test("agent runtime extends the AI Gateway client timeout", async () => {
+  const runtimeSource = await readFile(runtimePath, "utf8")
+
+  assert.match(
+    runtimeSource,
+    /new Dispatcher1Wrapper\(\s*new Agent\(\{\s*bodyTimeout: AI_GATEWAY_CLIENT_TIMEOUT_MS,\s*headersTimeout: AI_GATEWAY_CLIENT_TIMEOUT_MS,\s*\}\)\s*\)/,
+    "Expected the AI Gateway runtime to use a custom Undici timeout dispatcher."
+  )
+  assert.match(
+    runtimeSource,
+    /createGateway\(\{\s*apiKey: params\.aiGatewayApiKey,\s*fetch: aiGatewayFetch,/,
+    "Expected createGateway to receive the custom fetch implementation."
+  )
+})
+
+test("agent runtime keeps Grok chat toolsets focused", async () => {
+  const runtimeSource = await readFile(runtimePath, "utf8")
+
+  assert.match(
+    runtimeSource,
+    /function shouldEnableAmbientFinanceTools[\s\S]*model\.startsWith\("xai\/"\)[\s\S]*runtimeProfile\.id === "chat_default"[\s\S]*runtimeProfile\.id === "finance_analysis"/,
+    "Expected Grok chat and finance requests to avoid model-driven ambient finance tools."
+  )
+  assert.match(
+    runtimeSource,
+    /runtimeProfile\.fmpMcpEnabled && ambientFinanceToolsEnabled/,
+    "Expected FMP MCP tools to respect the focused Grok chat toolset."
+  )
+  assert.match(
+    runtimeSource,
+    /runtimeProfile\.financeDataEnabled && ambientFinanceToolsEnabled/,
+    "Expected finance data tools to respect the focused Grok chat toolset."
+  )
+  assert.match(
+    runtimeSource,
+    /function shouldEnableCodeExecutionTools[\s\S]*model\.startsWith\("xai\/"\)[\s\S]*runtimeProfile\.id === "chat_default"[\s\S]*runtimeProfile\.id === "finance_analysis"/,
+    "Expected Grok chat and finance requests to avoid model-driven code execution loops."
+  )
+  assert.match(
+    runtimeSource,
+    /codeExecutionToolsEnabled[\s\S]*createAiSdkCodeExecutionTools/,
+    "Expected code execution tools to respect the focused Grok chat toolset."
+  )
+  assert.match(
+    runtimeSource,
+    /function shouldEnableModelToolCalling[\s\S]*model\.startsWith\("xai\/"\)[\s\S]*runtimeProfile\.id === "chat_default"[\s\S]*runtimeProfile\.id === "finance_analysis"/,
+    "Expected Grok chat and finance requests to avoid model-initiated tool loops."
+  )
+  assert.match(
+    runtimeSource,
+    /createAiSdkTavilyEvidenceContext/,
+    "Expected Grok chat requests to prefetch Tavily evidence outside the model tool loop."
+  )
+  assert.match(
+    runtimeSource,
+    /createAiSdkFinanceDataEvidenceContext/,
+    "Expected Grok finance requests to prefetch finance evidence outside the model tool loop."
+  )
+  assert.match(
+    runtimeSource,
+    /XAI_CHAT_MAX_OUTPUT_TOKENS\s*=\s*4096/,
+    "Expected Grok chat requests to receive an explicit output budget."
+  )
+  assert.match(
+    runtimeSource,
+    /maxOutputTokens !== undefined \? \{ maxOutputTokens \} : \{\}/,
+    "Expected the runtime to pass explicit maxOutputTokens when configured."
+  )
+})
+
+test("agent runtime logs finish metadata for model streams", async () => {
+  const runtimeSource = await readFile(runtimePath, "utf8")
+
+  assert.match(
+    runtimeSource,
+    /part\.type === "finish-step"[\s\S]*finishReason: part\.finishReason/,
+    "Expected runtime step finish reasons to be logged."
+  )
+  assert.match(
+    runtimeSource,
+    /part\.type === "finish"[\s\S]*totalUsage/,
+    "Expected final stream finish usage to be logged."
   )
 })
