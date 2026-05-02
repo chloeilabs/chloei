@@ -279,8 +279,8 @@ function shouldPrefetchFinanceEvidence(
 
   return Boolean(
     model.startsWith("xai/") &&
-      runtimeProfile.id === "finance_analysis" &&
-      lastUserText
+    runtimeProfile.id === "finance_analysis" &&
+    lastUserText
   )
 }
 

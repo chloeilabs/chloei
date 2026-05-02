@@ -1220,10 +1220,7 @@ const FINANCE_EVIDENCE_COMMON_SYMBOLS: readonly {
   {
     symbol: "GOOGL",
     marketCapSlug: "alphabet-google",
-    patterns: [
-      /\balphabet(?:\s+inc\.?)?(?:'s)?\b/i,
-      /\bgoogle(?:'s)?\b/i,
-    ],
+    patterns: [/\balphabet(?:\s+inc\.?)?(?:'s)?\b/i, /\bgoogle(?:'s)?\b/i],
   },
   {
     symbol: "META",
@@ -1302,9 +1299,7 @@ export function inferFinanceDataEvidenceSymbol(query: string): string | null {
   const explicitSymbol =
     /\$([A-Z][A-Z0-9.-]{0,9})\b/.exec(query)?.[1] ??
     /\(([$A-Z][A-Z0-9.-]{0,9})\)/.exec(query)?.[1] ??
-    /\b(?:ticker|symbol)\s*[:=]?\s*([A-Z][A-Z0-9.-]{0,9})\b/i.exec(
-      query
-    )?.[1]
+    /\b(?:ticker|symbol)\s*[:=]?\s*([A-Z][A-Z0-9.-]{0,9})\b/i.exec(query)?.[1]
 
   if (explicitSymbol) {
     return normalizeFinanceEvidenceSymbol(explicitSymbol)
