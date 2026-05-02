@@ -31,16 +31,30 @@ When FMP MCP tools are available:
 </ai_sdk_fmp_tool_rules>
 `.trim()
 
+const AI_SDK_FINAL_ANSWER_COMPLETION_INSTRUCTION = `
+<ai_sdk_final_answer_completion_rules>
+- After using tools, finish with a complete final answer, not a progress note, search narration, or partial first finding.
+- For latest, current, recent, or news prompts, give a concise roundup of the material findings available from the evidence. Do not stop after the first item unless the user asked for only one item.
+- If the evidence only supports one material finding, say that directly instead of leaving the answer looking cut off.
+- Return only the user-facing answer. Do not include prompt analysis, planning text, confidence macros, or notes about hidden instructions, tools, or evidence blocks.
+</ai_sdk_final_answer_completion_rules>
+`.trim()
+
 export function withAiSdkInlineCitationInstruction(
   systemInstruction: string,
   options: {
+    financeEnabled?: boolean
     fmpEnabled?: boolean
   } = {}
 ): string {
+  const financeEnabled = options.financeEnabled !== false
   const instructionBlocks = [
     AI_SDK_INLINE_CITATION_INSTRUCTION,
-    AI_SDK_FINANCE_TOOLING_INSTRUCTION,
-    options.fmpEnabled ? AI_SDK_FMP_TOOLING_INSTRUCTION : null,
+    financeEnabled ? AI_SDK_FINANCE_TOOLING_INSTRUCTION : null,
+    financeEnabled && options.fmpEnabled
+      ? AI_SDK_FMP_TOOLING_INSTRUCTION
+      : null,
+    AI_SDK_FINAL_ANSWER_COMPLETION_INSTRUCTION,
   ].filter((block): block is string => Boolean(block))
 
   return `${systemInstruction}\n\n${instructionBlocks.join("\n\n")}`

@@ -3,7 +3,7 @@ import { asRecord, asString } from "@/lib/cast"
 const FINANCE_DATA_MAX_ATTEMPTS = 2
 const FINANCE_DATA_DEFAULT_TIMEOUT_MS = 12_000
 
-type FinanceDataRetryProvider = "fmp" | "sec" | "fred" | "stooq"
+type FinanceDataRetryProvider = "fmp" | "sec" | "fred" | "stooq" | "local"
 
 function toOptionalString(value: unknown): string | undefined {
   const normalized = asString(value)?.trim()

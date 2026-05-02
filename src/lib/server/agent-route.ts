@@ -48,6 +48,18 @@ const TOOL_OUTPUT_ONLY_FALLBACK_TEXT =
 
 const DATA_URL_BASE64_PREFIX_PATTERN = /^data:([^;,]+);base64,/i
 const BASE64_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/
+const TIMEOUT_ERROR_CODES = new Set([
+  "UND_ERR_BODY_TIMEOUT",
+  "UND_ERR_CONNECT_TIMEOUT",
+  "UND_ERR_HEADERS_TIMEOUT",
+])
+const TIMEOUT_ERROR_NAMES = new Set([
+  "BodyTimeoutError",
+  "ConnectTimeoutError",
+  "GatewayTimeoutError",
+  "HeadersTimeoutError",
+  "TimeoutError",
+])
 
 const agentAttachmentSchema = z
   .object({
@@ -200,6 +212,14 @@ function textDeltaEvent(delta: string): AgentStreamEvent {
   return { type: "text_delta", delta }
 }
 
+function shouldIncludeFinanceToolingInstruction(
+  model: ModelType,
+  runtimeProfile: AgentRuntimeProfileId | undefined
+): boolean {
+  void runtimeProfile
+  return !model.startsWith("xai/")
+}
+
 function isProviderAuthenticationError(error: unknown): boolean {
   const record = asRecord(error)
   const status =
@@ -224,6 +244,48 @@ function isProviderAuthenticationError(error: unknown): boolean {
   return message.includes("api key")
 }
 
+function isTimeoutLikeError(error: unknown): boolean {
+  if (isAbortError(error)) {
+    return true
+  }
+
+  const seen = new Set<unknown>()
+  let current: unknown = error
+
+  while (current && typeof current === "object" && !seen.has(current)) {
+    seen.add(current)
+    if (isAbortError(current)) {
+      return true
+    }
+
+    const record = asRecord(current)
+    const code = asString(record?.code)?.toUpperCase()
+    if (code && TIMEOUT_ERROR_CODES.has(code)) {
+      return true
+    }
+
+    const name = asString(record?.name)
+    if (name && TIMEOUT_ERROR_NAMES.has(name)) {
+      return true
+    }
+
+    const message =
+      asString(record?.message)?.toLowerCase() ??
+      (current instanceof Error ? current.message.toLowerCase() : "")
+    if (
+      message.includes("body timeout") ||
+      message.includes("client-side timeout") ||
+      message.includes("headers timeout")
+    ) {
+      return true
+    }
+
+    current = record?.cause
+  }
+
+  return false
+}
+
 function isSupportedModel(model: unknown): model is ModelType {
   return (
     typeof model === "string" &&
@@ -246,10 +308,6 @@ function getTotalMessageChars(
 
 function getMessageAttachments(messages: AgentStreamRequest["messages"]) {
   return messages.flatMap((message) => message.attachments ?? [])
-}
-
-function hasMessageAttachments(messages: AgentStreamRequest["messages"]) {
-  return messages.some((message) => (message.attachments?.length ?? 0) > 0)
 }
 
 function getTotalAttachmentBytes(
@@ -558,21 +616,8 @@ export function parseAgentStreamRequest(
     })
   }
 
-  if (
-    hasMessageAttachments(parsed.data.messages) &&
-    !isAvailableModel(params.availableModels, AvailableModels.OPENAI_GPT_5_5)
-  ) {
-    return createJsonErrorResponse({
-      requestId: params.requestId,
-      error: "File attachments require GPT-5.5 model access.",
-      errorCode: "AGENT_ATTACHMENT_MODEL_UNAVAILABLE",
-      status: 400,
-      rateLimitDecision: params.rateLimitDecision,
-    })
-  }
-
   const selectedModelCandidate =
-    runMode === "research" || hasMessageAttachments(parsed.data.messages)
+    runMode === "research"
       ? AvailableModels.OPENAI_GPT_5_5
       : (parsed.data.model ?? resolveDefaultModel(params.availableModels))
 
@@ -633,6 +678,9 @@ export function createAgentStreamResponse(
         hasStructuredOutput: false,
         hasToolOutput: false,
         sawTerminalAgentStatus: false,
+        textChunkCount: 0,
+        textCharCount: 0,
+        toolOutputCount: 0,
       }
       let streamOutcome = "completed"
 
@@ -659,10 +707,22 @@ export function createAgentStreamResponse(
         }
       }
 
+      const enqueueTimeoutFallback = () => {
+        const prefix = streamState.hasTextChunk ? "\n\n" : ""
+        const fallbackText = `${prefix}${STREAM_TIMEOUT_FALLBACK_TEXT}`
+        streamState.hasTextChunk = true
+        streamState.hasMeaningfulText = true
+        streamState.textChunkCount += 1
+        streamState.textCharCount += fallbackText.length
+        enqueueEvent(textDeltaEvent(fallbackText))
+      }
+
       try {
         const handleEvent = (event: AgentStreamEvent) => {
           if (event.type === "text_delta") {
             streamState.hasTextChunk = true
+            streamState.textChunkCount += 1
+            streamState.textCharCount += event.delta.length
             if (event.delta.trim().length > 0) {
               streamState.hasMeaningfulText = true
             }
@@ -670,6 +730,9 @@ export function createAgentStreamResponse(
             streamState.hasStructuredOutput = true
             if (event.type === "tool_call" || event.type === "tool_result") {
               streamState.hasToolOutput = true
+              if (event.type === "tool_result") {
+                streamState.toolOutputCount += 1
+              }
             }
           }
 
@@ -683,6 +746,7 @@ export function createAgentStreamResponse(
         handleEvent({ type: "agent_status", status: "in_progress" })
 
         const stream = startGatewayResponseStream({
+          requestId: params.requestId,
           model: params.selectedModel,
           aiGatewayApiKey: params.aiGatewayApiKey,
           tavilyApiKey: params.tavilyApiKey,
@@ -693,6 +757,10 @@ export function createAgentStreamResponse(
           systemInstruction: withAiSdkInlineCitationInstruction(
             params.systemInstruction,
             {
+              financeEnabled: shouldIncludeFinanceToolingInstruction(
+                params.selectedModel,
+                params.runtimeProfile
+              ),
               fmpEnabled: Boolean(params.fmpApiKey?.trim()),
             }
           ),
@@ -705,20 +773,19 @@ export function createAgentStreamResponse(
 
         const completedWithoutAnswer = !streamState.hasMeaningfulText
         if (completedWithoutAnswer) {
+          const fallbackText = streamState.hasStructuredOutput
+            ? streamState.hasToolOutput
+              ? TOOL_OUTPUT_ONLY_FALLBACK_TEXT
+              : STRUCTURED_OUTPUT_ONLY_FALLBACK_TEXT
+            : ASSISTANT_EMPTY_RESPONSE_FALLBACK
           streamOutcome = streamState.hasStructuredOutput
             ? "incomplete"
             : streamOutcome
           streamState.hasTextChunk = true
           streamState.hasMeaningfulText = true
-          enqueueEvent(
-            textDeltaEvent(
-              streamState.hasStructuredOutput
-                ? streamState.hasToolOutput
-                  ? TOOL_OUTPUT_ONLY_FALLBACK_TEXT
-                  : STRUCTURED_OUTPUT_ONLY_FALLBACK_TEXT
-                : ASSISTANT_EMPTY_RESPONSE_FALLBACK
-            )
-          )
+          streamState.textChunkCount += 1
+          streamState.textCharCount += fallbackText.length
+          enqueueEvent(textDeltaEvent(fallbackText))
         }
 
         if (!streamState.sawTerminalAgentStatus) {
@@ -739,23 +806,19 @@ export function createAgentStreamResponse(
         }
         enqueueEvent({ type: "agent_status", status: "failed" })
 
-        if (isAbortError(streamError)) {
+        if (isTimeoutLikeError(streamError)) {
           streamOutcome = clientAborted ? "client_aborted" : "timeout"
           if (!clientAborted) {
-            logger.warn(
-              `Agent stream aborted after ${String(params.timeoutMs)}ms timeout.`,
-              {
-                errorCode: "AGENT_STREAM_TIMEOUT",
-                requestId: params.requestId,
-                timeoutMs: params.timeoutMs,
-              }
-            )
+            logger.warn("Agent stream timed out before completion.", {
+              error: streamError,
+              errorCode: "AGENT_STREAM_TIMEOUT",
+              requestId: params.requestId,
+              timeoutMs: params.timeoutMs,
+            })
           }
 
-          if (!clientAborted && !streamState.hasMeaningfulText) {
-            streamState.hasTextChunk = true
-            streamState.hasMeaningfulText = true
-            enqueueEvent(textDeltaEvent(STREAM_TIMEOUT_FALLBACK_TEXT))
+          if (!clientAborted) {
+            enqueueTimeoutFallback()
           }
         } else if (
           isProviderAuthenticationError(streamError) &&
@@ -769,6 +832,9 @@ export function createAgentStreamResponse(
           })
           streamState.hasTextChunk = true
           streamState.hasMeaningfulText = true
+          streamState.textChunkCount += 1
+          streamState.textCharCount +=
+            "Invalid AI_GATEWAY_API_KEY on the server.".length
           enqueueEvent(
             textDeltaEvent("Invalid AI_GATEWAY_API_KEY on the server.")
           )
@@ -777,11 +843,15 @@ export function createAgentStreamResponse(
           logger.error("Agent stream failed.", streamFailureDetails)
           streamState.hasTextChunk = true
           streamState.hasMeaningfulText = true
+          streamState.textChunkCount += 1
+          streamState.textCharCount += STREAM_ERROR_FALLBACK_TEXT.length
           enqueueEvent(textDeltaEvent(STREAM_ERROR_FALLBACK_TEXT))
         } else if (!streamState.hasTextChunk) {
           streamOutcome = "failed"
           logger.error("Agent stream failed.", streamFailureDetails)
           streamState.hasTextChunk = true
+          streamState.textChunkCount += 1
+          streamState.textCharCount += ASSISTANT_EMPTY_RESPONSE_FALLBACK.length
           enqueueEvent(textDeltaEvent(ASSISTANT_EMPTY_RESPONSE_FALLBACK))
         } else {
           streamOutcome = "failed"
@@ -795,6 +865,9 @@ export function createAgentStreamResponse(
           outcome: streamOutcome,
           hadMeaningfulText: streamState.hasMeaningfulText,
           hadStructuredOutput: streamState.hasStructuredOutput,
+          textChunkCount: streamState.textChunkCount,
+          textCharCount: streamState.textCharCount,
+          toolOutputCount: streamState.toolOutputCount,
         })
         await settleStream()
         closeController()

@@ -13,7 +13,6 @@ import { createRequestHeaders, getRequestIdFromHeaders } from "@/lib/request-id"
 import {
   type AgentRequestAttachment,
   type AgentRunMode,
-  AvailableModels,
   type Message as AgentMessage,
   type ModelType,
   type Thread,
@@ -494,23 +493,16 @@ export function useAgentSession({
         attachmentsByMessageId:
           attachmentPayloadsRef.current.get(activeThreadId),
       })
-      const hasAttachments = requestMessages.some(
-        (message) => (message.attachments?.length ?? 0) > 0
-      )
-      const effectiveModel =
-        runMode === "research" || hasAttachments
-          ? AvailableModels.OPENAI_GPT_5_5
-          : model
 
       return streamAgentRequest({
         endpoint: "/api/agent",
         threadId: activeThreadId,
         baseMessages: nextMessages,
-        model: effectiveModel,
+        model,
         runMode,
         errorTitle: "Failed to send message",
         body: {
-          model: effectiveModel,
+          model,
           runMode,
           threadId: activeThreadId,
           messages: requestMessages,

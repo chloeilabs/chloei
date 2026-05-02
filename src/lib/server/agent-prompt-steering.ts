@@ -1,6 +1,11 @@
 import type { ModelType } from "@/lib/shared"
 
-export type PromptProvider = "anthropic" | "deepseek" | "moonshotai" | "openai"
+export type PromptProvider =
+  | "anthropic"
+  | "deepseek"
+  | "moonshotai"
+  | "openai"
+  | "xai"
 
 export type PromptTaskMode =
   | "general"
@@ -77,6 +82,17 @@ Use OpenAI reasoning mode efficiently.
 - Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
 - After tool use, synthesize the result and stop. Do not replay raw tool traces.
 `.trim(),
+  xai: `
+Use Grok reasoning mode efficiently.
+- Keep the final answer concise and grounded in the actual task.
+- Prefer direct execution and verification over speculative narration.
+- On format-sensitive tasks, do a literal final-format check before finishing.
+- Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
+- For tool-backed current-events, news, or research answers, write the complete final response in one pass. Do not stop after the first section, source, or example.
+- Keep hidden search planning and tool-use narration out of the final answer.
+- Do not include meta commentary such as "the user asked", "the task is", "I think", confidence macros, or notes about instructions.
+- After tool use, synthesize the result and stop. Do not replay raw tool traces.
+`.trim(),
 }
 
 const TASK_MODE_OVERLAYS: Record<Exclude<PromptTaskMode, "general">, string> = {
@@ -138,6 +154,17 @@ This request is high-stakes.
 `.trim(),
 }
 
+const XAI_FINANCE_ANALYSIS_OVERLAY = `
+This request is finance-analysis work.
+- Use structured finance evidence supplied in the prompt when present; that evidence was retrieved before the model response.
+- Cite the evidence sources when the user asks for sources or current market facts.
+- If quote, profile, filing, statement, market-cap, or macro data is absent or stale, say that plainly instead of filling gaps with invented figures.
+- Distinguish reported facts, computed values, assumptions, and interpretation.
+- Return only the user-facing answer. Do not include prompt analysis, planning text, confidence macros, or notes about internal instructions.
+- Do not provide personalized investment, tax, legal, or trade-execution advice. Frame analysis as informational unless the user provided an institutional workflow.
+- Stay on the finance task and complete the answer in one pass.
+`.trim()
+
 function normalizeUserText(messages: readonly PromptSteeringMessage[]): string {
   return messages
     .filter((message) => message.role === "user")
@@ -171,6 +198,10 @@ export function resolvePromptProvider(model: ModelType): PromptProvider {
 
   if (model.startsWith("moonshotai/")) {
     return "moonshotai"
+  }
+
+  if (model.startsWith("xai/")) {
+    return "xai"
   }
 
   throw new Error(`Unsupported model provider for model: ${model}`)
@@ -251,7 +282,10 @@ export function createPromptSteeringBlocks(
   ) {
     blocks.push({
       label: `TASK MODE OVERLAY: ${params.taskMode.toUpperCase()}`,
-      body: TASK_MODE_OVERLAYS[params.taskMode],
+      body:
+        params.provider === "xai" && params.taskMode === "finance_analysis"
+          ? XAI_FINANCE_ANALYSIS_OVERLAY
+          : TASK_MODE_OVERLAYS[params.taskMode],
     })
   }
 

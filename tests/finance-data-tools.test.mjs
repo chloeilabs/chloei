@@ -19,6 +19,7 @@ setTestModuleStubs({
 
 const {
   classifyFinanceDataRetry,
+  createAiSdkFinanceDataEvidenceContext,
   getAiSdkFinanceDataToolCallMetadata,
   getAiSdkFinanceDataToolResultMetadata,
   runFinanceDataOperation,
@@ -54,6 +55,95 @@ test("finance data operation returns sanitized provider sources", async () => {
   assert.equal(result.output?.provider, "fmp")
   assert.equal(result.output?.requestUrl.includes("secret-key"), false)
   assert.equal(result.output?.sources[0]?.title, "Financial Modeling Prep")
+})
+
+test("finance evidence context prefetches quote and profile data", async () => {
+  const result = await createAiSdkFinanceDataEvidenceContext({
+    query: "What is Apple's current stock price and market cap? Cite sources.",
+    fmpApiKey: "secret-key",
+    fetchImpl: async (url) => {
+      const requestUrl = String(url)
+      if (requestUrl.includes("financialmodelingprep.com")) {
+        assert.match(requestUrl, /apikey=secret-key/)
+        return new Response(
+          JSON.stringify([
+            {
+              symbol: "AAPL",
+              price: 280.14,
+              marketCap: 4200000000000,
+            },
+          ]),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      }
+
+      if (requestUrl.includes("company_tickers.json")) {
+        return new Response(
+          JSON.stringify({
+            0: {
+              cik_str: 320193,
+              ticker: "AAPL",
+              title: "Apple Inc.",
+            },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      }
+
+      if (requestUrl.includes("CIK0000320193.json")) {
+        return new Response(
+          JSON.stringify({
+            cik: "320193",
+            name: "Apple Inc.",
+            tickers: ["AAPL"],
+            exchanges: ["Nasdaq"],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      }
+
+      if (requestUrl.includes("companiesmarketcap.com/apple/marketcap")) {
+        return new Response(
+          '<meta name="description" content="As of May 2026 Apple has a market cap of $4.112 Trillion USD.">',
+          {
+            status: 200,
+            headers: { "Content-Type": "text/html" },
+          }
+        )
+      }
+
+      throw new Error(`Unexpected URL: ${requestUrl}`)
+    },
+  })
+
+  assert.equal(result.errors.length, 0)
+  assert.equal(result.outputs.length, 2)
+  assert.equal(result.supplements.length, 1)
+  assert.match(result.context, /Resolved symbol: AAPL/)
+  assert.match(result.context, /"marketCap": 4200000000000/)
+  assert.match(result.context, /\$4\.112 Trillion USD/)
+  assert.equal(
+    result.sources.some((source) => source.title === "Financial Modeling Prep"),
+    true
+  )
+  assert.equal(
+    result.sources.some((source) => source.title === "CompaniesMarketCap"),
+    true
+  )
+  assert.equal(
+    result.sources.some((source) => source.title === "SEC company submissions"),
+    true
+  )
+  assert.equal(result.context.includes("secret-key"), false)
 })
 
 test("finance provider status validates configured provider availability", async () => {

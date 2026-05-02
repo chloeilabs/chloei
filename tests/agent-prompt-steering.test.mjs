@@ -14,7 +14,11 @@ const steeringUrl = pathToFileURL(
 ).href
 
 const { AvailableModels } = await import(modelsUrl)
-const { inferPromptTaskMode, resolvePromptProvider } = await import(steeringUrl)
+const {
+  createPromptSteeringBlocks,
+  inferPromptTaskMode,
+  resolvePromptProvider,
+} = await import(steeringUrl)
 
 test("prompt steering resolves supported model providers", () => {
   assert.equal(
@@ -29,6 +33,50 @@ test("prompt steering resolves supported model providers", () => {
   assert.equal(
     resolvePromptProvider(AvailableModels.DEEPSEEK_V4_PRO),
     "deepseek"
+  )
+  assert.equal(resolvePromptProvider(AvailableModels.XAI_GROK_4_3), "xai")
+})
+
+test("prompt steering tells Grok to complete tool-backed news answers", () => {
+  const blocks = createPromptSteeringBlocks({
+    provider: "xai",
+    taskMode: "research",
+  })
+  const overlayText = blocks.map((block) => block.body).join("\n\n")
+
+  assert.match(
+    overlayText,
+    /complete final response in one pass/,
+    "Expected Grok news and research requests to avoid early final-answer stops."
+  )
+  assert.match(
+    overlayText,
+    /Do not stop after the first section/,
+    "Expected Grok to avoid one-section partial news answers."
+  )
+})
+
+test("prompt steering tells Grok finance to use prefetched evidence", () => {
+  const blocks = createPromptSteeringBlocks({
+    provider: "xai",
+    taskMode: "finance_analysis",
+  })
+  const overlayText = blocks.map((block) => block.body).join("\n\n")
+
+  assert.match(
+    overlayText,
+    /structured finance evidence supplied in the prompt/,
+    "Expected Grok finance prompts to rely on server-prefetched evidence."
+  )
+  assert.match(
+    overlayText,
+    /Return only the user-facing answer/,
+    "Expected Grok finance prompts to suppress visible planning text."
+  )
+  assert.doesNotMatch(
+    overlayText,
+    /call `finance_data`/,
+    "Expected Grok finance prompts to avoid model-driven finance tool calls."
   )
 })
 

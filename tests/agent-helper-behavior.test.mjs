@@ -334,7 +334,7 @@ test("agent helper validates total size, last-message role, and default model su
   })
 })
 
-test("agent helper validates file attachments and forces the OpenAI vision model", async () => {
+test("agent helper validates file attachments and preserves the selected model", async () => {
   const imageAttachment = {
     id: "attachment-1",
     kind: "image",
@@ -364,12 +364,12 @@ test("agent helper validates file attachments and forces the OpenAI vision model
   })
 
   assert(!(attachmentResult instanceof Response))
-  assert.equal(attachmentResult.selectedModel, "openai/gpt-5.5")
+  assert.equal(attachmentResult.selectedModel, "anthropic/claude-sonnet-4.6")
   assert.deepEqual(attachmentResult.parsedRequest.messages[0]?.attachments, [
     imageAttachment,
   ])
 
-  const unavailableAttachmentModelResult = parseAgentStreamRequest({
+  const defaultAttachmentModelResult = parseAgentStreamRequest({
     body: {
       messages: [
         {
@@ -380,16 +380,14 @@ test("agent helper validates file attachments and forces the OpenAI vision model
       ],
     },
     availableModels: [{ id: "anthropic/claude-sonnet-4.6" }],
-    requestId: "request-attachment-unavailable",
+    requestId: "request-attachment-default-model",
   })
 
-  assert(unavailableAttachmentModelResult instanceof Response)
-  assert.equal(unavailableAttachmentModelResult.status, 400)
-  assert.deepEqual(await unavailableAttachmentModelResult.json(), {
-    error: "File attachments require GPT-5.5 model access.",
-    errorCode: "AGENT_ATTACHMENT_MODEL_UNAVAILABLE",
-    requestId: "request-attachment-unavailable",
-  })
+  assert(!(defaultAttachmentModelResult instanceof Response))
+  assert.equal(
+    defaultAttachmentModelResult.selectedModel,
+    "anthropic/claude-sonnet-4.6"
+  )
 
   const assistantAttachmentResult = parseAgentStreamRequest({
     body: {
@@ -721,9 +719,66 @@ test("agent helper streams fallback output when the model yields no content", as
   assert.deepEqual(recorded.augmentedInstructions[0], {
     instruction: "system",
     options: {
+      financeEnabled: true,
       fmpEnabled: true,
     },
   })
+})
+
+test("agent helper turns upstream body timeouts into visible timeout output", async () => {
+  setTestMocks({
+    gatewayResponses: {
+      startGatewayResponseStream(params) {
+        recorded.streamParams.push(params)
+        return (async function* () {
+          yield { type: "reasoning_delta", delta: "Searching current news." }
+          const bodyTimeoutError = Object.assign(
+            new Error("Body Timeout Error"),
+            {
+              code: "UND_ERR_BODY_TIMEOUT",
+              name: "BodyTimeoutError",
+            }
+          )
+          throw Object.assign(new TypeError("terminated"), {
+            cause: bodyTimeoutError,
+          })
+        })()
+      },
+    },
+  })
+
+  const response = createAgentStreamResponse({
+    request: createRequest(),
+    requestId: "request-body-timeout",
+    timeoutMs: 30_000,
+    selectedModel: "xai/grok-4.3",
+    runMode: "chat",
+    aiGatewayApiKey: "ai-gateway-key",
+    messages: [{ role: "user", content: "Latest AI news" }],
+    systemInstruction: "system",
+  })
+
+  const events = await readNdjsonEvents(response)
+
+  assert.deepEqual(events, [
+    { type: "agent_status", status: "in_progress" },
+    { type: "reasoning_delta", delta: "Searching current news." },
+    { type: "agent_status", status: "failed" },
+    {
+      type: "text_delta",
+      delta: "Sorry, I couldn't finish the response in time. Please retry.",
+    },
+  ])
+  assert.equal(recorded.loggerErrors.length, 0)
+  assert.equal(
+    recorded.loggerWarnings[0]?.message,
+    "Agent stream timed out before completion."
+  )
+  assert.equal(
+    recorded.loggerWarnings[0]?.error?.errorCode,
+    "AGENT_STREAM_TIMEOUT"
+  )
+  assert.equal(recorded.loggerInfos[0]?.details?.outcome, "timeout")
 })
 
 test("agent helper forwards the deep research runtime profile", async () => {
