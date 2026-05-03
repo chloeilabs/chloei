@@ -36,3 +36,5 @@ Standard commands are documented in `CLAUDE.md` and `README.md`. Key ones:
 - Unit tests use stubs and run without a database. No external services are needed for `pnpm test`.
 - The `pnpm.onlyBuiltDependencies` field in `package.json` already handles build script approval for `sharp`; do not run `pnpm approve-builds`.
 - Node.js 24.x is required (pinned in `engines`). The VM needs `/usr/local/node/bin` on `PATH`.
+- If `docker start postgres` fails with a "file exists" error after a VM restart, remove the stale container with `docker rm -f postgres` and recreate it with the full `docker run` command above.
+- After signing up a user via `/api/auth/sign-up/email`, the session cookie is automatically set; no separate sign-in step is needed.
