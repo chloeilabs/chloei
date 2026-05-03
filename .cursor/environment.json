@@ -1,0 +1,11 @@
+{
+  "$schema": "https://www.cursor.com/schemas/environment.schema.json",
+  "name": "chloei-cloud-agent",
+  "user": "cursor",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "install": "bash .cursor/setup.sh",
+  "start": "sudo service postgresql start"
+}
