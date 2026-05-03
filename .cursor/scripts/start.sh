@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export PATH="/usr/local/node/bin:$PATH"
+source "$(dirname "$0")/node-toolchain.sh"
+ensure_node_toolchain
 
 POSTGRES_CONTAINER_NAME="postgres"
 POSTGRES_USER="chloei"
