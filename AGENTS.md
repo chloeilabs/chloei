@@ -4,10 +4,10 @@
 
 ### Services
 
-| Service | How to start | Notes |
-|---------|-------------|-------|
-| PostgreSQL | `docker start postgres` (if container exists) or `docker run -d --name postgres -e POSTGRES_USER=chloei -e POSTGRES_PASSWORD=chloei_dev -e POSTGRES_DB=chloei -p 5432:5432 postgres:16-alpine` | Must be running before dev server or migrations |
-| Next.js dev server | `pnpm dev` | Runs on port 3000; requires `.env.local` with `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` |
+| Service            | How to start                                                                                                                                                                                   | Notes                                                                                                 |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| PostgreSQL         | `docker start postgres` (if container exists) or `docker run -d --name postgres -e POSTGRES_USER=chloei -e POSTGRES_PASSWORD=chloei_dev -e POSTGRES_DB=chloei -p 5432:5432 postgres:16-alpine` | Must be running before dev server or migrations                                                       |
+| Next.js dev server | `pnpm dev`                                                                                                                                                                                     | Runs on port 3000; requires `.env.local` with `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` |
 
 ### Environment
 
