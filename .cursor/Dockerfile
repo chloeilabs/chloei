@@ -16,6 +16,7 @@ RUN apt-get update && \
       python3 \
       ripgrep \
       sudo \
+      tmux \
       xz-utils && \
     rm -rf /var/lib/apt/lists/*
 
