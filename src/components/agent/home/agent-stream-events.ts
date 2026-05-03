@@ -120,7 +120,7 @@ function parseOptionalStringField(
   }
 
   const trimmed = stringValue.trim()
-  return trimmed.length > 0 ? trimmed : null
+  return trimmed.length > 0 ? trimmed : undefined
 }
 
 export function parseStreamEventLine(line: string): AgentStreamEvent | null {

@@ -141,16 +141,21 @@ test("parseStreamEventLine rejects malformed checkpoint and tool data", () => {
     null
   )
 
-  assert.equal(
+  assert.deepEqual(
     parseStreamEventLine(
       JSON.stringify({
         type: "harness_trace",
         stage: "plan",
         label: "Planning",
         detail: "   ",
+        status: "",
       })
     ),
-    null
+    {
+      type: "harness_trace",
+      stage: "plan",
+      label: "Planning",
+    }
   )
 
   assert.equal(

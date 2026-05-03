@@ -126,6 +126,21 @@ test("agent runtime passes runtime mode as a harness profile hint", async () => 
   )
 })
 
+test("agent runtime only appends harness prompt context for specialized profiles", async () => {
+  const runtimeSource = await readFile(runtimePath, "utf8")
+
+  assert.match(
+    runtimeSource,
+    /function appendHarnessPromptContext[\s\S]*harnessRun\.profile === "chat_default"[\s\S]*return systemInstruction[\s\S]*getHarnessPromptContext\(harnessRun\)/,
+    "Expected default chat prompts to avoid harness context token overhead."
+  )
+  assert.match(
+    runtimeSource,
+    /appendHarnessPromptContext\(params\.systemInstruction,\s*harnessRun\)/,
+    "Expected runtime system instructions to use the gated harness prompt context helper."
+  )
+})
+
 test("agent runtime annotates harness traces with checkpoint fields", async () => {
   const runtimeSource = await readFile(runtimePath, "utf8")
 

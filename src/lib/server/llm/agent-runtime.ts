@@ -21,6 +21,7 @@ import { type AgentStreamEvent, type ModelType } from "@/lib/shared"
 
 import {
   type AgentHarnessProfileId,
+  type AgentHarnessRun,
   createAgentHarnessRun,
   createHarnessTraceEvents,
   getHarnessPromptContext,
@@ -447,6 +448,17 @@ function appendFinanceEvidenceToSystemInstruction(
   ].join("\n\n")
 }
 
+function appendHarnessPromptContext(
+  systemInstruction: string,
+  harnessRun: AgentHarnessRun
+): string {
+  if (harnessRun.profile === "chat_default") {
+    return systemInstruction
+  }
+
+  return `${systemInstruction}\n\n${getHarnessPromptContext(harnessRun)}`
+}
+
 export async function* startAgentRuntimeStream(
   params: StartAgentRuntimeStreamParams
 ): AsyncGenerator<AgentStreamEvent> {
@@ -741,7 +753,7 @@ export async function* startAgentRuntimeStream(
     })
     const systemInstruction = appendFinanceEvidenceToSystemInstruction(
       appendWebEvidenceToSystemInstruction(
-        `${params.systemInstruction}\n\n${getHarnessPromptContext(harnessRun)}`,
+        appendHarnessPromptContext(params.systemInstruction, harnessRun),
         prefetchedWebEvidence
       ),
       prefetchedFinanceEvidence
