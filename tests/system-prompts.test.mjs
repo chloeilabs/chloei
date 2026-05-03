@@ -12,9 +12,9 @@ const systemPromptsUrl = pathToFileURL(
 
 const {
   buildSystemPrompt,
-  buildToolPolicyPromptBlocks,
   createPromptSteeringBlocks,
   resolveAgentPromptMode,
+  withAiSdkInlineCitationInstruction,
 } = await import(systemPromptsUrl)
 
 test("system prompt always starts with the base agent protocol", () => {
@@ -119,26 +119,20 @@ test("prompt steering maps compatibility task modes into centralized overlays", 
 })
 
 test("tool policy overlays are generated from enabled tool options", () => {
-  const financeDisabled = buildToolPolicyPromptBlocks({
+  const financeDisabledText = withAiSdkInlineCitationInstruction("Base", {
     financeEnabled: false,
     fmpEnabled: true,
   })
-  const financeDisabledText = financeDisabled
-    .map((block) => `${block.label}\n${block.body}`)
-    .join("\n\n")
 
   assert.match(financeDisabledText, /AI SDK INLINE CITATION RULES/)
   assert.match(financeDisabledText, /AI SDK FINAL ANSWER COMPLETION RULES/)
   assert.doesNotMatch(financeDisabledText, /AI SDK FINANCE TOOL RULES/)
   assert.doesNotMatch(financeDisabledText, /AI SDK FMP TOOL RULES/)
 
-  const financeEnabled = buildToolPolicyPromptBlocks({
+  const financeEnabledText = withAiSdkInlineCitationInstruction("Base", {
     financeEnabled: true,
     fmpEnabled: true,
   })
-  const financeEnabledText = financeEnabled
-    .map((block) => `${block.label}\n${block.body}`)
-    .join("\n\n")
 
   assert.match(financeEnabledText, /AI SDK FINANCE TOOL RULES/)
   assert.match(financeEnabledText, /AI SDK FMP TOOL RULES/)

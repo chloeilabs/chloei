@@ -917,10 +917,33 @@ export async function runFinanceDataOperation(
       }
 
       const source = createProviderSource(provider, input.operation, url)
-      const data =
-        requestedProvider === "auto"
-          ? normalizeFmpAutoData(response.data, input)
-          : response.data
+      let data = response.data
+      if (requestedProvider === "auto") {
+        try {
+          data = normalizeFmpAutoData(response.data, input)
+        } catch (error) {
+          const record = asRecord(error)
+          const code = toOptionalString(record?.code) ?? "NORMALIZATION_FAILED"
+          return {
+            error: {
+              message:
+                toOptionalString(record?.message) ??
+                (error instanceof Error
+                  ? error.message
+                  : "FMP response normalization failed."),
+              code,
+              operation: input.operation,
+              provider,
+              retryable:
+                typeof record?.retryable === "boolean"
+                  ? record.retryable
+                  : classifyFinanceDataRetry({ code }),
+              attempts: response.attempts,
+              durationMs,
+            },
+          }
+        }
+      }
       return {
         output: {
           operation: input.operation,

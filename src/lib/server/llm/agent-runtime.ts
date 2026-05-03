@@ -486,9 +486,7 @@ export async function* startAgentRuntimeStream(
         : { profileHint: getHarnessProfileHint(runtimeProfile) }),
       userTimeZone: params.userTimeZone,
     })
-    for (const event of createHarnessTraceEvents(harnessRun)) {
-      yield event
-    }
+    const harnessTraceEvents = createHarnessTraceEvents(harnessRun)
     const ambientFinanceToolsEnabled = shouldEnableAmbientFinanceTools(
       params.model,
       runtimeProfile
@@ -754,6 +752,10 @@ export async function* startAgentRuntimeStream(
           : undefined,
       stopWhen: stepCountIs(runtimeProfile.toolMaxSteps),
     })
+
+    for (const event of harnessTraceEvents) {
+      yield event
+    }
 
     for await (const part of result.fullStream) {
       if (part.type === "finish-step") {

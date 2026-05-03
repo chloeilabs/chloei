@@ -488,6 +488,8 @@ test("finance quote auto provider rejects null FMP prices", async () => {
   assert.equal(result.output, undefined)
   assert.equal(result.error?.code, "QUOTE_UNAVAILABLE")
   assert.equal(result.error?.provider, "fmp")
+  assert.equal(result.error?.attempts, 1)
+  assert.equal(result.error?.retryable, true)
 })
 
 test("finance historical prices auto provider normalizes configured FMP data", async () => {

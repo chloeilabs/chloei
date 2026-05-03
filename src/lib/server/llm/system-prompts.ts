@@ -464,7 +464,7 @@ export function buildSystemPrompt(input: BuildSystemPromptInput): string {
   return blocks.join("\n\n")
 }
 
-export function buildToolPolicyPromptBlocks(
+function buildToolPolicyPromptBlocks(
   options: BuildToolPolicyBlocksOptions = {}
 ): PromptBlock[] {
   const financeEnabled = options.financeEnabled !== false
