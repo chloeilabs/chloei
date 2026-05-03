@@ -12,7 +12,8 @@
 ### Environment
 
 - `.env.local` must contain at minimum: `DATABASE_URL=postgresql://chloei:chloei_dev@localhost:5432/chloei`, `BETTER_AUTH_SECRET=<any-string>`, `BETTER_AUTH_URL=http://localhost:3000`.
-- `AI_GATEWAY_API_KEY` is needed for actual AI chat responses but the app starts and the auth flow works without it.
+- `AI_GATEWAY_API_KEY`, `TAVILY_API_KEY`, and `FMP_API_KEY` are configured as Cloud Agent secrets and injected as environment variables. Write them into `.env.local` before starting the dev server so Next.js picks them up (e.g. `echo "AI_GATEWAY_API_KEY=${AI_GATEWAY_API_KEY}" >> .env.local`).
+- Without `AI_GATEWAY_API_KEY` the app starts and auth works, but `/api/models` returns an empty list and `/api/agent` cannot stream responses.
 - Run `pnpm migrate` after provisioning the database and before the first request.
 
 ### Docker daemon
