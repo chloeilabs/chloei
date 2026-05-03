@@ -138,7 +138,7 @@ After assembly, `withAiSdkInlineCitationInstruction` appends inline citation rul
 
 ### Agent Tools
 
-Three tool categories, each only active when the respective API key is configured:
+Multiple tool categories, each only active when the respective API key is configured:
 
 | Tool             | Key                    | Description                                         |
 | ---------------- | ---------------------- | --------------------------------------------------- |
@@ -174,7 +174,7 @@ Three tool categories, each only active when the respective API key is configure
 
 ### Rate Limiting
 
-PostgreSQL-backed when `DATABASE_URL` is configured; local/no-database runs fall back to in-memory limits unless `AGENT_RATE_LIMIT_STORE=postgres` is set. Two independent controls:
+Default store is `auto` (PostgreSQL-backed when `DATABASE_URL` is configured; falls back to in-memory otherwise). Override with `AGENT_RATE_LIMIT_STORE=postgres` or `memory`. Two independent controls:
 
 - **Sliding window**: 60 req / 60 s per user (keyed `user:<userId>`)
 - **Concurrency slots**: max 4 in-flight requests per user
@@ -191,8 +191,9 @@ All available models are defined in `src/lib/shared/llm/models.ts` (`AvailableMo
 | `OPENAI_GPT_5_5`              | `openai/gpt-5.5`              | GPT-5.5           |
 | `MOONSHOTAI_KIMI_K2_6`        | `moonshotai/kimi-k2.6`        | Kimi K2.6         |
 | `DEEPSEEK_V4_PRO`             | `deepseek/deepseek-v4-pro`    | DeepSeek V4 Pro   |
+| `XAI_GROK_4_3`                | `xai/grok-4.3`                | Grok 4.3          |
 
-Adding a model requires updating `AvailableModels`, `ModelInfos`, and `SUPPORTED_MODELS` in that file. The `/api/models` route reads from this registry (filtered by configured API keys via `getModels()` in `src/lib/actions/api-keys.ts`); the agent validates the requested model against it.
+`MODEL_SELECTOR_MODELS` defines the subset shown in the model selector UI (currently Kimi K2.6, DeepSeek V4 Pro, Grok 4.3). Adding a model requires updating `AvailableModels`, `ModelInfos`, `SUPPORTED_MODELS`, and optionally `MODEL_SELECTOR_MODELS` in that file. The `/api/models` route reads from this registry (filtered by configured API keys via `getModels()` in `src/lib/actions/api-keys.ts`); the agent validates the requested model against it.
 
 ### Authentication
 
@@ -256,12 +257,23 @@ src/
       api-response.ts           # createApiHeaders, createApiErrorBody/Response
       auth-session.ts           # getRequestSession
       auth.ts                   # isAuthConfigured, createAuthUnavailableResponse
+      e2e-test-mode.ts          # E2E test mode detection for mock auth/agent
       llm/
+        agent-runtime.ts          # Core agent runtime orchestration
+        agent-runtime-messages.ts # Agent message preparation and formatting
+        ai-sdk-finance-data-tools.ts  # Normalized finance_data tool (FMP, SEC, FRED)
         ai-sdk-fmp-mcp-tools.ts   # FMP MCP client + curated tool wrappers
+        ai-sdk-gateway-search-tools.ts # Native AI Gateway + Anthropic search tools
         ai-sdk-tavily-tools.ts    # Tavily search/extract tools
         code-execution-tools.ts   # Sandboxed JS/Python execution
-        ai-sdk-gateway-search-tools.ts # Native AI Gateway + Anthropic search tools
+        finance-data/             # Finance data provider internals
+          provider-urls.ts        # FMP/FRED URL builders
+          retry.ts                # Fetch with retry + classification
+          sec-company-facts.ts    # SEC EDGAR company facts summarizer
+          sources.ts              # Source URL/ID generators
+          stooq-provider.ts       # Stooq historical price provider
         gateway-responses.ts      # startGatewayResponseStream generator
+        initial-reasoning-chunk-sanitizer.ts  # Filters redacted reasoning placeholders
         system-instruction-augmentations.ts  # Citation + FMP rules appended to prompt
       postgres.ts               # getDatabase() Kysely instance
       postgres-url.mjs          # normalizePostgresConnectionString
@@ -271,7 +283,9 @@ src/
       threads.ts                # listThreadsForUser, getThreadForUser, upsertThreadForUser, deleteThreadForUser
     shared/
       agent/messages.ts   # AgentStreamEvent, Message, ToolInvocation, ActivityTimelineEntry types
-      llm/models.ts       # AvailableModels, ModelInfos, ALL_MODELS
+      agent/attachments.ts # Attachment metadata types and helpers
+      agent-request-limits.ts  # Numeric defaults for message/char limits
+      llm/models.ts       # AvailableModels, ModelInfos, ALL_MODELS, MODEL_SELECTOR_MODELS
       llm/system-instructions.ts  # DEFAULT_OPERATING_INSTRUCTION, DEFAULT_SOUL_FALLBACK_INSTRUCTION
       source-links.ts
       threads.ts          # Thread type, sortThreadsNewestFirst, normalizeThread, deriveThreadTitle
@@ -289,6 +303,7 @@ src/
   types/assets.d.ts
 tests/
   *.test.mjs              # Node built-in test runner; no framework
+  smoke/                  # Playwright browser smoke tests (*.spec.mjs)
   stubs/                  # Per-module test stubs (imported via register-ts-path-hooks.mjs)
 ```
 
@@ -340,20 +355,22 @@ All other variables are optional — the code has safe defaults. See `.env.examp
 | `FRED_API_KEY`                             | Enables FRED macro/rates lookups through `finance_data`                          |
 | `SEC_API_USER_AGENT`                       | User agent for SEC public company-facts requests                                 |
 | `OPENAI_API_KEY`                           | Enables OpenAI judge for prompt evals                                            |
-| `OPENAI_EVAL_JUDGE_MODEL`                  | Judge model override (default: `gpt-5.4`)                                        |
+| `OPENAI_EVAL_JUDGE_MODEL`                  | Judge model override (default: `gpt-5.4-mini`)                                   |
 | `PYTHON3_PATH`                             | Override `python3` binary for code execution                                     |
 | `AGENT_MAX_MESSAGES`                       | Max messages per request (default: 50)                                           |
 | `AGENT_MAX_MESSAGE_CHARS`                  | Max chars per message (default: 12,000)                                          |
 | `AGENT_MAX_TOTAL_CHARS`                    | Max total conversation chars (default: 48,000)                                   |
 | `AGENT_STREAM_TIMEOUT_MS`                  | Stream timeout (default: 800,000 ms)                                             |
 | `AGENT_TOOL_MAX_STEPS`                     | Max tool use steps per run (default: 12)                                         |
+| `AGENT_RESEARCH_TOOL_MAX_STEPS`            | Max tool steps for research runs (default: 20)                                   |
+| `AI_GATEWAY_CLIENT_TIMEOUT_MS`             | AI Gateway HTTP client timeout (default: 3,600,000 ms)                           |
 | `AGENT_CODE_EXECUTION_BACKEND`             | `restricted` or `finance`                                                        |
 | `AGENT_CODE_EXECUTION_PYTHON_VENV_PATH`    | Optional venv/python path for curated finance execution                          |
 | `AGENT_EVAL_RESULTS_DIR`                   | Output directory for finance eval results/artifacts                              |
 | `AGENT_RATE_LIMIT_ENABLED`                 | Enable/disable rate limiting (default: true)                                     |
 | `AGENT_RATE_LIMIT_WINDOW_MS`               | Rate limit window (default: 60,000 ms)                                           |
 | `AGENT_RATE_LIMIT_MAX_REQUESTS`            | Max requests per window (default: 60)                                            |
-| `AGENT_RATE_LIMIT_STORE`                   | `memory` or `postgres` (default: postgres if `DATABASE_URL` is set, else memory) |
+| `AGENT_RATE_LIMIT_STORE`                   | `auto`, `memory`, or `postgres` (default: `auto` — uses postgres if `DATABASE_URL` is set, else memory) |
 | `AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT` | Concurrency limit (default: 4)                                                   |
 | `LOG_FORMAT`                               | Set to `json` to force structured JSON logs                                      |
 | `BETTER_AUTH_COOKIE_DOMAIN`                | Shared cookie domain for cross-subdomain auth                                    |

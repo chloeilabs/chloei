@@ -1,6 +1,6 @@
 # Chloei
 
-Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently exposes a curated model selector with Kimi K2.6, DeepSeek V4 Pro, and Grok 4.3, uses GPT-5.5 for deep research runs, and supports file attachments, native web search, local code execution, optional Tavily retrieval, optional Financial Modeling Prep MCP tools, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
+Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently exposes a curated model selector with Kimi K2.6, DeepSeek V4 Pro, and Grok 4.3, uses GPT-5.5 for deep research runs, supports Claude Sonnet 4.6, and offers file attachments, native web search, local code execution, optional Tavily retrieval, optional Financial Modeling Prep MCP tools, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
 
 ## Requirements
 
@@ -76,7 +76,7 @@ Optional variables let you override the built-in safe defaults for message limit
 - `SEC_API_USER_AGENT`: identifies Chloei for SEC public company-facts requests
 
 By default, Chloei enforces safe built-in agent limits even if you leave all optional `AGENT_*` env vars unset.
-`AGENT_RATE_LIMIT_STORE` defaults to `auto`, which uses PostgreSQL when `DATABASE_URL` is configured and falls back to process memory for local/no-database runs. Set it to `postgres` to require shared rate limits or `memory` for local-only limits.
+`AGENT_RATE_LIMIT_STORE` defaults to `auto`, which uses PostgreSQL when `DATABASE_URL` is configured and falls back to process memory for local/no-database runs. Allowed values: `auto`, `postgres`, `memory`.
 
 ## Important paths
 
