@@ -347,33 +347,33 @@ AI_GATEWAY_API_KEY=
 
 All other variables are optional — the code has safe defaults. See `.env.example` for the full list with inline documentation.
 
-| Variable                                   | Purpose                                                                          |
-| ------------------------------------------ | -------------------------------------------------------------------------------- |
-| `AUTH_DATABASE_URL`                        | Separate DB for Better Auth (falls back to `DATABASE_URL`)                       |
-| `TAVILY_API_KEY`                           | Enables Tavily web search + extract tools                                        |
-| `FMP_API_KEY`                              | Enables Financial Modeling Prep MCP finance tools                                |
-| `FRED_API_KEY`                             | Enables FRED macro/rates lookups through `finance_data`                          |
-| `SEC_API_USER_AGENT`                       | User agent for SEC public company-facts requests                                 |
-| `OPENAI_API_KEY`                           | Enables OpenAI judge for prompt evals                                            |
-| `OPENAI_EVAL_JUDGE_MODEL`                  | Judge model override (default: `gpt-5.4-mini`)                                   |
-| `PYTHON3_PATH`                             | Override `python3` binary for code execution                                     |
-| `AGENT_MAX_MESSAGES`                       | Max messages per request (default: 50)                                           |
-| `AGENT_MAX_MESSAGE_CHARS`                  | Max chars per message (default: 12,000)                                          |
-| `AGENT_MAX_TOTAL_CHARS`                    | Max total conversation chars (default: 48,000)                                   |
-| `AGENT_STREAM_TIMEOUT_MS`                  | Stream timeout (default: 800,000 ms)                                             |
-| `AGENT_TOOL_MAX_STEPS`                     | Max tool use steps per run (default: 12)                                         |
-| `AGENT_RESEARCH_TOOL_MAX_STEPS`            | Max tool steps for research runs (default: 20)                                   |
-| `AI_GATEWAY_CLIENT_TIMEOUT_MS`             | AI Gateway HTTP client timeout (default: 3,600,000 ms)                           |
-| `AGENT_CODE_EXECUTION_BACKEND`             | `restricted` or `finance`                                                        |
-| `AGENT_CODE_EXECUTION_PYTHON_VENV_PATH`    | Optional venv/python path for curated finance execution                          |
-| `AGENT_EVAL_RESULTS_DIR`                   | Output directory for finance eval results/artifacts                              |
-| `AGENT_RATE_LIMIT_ENABLED`                 | Enable/disable rate limiting (default: true)                                     |
-| `AGENT_RATE_LIMIT_WINDOW_MS`               | Rate limit window (default: 60,000 ms)                                           |
-| `AGENT_RATE_LIMIT_MAX_REQUESTS`            | Max requests per window (default: 60)                                            |
+| Variable                                   | Purpose                                                                                                 |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `AUTH_DATABASE_URL`                        | Separate DB for Better Auth (falls back to `DATABASE_URL`)                                              |
+| `TAVILY_API_KEY`                           | Enables Tavily web search + extract tools                                                               |
+| `FMP_API_KEY`                              | Enables Financial Modeling Prep MCP finance tools                                                       |
+| `FRED_API_KEY`                             | Enables FRED macro/rates lookups through `finance_data`                                                 |
+| `SEC_API_USER_AGENT`                       | User agent for SEC public company-facts requests                                                        |
+| `OPENAI_API_KEY`                           | Enables OpenAI judge for prompt evals                                                                   |
+| `OPENAI_EVAL_JUDGE_MODEL`                  | Judge model override (default: `gpt-5.4-mini`)                                                          |
+| `PYTHON3_PATH`                             | Override `python3` binary for code execution                                                            |
+| `AGENT_MAX_MESSAGES`                       | Max messages per request (default: 50)                                                                  |
+| `AGENT_MAX_MESSAGE_CHARS`                  | Max chars per message (default: 12,000)                                                                 |
+| `AGENT_MAX_TOTAL_CHARS`                    | Max total conversation chars (default: 48,000)                                                          |
+| `AGENT_STREAM_TIMEOUT_MS`                  | Stream timeout (default: 800,000 ms)                                                                    |
+| `AGENT_TOOL_MAX_STEPS`                     | Max tool use steps per run (default: 12)                                                                |
+| `AGENT_RESEARCH_TOOL_MAX_STEPS`            | Max tool steps for research runs (default: 20)                                                          |
+| `AI_GATEWAY_CLIENT_TIMEOUT_MS`             | AI Gateway HTTP client timeout (default: 3,600,000 ms)                                                  |
+| `AGENT_CODE_EXECUTION_BACKEND`             | `restricted` or `finance`                                                                               |
+| `AGENT_CODE_EXECUTION_PYTHON_VENV_PATH`    | Optional venv/python path for curated finance execution                                                 |
+| `AGENT_EVAL_RESULTS_DIR`                   | Output directory for finance eval results/artifacts                                                     |
+| `AGENT_RATE_LIMIT_ENABLED`                 | Enable/disable rate limiting (default: true)                                                            |
+| `AGENT_RATE_LIMIT_WINDOW_MS`               | Rate limit window (default: 60,000 ms)                                                                  |
+| `AGENT_RATE_LIMIT_MAX_REQUESTS`            | Max requests per window (default: 60)                                                                   |
 | `AGENT_RATE_LIMIT_STORE`                   | `auto`, `memory`, or `postgres` (default: `auto` — uses postgres if `DATABASE_URL` is set, else memory) |
-| `AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT` | Concurrency limit (default: 4)                                                   |
-| `LOG_FORMAT`                               | Set to `json` to force structured JSON logs                                      |
-| `BETTER_AUTH_COOKIE_DOMAIN`                | Shared cookie domain for cross-subdomain auth                                    |
-| `BETTER_AUTH_TRUSTED_ORIGINS`              | Comma-separated list of additional trusted origins                               |
+| `AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT` | Concurrency limit (default: 4)                                                                          |
+| `LOG_FORMAT`                               | Set to `json` to force structured JSON logs                                                             |
+| `BETTER_AUTH_COOKIE_DOMAIN`                | Shared cookie domain for cross-subdomain auth                                                           |
+| `BETTER_AUTH_TRUSTED_ORIGINS`              | Comma-separated list of additional trusted origins                                                      |
 
 Vercel tip: `vercel env pull .env.local` is the quickest way to hydrate local development from Vercel project settings.
