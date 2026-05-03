@@ -383,6 +383,15 @@ function normalizeFmpHistoricalPricesData(
   }
 }
 
+function isTruthyProviderFlag(value: unknown): boolean {
+  if (typeof value === "boolean") {
+    return value
+  }
+
+  const normalized = toOptionalString(value)?.toLowerCase()
+  return normalized === "true" || normalized === "1" || normalized === "yes"
+}
+
 function normalizeFmpCompanyProfileData(
   data: unknown,
   input: FinanceDataToolInput
@@ -409,7 +418,7 @@ function normalizeFmpCompanyProfileData(
     name: toOptionalString(row.companyName) ?? toOptionalString(row.name),
     tickers: symbol ? [symbol] : [],
     exchanges: exchange ? [exchange] : [],
-    entityType: toOptionalString(row.isEtf) === "true" ? "ETF" : undefined,
+    entityType: isTruthyProviderFlag(row.isEtf) ? "ETF" : undefined,
     sic: toOptionalString(row.sic),
     sicDescription: toOptionalString(row.industry),
     ownerOrg: toOptionalString(row.sector),
@@ -918,7 +927,10 @@ export async function runFinanceDataOperation(
 
       const source = createProviderSource(provider, input.operation, url)
       let data = response.data
-      if (requestedProvider === "auto") {
+      if (
+        requestedProvider === "auto" ||
+        input.operation === "company_profile"
+      ) {
         try {
           data = normalizeFmpAutoData(response.data, input)
         } catch (error) {

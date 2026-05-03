@@ -675,6 +675,40 @@ test("finance company_profile auto provider uses SEC submissions even with FMP c
   assert.equal(result.output?.sources[0]?.title, "SEC company submissions")
 })
 
+test("finance company_profile FMP provider preserves boolean ETF flags", async () => {
+  const result = await runFinanceDataOperation(
+    {
+      operation: "company_profile",
+      provider: "fmp",
+      symbol: "SPY",
+    },
+    {
+      fmpApiKey: "fmp-key",
+      fetchImpl: async (url) => {
+        assert.match(String(url), /profile\/SPY/)
+        return new Response(
+          JSON.stringify([
+            {
+              symbol: "SPY",
+              companyName: "SPDR S&P 500 ETF Trust",
+              exchangeShortName: "NYSEARCA",
+              isEtf: true,
+            },
+          ]),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      },
+    }
+  )
+
+  assert.equal(result.error, undefined)
+  assert.equal(result.output?.provider, "fmp")
+  assert.equal(result.output?.data.entityType, "ETF")
+})
+
 test("finance income statement auto provider uses SEC company facts fallback", async () => {
   const result = await runFinanceDataOperation(
     {
