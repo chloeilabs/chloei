@@ -29,7 +29,7 @@ install_node() {
 
   node_version="$(
     curl -fsSL https://nodejs.org/dist/index.json |
-      python3 -c 'import json, sys; versions = json.load(sys.stdin); print(next(v["version"] for v in versions if v["version"].startswith("v24.")))'
+      NODE_MAJOR_VERSION="$NODE_MAJOR_VERSION" python3 -c 'import json, os, sys; versions = json.load(sys.stdin); major = os.environ["NODE_MAJOR_VERSION"]; print(next(v["version"] for v in versions if v["version"].startswith(f"v{major}.")))'
   )"
 
   tmpdir="$(mktemp -d)"
