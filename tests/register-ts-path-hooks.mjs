@@ -16,7 +16,7 @@ function isFile(candidate) {
 }
 
 function resolveCandidatePath(specifier, parentURL) {
-  let basePath = null
+  let basePath
 
   if (specifier.startsWith("@/")) {
     basePath = path.join(cwd, "src", specifier.slice(2))
