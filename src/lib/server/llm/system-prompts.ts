@@ -350,7 +350,7 @@ function getModeOverlay(
   taskMode: PromptTaskMode | undefined,
   provider: PromptProvider | undefined
 ): string | null {
-  if (taskMode) {
+  if (taskMode && taskMode !== "general") {
     return getTaskModeOverlay(taskMode, provider)
   }
   return MODE_OVERLAYS[mode]

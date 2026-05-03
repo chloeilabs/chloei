@@ -83,14 +83,12 @@ test("system prompt mode overlays stay distinct", () => {
   )
 })
 
-test("general task mode does not emit a compatibility overlay", () => {
-  const prompt = buildSystemPrompt({ mode: "chat", taskMode: "general" })
-  const modeOnlyPrompt = buildSystemPrompt({ mode: "chat" })
+test("general task mode falls back to the mode overlay", () => {
+  const prompt = buildSystemPrompt({ mode: "finance", taskMode: "general" })
 
-  assert.doesNotMatch(prompt, /--- BEGIN MODE OVERLAY: CHAT ---/)
-  assert.doesNotMatch(prompt, /Avoid unnecessary research/)
-  assert.match(modeOnlyPrompt, /--- BEGIN MODE OVERLAY: CHAT ---/)
-  assert.match(modeOnlyPrompt, /Avoid unnecessary research/)
+  assert.match(prompt, /--- BEGIN MODE OVERLAY: FINANCE ---/)
+  assert.match(prompt, /Prefer structured finance\/data tools/)
+  assert.doesNotMatch(prompt, /--- BEGIN TASK MODE OVERLAY: GENERAL ---/)
 })
 
 test("prompt steering maps compatibility task modes into centralized overlays", () => {
