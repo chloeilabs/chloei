@@ -1,7 +1,6 @@
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { fixupPluginRules } from "@eslint/compat"
 import js from "@eslint/js"
 import pluginNext from "@next/eslint-plugin-next"
 import eslintConfigPrettier from "eslint-config-prettier"
@@ -34,10 +33,6 @@ const typeCheckedConfigs = [
   ...config,
   files: typeCheckedFiles,
 }))
-const reactHooksRules = {
-  "react-hooks/exhaustive-deps": "warn",
-  "react-hooks/rules-of-hooks": "error",
-}
 
 /** @type {import("eslint").Linter.Config[]} */
 export default [
@@ -79,8 +74,8 @@ export default [
     },
     plugins: {
       "@next/next": pluginNext,
-      "jsx-a11y": fixupPluginRules(jsxA11y),
-      react: fixupPluginRules(pluginReact),
+      "jsx-a11y": jsxA11y,
+      react: pluginReact,
       "react-hooks": pluginReactHooks,
       "simple-import-sort": simpleImportSort,
     },
@@ -93,7 +88,7 @@ export default [
       ...pluginReact.configs.flat.recommended.rules,
       ...pluginNext.configs.recommended.rules,
       ...pluginNext.configs["core-web-vitals"].rules,
-      ...reactHooksRules,
+      ...pluginReactHooks.configs.recommended.rules,
       ...jsxA11y.flatConfigs.recommended.rules,
       "no-console": ["error", { allow: ["warn", "error"] }],
       "no-debugger": "error",
