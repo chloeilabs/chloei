@@ -130,7 +130,11 @@ function sanitizeHarnessPromptValue(value: string): string {
 }
 
 function inferHarnessProfile(text: string): AgentHarnessProfileId {
-  if (/\b(earnings|transcript|guidance|surprise|estimate)\b/i.test(text)) {
+  if (
+    /\b(earnings|transcript|guidance|surprise|analyst estimates?|consensus estimates?|eps estimates?)\b/i.test(
+      text
+    )
+  ) {
     return "earnings_research"
   }
   if (/\b(memo|investment thesis|valuation|dcf|catalyst|moat)\b/i.test(text)) {

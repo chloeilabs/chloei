@@ -169,6 +169,20 @@ test("agent harness profile hints allow specialized production inference", () =>
     ),
     "macro_research"
   )
+  assert.equal(
+    resolveAgentHarnessProfile("Estimate fair value using DCF for NVDA."),
+    "investment_memo"
+  )
+  assert.equal(
+    resolveAgentHarnessProfile("Estimate the current market cap for AAPL."),
+    "finance_analysis"
+  )
+  assert.equal(
+    resolveAgentHarnessProfile(
+      "Summarize analyst estimates for AAPL earnings."
+    ),
+    "earnings_research"
+  )
 })
 
 test("finance router prefers paid FMP and official fallbacks", () => {

@@ -149,14 +149,6 @@ export function verifyEvidence(
     (entry) => `${entry.provider}:${entry.operation}:${entry.confidence}`
   )
   const gaps = evidence.flatMap((entry) => entry.limitations ?? [])
-  const providersByKind = new Map<EvidenceKind, Set<string>>()
-
-  for (const entry of evidence) {
-    const providers = providersByKind.get(entry.kind) ?? new Set<string>()
-    providers.add(entry.provider)
-    providersByKind.set(entry.kind, providers)
-  }
-
   const sourceBackedEvidence = evidence.filter((entry) => entry.source)
   const sourceGap =
     sourceBackedEvidence.length === 0
