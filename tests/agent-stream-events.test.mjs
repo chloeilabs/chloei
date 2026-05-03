@@ -77,6 +77,8 @@ test("parseStreamEventLine parses harness trace events", () => {
     label: "Evidence verified",
     detail: "FMP quote and SEC facts checked.",
     status: "success",
+    interactionId: "request-1",
+    lastEventId: "request-1:harness:1",
   })
 
   assert.deepEqual(parseStreamEventLine(line), {
@@ -85,6 +87,8 @@ test("parseStreamEventLine parses harness trace events", () => {
     label: "Evidence verified",
     detail: "FMP quote and SEC facts checked.",
     status: "success",
+    interactionId: "request-1",
+    lastEventId: "request-1:harness:1",
   })
 })
 

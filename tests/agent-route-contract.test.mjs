@@ -126,6 +126,21 @@ test("agent runtime passes runtime mode as a harness profile hint", async () => 
   )
 })
 
+test("agent runtime annotates harness traces with checkpoint fields", async () => {
+  const runtimeSource = await readFile(runtimePath, "utf8")
+
+  assert.match(
+    runtimeSource,
+    /function getCheckpointedHarnessTraceEvent[\s\S]*interactionId: event\.interactionId \?\? requestId[\s\S]*lastEventId:[\s\S]*event\.lastEventId \?\? `\$\{requestId\}:harness:\$\{String\(index \+ 1\)\}`/,
+    "Expected harness trace events to carry request-scoped checkpoint fields."
+  )
+  assert.match(
+    runtimeSource,
+    /for \(const \[index, event\] of harnessTraceEvents\.entries\(\)\)[\s\S]*getCheckpointedHarnessTraceEvent\(event, index, params\.requestId\)/,
+    "Expected runtime harness trace emission to apply checkpoint fields."
+  )
+})
+
 test("agent runtime extends the AI Gateway client timeout", async () => {
   const runtimeSource = await readFile(runtimePath, "utf8")
 

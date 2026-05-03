@@ -207,6 +207,23 @@ function getSourceEvent(
   }
 }
 
+function getCheckpointedHarnessTraceEvent(
+  event: Extract<AgentStreamEvent, { type: "harness_trace" }>,
+  index: number,
+  requestId: string | undefined
+): Extract<AgentStreamEvent, { type: "harness_trace" }> {
+  if (!requestId) {
+    return event
+  }
+
+  return {
+    ...event,
+    interactionId: event.interactionId ?? requestId,
+    lastEventId:
+      event.lastEventId ?? `${requestId}:harness:${String(index + 1)}`,
+  }
+}
+
 function shouldSkipReasoningChunk(text: string): boolean {
   return text.trim() === "[REDACTED]"
 }
@@ -753,8 +770,8 @@ export async function* startAgentRuntimeStream(
       stopWhen: stepCountIs(runtimeProfile.toolMaxSteps),
     })
 
-    for (const event of harnessTraceEvents) {
-      yield event
+    for (const [index, event] of harnessTraceEvents.entries()) {
+      yield getCheckpointedHarnessTraceEvent(event, index, params.requestId)
     }
 
     for await (const part of result.fullStream) {

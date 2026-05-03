@@ -56,6 +56,10 @@ test("tool call text sanitizer drops orphan pseudo-tool markers", () => {
     sanitize('| DSML | invoke name="code_execution" parameter name="code"'),
     ""
   )
+  assert.equal(
+    sanitize('invoke name="code_execution" parameter name="code"'),
+    ""
+  )
   assert.equal(sanitize("Normal answer"), "Normal answer")
 })
 

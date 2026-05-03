@@ -1,5 +1,5 @@
 const PSEUDO_TOOL_MARKER_PATTERN =
-  /(?:<\s*\|\s*DSML\s*\||\|\s*DSML\s*\||tool_calls\s*>|invoke\s+name=|parameter\s+name=)/i
+  /(?:<\s*\|\s*DSML\s*\||\|\s*DSML\s*\||tool_calls\s*>|invoke\s+name\s*=\s*["']|parameter\s+name\s*=\s*["'])/i
 const PSEUDO_TOOL_BLOCK_BOUNDARY_PATTERN =
   /<\s*\|\s*DSML\s*\|\s*tool_calls\s*>/i
 const PSEUDO_TOOL_MARKER_PREFIXES = [
@@ -33,10 +33,6 @@ function getPseudoToolMarkerMatch(text: string): RegExpExecArray | null {
   }
 
   return text.slice(0, match.index).trim().length === 0 ? match : null
-}
-
-function isDsmlPseudoToolMarker(match: RegExpExecArray): boolean {
-  return match[0].toLowerCase().includes("dsml")
 }
 
 function normalizeMarkerPrefix(value: string): string {
@@ -120,10 +116,9 @@ export function createToolCallTextSanitizer(): ToolCallTextSanitizer {
         const blockBoundary = getPseudoToolBlockBoundary(remaining)
         const markerMatch = getPseudoToolMarkerMatch(remaining)
         if (!blockBoundary) {
-          output +=
-            markerMatch && isDsmlPseudoToolMarker(markerMatch)
-              ? remaining.slice(0, markerMatch.index)
-              : remaining
+          output += markerMatch
+            ? remaining.slice(0, markerMatch.index)
+            : remaining
           return returnWithBufferedPrefix(output)
         }
 
