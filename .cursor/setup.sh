@@ -3,6 +3,10 @@ set -euo pipefail
 
 export PATH="/usr/local/node/bin:${PATH}"
 
+run_as_postgres() {
+  sudo -u postgres "$@"
+}
+
 read_env_var() {
   local key="$1"
 
@@ -81,16 +85,28 @@ for key in AI_GATEWAY_API_KEY TAVILY_API_KEY FMP_API_KEY FRED_API_KEY SEC_API_US
   fi
 done
 
-service postgresql start
+sudo service postgresql start
 
-su - postgres -c "psql -tc \"SELECT 1 FROM pg_roles WHERE rolname='chloei'\"" | rg -q 1 || \
-  su - postgres -c "psql -c \"CREATE ROLE chloei WITH LOGIN PASSWORD 'chloei_dev';\""
+for attempt in {1..30}; do
+  if run_as_postgres pg_isready -q; then
+    break
+  fi
 
-su - postgres -c "psql -tc \"SELECT 1 FROM pg_database WHERE datname='chloei'\"" | rg -q 1 || \
-  su - postgres -c "createdb -O chloei chloei"
+  if [[ "${attempt}" -eq 30 ]]; then
+    echo "PostgreSQL did not become ready in time." >&2
+    exit 1
+  fi
 
-corepack enable
-corepack prepare pnpm@10.32.1 --activate
+  sleep 1
+done
+
+run_as_postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='chloei'" | rg -q 1 || \
+  run_as_postgres psql -c "CREATE ROLE chloei WITH LOGIN PASSWORD 'chloei_dev';"
+
+run_as_postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='chloei'" | rg -q 1 || \
+  run_as_postgres createdb -O chloei chloei
+
+pnpm --version
 pnpm install --frozen-lockfile
 pnpm exec playwright install --with-deps chromium
 
