@@ -208,6 +208,13 @@ test("finance router prefers paid FMP and official fallbacks", () => {
   assert.equal(companyRoute.primaryProvider, "sec")
   assert.deepEqual(companyRoute.fallbackProviders, ["fmp"])
 
+  const statementRoute = routeCuratedFinanceRequest({
+    operation: "financial_statements",
+    capabilities: { fmpConfigured: true },
+  })
+  assert.equal(statementRoute.primaryProvider, "fmp")
+  assert.deepEqual(statementRoute.fallbackProviders, ["sec"])
+
   const filingRoute = routeCuratedFinanceRequest({
     operation: "filing_facts",
   })

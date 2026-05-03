@@ -774,6 +774,42 @@ test("finance income statement auto provider uses SEC company facts fallback", a
   assert.equal(result.output?.sources.length, 2)
 })
 
+test("finance income statement auto provider prefers configured FMP", async () => {
+  const requestedUrls = []
+  const result = await runFinanceDataOperation(
+    {
+      operation: "financial_statements",
+      provider: "auto",
+      symbol: "MSFT",
+      statementType: "income",
+      period: "annual",
+    },
+    {
+      fmpApiKey: "fmp-key",
+      fetchImpl: async (url) => {
+        const requestUrl = String(url)
+        requestedUrls.push(requestUrl)
+        assert.match(requestUrl, /financialmodelingprep\.com/)
+        return new Response(
+          JSON.stringify([{ date: "2025-06-30", revenue: 100 }]),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      },
+    }
+  )
+
+  assert.equal(result.error, undefined)
+  assert.equal(result.output?.provider, "fmp")
+  assert.equal(result.output?.data[0]?.revenue, 100)
+  assert.equal(
+    requestedUrls.some((url) => url.includes("income-statement/MSFT")),
+    true
+  )
+})
+
 test("finance income statement falls back from unavailable FMP to SEC facts", async () => {
   const requestedUrls = []
   const result = await runFinanceDataOperation(

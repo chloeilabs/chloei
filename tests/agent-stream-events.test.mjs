@@ -147,6 +147,18 @@ test("parseStreamEventLine rejects malformed checkpoint and tool data", () => {
         type: "harness_trace",
         stage: "plan",
         label: "Planning",
+        detail: "   ",
+      })
+    ),
+    null
+  )
+
+  assert.equal(
+    parseStreamEventLine(
+      JSON.stringify({
+        type: "harness_trace",
+        stage: "plan",
+        label: "Planning",
         detail: {},
       })
     ),

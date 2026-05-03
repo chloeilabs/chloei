@@ -267,7 +267,7 @@ function resolveProvider(
   }
 
   if (input.operation === "financial_statements") {
-    return "sec"
+    return config.fmpApiKey?.trim() ? "fmp" : "sec"
   }
 
   if (input.operation === "company_profile") {

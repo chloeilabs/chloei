@@ -119,7 +119,8 @@ function parseOptionalStringField(
     return null
   }
 
-  return stringValue.trim()
+  const trimmed = stringValue.trim()
+  return trimmed.length > 0 ? trimmed : null
 }
 
 export function parseStreamEventLine(line: string): AgentStreamEvent | null {
@@ -320,8 +321,8 @@ export function parseStreamEventLine(line: string): AgentStreamEvent | null {
       type,
       stage,
       label,
-      ...(detail ? { detail } : {}),
-      ...(status ? { status } : {}),
+      ...(detail !== undefined ? { detail } : {}),
+      ...(status !== undefined ? { status } : {}),
       ...checkpointFields,
     }
   }
