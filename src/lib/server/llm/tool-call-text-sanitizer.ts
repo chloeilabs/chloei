@@ -22,6 +22,19 @@ function getPseudoToolBlockBoundary(text: string): RegExpExecArray | null {
   return PSEUDO_TOOL_BLOCK_BOUNDARY_PATTERN.exec(text)
 }
 
+function getPseudoToolMarkerMatch(text: string): RegExpExecArray | null {
+  const match = PSEUDO_TOOL_MARKER_PATTERN.exec(text)
+  if (!match) {
+    return null
+  }
+
+  if (match[0].toLowerCase().includes("dsml")) {
+    return match
+  }
+
+  return text.slice(0, match.index).trim().length === 0 ? match : null
+}
+
 function normalizeMarkerPrefix(value: string): string {
   return value.replace(/\s+/g, "").toLowerCase()
 }
@@ -101,7 +114,7 @@ export function createToolCallTextSanitizer(): ToolCallTextSanitizer {
     while (remaining) {
       if (!isInsidePseudoToolBlock) {
         const blockBoundary = getPseudoToolBlockBoundary(remaining)
-        const markerMatch = PSEUDO_TOOL_MARKER_PATTERN.exec(remaining)
+        const markerMatch = getPseudoToolMarkerMatch(remaining)
         if (!blockBoundary) {
           output += markerMatch
             ? remaining.slice(0, markerMatch.index)

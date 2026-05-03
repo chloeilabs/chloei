@@ -59,6 +59,15 @@ test("tool call text sanitizer drops orphan pseudo-tool markers", () => {
   assert.equal(sanitize("Normal answer"), "Normal answer")
 })
 
+test("tool call text sanitizer preserves inline marker-like prose", () => {
+  const sanitize = createToolCallTextSanitizer()
+
+  assert.equal(
+    sanitize("You can invoke name= directly in this DSL."),
+    "You can invoke name= directly in this DSL."
+  )
+})
+
 test("tool call text sanitizer buffers split marker prefixes", () => {
   const sanitize = createToolCallTextSanitizer()
 

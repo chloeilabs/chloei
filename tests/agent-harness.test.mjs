@@ -43,7 +43,10 @@ const {
 const { routeCuratedFinanceRequest } = await import(routerUrl)
 const { addEvidence, createEvidenceLedger, verifyInvestmentMemoRequirements } =
   await import(ledgerUrl)
-const { createAiSdkCuratedFinanceTools } = await import(curatedToolsUrl)
+const {
+  createAiSdkCuratedFinanceTools,
+  getAiSdkCuratedFinanceToolResultMetadata,
+} = await import(curatedToolsUrl)
 const { calculateDcfScenario, calculateProbabilityWeightedExpectedValue } =
   await import(investmentMathUrl)
 
@@ -274,6 +277,13 @@ test("curated finance tool routes market data through FMP when configured", asyn
   assert.equal(result.route.primaryProvider, "fmp")
   assert.equal(result.result.output?.provider, "fmp")
   assert.equal(result.ledger.evidence[0]?.provider, "fmp")
+
+  const metadata = getAiSdkCuratedFinanceToolResultMetadata({
+    toolCallId: "call-1",
+    toolName: "curated_finance",
+    output: result,
+  })
+  assert.equal(metadata.sources[0]?.title, "Financial Modeling Prep")
 })
 
 test("curated finance tool validates operation-specific required fields", () => {

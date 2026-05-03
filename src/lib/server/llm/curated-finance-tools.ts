@@ -2,7 +2,7 @@ import { tool } from "ai"
 import { z } from "zod"
 
 import { asRecord } from "@/lib/cast"
-import type { ToolName } from "@/lib/shared"
+import type { MessageSource, ToolName } from "@/lib/shared"
 
 import { runFinanceDataOperation } from "./ai-sdk-finance-data-tools"
 import {
@@ -40,7 +40,7 @@ interface CuratedFinanceToolResultMetadata {
   callId: string
   toolName: CuratedFinanceToolName
   status: "success" | "error"
-  sources: []
+  sources: MessageSource[]
   operation?: string
   provider?: string
   errorCode?: string
@@ -306,6 +306,19 @@ function getErrorRetryable(error: unknown): boolean {
   return typeof retryable === "boolean" ? retryable : true
 }
 
+function isMessageSource(value: unknown): value is MessageSource {
+  const source = asRecord(value)
+  return (
+    typeof source?.id === "string" &&
+    typeof source.url === "string" &&
+    typeof source.title === "string"
+  )
+}
+
+function getMessageSources(value: unknown): MessageSource[] {
+  return Array.isArray(value) ? value.filter(isMessageSource) : []
+}
+
 export function createAiSdkCuratedFinanceTools(
   config: CuratedFinanceToolConfig = {}
 ) {
@@ -467,6 +480,8 @@ export function getAiSdkCuratedFinanceToolResultMetadata(
 
   const output = asRecord(part.output)
   const result = asRecord(output?.result)
+  const resultOutput = asRecord(result?.output)
+  const ledger = asRecord(output?.ledger)
   const error = asRecord(output?.error) ?? asRecord(result?.error)
   const route = asRecord(output?.route)
   const operation =
@@ -475,12 +490,15 @@ export function getAiSdkCuratedFinanceToolResultMetadata(
     typeof route?.primaryProvider === "string"
       ? route.primaryProvider
       : undefined
+  const resultSources = getMessageSources(resultOutput?.sources)
+  const ledgerSources = getMessageSources(ledger?.sources)
+  const sources = resultSources.length > 0 ? resultSources : ledgerSources
 
   return {
     callId: part.toolCallId,
     toolName: CURATED_FINANCE_TOOL_NAME,
     status: error ? "error" : "success",
-    sources: [],
+    sources,
     ...(operation ? { operation } : {}),
     ...(primaryProvider ? { provider: primaryProvider } : {}),
     ...(typeof error?.code === "string" ? { errorCode: error.code } : {}),

@@ -898,10 +898,7 @@ export async function runFinanceDataOperation(
       const durationMs = Date.now() - startedAt
 
       if (!response.ok) {
-        if (
-          fallbackProvider &&
-          (response.code === "HTTP_401" || response.code === "HTTP_403")
-        ) {
+        if (fallbackProvider) {
           return await runFinanceDataOperation(
             { ...input, provider: fallbackProvider },
             config
