@@ -105,6 +105,23 @@ function parseOptionalToolMetadata(record: Record<string, unknown>) {
   }
 }
 
+function parseOptionalStringField(
+  record: Record<string, unknown>,
+  key: string
+): string | null | undefined {
+  const value = record[key]
+  if (value === undefined || value === null) {
+    return undefined
+  }
+
+  const stringValue = asString(value)
+  if (stringValue === null) {
+    return null
+  }
+
+  return stringValue.trim()
+}
+
 export function parseStreamEventLine(line: string): AgentStreamEvent | null {
   if (!line) {
     return null
@@ -279,8 +296,16 @@ export function parseStreamEventLine(line: string): AgentStreamEvent | null {
       return null
     }
 
-    const detail = asString(record.detail)?.trim()
-    const status = asString(record.status)?.trim()
+    const detail = parseOptionalStringField(record, "detail")
+    if (detail === null) {
+      return null
+    }
+
+    const status = parseOptionalStringField(record, "status")
+    if (status === null) {
+      return null
+    }
+
     if (
       status !== undefined &&
       status !== "error" &&

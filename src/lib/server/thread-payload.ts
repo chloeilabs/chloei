@@ -120,7 +120,11 @@ const harnessActivityTimelineEntrySchema = z
     order: z.number().int().nonnegative(),
     createdAt: ISO_DATETIME_SCHEMA,
     label: z.string().trim().min(1).max(500),
-    status: TOOL_INVOCATION_STATUS_SCHEMA,
+    status: z.union([
+      TOOL_INVOCATION_STATUS_SCHEMA,
+      z.literal("info"),
+      z.literal("warning"),
+    ]),
     detail: z.string().trim().min(1).max(10_000).optional(),
   })
   .strict()

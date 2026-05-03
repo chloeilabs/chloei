@@ -119,11 +119,15 @@ function inferHarnessProfile(text: string): AgentHarnessProfileId {
   if (/\b(memo|investment thesis|valuation|dcf|catalyst|moat)\b/i.test(text)) {
     return "investment_memo"
   }
-  if (/\b(fed|fred|macro|inflation|cpi|gdp|treasury|yield|rates?)\b/i.test(text)) {
+  if (
+    /\b(fed|fred|macro|inflation|cpi|gdp|treasury|yield|interest rates?|fed funds rate|policy rates?)\b/i.test(
+      text
+    )
+  ) {
     return "macro_research"
   }
   if (
-    /\b(stock|ticker|filing|10-k|10-q|financial statement|market cap|fcf|ebitda)\b/i.test(
+    /\b(stock|ticker|filing|10-k|10-q|financial statements?|market cap|fcf|ebitda)\b/i.test(
       text
     )
   ) {
@@ -136,10 +140,16 @@ function inferHarnessProfile(text: string): AgentHarnessProfileId {
 }
 
 function inferRiskLevel(text: string): AgentHarnessRiskLevel {
-  if (/\b(should i buy|should i sell|tax|legal|retirement|portfolio)\b/i.test(text)) {
+  if (
+    /\b(should i buy|should i sell|tax|legal|retirement|portfolio)\b/i.test(
+      text
+    )
+  ) {
     return "high"
   }
-  if (/\b(current|latest|valuation|forecast|estimate|macro|filing)\b/i.test(text)) {
+  if (
+    /\b(current|latest|valuation|forecast|estimate|macro|filing)\b/i.test(text)
+  ) {
     return "medium"
   }
   return "low"

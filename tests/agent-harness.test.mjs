@@ -34,19 +34,17 @@ setTestModuleStubs({
   ai: toProjectFileUrl("tests/stubs/ai.mjs"),
 })
 
-const { createAgentHarnessRun, createHarnessTraceEvents, getHarnessPromptContext } =
-  await import(harnessUrl)
+const {
+  createAgentHarnessRun,
+  createHarnessTraceEvents,
+  getHarnessPromptContext,
+} = await import(harnessUrl)
 const { routeCuratedFinanceRequest } = await import(routerUrl)
-const {
-  addEvidence,
-  createEvidenceLedger,
-  verifyInvestmentMemoRequirements,
-} = await import(ledgerUrl)
+const { addEvidence, createEvidenceLedger, verifyInvestmentMemoRequirements } =
+  await import(ledgerUrl)
 const { createAiSdkCuratedFinanceTools } = await import(curatedToolsUrl)
-const {
-  calculateDcfScenario,
-  calculateProbabilityWeightedExpectedValue,
-} = await import(investmentMathUrl)
+const { calculateDcfScenario, calculateProbabilityWeightedExpectedValue } =
+  await import(investmentMathUrl)
 
 test("agent harness classifies finance and research plans", () => {
   const run = createAgentHarnessRun({
@@ -70,18 +68,27 @@ test("agent harness classifies finance and research plans", () => {
   assert.match(run.plan.requiredEvidence.join("\n"), /reverse DCF/)
   assert.match(run.plan.requiredEvidence.join("\n"), /GAAP vs non-GAAP EPS/)
   assert.match(run.plan.requiredEvidence.join("\n"), /hyperscaler AI capex/)
-  assert.match(run.plan.requiredEvidence.join("\n"), /primary-source hyperscaler capex/)
+  assert.match(
+    run.plan.requiredEvidence.join("\n"),
+    /primary-source hyperscaler capex/
+  )
   assert.match(run.plan.requiredEvidence.join("\n"), /China\/export-control/)
   assert.match(run.plan.requiredEvidence.join("\n"), /DCF sensitivity matrix/)
   assert.match(run.plan.requiredEvidence.join("\n"), /code-verified DCF math/)
-  assert.match(run.plan.requiredEvidence.join("\n"), /probability-weighted expected value/)
+  assert.match(
+    run.plan.requiredEvidence.join("\n"),
+    /probability-weighted expected value/
+  )
   assert.match(run.plan.requiredEvidence.join("\n"), /falsification triggers/)
   assert.match(run.plan.requiredEvidence.join("\n"), /bear\/base\/bull/)
   assert.match(getHarnessPromptContext(run), /reverse-DCF or scenario math/)
   assert.match(getHarnessPromptContext(run), /Institutional Memo Checklist/)
   assert.match(getHarnessPromptContext(run), /customer concentration/)
   assert.match(getHarnessPromptContext(run), /buy\/hold\/trim zones/)
-  assert.match(getHarnessPromptContext(run), /probability-weighted expected value/)
+  assert.match(
+    getHarnessPromptContext(run),
+    /probability-weighted expected value/
+  )
   assert.match(getHarnessPromptContext(run), /named model was trained/)
   assert.equal(createHarnessTraceEvents(run).length, 2)
 })
@@ -122,6 +129,16 @@ test("finance router prefers paid FMP and official fallbacks", () => {
   })
   assert.equal(macroRoute.primaryProvider, "fred")
   assert.equal(macroRoute.fallbackProviders.includes("treasury"), true)
+
+  const macroRouteWithoutFred = routeCuratedFinanceRequest({
+    operation: "macro_series",
+    capabilities: { fredConfigured: false },
+  })
+  assert.equal(macroRouteWithoutFred.primaryProvider, "treasury")
+  assert.equal(
+    macroRouteWithoutFred.fallbackProviders.includes("treasury"),
+    false
+  )
 })
 
 test("evidence ledger tracks sources and verification gaps", () => {
@@ -224,11 +241,87 @@ test("curated finance tool routes market data through FMP when configured", asyn
   assert.equal(result.ledger.evidence[0]?.provider, "fmp")
 })
 
+test("curated finance tool validates operation-specific required fields", () => {
+  const tools = createAiSdkCuratedFinanceTools()
+
+  assert.equal(
+    tools.curated_finance.inputSchema.safeParse({
+      operation: "macro_series",
+    }).success,
+    false
+  )
+  assert.equal(
+    tools.curated_finance.inputSchema.safeParse({
+      operation: "company_snapshot",
+      cik: "0000320193",
+    }).success,
+    true
+  )
+})
+
+test("curated finance tool preserves structured provider errors", async () => {
+  const tools = createAiSdkCuratedFinanceTools({
+    fetchImpl: async () => {
+      throw Object.assign(new Error("provider exploded"), {
+        retryable: false,
+      })
+    },
+  })
+
+  const result = await tools.curated_finance.execute({
+    operation: "market_data",
+    symbol: "AAPL",
+  })
+
+  assert.equal(result.result.error.message, "provider exploded")
+  assert.equal(result.result.error.retryable, false)
+  assert.equal(result.ledger.evidence.length, 0)
+})
+
+test("curated finance tool exposes investment memo math helpers", async () => {
+  const tools = createAiSdkCuratedFinanceTools()
+  const result = await tools.curated_finance.execute({
+    operation: "investment_memo_math",
+    dcf: {
+      startingFcf: 96.7,
+      fcfCagr: 0.2,
+      years: 10,
+      wacc: 0.1,
+      terminalGrowth: 0.03,
+      netCash: 54,
+      dilutedShares: 24.3,
+    },
+    scenarios: [
+      { probability: 0.3, price: 120 },
+      { probability: 0.5, price: 180 },
+      { probability: 0.2, price: 280 },
+    ],
+    memoChecks: {
+      hasDcfSensitivityMatrix: true,
+      hasCodeVerifiedDcfMath: true,
+      hasProbabilityWeightedExpectedValue: true,
+      hasPrimarySourceCapexRebuild: true,
+      hasChinaExportSizing: true,
+      labelsEstimatedCustomerExposure: true,
+      softensUnverifiedAiChipClaims: true,
+      rejectsUnsupportedSecondaryCatalysts: true,
+    },
+  })
+
+  assert.equal(result.route.primaryProvider, "local")
+  assert.equal(result.result.output.provider, "local")
+  assert.equal(Math.round(result.result.output.data.dcf.enterpriseValue), 5006)
+  assert.equal(result.result.output.data.expectedValue, 182)
+  assert.equal(result.result.output.data.verification.status, "verified")
+  assert.equal(result.ledger.evidence[0]?.kind, "calculation")
+})
+
 test("code execution includes Vercel Sandbox backend integration", async () => {
   const source = await readFile(codeExecutionPath, "utf8")
 
   assert.match(source, /@vercel\/sandbox/)
   assert.match(source, /vercel_sandbox/)
   assert.match(source, /networkPolicy: getVercelSandboxNetworkPolicy/)
+  assert.match(source, /return "deny-all"/)
   assert.match(source, /AGENT_CODE_EXECUTION_VERCEL_SANDBOX_SNAPSHOT_ID/)
 })

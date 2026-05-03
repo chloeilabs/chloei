@@ -9,12 +9,17 @@ import {
   addEvidence,
   createEvidenceLedger,
   type EvidenceKind,
+  verifyInvestmentMemoRequirements,
 } from "./evidence-ledger"
 import {
   type CuratedFinanceOperation,
   getCuratedFinanceProviderOrder,
   routeCuratedFinanceRequest,
 } from "./finance-tool-router"
+import {
+  calculateDcfScenario,
+  calculateProbabilityWeightedExpectedValue,
+} from "./investment-memo-math"
 
 const CURATED_FINANCE_TOOL_NAME = "curated_finance" as const
 
@@ -49,29 +54,131 @@ interface CuratedFinanceToolConfig {
   fetchImpl?: typeof fetch
 }
 
-const curatedFinanceInputSchema = z.object({
-  operation: z.enum([
-    "resolve_security",
-    "company_snapshot",
-    "market_data",
-    "financial_statements",
-    "filing_facts",
-    "macro_series",
-    "news_and_events",
-  ]),
-  symbol: z.string().trim().min(1).max(40).optional(),
-  cik: z.string().trim().min(1).max(20).optional(),
-  query: z.string().trim().min(1).max(500).optional(),
-  seriesId: z.string().trim().min(1).max(80).optional(),
-  statementType: z.enum(["income", "balance_sheet", "cash_flow"]).optional(),
-  period: z.enum(["annual", "quarter"]).optional(),
-  from: z.string().trim().min(1).max(20).optional(),
-  to: z.string().trim().min(1).max(20).optional(),
-})
+const curatedFinanceInputSchema = z
+  .object({
+    operation: z.enum([
+      "resolve_security",
+      "company_snapshot",
+      "market_data",
+      "financial_statements",
+      "filing_facts",
+      "investment_memo_math",
+      "macro_series",
+      "news_and_events",
+    ]),
+    symbol: z.string().trim().min(1).max(40).optional(),
+    cik: z.string().trim().min(1).max(20).optional(),
+    query: z.string().trim().min(1).max(500).optional(),
+    seriesId: z.string().trim().min(1).max(80).optional(),
+    statementType: z.enum(["income", "balance_sheet", "cash_flow"]).optional(),
+    period: z.enum(["annual", "quarter"]).optional(),
+    from: z.string().trim().min(1).max(20).optional(),
+    to: z.string().trim().min(1).max(20).optional(),
+    dcf: z
+      .object({
+        startingFcf: z.number(),
+        fcfCagr: z.number(),
+        years: z.number().int().min(1).max(50),
+        wacc: z.number().positive(),
+        terminalGrowth: z.number(),
+        netCash: z.number().optional(),
+        dilutedShares: z.number().positive().optional(),
+      })
+      .optional(),
+    scenarios: z
+      .array(
+        z.object({
+          probability: z.number().min(0).max(1),
+          price: z.number(),
+        })
+      )
+      .min(1)
+      .max(20)
+      .optional(),
+    memoChecks: z
+      .object({
+        hasPrimarySourceCapexRebuild: z.boolean().optional(),
+        hasDcfSensitivityMatrix: z.boolean().optional(),
+        hasCodeVerifiedDcfMath: z.boolean().optional(),
+        hasProbabilityWeightedExpectedValue: z.boolean().optional(),
+        hasChinaExportSizing: z.boolean().optional(),
+        labelsEstimatedCustomerExposure: z.boolean().optional(),
+        softensUnverifiedAiChipClaims: z.boolean().optional(),
+        rejectsUnsupportedSecondaryCatalysts: z.boolean().optional(),
+      })
+      .optional(),
+  })
+  .superRefine((value, context) => {
+    const addRequiredIssue = (path: string[], message: string) => {
+      context.addIssue({
+        code: "custom",
+        message,
+        path,
+      })
+    }
+
+    if (
+      value.operation === "resolve_security" &&
+      !value.query &&
+      !value.symbol
+    ) {
+      addRequiredIssue(
+        ["query"],
+        '"query" or "symbol" is required for operation "resolve_security".'
+      )
+    }
+
+    if (value.operation === "company_snapshot" && !value.symbol && !value.cik) {
+      addRequiredIssue(
+        ["symbol"],
+        '"symbol" or "cik" is required for operation "company_snapshot".'
+      )
+    }
+
+    if (
+      (value.operation === "market_data" ||
+        value.operation === "financial_statements") &&
+      !value.symbol
+    ) {
+      addRequiredIssue(
+        ["symbol"],
+        `"symbol" is required for operation "${value.operation}".`
+      )
+    }
+
+    if (value.operation === "filing_facts" && !value.cik) {
+      addRequiredIssue(
+        ["cik"],
+        '"cik" is required for operation "filing_facts".'
+      )
+    }
+
+    if (value.operation === "macro_series" && !value.seriesId) {
+      addRequiredIssue(
+        ["seriesId"],
+        '"seriesId" is required for operation "macro_series".'
+      )
+    }
+
+    if (
+      value.operation === "investment_memo_math" &&
+      !value.dcf &&
+      !value.scenarios &&
+      !value.memoChecks
+    ) {
+      addRequiredIssue(
+        ["dcf"],
+        '"dcf", "scenarios", or "memoChecks" is required for operation "investment_memo_math".'
+      )
+    }
+  })
 
 type CuratedFinanceInput = z.infer<typeof curatedFinanceInputSchema>
 
 function getEvidenceKind(operation: CuratedFinanceOperation): EvidenceKind {
+  if (operation === "investment_memo_math") {
+    return "calculation"
+  }
   if (operation === "macro_series") {
     return "macro"
   }
@@ -88,6 +195,7 @@ function getLabel(operation: string | undefined): string {
   if (operation === "company_snapshot") return "Curated finance: company"
   if (operation === "filing_facts") return "Curated finance: filings"
   if (operation === "financial_statements") return "Curated finance: statements"
+  if (operation === "investment_memo_math") return "Curated finance: memo math"
   if (operation === "macro_series") return "Curated finance: macro"
   if (operation === "market_data") return "Curated finance: market data"
   if (operation === "resolve_security") return "Curated finance: identifiers"
@@ -154,6 +262,50 @@ function toFinanceDataInput(input: CuratedFinanceInput) {
   return null
 }
 
+function runInvestmentMemoMath(input: CuratedFinanceInput) {
+  const startedAt = Date.now()
+  const dcf = input.dcf ? calculateDcfScenario(input.dcf) : undefined
+  const expectedValue = input.scenarios
+    ? calculateProbabilityWeightedExpectedValue(input.scenarios)
+    : undefined
+  const verification = input.memoChecks
+    ? verifyInvestmentMemoRequirements(input.memoChecks)
+    : undefined
+  const data = {
+    ...(dcf ? { dcf } : {}),
+    ...(expectedValue !== undefined ? { expectedValue } : {}),
+    ...(verification ? { verification } : {}),
+  }
+  const result = {
+    output: {
+      operation: "investment_memo_math" as const,
+      provider: "local" as const,
+      data,
+      sources: [],
+      durationMs: Date.now() - startedAt,
+      attempts: 1,
+    },
+  }
+  const ledger = addEvidence(createEvidenceLedger(), {
+    kind: "calculation",
+    provider: "local",
+    operation: "investment_memo_math",
+    title: getLabel(input.operation),
+    summary:
+      "Computed deterministic investment memo valuation math and verification checks.",
+    confidence: "high",
+    computedValues: data,
+    limitations: verification?.gaps,
+  })
+
+  return { result, ledger }
+}
+
+function getErrorRetryable(error: unknown): boolean {
+  const retryable = asRecord(error)?.retryable
+  return typeof retryable === "boolean" ? retryable : true
+}
+
 export function createAiSdkCuratedFinanceTools(
   config: CuratedFinanceToolConfig = {}
 ) {
@@ -184,6 +336,32 @@ export function createAiSdkCuratedFinanceTools(
           }
         }
 
+        if (input.operation === "investment_memo_math") {
+          try {
+            const { result, ledger } = runInvestmentMemoMath(input)
+            return {
+              route,
+              providerOrder: getCuratedFinanceProviderOrder(route),
+              result,
+              ledger,
+            }
+          } catch (error) {
+            return {
+              route,
+              providerOrder: getCuratedFinanceProviderOrder(route),
+              error: {
+                code: "INVESTMENT_MEMO_MATH_ERROR",
+                message:
+                  error instanceof Error
+                    ? error.message
+                    : "Investment memo math failed.",
+                retryable: false,
+              },
+              ledger: createEvidenceLedger(),
+            }
+          }
+        }
+
         const financeDataInput = toFinanceDataInput(input)
         if (!financeDataInput) {
           return {
@@ -197,28 +375,45 @@ export function createAiSdkCuratedFinanceTools(
           }
         }
 
-        const result = await runFinanceDataOperation(financeDataInput, config)
-        let ledger = createEvidenceLedger()
-        const output = result.output
-        if (output) {
-          ledger = addEvidence(ledger, {
-            kind: getEvidenceKind(input.operation),
-            provider: output.provider,
-            operation: output.operation,
-            title: getLabel(input.operation),
-            summary: `Curated finance route used ${output.provider} for ${output.operation}.`,
-            confidence: output.sources.length > 0 ? "high" : "medium",
-            source: output.sources[0],
-            reportedValues: asRecord(output.data) ?? undefined,
-          })
-        }
+        try {
+          const result = await runFinanceDataOperation(financeDataInput, config)
+          let ledger = createEvidenceLedger()
+          const output = result.output
+          if (output) {
+            ledger = addEvidence(ledger, {
+              kind: getEvidenceKind(input.operation),
+              provider: output.provider,
+              operation: output.operation,
+              title: getLabel(input.operation),
+              summary: `Curated finance route used ${output.provider} for ${output.operation}.`,
+              confidence: output.sources.length > 0 ? "high" : "medium",
+              source: output.sources[0],
+              reportedValues: asRecord(output.data) ?? undefined,
+            })
+          }
 
-        return {
-          route,
-          providerOrder: getCuratedFinanceProviderOrder(route),
-          financeDataInput,
-          result,
-          ledger,
+          return {
+            route,
+            providerOrder: getCuratedFinanceProviderOrder(route),
+            financeDataInput,
+            result,
+            ledger,
+          }
+        } catch (error) {
+          return {
+            route,
+            providerOrder: getCuratedFinanceProviderOrder(route),
+            financeDataInput,
+            error: {
+              code: "FINANCE_DATA_ERROR",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Curated finance data failed.",
+              retryable: getErrorRetryable(error),
+            },
+            ledger: createEvidenceLedger(),
+          }
         }
       },
     }),
@@ -277,7 +472,9 @@ export function getAiSdkCuratedFinanceToolResultMetadata(
   const operation =
     typeof route?.operation === "string" ? route.operation : undefined
   const primaryProvider =
-    typeof route?.primaryProvider === "string" ? route.primaryProvider : undefined
+    typeof route?.primaryProvider === "string"
+      ? route.primaryProvider
+      : undefined
 
   return {
     callId: part.toolCallId,
@@ -287,8 +484,11 @@ export function getAiSdkCuratedFinanceToolResultMetadata(
     ...(operation ? { operation } : {}),
     ...(primaryProvider ? { provider: primaryProvider } : {}),
     ...(typeof error?.code === "string" ? { errorCode: error.code } : {}),
-    ...(typeof error?.retryable === "boolean"
-      ? { retryable: error.retryable }
-      : { retryable: false }),
+    ...(error
+      ? {
+          retryable:
+            typeof error.retryable === "boolean" ? error.retryable : false,
+        }
+      : {}),
   }
 }

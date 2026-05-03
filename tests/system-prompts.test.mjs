@@ -37,7 +37,10 @@ test("system prompt always starts with the base agent protocol", () => {
   assert.match(prompt, /--- BEGIN RUNTIME DATE CONTEXT ---/)
   assert.match(prompt, /Current UTC timestamp: 2026-05-02T18:00:00.000Z/)
   assert.match(prompt, /--- BEGIN MODE OVERLAY: RESEARCH ---/)
-  assert.match(prompt, /Prioritize source quality, recency, and primary evidence/)
+  assert.match(
+    prompt,
+    /Prioritize source quality, recency, and primary evidence/
+  )
   assert.match(prompt, /--- BEGIN AUTH USER CONTEXT ---/)
   assert(
     prompt.indexOf("--- BEGIN BASE AGENT PROTOCOL ---") <
@@ -70,8 +73,14 @@ test("system prompt mode overlays stay distinct", () => {
   assert.match(financePrompt, /China\/export controls/)
   assert.match(financePrompt, /falsification tests/)
   assert.match(financePrompt, /Do not provide personalized financial advice/)
-  assert.match(codingPrompt, /Inspect relevant files before proposing broad changes/)
-  assert.match(highStakesPrompt, /Recommend consulting a qualified professional/)
+  assert.match(
+    codingPrompt,
+    /Inspect relevant files before proposing broad changes/
+  )
+  assert.match(
+    highStakesPrompt,
+    /Recommend consulting a qualified professional/
+  )
 })
 
 test("prompt steering maps compatibility task modes into centralized overlays", () => {
@@ -85,7 +94,10 @@ test("prompt steering maps compatibility task modes into centralized overlays", 
   })
   const xaiFinanceText = xaiFinanceBlocks.map((block) => block.body).join("\n")
 
-  assert.match(xaiFinanceText, /structured finance evidence supplied in the prompt/)
+  assert.match(
+    xaiFinanceText,
+    /structured finance evidence supplied in the prompt/
+  )
   assert.match(xaiFinanceText, /Return only the user-facing answer/)
   assert.doesNotMatch(xaiFinanceText, /call `finance_data`/)
 

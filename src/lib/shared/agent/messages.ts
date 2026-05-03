@@ -26,6 +26,7 @@ export const SEARCH_TOOL_NAMES = [
 ] as const satisfies readonly ToolName[]
 export type SearchToolName = (typeof SEARCH_TOOL_NAMES)[number]
 export type ToolInvocationStatus = "running" | "success" | "error"
+export type HarnessActivityStatus = ToolInvocationStatus | "info" | "warning"
 export const AGENT_RUN_STATUSES = [
   "in_progress",
   "completed",
@@ -115,7 +116,7 @@ export interface ReasoningActivityTimelineEntry extends ActivityTimelineBaseEntr
 export interface HarnessActivityTimelineEntry extends ActivityTimelineBaseEntry {
   kind: "harness"
   label: string
-  status: ToolInvocationStatus
+  status: HarnessActivityStatus
   detail?: string
 }
 
@@ -180,7 +181,12 @@ export interface AgentStatusStreamEvent extends InteractionCheckpointFields {
 
 export interface HarnessTraceStreamEvent extends InteractionCheckpointFields {
   type: "harness_trace"
-  stage: "evidence" | "final_synthesis" | "plan" | "tool_decision" | "verification"
+  stage:
+    | "evidence"
+    | "final_synthesis"
+    | "plan"
+    | "tool_decision"
+    | "verification"
   label: string
   detail?: string
   status?: "error" | "info" | "success" | "warning"

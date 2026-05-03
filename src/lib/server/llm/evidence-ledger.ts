@@ -67,8 +67,14 @@ interface AddEvidenceInput {
 function getEvidenceId(input: AddEvidenceInput, index: number): string {
   return [
     "evidence",
-    input.provider.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-    input.operation.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+    input.provider
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-"),
+    input.operation
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-"),
     String(index + 1),
   ].join("-")
 }

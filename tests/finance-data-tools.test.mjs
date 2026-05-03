@@ -392,7 +392,67 @@ test("finance quote auto provider prefers configured FMP over Stooq", async () =
 
   assert.equal(result.error, undefined)
   assert.equal(result.output?.provider, "fmp")
+  assert.equal(result.output?.data.close, 280)
+  assert.equal(result.output?.data.delayed, false)
   assert.equal(result.output?.sources[0]?.title, "Financial Modeling Prep")
+})
+
+test("finance historical prices auto provider normalizes configured FMP data", async () => {
+  const result = await runFinanceDataOperation(
+    {
+      operation: "historical_prices",
+      provider: "auto",
+      symbol: "AAPL",
+      limit: 2,
+    },
+    {
+      fmpApiKey: "secret-key",
+      fetchImpl: async (url) => {
+        assert.match(String(url), /financialmodelingprep\.com/)
+        return new Response(
+          JSON.stringify({
+            symbol: "AAPL",
+            historical: [
+              {
+                date: "2026-04-24",
+                open: 268,
+                high: 273,
+                low: 267,
+                close: 271,
+                volume: 1200,
+              },
+              {
+                date: "2026-04-23",
+                open: 264,
+                high: 270,
+                low: 263,
+                close: 268,
+                volume: 1100,
+              },
+              {
+                date: "2026-04-22",
+                open: 260,
+                high: 265,
+                low: 259,
+                close: 264,
+                volume: 1000,
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      },
+    }
+  )
+
+  assert.equal(result.error, undefined)
+  assert.equal(result.output?.provider, "fmp")
+  assert.equal(result.output?.data.rows.length, 2)
+  assert.equal(result.output?.data.rows[1].close, 271)
+  assert.equal(result.output?.data.truncated, true)
 })
 
 test("finance sources use unique ids for repeated operations", async () => {

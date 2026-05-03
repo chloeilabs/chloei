@@ -124,6 +124,30 @@ test("parseStreamEventLine rejects malformed checkpoint and tool data", () => {
     ),
     null
   )
+
+  assert.equal(
+    parseStreamEventLine(
+      JSON.stringify({
+        type: "harness_trace",
+        stage: "plan",
+        label: "Planning",
+        status: 123,
+      })
+    ),
+    null
+  )
+
+  assert.equal(
+    parseStreamEventLine(
+      JSON.stringify({
+        type: "harness_trace",
+        stage: "plan",
+        label: "Planning",
+        detail: {},
+      })
+    ),
+    null
+  )
 })
 
 test("getResponseErrorMessage prefers JSON error and falls back to body text", async () => {

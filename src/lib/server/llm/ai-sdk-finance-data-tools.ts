@@ -53,11 +53,9 @@ type FinanceDataOperation =
   | "fred_series"
 
 const FMP_AUTO_OPERATIONS: ReadonlySet<FinanceDataOperation> = new Set([
-  "symbol_search",
   "quote",
   "company_profile",
   "historical_prices",
-  "financial_statements",
 ])
 
 interface FinanceDataToolConfig {
@@ -209,6 +207,11 @@ function normalizeLimit(input: FinanceDataToolInput, fallback: number): number {
   return Math.max(1, Math.min(250, input.limit ?? fallback))
 }
 
+function toOptionalNumber(value: unknown): number | null {
+  const parsed = typeof value === "number" ? value : Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 function normalizeCik(cik: string): string {
   const digits = cik.replace(/\D/g, "")
   if (!digits) {
@@ -295,6 +298,147 @@ function resolveFmpFallbackProvider(
   }
 
   return null
+}
+
+function normalizeFmpQuoteData(data: unknown) {
+  const row = Array.isArray(data) ? asRecord(data[0]) : asRecord(data)
+  if (!row) {
+    throw Object.assign(new Error("FMP quote data is unavailable."), {
+      code: "QUOTE_UNAVAILABLE",
+      retryable: true,
+    })
+  }
+
+  const close = toOptionalNumber(row.price)
+  if (close === null) {
+    throw Object.assign(new Error("FMP quote data is unavailable."), {
+      code: "QUOTE_UNAVAILABLE",
+      retryable: true,
+    })
+  }
+
+  return {
+    symbol: toOptionalString(row.symbol),
+    date: toOptionalString(row.date),
+    time: toOptionalString(row.timestamp),
+    open: toOptionalNumber(row.open),
+    high: toOptionalNumber(row.dayHigh),
+    low: toOptionalNumber(row.dayLow),
+    close,
+    volume: toOptionalNumber(row.volume),
+    name: toOptionalString(row.name),
+    marketCap: toOptionalNumber(row.marketCap),
+    delayed: false,
+  }
+}
+
+function normalizeFmpHistoricalPricesData(
+  data: unknown,
+  input: FinanceDataToolInput
+) {
+  const record = asRecord(data)
+  const rows = (Array.isArray(record?.historical) ? record.historical : [])
+    .flatMap((entry) => {
+      const row = asRecord(entry)
+      const close = toOptionalNumber(row?.close)
+      const date = toOptionalString(row?.date)
+      if (!date || close === null) {
+        return []
+      }
+
+      return [
+        {
+          date,
+          open: toOptionalNumber(row?.open),
+          high: toOptionalNumber(row?.high),
+          low: toOptionalNumber(row?.low),
+          close,
+          volume: toOptionalNumber(row?.volume),
+        },
+      ]
+    })
+    .reverse()
+
+  if (rows.length === 0) {
+    throw Object.assign(new Error("FMP historical prices are unavailable."), {
+      code: "HISTORICAL_PRICES_UNAVAILABLE",
+      retryable: true,
+    })
+  }
+
+  const limit = normalizeLimit(input, 30)
+  return {
+    symbol:
+      toOptionalString(record?.symbol) ??
+      normalizeTickerSymbol(requireField(input, "symbol")),
+    interval: "1d",
+    rows: rows.slice(-limit),
+    rowCount: Math.min(rows.length, limit),
+    totalRowsAvailable: rows.length,
+    truncated: rows.length > limit,
+  }
+}
+
+function normalizeFmpCompanyProfileData(
+  data: unknown,
+  input: FinanceDataToolInput
+) {
+  const row = Array.isArray(data) ? asRecord(data[0]) : asRecord(data)
+  if (!row) {
+    throw Object.assign(new Error("FMP company profile data is unavailable."), {
+      code: "COMPANY_PROFILE_UNAVAILABLE",
+      retryable: true,
+    })
+  }
+
+  const symbol =
+    toOptionalString(row.symbol) ??
+    normalizeTickerSymbol(requireField(input, "symbol"))
+  const exchange =
+    toOptionalString(row.exchangeShortName) ?? toOptionalString(row.exchange)
+  const city = toOptionalString(row.city)
+  const stateOrCountry =
+    toOptionalString(row.state) ?? toOptionalString(row.country)
+
+  return {
+    cik: toOptionalString(row.cik),
+    name: toOptionalString(row.companyName) ?? toOptionalString(row.name),
+    tickers: symbol ? [symbol] : [],
+    exchanges: exchange ? [exchange] : [],
+    entityType: toOptionalString(row.isEtf) === "true" ? "ETF" : undefined,
+    sic: toOptionalString(row.sic),
+    sicDescription: toOptionalString(row.industry),
+    ownerOrg: toOptionalString(row.sector),
+    category: toOptionalString(row.exchange),
+    fiscalYearEnd: toOptionalString(row.fiscalYearEnd),
+    stateOfIncorporation: toOptionalString(row.state),
+    businessAddress:
+      city || stateOrCountry
+        ? {
+            city,
+            stateOrCountry,
+          }
+        : undefined,
+    marketCap: toOptionalNumber(row.mktCap ?? row.marketCap),
+    website: toOptionalString(row.website),
+    description: toOptionalString(row.description),
+  }
+}
+
+function normalizeFmpAutoData(data: unknown, input: FinanceDataToolInput) {
+  if (input.operation === "quote") {
+    return normalizeFmpQuoteData(data)
+  }
+
+  if (input.operation === "company_profile") {
+    return normalizeFmpCompanyProfileData(data, input)
+  }
+
+  if (input.operation === "historical_prices") {
+    return normalizeFmpHistoricalPricesData(data, input)
+  }
+
+  return data
 }
 
 function buildSecCompanyFactsUrl(cik: string): URL {
@@ -698,6 +842,7 @@ export async function runFinanceDataOperation(
 ): Promise<FinanceDataToolResultPayload> {
   const startedAt = Date.now()
   const fetchImpl = config.fetchImpl ?? fetch
+  const requestedProvider = normalizeProvider(input.provider)
   const provider = resolveProvider(input, config)
 
   if (provider === "local") {
@@ -771,11 +916,15 @@ export async function runFinanceDataOperation(
       }
 
       const source = createProviderSource(provider, input.operation, url)
+      const data =
+        requestedProvider === "auto"
+          ? normalizeFmpAutoData(response.data, input)
+          : response.data
       return {
         output: {
           operation: input.operation,
           provider,
-          data: response.data,
+          data,
           sources: [source],
           durationMs,
           attempts: response.attempts,

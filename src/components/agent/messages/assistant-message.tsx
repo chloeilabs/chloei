@@ -1,10 +1,19 @@
-import { Check, ChevronDown, CircleCheck, CircleX, Copy } from "lucide-react"
+import {
+  Check,
+  ChevronDown,
+  CircleCheck,
+  CircleX,
+  Copy,
+  Info,
+  TriangleAlert,
+} from "lucide-react"
 import dynamic from "next/dynamic"
 import { useMemo, useState } from "react"
 
 import { LogoHover } from "@/components/graphics/logo/logo-hover"
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard"
 import {
+  type HarnessActivityStatus,
   type Message,
   type SearchToolName,
   type ToolInvocationStatus,
@@ -71,7 +80,11 @@ export function CraftingShimmer() {
   )
 }
 
-function ToolStatusIcon({ status }: { status: ToolInvocationStatus }) {
+function ToolStatusIcon({
+  status,
+}: {
+  status: ToolInvocationStatus | HarnessActivityStatus
+}) {
   if (status === "running") {
     return (
       <LogoHover forceAnimate size="xs" className="shrink-0 text-foreground" />
@@ -80,6 +93,14 @@ function ToolStatusIcon({ status }: { status: ToolInvocationStatus }) {
 
   if (status === "success") {
     return <CircleCheck className="size-3.5 shrink-0 text-green-600" />
+  }
+
+  if (status === "info") {
+    return <Info className="size-3.5 shrink-0 text-blue-600" />
+  }
+
+  if (status === "warning") {
+    return <TriangleAlert className="size-3.5 shrink-0 text-amber-600" />
   }
 
   return <CircleX className="size-3.5 shrink-0 text-red-600" />
@@ -105,7 +126,9 @@ export function AssistantMessage({ message }: { message: Message }) {
     () =>
       activityTimeline.some(
         (entry) =>
-          (entry.kind === "tool" || entry.kind === "search") &&
+          (entry.kind === "tool" ||
+            entry.kind === "search" ||
+            entry.kind === "harness") &&
           entry.status === "running"
       ),
     [activityTimeline]

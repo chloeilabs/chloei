@@ -204,11 +204,13 @@ export function applyAgentStreamEvent(
 function getHarnessTimelineStatus(
   status: Extract<AgentStreamEvent, { type: "harness_trace" }>["status"]
 ): HarnessActivityTimelineEntry["status"] {
-  if (status === "error") {
-    return "error"
-  }
-  if (status === "success") {
-    return "success"
+  if (
+    status === "error" ||
+    status === "info" ||
+    status === "success" ||
+    status === "warning"
+  ) {
+    return status
   }
   return "running"
 }
@@ -674,7 +676,9 @@ function finalizeRunningTimelineToolEntries(
   if (
     !current.some(
       (entry) =>
-        (entry.kind === "tool" || entry.kind === "search") &&
+        (entry.kind === "tool" ||
+          entry.kind === "search" ||
+          entry.kind === "harness") &&
         entry.status === "running"
     )
   ) {
@@ -682,7 +686,9 @@ function finalizeRunningTimelineToolEntries(
   }
 
   return current.map((entry) =>
-    (entry.kind === "tool" || entry.kind === "search") &&
+    (entry.kind === "tool" ||
+      entry.kind === "search" ||
+      entry.kind === "harness") &&
     entry.status === "running"
       ? { ...entry, status }
       : entry

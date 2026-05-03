@@ -1,6 +1,4 @@
-import {
-  type AuthViewer,
-} from "@/lib/shared"
+import { type AuthViewer } from "@/lib/shared"
 
 import {
   buildSystemPrompt,

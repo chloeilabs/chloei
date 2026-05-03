@@ -20,7 +20,6 @@ import { asRecord } from "@/lib/cast"
 import {
   AGENT_CODE_EXECUTION_BACKEND,
   AGENT_CODE_EXECUTION_PYTHON_VENV_PATH,
-  AGENT_CODE_EXECUTION_VERCEL_SANDBOX_NETWORK,
   AGENT_CODE_EXECUTION_VERCEL_SANDBOX_SNAPSHOT_ID,
 } from "@/lib/server/agent-runtime-config"
 import type { ToolName } from "@/lib/shared"
@@ -230,6 +229,21 @@ function buildCombinedOutput(stdout: string, stderr: string): string {
   ].filter((section): section is string => section !== null)
 
   return sections.join("\n\n").trim()
+}
+
+function buildLimitedCombinedOutput(
+  stdout: string,
+  stderr: string
+): {
+  output: string
+  truncated: boolean
+} {
+  const combined = buildCombinedOutput(stdout, stderr)
+  const result = appendWithLimit("", combined)
+  return {
+    output: result.next,
+    truncated: result.truncated,
+  }
 }
 
 function resolvePythonCommand(backend: CodeExecutionBackend): string {
@@ -646,7 +660,9 @@ async function runProcess(args: {
       child.on("close", (exitCode: number | null) => {
         void (async () => {
           const durationMs = Date.now() - startedAt
-          const combinedOutput = buildCombinedOutput(stdout, stderr)
+          const combined = buildLimitedCombinedOutput(stdout, stderr)
+          const combinedOutput = combined.output
+          truncated ||= combined.truncated
           const artifactManifest = await collectManifest()
           const artifactDirectory =
             args.workspaceMode === "preserve" ? workspaceDir : undefined
@@ -730,9 +746,7 @@ async function runProcess(args: {
 }
 
 function getVercelSandboxNetworkPolicy(): NetworkPolicy {
-  return AGENT_CODE_EXECUTION_VERCEL_SANDBOX_NETWORK === "allow-all"
-    ? "allow-all"
-    : "deny-all"
+  return "deny-all"
 }
 
 function getVercelSandboxRuntime(language: CodeExecutionLanguage): string {
@@ -779,7 +793,10 @@ async function writeSandboxInputFiles(
       "/"
     )}`
     await sandbox.fs.mkdir(path.posix.dirname(destination), { recursive: true })
-    await sandbox.fs.writeFile(destination, await readFile(inputFile.sourcePath))
+    await sandbox.fs.writeFile(
+      destination,
+      await readFile(inputFile.sourcePath)
+    )
     mounted.add(relativePath.replaceAll("\\", "/"))
   }
 
@@ -814,7 +831,11 @@ async function collectSandboxArtifactManifest(
       }
 
       const relativePath = path.posix.relative(rootDir, fullPath)
-      if (excludedPaths.has(relativePath) || relativePath === "script.py" || relativePath === "script.mjs") {
+      if (
+        excludedPaths.has(relativePath) ||
+        relativePath === "script.py" ||
+        relativePath === "script.mjs"
+      ) {
         continue
       }
 
@@ -834,6 +855,53 @@ async function collectSandboxArtifactManifest(
   return artifacts.sort((a, b) => a.path.localeCompare(b.path))
 }
 
+async function collectSandboxCommandOutput(
+  command: {
+    logs: (opts?: { signal?: AbortSignal }) => AsyncIterable<{
+      data: string
+      stream: "stderr" | "stdout"
+    }> & {
+      close?: () => void
+    }
+  },
+  signal: AbortSignal
+): Promise<{
+  stdout: string
+  stderr: string
+  combinedOutput: string
+  truncated: boolean
+}> {
+  let stdout = ""
+  let stderr = ""
+  let truncated = false
+  const logs = command.logs({ signal })
+
+  try {
+    for await (const log of logs) {
+      if (log.stream === "stdout") {
+        const result = appendWithLimit(stdout, log.data)
+        stdout = result.next
+        truncated ||= result.truncated
+        continue
+      }
+
+      const result = appendWithLimit(stderr, log.data)
+      stderr = result.next
+      truncated ||= result.truncated
+    }
+  } finally {
+    logs.close?.()
+  }
+
+  const combined = buildLimitedCombinedOutput(stdout, stderr)
+  return {
+    stdout,
+    stderr,
+    combinedOutput: combined.output,
+    truncated: truncated || combined.truncated,
+  }
+}
+
 async function runVercelSandbox(
   args: CodeExecutionToolArgs
 ): Promise<CodeExecutionToolResultPayload> {
@@ -841,23 +909,24 @@ async function runVercelSandbox(
   const workspaceDir = "/home/vercel-sandbox/workspace"
   const sandboxArgs = getVercelSandboxCommand(args)
   const signal = AbortSignal.timeout(args.timeoutMs)
-  const { Sandbox } = await import("@vercel/sandbox")
-  const sandbox = await Sandbox.create({
-    ...(AGENT_CODE_EXECUTION_VERCEL_SANDBOX_SNAPSHOT_ID
-      ? {
-          source: {
-            type: "snapshot" as const,
-            snapshotId: AGENT_CODE_EXECUTION_VERCEL_SANDBOX_SNAPSHOT_ID,
-          },
-        }
-      : { runtime: getVercelSandboxRuntime(args.language) }),
-    networkPolicy: getVercelSandboxNetworkPolicy(),
-    timeout: Math.max(args.timeoutMs + 5_000, 30_000),
-    resources: { vcpus: 2 },
-    signal,
-  })
+  let sandbox: VercelSandbox | undefined
 
   try {
+    const { Sandbox } = await import("@vercel/sandbox")
+    sandbox = await Sandbox.create({
+      ...(AGENT_CODE_EXECUTION_VERCEL_SANDBOX_SNAPSHOT_ID
+        ? {
+            source: {
+              type: "snapshot" as const,
+              snapshotId: AGENT_CODE_EXECUTION_VERCEL_SANDBOX_SNAPSHOT_ID,
+            },
+          }
+        : { runtime: getVercelSandboxRuntime(args.language) }),
+      networkPolicy: getVercelSandboxNetworkPolicy(),
+      timeout: Math.max(args.timeoutMs + 5_000, 30_000),
+      resources: { vcpus: 2 },
+      signal,
+    })
     await sandbox.fs.mkdir(workspaceDir, { recursive: true, signal })
     const mountedInputFiles = await writeSandboxInputFiles(
       sandbox,
@@ -879,15 +948,9 @@ async function runVercelSandbox(
       },
       signal,
     })
-    const [stdout, stderr] = await Promise.all([
-      command.stdout({ signal }),
-      command.stderr({ signal }),
-    ])
+    const { stdout, stderr, combinedOutput, truncated } =
+      await collectSandboxCommandOutput(command, signal)
     const durationMs = Date.now() - startedAt
-    const combinedOutput = buildCombinedOutput(stdout, stderr)
-    const truncated =
-      stdout.length > CODE_EXECUTION_MAX_OUTPUT_CHARS ||
-      stderr.length > CODE_EXECUTION_MAX_OUTPUT_CHARS
     const artifactManifest = await collectSandboxArtifactManifest(
       sandbox,
       workspaceDir,
@@ -896,9 +959,9 @@ async function runVercelSandbox(
     const outputBase = {
       language: args.language,
       exitCode: command.exitCode,
-      stdout: stdout.slice(0, CODE_EXECUTION_MAX_OUTPUT_CHARS),
-      stderr: stderr.slice(0, CODE_EXECUTION_MAX_OUTPUT_CHARS),
-      combinedOutput: combinedOutput.slice(0, CODE_EXECUTION_MAX_OUTPUT_CHARS),
+      stdout,
+      stderr,
+      combinedOutput,
       durationMs,
       truncated,
       backend: args.backend,
@@ -930,7 +993,8 @@ async function runVercelSandbox(
           error instanceof DOMException && error.name === "TimeoutError"
             ? "TIMEOUT"
             : "VERCEL_SANDBOX_ERROR",
-        timedOut: error instanceof DOMException && error.name === "TimeoutError",
+        timedOut:
+          error instanceof DOMException && error.name === "TimeoutError",
         language: args.language,
         backend: args.backend,
         durationMs: Date.now() - startedAt,
@@ -938,7 +1002,7 @@ async function runVercelSandbox(
       },
     }
   } finally {
-    await sandbox.stop({ blocking: false }).catch(() => undefined)
+    await sandbox?.stop({ blocking: false }).catch(() => undefined)
   }
 }
 

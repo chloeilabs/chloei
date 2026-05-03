@@ -2,6 +2,7 @@ export type CuratedFinanceOperation =
   | "company_snapshot"
   | "filing_facts"
   | "financial_statements"
+  | "investment_memo_math"
   | "macro_series"
   | "market_data"
   | "news_and_events"
@@ -14,6 +15,7 @@ export type CuratedFinanceProvider =
   | "finnhub"
   | "fmp"
   | "fred"
+  | "local"
   | "openfigi"
   | "sec"
   | "stooq"
@@ -128,12 +130,28 @@ export function routeCuratedFinanceRequest(params: {
     }
   }
 
+  if (params.operation === "investment_memo_math") {
+    return {
+      operation: params.operation,
+      primaryProvider: "local",
+      fallbackProviders: [],
+      requiresCalculation: true,
+      sourcePolicy: "official",
+      rationale:
+        "Use local deterministic valuation math for DCF, scenario weighting, and investment memo verification checks.",
+    }
+  }
+
   if (params.operation === "macro_series") {
     return {
       operation: params.operation,
       primaryProvider: capabilities.fredConfigured ? "fred" : "treasury",
-      fallbackProviders: ["treasury", "bea", "bls", "census"],
-      financeDataOperation: capabilities.fredConfigured ? "fred_series" : undefined,
+      fallbackProviders: capabilities.fredConfigured
+        ? ["treasury", "bea", "bls", "census"]
+        : ["bea", "bls", "census"],
+      financeDataOperation: capabilities.fredConfigured
+        ? "fred_series"
+        : undefined,
       requiresCalculation: false,
       sourcePolicy: "official",
       rationale:

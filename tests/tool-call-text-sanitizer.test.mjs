@@ -45,3 +45,25 @@ test("tool call text sanitizer drops orphan pseudo-tool markers", () => {
   )
   assert.equal(sanitize("Normal answer"), "Normal answer")
 })
+
+test("tool call text sanitizer buffers split marker prefixes", () => {
+  const sanitize = createToolCallTextSanitizer()
+
+  assert.equal(sanitize("Visible <| DS"), "Visible ")
+  assert.equal(
+    sanitize('ML | tool_calls><| DSML | invoke name="code_execution">'),
+    ""
+  )
+  assert.equal(
+    sanitize('<| DSML | parameter name="code">print("hidden")<| DSML | tool_'),
+    ""
+  )
+  assert.equal(sanitize("calls> Final answer."), " Final answer.")
+})
+
+test("tool call text sanitizer releases non-marker buffered text", () => {
+  const sanitize = createToolCallTextSanitizer()
+
+  assert.equal(sanitize("Please invo"), "Please ")
+  assert.equal(sanitize("ice the customer."), "invoice the customer.")
+})
