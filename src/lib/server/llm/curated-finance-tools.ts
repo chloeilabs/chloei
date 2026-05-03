@@ -334,6 +334,10 @@ export function createAiSdkCuratedFinanceTools(
             fmpConfigured: Boolean(config.fmpApiKey?.trim()),
             fredConfigured: Boolean(config.fredApiKey?.trim()),
           },
+          marketDataFinanceDataOperation:
+            input.operation === "market_data" && (input.from || input.to)
+              ? "historical_prices"
+              : "quote",
         })
 
         if (input.operation === "news_and_events") {

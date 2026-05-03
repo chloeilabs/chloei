@@ -68,6 +68,15 @@ test("tool call text sanitizer preserves inline marker-like prose", () => {
   )
 })
 
+test("tool call text sanitizer preserves leading non-DSML marker prose", () => {
+  const sanitize = createToolCallTextSanitizer()
+
+  assert.equal(
+    sanitize("invoke name= can appear in documentation."),
+    "invoke name= can appear in documentation."
+  )
+})
+
 test("tool call text sanitizer buffers split marker prefixes", () => {
   const sanitize = createToolCallTextSanitizer()
 

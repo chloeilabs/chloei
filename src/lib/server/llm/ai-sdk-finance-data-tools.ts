@@ -54,7 +54,6 @@ type FinanceDataOperation =
 
 const FMP_AUTO_OPERATIONS: ReadonlySet<FinanceDataOperation> = new Set([
   "quote",
-  "company_profile",
   "historical_prices",
 ])
 

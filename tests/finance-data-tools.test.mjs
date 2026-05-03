@@ -160,7 +160,7 @@ test("finance evidence context prefetches quote and profile data", async () => {
   )
   assert.equal(
     result.sources.some((source) => source.title === "SEC company submissions"),
-    false
+    true
   )
   assert.equal(result.context.includes("secret-key"), false)
 })
@@ -614,7 +614,7 @@ test("finance historical prices auto provider uses Stooq structured fallback", a
   assert.equal(result.output?.data.truncated, true)
 })
 
-test("finance company_profile auto provider uses SEC submissions fallback", async () => {
+test("finance company_profile auto provider uses SEC submissions even with FMP configured", async () => {
   const result = await runFinanceDataOperation(
     {
       operation: "company_profile",
@@ -622,6 +622,7 @@ test("finance company_profile auto provider uses SEC submissions fallback", asyn
       symbol: "AA PL",
     },
     {
+      fmpApiKey: "secret-key",
       fetchImpl: async (url) => {
         const requestUrl = String(url)
         if (requestUrl.includes("company_tickers.json")) {

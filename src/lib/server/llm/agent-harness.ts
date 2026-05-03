@@ -103,6 +103,9 @@ const DEFAULT_BUDGETS: Record<AgentHarnessProfileId, AgentHarnessBudgets> = {
   },
 }
 
+const HARNESS_PROMPT_VALUE_MAX_CHARS = 500
+const DEFAULT_OBJECTIVE = "Respond to the user's request."
+
 function getLastUserMessage(messages: readonly AgentInputMessage[]): string {
   return (
     [...messages]
@@ -110,6 +113,20 @@ function getLastUserMessage(messages: readonly AgentInputMessage[]): string {
       .find((message) => message.role === "user" && message.content.trim())
       ?.content.trim() ?? ""
   )
+}
+
+function sanitizeHarnessPromptValue(value: string): string {
+  const normalized = value
+    .replace(/\r\n?/g, "\n")
+    .replace(/---\s*(?:BEGIN|END)\s+[^\n]*---/gi, "[prompt delimiter removed]")
+    .replace(/\s+/g, " ")
+    .trim()
+
+  if (normalized.length <= HARNESS_PROMPT_VALUE_MAX_CHARS) {
+    return normalized
+  }
+
+  return `${normalized.slice(0, HARNESS_PROMPT_VALUE_MAX_CHARS - 3)}...`
 }
 
 function inferHarnessProfile(text: string): AgentHarnessProfileId {
@@ -307,8 +324,10 @@ export function createAgentHarnessRun(params: {
     params.profile ??
     resolveAgentHarnessProfile(lastUserMessage, params.profileHint)
   const riskLevel = inferRiskLevel(lastUserMessage)
+  const objective =
+    sanitizeHarnessPromptValue(lastUserMessage) || DEFAULT_OBJECTIVE
   const plan: AgentPlan = {
-    objective: lastUserMessage || "Respond to the user's request.",
+    objective,
     profile,
     riskLevel,
     requiredEvidence: getRequiredEvidence(profile),
@@ -325,7 +344,7 @@ export function createAgentHarnessRun(params: {
     model: params.model,
     profile,
     userTimeZone: params.userTimeZone,
-    messageSummary: lastUserMessage.slice(0, 500),
+    messageSummary: objective,
     budgets: DEFAULT_BUDGETS[profile],
     plan,
     evidenceLedger: createEvidenceLedger(),

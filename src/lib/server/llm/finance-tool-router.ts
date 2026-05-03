@@ -51,7 +51,8 @@ export interface CuratedFinanceRoute {
 }
 
 function getMarketDataRoute(
-  capabilities: FinanceRouterCapabilities
+  capabilities: FinanceRouterCapabilities,
+  financeDataOperation: "historical_prices" | "quote"
 ): CuratedFinanceRoute {
   return {
     operation: "market_data",
@@ -59,7 +60,7 @@ function getMarketDataRoute(
     fallbackProviders: capabilities.fmpConfigured
       ? ["stooq", "tiingo", "twelve_data"]
       : ["tiingo", "twelve_data"],
-    financeDataOperation: "quote",
+    financeDataOperation,
     requiresCalculation: false,
     sourcePolicy: "primary_or_fallback",
     rationale: capabilities.fmpConfigured
@@ -71,6 +72,7 @@ function getMarketDataRoute(
 export function routeCuratedFinanceRequest(params: {
   operation: CuratedFinanceOperation
   capabilities?: FinanceRouterCapabilities
+  marketDataFinanceDataOperation?: "historical_prices" | "quote"
 }): CuratedFinanceRoute {
   const capabilities = params.capabilities ?? {}
 
@@ -90,18 +92,21 @@ export function routeCuratedFinanceRequest(params: {
   if (params.operation === "company_snapshot") {
     return {
       operation: params.operation,
-      primaryProvider: capabilities.fmpConfigured ? "fmp" : "sec",
-      fallbackProviders: capabilities.fmpConfigured ? ["sec"] : ["fmp"],
+      primaryProvider: "sec",
+      fallbackProviders: capabilities.fmpConfigured ? ["fmp"] : [],
       financeDataOperation: "company_profile",
       requiresCalculation: false,
       sourcePolicy: "primary_or_fallback",
       rationale:
-        "Prefer FMP company profile data when configured, then verify identifiers against SEC submissions.",
+        "Use SEC submissions for stable company identifiers and profile facts, with FMP available as a configured fallback.",
     }
   }
 
   if (params.operation === "market_data") {
-    return getMarketDataRoute(capabilities)
+    return getMarketDataRoute(
+      capabilities,
+      params.marketDataFinanceDataOperation ?? "quote"
+    )
   }
 
   if (params.operation === "financial_statements") {
