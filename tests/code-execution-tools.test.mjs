@@ -14,11 +14,14 @@ const cwd = fileURLToPath(new URL("..", import.meta.url))
 const codeExecutionToolsUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/llm/code-execution-tools.ts")
 ).href
+const vercelSandboxStubUrl = toProjectFileUrl("tests/stubs/vercel-sandbox.mjs")
 
 setTestModuleStubs({
   ai: toProjectFileUrl("tests/stubs/ai.mjs"),
+  "@vercel/sandbox": vercelSandboxStubUrl,
 })
 
+const sandboxStub = await import(vercelSandboxStubUrl)
 const {
   createAiSdkCodeExecutionTools,
   getAiSdkCodeExecutionToolResultMetadata,
@@ -112,6 +115,36 @@ test("finance code execution blocks unsafe path literals", async () => {
   assert.equal(result.output, undefined)
   assert.equal(result.error?.code, "BLOCKED_PATTERN")
   assert.match(result.error?.message ?? "", /relative workspace paths/)
+})
+
+test("restricted Python code execution blocks direct open calls", async () => {
+  const tools = createAiSdkCodeExecutionTools({ backend: "restricted" })
+  const result = await tools.code_execution.execute({
+    language: "python",
+    code: "with open('artifact.txt', 'w') as file:\n    file.write('blocked')",
+  })
+
+  assert.equal(result.output, undefined)
+  assert.equal(result.error?.code, "BLOCKED_PATTERN")
+  assert.match(result.error?.message ?? "", /direct filesystem access/)
+})
+
+test("Vercel Sandbox Python code execution allows relative open calls", async () => {
+  const beforeCount = sandboxStub.createdSandboxes.length
+  const tools = createAiSdkCodeExecutionTools({ backend: "vercel_sandbox" })
+  const result = await tools.code_execution.execute({
+    language: "python",
+    code: "with open('artifact.txt', 'w') as file:\n    file.write('ok')",
+  })
+  const sandbox = sandboxStub.createdSandboxes.at(-1)
+  const script = sandbox?.files.get("/home/vercel-sandbox/workspace/script.py")
+
+  assert.equal(result.error, undefined)
+  assert.equal(result.output?.backend, "vercel_sandbox")
+  assert.equal(result.output?.stdout, "sandbox ok\n")
+  assert.equal(sandboxStub.createdSandboxes.length, beforeCount + 1)
+  assert.match(script ?? "", /sandbox_builtins\.open = sandbox_open/)
+  assert.match(script ?? "", /open\('artifact\.txt', 'w'\)/)
 })
 
 test("preserved code execution workspace does not overwrite mounted inputs", async () => {

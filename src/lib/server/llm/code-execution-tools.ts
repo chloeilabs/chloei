@@ -136,16 +136,24 @@ const JAVASCRIPT_FORBIDDEN_PATTERNS = [
   { pattern: /\b(?:Deno|Bun|Worker)\b/, label: "runtime escape APIs" },
 ] as const
 
-const PYTHON_FORBIDDEN_PATTERNS = [
+const PYTHON_COMMON_FORBIDDEN_PATTERNS = [
   {
-    pattern: /\b(?:open|exec|eval|compile|__import__)\s*\(/,
-    label: "dynamic or filesystem execution",
+    pattern: /\b(?:exec|eval|compile|__import__)\s*\(/,
+    label: "dynamic execution",
   },
   {
     pattern:
       /\b(?:subprocess|socket|requests|urllib|http|pathlib|os|sys|shutil|tempfile|ctypes|multiprocessing|threading|asyncio|builtins)\b/,
     label: "system, filesystem, or network modules",
   },
+] as const
+
+const PYTHON_FORBIDDEN_PATTERNS = [
+  {
+    pattern: /\bopen\s*\(/,
+    label: "direct filesystem access",
+  },
+  ...PYTHON_COMMON_FORBIDDEN_PATTERNS,
 ] as const
 
 const PYTHON_ALLOWED_IMPORTS = new Set([
@@ -287,7 +295,7 @@ function validatePathStringLiterals(code: string): string | null {
   for (const match of code.matchAll(PYTHON_STRING_LITERAL_PATTERN)) {
     const literal = match[2] ?? ""
     if (isUnsafeWorkspacePathLiteral(literal)) {
-      return "Python finance code execution can only access relative workspace paths without parent-directory traversal."
+      return "Python code execution can only access relative workspace paths without parent-directory traversal."
     }
   }
 
@@ -542,7 +550,12 @@ function validateCodeSafety(args: CodeExecutionToolArgs): string | null {
     return null
   }
 
-  for (const rule of PYTHON_FORBIDDEN_PATTERNS) {
+  const forbiddenPatterns =
+    args.backend === "vercel_sandbox"
+      ? PYTHON_COMMON_FORBIDDEN_PATTERNS
+      : PYTHON_FORBIDDEN_PATTERNS
+
+  for (const rule of forbiddenPatterns) {
     if (rule.pattern.test(args.code)) {
       return `Python code execution is limited to self-contained computation and cannot use ${rule.label}.`
     }
@@ -1116,7 +1129,9 @@ export function createAiSdkCodeExecutionTools(
       description:
         backend === "finance"
           ? "Execute small self-contained JavaScript or curated Python finance-analysis snippets for arithmetic, statistics, table transformations, spreadsheet generation, chart generation, or quick validation. Network, subprocess, and host filesystem access are blocked. In finance/eval mode, mounted reference files may be read by relative path with libraries such as pandas/openpyxl, and generated workspace artifacts are reported in an artifact manifest. For spreadsheet deliverables, write relative filenames directly with library save APIs such as DataFrame.to_excel('deliverable.xlsx'), Workbook.save('deliverable.xlsx'), or plt.savefig('chart.png'). Do not create scratch/test/probe files; every generated file may be treated as a submitted artifact. Avoid blocked APIs such as open(), pathlib, os, subprocess, requests, urllib, and sockets."
-          : "Execute small self-contained JavaScript or Python snippets for arithmetic, logic checks, data transformations, or quick validation. This tool cannot access the network, filesystem, or subprocesses.",
+          : backend === "vercel_sandbox"
+            ? "Execute small self-contained JavaScript or curated Python finance-analysis snippets inside an isolated Vercel Sandbox microVM for arithmetic, statistics, table transformations, spreadsheet generation, chart generation, or quick validation. Network access is denied. Python code may read mounted input files and write generated artifacts with relative workspace paths, including standard open() calls; absolute paths, file URLs, parent-directory traversal, subprocesses, and network modules are blocked."
+            : "Execute small self-contained JavaScript or Python snippets for arithmetic, logic checks, data transformations, or quick validation. This tool cannot access the network, filesystem, or subprocesses.",
       inputSchema: codeExecutionInputSchema,
       execute: async (input) =>
         executeCode({
