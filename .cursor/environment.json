@@ -1,0 +1,20 @@
+{
+  "name": "chloei",
+  "user": "root",
+  "install": "bash .cursor/scripts/install.sh",
+  "start": "bash .cursor/scripts/start.sh",
+  "ports": [
+    {
+      "name": "Next.js",
+      "port": 3000
+    }
+  ],
+  "terminals": [
+    {
+      "name": "Next.js dev server",
+      "command": "pnpm dev",
+      "description": "Runs the app on port 3000 after the start script has prepared PostgreSQL, .env.local, and migrations."
+    }
+  ],
+  "agentCanUpdateSnapshot": true
+}
