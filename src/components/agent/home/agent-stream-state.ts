@@ -212,7 +212,7 @@ function getHarnessTimelineStatus(
   ) {
     return status
   }
-  return "running"
+  return "info"
 }
 
 function appendHarnessTraceToTimeline(
@@ -676,9 +676,7 @@ function finalizeRunningTimelineToolEntries(
   if (
     !current.some(
       (entry) =>
-        (entry.kind === "tool" ||
-          entry.kind === "search" ||
-          entry.kind === "harness") &&
+        (entry.kind === "tool" || entry.kind === "search") &&
         entry.status === "running"
     )
   ) {
@@ -686,9 +684,7 @@ function finalizeRunningTimelineToolEntries(
   }
 
   return current.map((entry) =>
-    (entry.kind === "tool" ||
-      entry.kind === "search" ||
-      entry.kind === "harness") &&
+    (entry.kind === "tool" || entry.kind === "search") &&
     entry.status === "running"
       ? { ...entry, status }
       : entry

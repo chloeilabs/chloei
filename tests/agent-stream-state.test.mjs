@@ -36,7 +36,7 @@ test("harness trace timeline preserves info and warning statuses", () => {
   )
 })
 
-test("finalizeAgentStreamAccumulator closes running harness traces", () => {
+test("finalizeAgentStreamAccumulator preserves status-free harness traces as info", () => {
   const accumulator = applyAgentStreamEvent(createAgentStreamAccumulator(), {
     type: "harness_trace",
     stage: "tool_decision",
@@ -45,5 +45,5 @@ test("finalizeAgentStreamAccumulator closes running harness traces", () => {
   const finalized = finalizeAgentStreamAccumulator(accumulator, "success")
 
   assert.equal(finalized.activityTimeline[0]?.kind, "harness")
-  assert.equal(finalized.activityTimeline[0]?.status, "success")
+  assert.equal(finalized.activityTimeline[0]?.status, "info")
 })
