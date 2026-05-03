@@ -346,9 +346,7 @@ test("curated finance tool validates operation-specific required fields", () => 
 test("curated finance tool preserves structured provider errors", async () => {
   const tools = createAiSdkCuratedFinanceTools({
     fetchImpl: async () => {
-      throw Object.assign(new Error("provider exploded"), {
-        retryable: false,
-      })
+      return new Response("provider rejected", { status: 400 })
     },
   })
 
@@ -357,7 +355,9 @@ test("curated finance tool preserves structured provider errors", async () => {
     symbol: "AAPL",
   })
 
-  assert.equal(result.result.error.message, "provider exploded")
+  assert.equal(result.error, undefined)
+  assert.equal(result.result.error.message, "stooq returned HTTP 400.")
+  assert.equal(result.result.error.code, "HTTP_400")
   assert.equal(result.result.error.retryable, false)
   assert.equal(result.ledger.evidence.length, 0)
 })

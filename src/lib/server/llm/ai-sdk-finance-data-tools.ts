@@ -52,11 +52,6 @@ type FinanceDataOperation =
   | "sec_company_facts"
   | "fred_series"
 
-const FMP_AUTO_OPERATIONS: ReadonlySet<FinanceDataOperation> = new Set([
-  "quote",
-  "historical_prices",
-])
-
 interface FinanceDataToolConfig {
   fmpApiKey?: string
   fredApiKey?: string
@@ -267,16 +262,8 @@ function resolveProvider(
     return "fred"
   }
 
-  if (config.fmpApiKey?.trim() && FMP_AUTO_OPERATIONS.has(input.operation)) {
-    return "fmp"
-  }
-
-  if (input.operation === "quote") {
-    return "stooq"
-  }
-
-  if (input.operation === "historical_prices") {
-    return "stooq"
+  if (input.operation === "quote" || input.operation === "historical_prices") {
+    return config.fmpApiKey?.trim() ? "fmp" : "stooq"
   }
 
   if (input.operation === "financial_statements") {
