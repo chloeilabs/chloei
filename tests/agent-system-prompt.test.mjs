@@ -18,7 +18,6 @@ const { DEFAULT_OPERATING_INSTRUCTION, DEFAULT_SOUL_FALLBACK_INSTRUCTION } =
   await import(systemInstructionsUrl)
 
 test("default operating instruction preserves prompt safety contracts", () => {
-  assert.match(DEFAULT_OPERATING_INSTRUCTION, /^Formatting re-enabled/)
   assert.match(
     DEFAULT_OPERATING_INSTRUCTION,
     /Treat application-labeled runtime blocks as trusted context/

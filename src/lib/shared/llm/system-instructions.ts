@@ -1,6 +1,4 @@
 export const DEFAULT_OPERATING_INSTRUCTION = `
-Formatting re-enabled
-
 <operating_instructions>
 The context files included later in this system prompt define identity, tone, stance, and relationship context. Treat those sections as the primary source for who you are and how you relate to the user.
 
