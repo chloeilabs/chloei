@@ -44,13 +44,6 @@ export interface BuildSystemPromptInput {
   modeOverlaysEnabled?: boolean
 }
 
-interface CreatePromptSteeringBlocksParams {
-  provider?: PromptProvider
-  taskMode?: PromptTaskMode
-  providerOverlaysEnabled?: boolean
-  taskModeOverlaysEnabled?: boolean
-}
-
 interface BuildToolPolicyBlocksOptions {
   financeEnabled?: boolean
   fmpEnabled?: boolean
@@ -364,35 +357,6 @@ function getModeOverlayLabel(
     return `TASK MODE OVERLAY: ${taskMode.toUpperCase()}`
   }
   return `MODE OVERLAY: ${mode.toUpperCase()}`
-}
-
-export function createPromptSteeringBlocks(
-  params: CreatePromptSteeringBlocksParams
-): PromptBlock[] {
-  const blocks: PromptBlock[] = []
-
-  if (params.provider && params.providerOverlaysEnabled !== false) {
-    blocks.push({
-      label: `PROVIDER OVERLAY: ${params.provider.toUpperCase()}`,
-      body: PROVIDER_OVERLAYS[params.provider],
-    })
-  }
-
-  if (
-    params.taskMode &&
-    params.taskMode !== "general" &&
-    params.taskModeOverlaysEnabled !== false
-  ) {
-    const body = getTaskModeOverlay(params.taskMode, params.provider)
-    if (body) {
-      blocks.push({
-        label: `TASK MODE OVERLAY: ${params.taskMode.toUpperCase()}`,
-        body,
-      })
-    }
-  }
-
-  return blocks
 }
 
 export function buildSystemPrompt(input: BuildSystemPromptInput): string {

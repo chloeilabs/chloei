@@ -173,6 +173,10 @@ function resolveAgentRuntimeProfile(
   return AGENT_RUNTIME_PROFILES[id ?? "chat_default"]
 }
 
+function assertNeverRuntimeProfileId(id: never): never {
+  throw new Error(`Unsupported agent runtime profile: ${String(id)}`)
+}
+
 function getHarnessProfileHint(
   runtimeProfile: AgentRuntimeProfile
 ): AgentHarnessProfileId {
@@ -183,6 +187,8 @@ function getHarnessProfileHint(
     case "deep_research":
     case "finance_analysis":
       return runtimeProfile.id
+    default:
+      return assertNeverRuntimeProfileId(runtimeProfile.id)
   }
 }
 
@@ -788,6 +794,10 @@ export async function* startAgentRuntimeStream(
 
     for await (const part of result.fullStream) {
       if (part.type === "finish-step") {
+        const trailingDelta = sanitizeTextChunk.flush()
+        if (trailingDelta.length > 0) {
+          yield { type: "text_delta", delta: trailingDelta }
+        }
         logger.info("Agent runtime model step finished.", {
           requestId: params.requestId,
           model: params.model,

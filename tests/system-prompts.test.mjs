@@ -12,7 +12,6 @@ const systemPromptsUrl = pathToFileURL(
 
 const {
   buildSystemPrompt,
-  createPromptSteeringBlocks,
   resolveAgentPromptMode,
   withAiSdkInlineCitationInstruction,
 } = await import(systemPromptsUrl)
@@ -96,11 +95,11 @@ test("prompt steering maps compatibility task modes into centralized overlays", 
   assert.equal(resolveAgentPromptMode("finance_analysis"), "finance")
   assert.equal(resolveAgentPromptMode("high_stakes"), "high_stakes")
 
-  const xaiFinanceBlocks = createPromptSteeringBlocks({
+  const xaiFinanceText = buildSystemPrompt({
+    mode: resolveAgentPromptMode("finance_analysis"),
     provider: "xai",
     taskMode: "finance_analysis",
   })
-  const xaiFinanceText = xaiFinanceBlocks.map((block) => block.body).join("\n")
 
   assert.match(
     xaiFinanceText,
@@ -109,11 +108,12 @@ test("prompt steering maps compatibility task modes into centralized overlays", 
   assert.match(xaiFinanceText, /Return only the user-facing answer/)
   assert.doesNotMatch(xaiFinanceText, /call `finance_data`/)
 
-  const strictBlocks = createPromptSteeringBlocks({
+  const strictPrompt = buildSystemPrompt({
+    mode: resolveAgentPromptMode("instruction_following"),
     taskMode: "instruction_following",
   })
 
-  assert.match(strictBlocks[0]?.body ?? "", /Exact compliance is mandatory/)
+  assert.match(strictPrompt, /Exact compliance is mandatory/)
 })
 
 test("tool policy overlays are generated from enabled tool options", () => {
@@ -146,11 +146,11 @@ test("tool policy overlays are generated from enabled tool options", () => {
 })
 
 test("provider overlays tell text-tool models not to emit pseudo tool calls", () => {
-  const deepseekBlocks = createPromptSteeringBlocks({
+  const overlayText = buildSystemPrompt({
+    mode: resolveAgentPromptMode("finance_analysis"),
     provider: "deepseek",
     taskMode: "finance_analysis",
   })
-  const overlayText = deepseekBlocks.map((block) => block.body).join("\n\n")
 
   assert.match(overlayText, /Do not write XML, DSML, JSON, or pseudo-code/)
 })

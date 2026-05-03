@@ -116,6 +116,11 @@ test("agent runtime passes runtime mode as a harness profile hint", async () => 
   )
   assert.match(
     runtimeSource,
+    /default:[\s\S]*assertNeverRuntimeProfileId\(runtimeProfile\.id\)/,
+    "Expected runtime profile hint mapping to fail closed when a profile id is added."
+  )
+  assert.match(
+    runtimeSource,
     /createAgentHarnessRun\(\{[\s\S]*params\.lockHarnessProfile[\s\S]*profile:\s*getHarnessProfileHint\(runtimeProfile\)[\s\S]*profileHint:\s*getHarnessProfileHint\(runtimeProfile\)/,
     "Expected production harness setup to lock explicit runtime profiles and otherwise keep specialized inference reachable."
   )
@@ -123,6 +128,16 @@ test("agent runtime passes runtime mode as a harness profile hint", async () => 
     runtimeSource,
     /createAgentHarnessRun\(\{[\s\S]*profile:\s*runtimeProfile\.id/,
     "Expected runtime profile ids not to bypass harness-specific inference."
+  )
+})
+
+test("agent runtime flushes text sanitizer at model step boundaries", async () => {
+  const runtimeSource = await readFile(runtimePath, "utf8")
+
+  assert.match(
+    runtimeSource,
+    /part\.type === "finish-step"[\s\S]*sanitizeTextChunk\.flush\(\)[\s\S]*yield \{ type: "text_delta", delta: trailingDelta \}[\s\S]*Agent runtime model step finished/,
+    "Expected pseudo-tool text sanitizer state to reset between model steps."
   )
 })
 

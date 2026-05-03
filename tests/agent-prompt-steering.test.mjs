@@ -17,7 +17,7 @@ const steeringUrl = pathToFileURL(
 ).href
 
 const { AvailableModels } = await import(modelsUrl)
-const { createPromptSteeringBlocks } = await import(systemPromptsUrl)
+const { buildSystemPrompt } = await import(systemPromptsUrl)
 const { inferPromptTaskMode, resolvePromptProvider } = await import(steeringUrl)
 
 test("prompt steering resolves supported model providers", () => {
@@ -38,11 +38,11 @@ test("prompt steering resolves supported model providers", () => {
 })
 
 test("prompt steering tells Grok to complete tool-backed news answers", () => {
-  const blocks = createPromptSteeringBlocks({
+  const overlayText = buildSystemPrompt({
+    mode: "research",
     provider: "xai",
     taskMode: "research",
   })
-  const overlayText = blocks.map((block) => block.body).join("\n\n")
 
   assert.match(
     overlayText,
@@ -57,11 +57,11 @@ test("prompt steering tells Grok to complete tool-backed news answers", () => {
 })
 
 test("prompt steering tells Grok finance to use prefetched evidence", () => {
-  const blocks = createPromptSteeringBlocks({
+  const overlayText = buildSystemPrompt({
+    mode: "finance",
     provider: "xai",
     taskMode: "finance_analysis",
   })
-  const overlayText = blocks.map((block) => block.body).join("\n\n")
 
   assert.match(
     overlayText,
