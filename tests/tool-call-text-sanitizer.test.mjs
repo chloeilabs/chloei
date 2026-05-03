@@ -20,6 +20,19 @@ test("tool call text sanitizer strips single-chunk DSML tool calls", () => {
   assert.equal(sanitize(`Before ${leakedToolCall} After`), "Before  After")
 })
 
+test("tool call text sanitizer preserves content between multiple DSML blocks", () => {
+  const sanitize = createToolCallTextSanitizer()
+  const firstBlock =
+    '<| DSML | tool_calls><| DSML | invoke name="code_execution">hidden<| DSML | tool_calls>'
+  const secondBlock =
+    '<| DSML | tool_calls><| DSML | invoke name="finance_data">hidden<| DSML | tool_calls>'
+
+  assert.equal(
+    sanitize(`Before ${firstBlock} Middle ${secondBlock} After`),
+    "Before  Middle  After"
+  )
+})
+
 test("tool call text sanitizer buffers split DSML tool calls", () => {
   const sanitize = createToolCallTextSanitizer()
 

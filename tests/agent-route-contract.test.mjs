@@ -52,6 +52,11 @@ test("agent route streams through the extracted AI Gateway helper path", async (
     /const stream = startGatewayResponseStream\(\{[\s\S]*requestId: params\.requestId,[\s\S]*messages: params\.messages,[\s\S]*systemInstruction: withAiSdkInlineCitationInstruction\(/,
     "Expected the helper to stream via startGatewayResponseStream."
   )
+  assert.match(
+    helperSource,
+    /lockHarnessProfile:\s*params\.runtimeProfile === "deep_research"/,
+    "Expected explicit research mode to lock the harness profile while inferred finance mode remains a hint."
+  )
 
   assert.match(
     helperSource,
@@ -111,8 +116,8 @@ test("agent runtime passes runtime mode as a harness profile hint", async () => 
   )
   assert.match(
     runtimeSource,
-    /createAgentHarnessRun\(\{[\s\S]*profileHint:\s*getHarnessProfileHint\(runtimeProfile\)/,
-    "Expected production harness setup to pass a profile hint instead of a hard runtime profile."
+    /createAgentHarnessRun\(\{[\s\S]*params\.lockHarnessProfile[\s\S]*profile:\s*getHarnessProfileHint\(runtimeProfile\)[\s\S]*profileHint:\s*getHarnessProfileHint\(runtimeProfile\)/,
+    "Expected production harness setup to lock explicit runtime profiles and otherwise keep specialized inference reachable."
   )
   assert.doesNotMatch(
     runtimeSource,

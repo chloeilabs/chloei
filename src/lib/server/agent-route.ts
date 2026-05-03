@@ -753,6 +753,7 @@ export function createAgentStreamResponse(
           fmpApiKey: params.fmpApiKey,
           userTimeZone: params.userTimeZone,
           runtimeProfile: params.runtimeProfile,
+          lockHarnessProfile: params.runtimeProfile === "deep_research",
           messages: params.messages,
           systemInstruction: withAiSdkInlineCitationInstruction(
             params.systemInstruction,

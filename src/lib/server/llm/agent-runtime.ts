@@ -113,6 +113,7 @@ export interface StartAgentRuntimeStreamParams {
   messages: AgentInputMessage[]
   systemInstruction: string
   runtimeProfile?: AgentRuntimeProfileId
+  lockHarnessProfile?: boolean
   temperature?: number
   signal?: AbortSignal
   codeExecutionInputFiles?: {
@@ -480,7 +481,9 @@ export async function* startAgentRuntimeStream(
       requestId: params.requestId,
       model: params.model,
       messages: params.messages,
-      profileHint: getHarnessProfileHint(runtimeProfile),
+      ...(params.lockHarnessProfile
+        ? { profile: getHarnessProfileHint(runtimeProfile) }
+        : { profileHint: getHarnessProfileHint(runtimeProfile) }),
       userTimeZone: params.userTimeZone,
     })
     for (const event of createHarnessTraceEvents(harnessRun)) {
