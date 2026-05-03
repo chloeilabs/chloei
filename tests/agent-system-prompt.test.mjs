@@ -63,12 +63,27 @@ test("agent system prompt composes trusted blocks in priority order", () => {
   const soulIndex = prompt.indexOf("--- BEGIN SHARED CONTEXT FILE: SOUL.md ---")
   const authIndex = prompt.indexOf("--- BEGIN AUTH USER CONTEXT ---")
 
-  assert(operatingIndex >= 0)
-  assert(dateIndex > operatingIndex)
-  assert(providerIndex > dateIndex)
-  assert(taskIndex > providerIndex)
-  assert(soulIndex > taskIndex)
-  assert(authIndex > soulIndex)
+  assert(operatingIndex >= 0, "OPERATING INSTRUCTIONS block not found")
+  assert(dateIndex >= 0, "RUNTIME DATE CONTEXT block not found")
+  assert(providerIndex >= 0, "PROVIDER OVERLAY block not found")
+  assert(taskIndex >= 0, "TASK MODE OVERLAY block not found")
+  assert(soulIndex >= 0, "SOUL.md block not found")
+  assert(authIndex >= 0, "AUTH USER CONTEXT block not found")
+
+  assert(
+    dateIndex > operatingIndex,
+    "Runtime date context should follow operating instructions"
+  )
+  assert(
+    providerIndex > dateIndex,
+    "Provider overlay should follow runtime date context"
+  )
+  assert(
+    taskIndex > providerIndex,
+    "Task mode overlay should follow provider overlay"
+  )
+  assert(soulIndex > taskIndex, "SOUL.md should follow task mode overlay")
+  assert(authIndex > soulIndex, "Auth context should follow SOUL.md")
 
   assert.match(prompt, /Current UTC timestamp: 2026-05-03T12:34:56.000Z/)
   assert.match(prompt, /User time zone: America\/Chicago/)
