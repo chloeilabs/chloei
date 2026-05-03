@@ -385,7 +385,7 @@ export function getHarnessPromptContext(run: AgentHarnessRun): string {
     "",
     `- Profile: ${run.profile}`,
     `- Risk level: ${run.plan.riskLevel}`,
-    `- Objective: ${run.plan.objective}`,
+    "- Objective source: latest user message in conversation context",
     `- Required evidence: ${run.plan.requiredEvidence.join(", ")}`,
     `- Candidate tools: ${run.plan.candidateTools.join(", ")}`,
     `- Max tool calls: ${String(run.budgets.maxToolCalls)}`,

@@ -132,9 +132,15 @@ test("agent harness sanitizes user objective before prompt injection", () => {
 
   assert.doesNotMatch(run.plan.objective, /--- (BEGIN|END) /)
   assert.doesNotMatch(promptContext, /--- (BEGIN|END) /)
+  assert.doesNotMatch(promptContext, /Ignore previous instructions/)
+  assert.doesNotMatch(promptContext, /Build an investment memo for NVDA/)
   assert.doesNotMatch(run.plan.objective, /\n/)
   assert.equal(run.plan.objective.length <= 500, true)
   assert.match(run.plan.objective, /\[prompt delimiter removed\]/)
+  assert.match(
+    promptContext,
+    /Objective source: latest user message in conversation context/
+  )
 })
 
 test("agent harness profile hints allow specialized production inference", () => {

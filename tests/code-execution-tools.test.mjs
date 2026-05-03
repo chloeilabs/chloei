@@ -136,8 +136,11 @@ test("Vercel Sandbox Python code execution allows relative open calls", async ()
     language: "python",
     code: "with open('artifact.txt', 'w') as file:\n    file.write('ok')",
   })
-  const sandbox = sandboxStub.createdSandboxes.at(-1)
-  const script = sandbox?.files.get("/home/vercel-sandbox/workspace/script.py")
+  const sandbox = sandboxStub.createdSandboxes[beforeCount]
+  assert.ok(sandbox)
+  const script = [...sandbox.files.entries()].find(([filePath]) =>
+    filePath.endsWith(".py")
+  )?.[1]
 
   assert.equal(result.error, undefined)
   assert.equal(result.output?.backend, "vercel_sandbox")

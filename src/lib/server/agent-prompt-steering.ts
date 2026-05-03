@@ -1,24 +1,12 @@
 import type { ModelType } from "@/lib/shared"
 
-import {
-  createPromptSteeringBlocks as createSystemPromptSteeringBlocks,
-  type PromptBlock,
-  type PromptProvider,
-  type PromptTaskMode,
-} from "./llm/system-prompts"
+import type { PromptProvider, PromptTaskMode } from "./llm/system-prompts"
 
 export type { PromptProvider, PromptTaskMode } from "./llm/system-prompts"
 
 interface PromptSteeringMessage {
   role: "user" | "assistant"
   content: string
-}
-
-interface CreatePromptSteeringBlocksParams {
-  provider?: PromptProvider
-  taskMode?: PromptTaskMode
-  providerOverlaysEnabled?: boolean
-  taskModeOverlaysEnabled?: boolean
 }
 
 const CODING_PATTERN =
@@ -132,10 +120,4 @@ export function inferPromptTaskMode(
   }
 
   return "general"
-}
-
-export function createPromptSteeringBlocks(
-  params: CreatePromptSteeringBlocksParams
-): PromptBlock[] {
-  return createSystemPromptSteeringBlocks(params)
 }

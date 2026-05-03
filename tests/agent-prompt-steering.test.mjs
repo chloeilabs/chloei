@@ -9,16 +9,16 @@ const cwd = fileURLToPath(new URL("..", import.meta.url))
 const modelsUrl = pathToFileURL(
   path.join(cwd, "src/lib/shared/llm/models.ts")
 ).href
+const systemPromptsUrl = pathToFileURL(
+  path.join(cwd, "src/lib/server/llm/system-prompts.ts")
+).href
 const steeringUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/agent-prompt-steering.ts")
 ).href
 
 const { AvailableModels } = await import(modelsUrl)
-const {
-  createPromptSteeringBlocks,
-  inferPromptTaskMode,
-  resolvePromptProvider,
-} = await import(steeringUrl)
+const { createPromptSteeringBlocks } = await import(systemPromptsUrl)
+const { inferPromptTaskMode, resolvePromptProvider } = await import(steeringUrl)
 
 test("prompt steering resolves supported model providers", () => {
   assert.equal(
