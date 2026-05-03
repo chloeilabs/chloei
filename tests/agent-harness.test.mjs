@@ -243,6 +243,12 @@ test("finance router prefers paid FMP and official fallbacks", () => {
     macroRouteWithoutFred.fallbackProviders.includes("treasury"),
     false
   )
+
+  const newsRoute = routeCuratedFinanceRequest({
+    operation: "news_and_events",
+  })
+  assert.equal(newsRoute.operation, "news_and_events")
+  assert.equal(newsRoute.primaryProvider, "web_search")
 })
 
 test("evidence ledger tracks sources and verification gaps", () => {

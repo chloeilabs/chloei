@@ -128,9 +128,7 @@ export function AssistantMessage({ message }: { message: Message }) {
     () =>
       activityTimeline.some(
         (entry) =>
-          (entry.kind === "tool" ||
-            entry.kind === "search" ||
-            entry.kind === "harness") &&
+          (entry.kind === "tool" || entry.kind === "search") &&
           entry.status === "running"
       ),
     [activityTimeline]

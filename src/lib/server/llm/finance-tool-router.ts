@@ -50,6 +50,12 @@ export interface CuratedFinanceRoute {
   rationale: string
 }
 
+function assertNeverCuratedFinanceOperation(
+  operation: never
+): CuratedFinanceRoute {
+  throw new Error(`Unsupported curated finance operation: ${String(operation)}`)
+}
+
 function getMarketDataRoute(
   capabilities: FinanceRouterCapabilities,
   financeDataOperation: "historical_prices" | "quote"
@@ -76,102 +82,93 @@ export function routeCuratedFinanceRequest(params: {
 }): CuratedFinanceRoute {
   const capabilities = params.capabilities ?? {}
 
-  if (params.operation === "resolve_security") {
-    return {
-      operation: params.operation,
-      primaryProvider: capabilities.openFigiConfigured ? "openfigi" : "fmp",
-      fallbackProviders: ["sec"],
-      financeDataOperation: "symbol_search",
-      requiresCalculation: false,
-      sourcePolicy: "primary_or_fallback",
-      rationale:
-        "Resolve identifiers before fetching company facts so downstream tools use a stable symbol, CIK, or FIGI.",
-    }
-  }
-
-  if (params.operation === "company_snapshot") {
-    return {
-      operation: params.operation,
-      primaryProvider: "sec",
-      fallbackProviders: capabilities.fmpConfigured ? ["fmp"] : [],
-      financeDataOperation: "company_profile",
-      requiresCalculation: false,
-      sourcePolicy: "primary_or_fallback",
-      rationale:
-        "Use SEC submissions for stable company identifiers and profile facts, with FMP available as a configured fallback.",
-    }
-  }
-
-  if (params.operation === "market_data") {
-    return getMarketDataRoute(
-      capabilities,
-      params.marketDataFinanceDataOperation ?? "quote"
-    )
-  }
-
-  if (params.operation === "financial_statements") {
-    return {
-      operation: params.operation,
-      primaryProvider: capabilities.fmpConfigured ? "fmp" : "sec",
-      fallbackProviders: capabilities.fmpConfigured ? ["sec"] : ["fmp"],
-      financeDataOperation: "financial_statements",
-      requiresCalculation: true,
-      sourcePolicy: "official",
-      rationale:
-        "Use FMP Starter for normalized statements when configured and SEC XBRL facts as the official fallback.",
-    }
-  }
-
-  if (params.operation === "filing_facts") {
-    return {
-      operation: params.operation,
-      primaryProvider: "sec",
-      fallbackProviders: [],
-      financeDataOperation: "sec_company_facts",
-      requiresCalculation: true,
-      sourcePolicy: "official",
-      rationale:
-        "SEC EDGAR is the authoritative source for filings and company facts.",
-    }
-  }
-
-  if (params.operation === "investment_memo_math") {
-    return {
-      operation: params.operation,
-      primaryProvider: "local",
-      fallbackProviders: [],
-      requiresCalculation: true,
-      sourcePolicy: "official",
-      rationale:
-        "Use local deterministic valuation math for DCF, scenario weighting, and investment memo verification checks.",
-    }
-  }
-
-  if (params.operation === "macro_series") {
-    return {
-      operation: params.operation,
-      primaryProvider: capabilities.fredConfigured ? "fred" : "treasury",
-      fallbackProviders: capabilities.fredConfigured
-        ? ["treasury", "bea", "bls", "census"]
-        : ["bea", "bls", "census"],
-      financeDataOperation: capabilities.fredConfigured
-        ? "fred_series"
-        : undefined,
-      requiresCalculation: false,
-      sourcePolicy: "official",
-      rationale:
-        "Use official macro sources first, with FRED as the normalized entry point when configured.",
-    }
-  }
-
-  return {
-    operation: "news_and_events",
-    primaryProvider: "web_search",
-    fallbackProviders: ["tavily", "finnhub", "tiingo"],
-    requiresCalculation: false,
-    sourcePolicy: "search",
-    rationale:
-      "News and event context is separated from structured finance data and should be source-backed.",
+  switch (params.operation) {
+    case "resolve_security":
+      return {
+        operation: params.operation,
+        primaryProvider: capabilities.openFigiConfigured ? "openfigi" : "fmp",
+        fallbackProviders: ["sec"],
+        financeDataOperation: "symbol_search",
+        requiresCalculation: false,
+        sourcePolicy: "primary_or_fallback",
+        rationale:
+          "Resolve identifiers before fetching company facts so downstream tools use a stable symbol, CIK, or FIGI.",
+      }
+    case "company_snapshot":
+      return {
+        operation: params.operation,
+        primaryProvider: "sec",
+        fallbackProviders: capabilities.fmpConfigured ? ["fmp"] : [],
+        financeDataOperation: "company_profile",
+        requiresCalculation: false,
+        sourcePolicy: "primary_or_fallback",
+        rationale:
+          "Use SEC submissions for stable company identifiers and profile facts, with FMP available as a configured fallback.",
+      }
+    case "market_data":
+      return getMarketDataRoute(
+        capabilities,
+        params.marketDataFinanceDataOperation ?? "quote"
+      )
+    case "financial_statements":
+      return {
+        operation: params.operation,
+        primaryProvider: capabilities.fmpConfigured ? "fmp" : "sec",
+        fallbackProviders: capabilities.fmpConfigured ? ["sec"] : ["fmp"],
+        financeDataOperation: "financial_statements",
+        requiresCalculation: true,
+        sourcePolicy: "official",
+        rationale:
+          "Use FMP Starter for normalized statements when configured and SEC XBRL facts as the official fallback.",
+      }
+    case "filing_facts":
+      return {
+        operation: params.operation,
+        primaryProvider: "sec",
+        fallbackProviders: [],
+        financeDataOperation: "sec_company_facts",
+        requiresCalculation: true,
+        sourcePolicy: "official",
+        rationale:
+          "SEC EDGAR is the authoritative source for filings and company facts.",
+      }
+    case "investment_memo_math":
+      return {
+        operation: params.operation,
+        primaryProvider: "local",
+        fallbackProviders: [],
+        requiresCalculation: true,
+        sourcePolicy: "official",
+        rationale:
+          "Use local deterministic valuation math for DCF, scenario weighting, and investment memo verification checks.",
+      }
+    case "macro_series":
+      return {
+        operation: params.operation,
+        primaryProvider: capabilities.fredConfigured ? "fred" : "treasury",
+        fallbackProviders: capabilities.fredConfigured
+          ? ["treasury", "bea", "bls", "census"]
+          : ["bea", "bls", "census"],
+        financeDataOperation: capabilities.fredConfigured
+          ? "fred_series"
+          : undefined,
+        requiresCalculation: false,
+        sourcePolicy: "official",
+        rationale:
+          "Use official macro sources first, with FRED as the normalized entry point when configured.",
+      }
+    case "news_and_events":
+      return {
+        operation: params.operation,
+        primaryProvider: "web_search",
+        fallbackProviders: ["tavily", "finnhub", "tiingo"],
+        requiresCalculation: false,
+        sourcePolicy: "search",
+        rationale:
+          "News and event context is separated from structured finance data and should be source-backed.",
+      }
+    default:
+      return assertNeverCuratedFinanceOperation(params.operation)
   }
 }
 
