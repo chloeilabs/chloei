@@ -397,7 +397,7 @@ test("finance quote auto provider prefers configured FMP over Stooq", async () =
   assert.equal(result.output?.sources[0]?.title, "Financial Modeling Prep")
 })
 
-test("finance quote auto provider falls back from FMP errors to Stooq", async () => {
+test("finance quote auto provider falls back from FMP auth errors to Stooq", async () => {
   const result = await runFinanceDataOperation(
     {
       operation: "quote",
@@ -409,8 +409,8 @@ test("finance quote auto provider falls back from FMP errors to Stooq", async ()
       fetchImpl: async (url) => {
         const requestUrl = String(url)
         if (requestUrl.includes("financialmodelingprep.com")) {
-          return new Response(JSON.stringify({ error: "temporarily down" }), {
-            status: 503,
+          return new Response(JSON.stringify({ error: "unauthorized" }), {
+            status: 401,
             headers: { "Content-Type": "application/json" },
           })
         }
@@ -433,6 +433,37 @@ test("finance quote auto provider falls back from FMP errors to Stooq", async ()
   assert.equal(result.error, undefined)
   assert.equal(result.output?.provider, "stooq")
   assert.equal(result.output?.data.close, 271.06)
+})
+
+test("finance quote auto provider surfaces transient FMP errors", async () => {
+  const requestedUrls = []
+  const result = await runFinanceDataOperation(
+    {
+      operation: "quote",
+      provider: "auto",
+      symbol: "AAPL",
+    },
+    {
+      fmpApiKey: "secret-key",
+      fetchImpl: async (url) => {
+        const requestUrl = String(url)
+        requestedUrls.push(requestUrl)
+        assert.match(requestUrl, /financialmodelingprep\.com/)
+        assert.doesNotMatch(requestUrl, /stooq\.com/)
+        return new Response(JSON.stringify({ error: "temporarily down" }), {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        })
+      },
+    }
+  )
+
+  assert.equal(result.output, undefined)
+  assert.equal(result.error?.provider, "fmp")
+  assert.equal(result.error?.code, "HTTP_503")
+  assert.equal(result.error?.retryable, true)
+  assert.equal(result.error?.attempts, 2)
+  assert.equal(requestedUrls.length, 2)
 })
 
 test("finance quote auto provider rejects null FMP prices", async () => {

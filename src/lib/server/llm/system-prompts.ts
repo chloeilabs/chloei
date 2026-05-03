@@ -349,9 +349,9 @@ function getModeOverlay(
   mode: AgentPromptMode,
   taskMode: PromptTaskMode | undefined,
   provider: PromptProvider | undefined
-): string {
+): string | null {
   if (taskMode) {
-    return getTaskModeOverlay(taskMode, provider) ?? MODE_OVERLAYS[mode]
+    return getTaskModeOverlay(taskMode, provider)
   }
   return MODE_OVERLAYS[mode]
 }
@@ -360,7 +360,7 @@ function getModeOverlayLabel(
   mode: AgentPromptMode,
   taskMode: PromptTaskMode | undefined
 ): string {
-  if (taskMode === "instruction_following" || taskMode === "closed_answer") {
+  if (taskMode && taskMode !== "general") {
     return `TASK MODE OVERLAY: ${taskMode.toUpperCase()}`
   }
   return `MODE OVERLAY: ${mode.toUpperCase()}`
@@ -426,11 +426,15 @@ export function buildSystemPrompt(input: BuildSystemPromptInput): string {
     )
   }
 
-  if (input.modeOverlaysEnabled !== false) {
+  const modeOverlay =
+    input.modeOverlaysEnabled !== false
+      ? getModeOverlay(input.mode, input.taskMode, input.provider)
+      : null
+  if (modeOverlay) {
     blocks.push(
       formatPromptBlock(
         getModeOverlayLabel(input.mode, input.taskMode),
-        getModeOverlay(input.mode, input.taskMode, input.provider)
+        modeOverlay
       )
     )
   }

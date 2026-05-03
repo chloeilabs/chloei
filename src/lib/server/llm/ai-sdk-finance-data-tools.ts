@@ -313,6 +313,11 @@ function resolveFmpFallbackProvider(
   return null
 }
 
+function canFallbackFromFmpError(code: string | undefined): boolean {
+  const normalized = code?.trim().toUpperCase()
+  return normalized === "HTTP_401" || normalized === "HTTP_403"
+}
+
 function normalizeFmpQuoteData(data: unknown) {
   const row = Array.isArray(data) ? asRecord(data[0]) : asRecord(data)
   if (!row) {
@@ -898,7 +903,7 @@ export async function runFinanceDataOperation(
       const durationMs = Date.now() - startedAt
 
       if (!response.ok) {
-        if (fallbackProvider) {
+        if (fallbackProvider && canFallbackFromFmpError(response.code)) {
           return await runFinanceDataOperation(
             { ...input, provider: fallbackProvider },
             config
