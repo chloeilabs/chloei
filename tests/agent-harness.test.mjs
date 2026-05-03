@@ -339,6 +339,28 @@ test("curated finance tool routes market data through FMP when configured", asyn
   assert.equal(metadata.sources[0]?.title, "Financial Modeling Prep")
 })
 
+test("curated finance macro route does not call FRED when unconfigured", async () => {
+  let fetchCalled = false
+  const tools = createAiSdkCuratedFinanceTools({
+    fetchImpl: async () => {
+      fetchCalled = true
+      return new Response("unexpected", { status: 500 })
+    },
+  })
+
+  const result = await tools.curated_finance.execute({
+    operation: "macro_series",
+    seriesId: "DGS10",
+  })
+
+  assert.equal(fetchCalled, false)
+  assert.equal(result.route.primaryProvider, "treasury")
+  assert.deepEqual(result.providerOrder, ["treasury", "bea", "bls", "census"])
+  assert.equal(result.financeDataInput, undefined)
+  assert.equal(result.error?.code, "MACRO_SOURCE_REQUIRED")
+  assert.equal(result.error?.retryable, false)
+})
+
 test("curated finance tool validates operation-specific required fields", () => {
   const tools = createAiSdkCuratedFinanceTools()
 

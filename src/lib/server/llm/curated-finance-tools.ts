@@ -13,6 +13,7 @@ import {
 } from "./evidence-ledger"
 import {
   type CuratedFinanceOperation,
+  type CuratedFinanceRoute,
   getCuratedFinanceProviderOrder,
   routeCuratedFinanceRequest,
 } from "./finance-tool-router"
@@ -203,7 +204,10 @@ function getLabel(operation: string | undefined): string {
   return "Curated finance"
 }
 
-function toFinanceDataInput(input: CuratedFinanceInput) {
+function toFinanceDataInput(
+  input: CuratedFinanceInput,
+  route: CuratedFinanceRoute
+) {
   if (input.operation === "resolve_security") {
     return {
       operation: "symbol_search" as const,
@@ -250,9 +254,16 @@ function toFinanceDataInput(input: CuratedFinanceInput) {
   }
 
   if (input.operation === "macro_series") {
+    if (
+      route.financeDataOperation !== "fred_series" ||
+      route.primaryProvider !== "fred"
+    ) {
+      return null
+    }
+
     return {
-      operation: "fred_series" as const,
-      provider: "fred" as const,
+      operation: route.financeDataOperation,
+      provider: route.primaryProvider,
       seriesId: input.seriesId,
       from: input.from,
       to: input.to,
@@ -379,11 +390,26 @@ export function createAiSdkCuratedFinanceTools(
           }
         }
 
-        const financeDataInput = toFinanceDataInput(input)
+        const financeDataInput = toFinanceDataInput(input, route)
         if (!financeDataInput) {
+          const providerOrder = getCuratedFinanceProviderOrder(route)
+          if (input.operation === "macro_series") {
+            return {
+              route,
+              providerOrder,
+              error: {
+                code: "MACRO_SOURCE_REQUIRED",
+                message:
+                  "FRED is not configured, so this macro route should use the official source provider order instead of finance_data.",
+                retryable: false,
+              },
+              ledger: createEvidenceLedger(),
+            }
+          }
+
           return {
             route,
-            providerOrder: getCuratedFinanceProviderOrder(route),
+            providerOrder,
             error: {
               code: "UNSUPPORTED_CURATED_OPERATION",
               message: "This curated finance operation is not implemented yet.",
