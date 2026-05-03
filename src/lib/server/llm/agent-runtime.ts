@@ -20,6 +20,7 @@ import {
 import { type AgentStreamEvent, type ModelType } from "@/lib/shared"
 
 import {
+  type AgentHarnessProfileId,
   createAgentHarnessRun,
   createHarnessTraceEvents,
   getHarnessPromptContext,
@@ -168,6 +169,19 @@ function resolveAgentRuntimeProfile(
   id: AgentRuntimeProfileId | undefined
 ): AgentRuntimeProfile {
   return AGENT_RUNTIME_PROFILES[id ?? "chat_default"]
+}
+
+function getHarnessProfileHint(
+  runtimeProfile: AgentRuntimeProfile
+): AgentHarnessProfileId {
+  switch (runtimeProfile.id) {
+    case "gdpval_workspace":
+      return "finance_analysis"
+    case "chat_default":
+    case "deep_research":
+    case "finance_analysis":
+      return runtimeProfile.id
+  }
 }
 
 function shouldForceFinalSynthesisStep(
@@ -466,10 +480,7 @@ export async function* startAgentRuntimeStream(
       requestId: params.requestId,
       model: params.model,
       messages: params.messages,
-      profile:
-        runtimeProfile.id === "gdpval_workspace"
-          ? "finance_analysis"
-          : runtimeProfile.id,
+      profileHint: getHarnessProfileHint(runtimeProfile),
       userTimeZone: params.userTimeZone,
     })
     for (const event of createHarnessTraceEvents(harnessRun)) {

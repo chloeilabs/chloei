@@ -397,6 +397,30 @@ test("finance quote auto provider prefers configured FMP over Stooq", async () =
   assert.equal(result.output?.sources[0]?.title, "Financial Modeling Prep")
 })
 
+test("finance quote auto provider rejects null FMP prices", async () => {
+  const result = await runFinanceDataOperation(
+    {
+      operation: "quote",
+      provider: "auto",
+      symbol: "AAPL",
+    },
+    {
+      fmpApiKey: "secret-key",
+      fetchImpl: async (url) => {
+        assert.match(String(url), /financialmodelingprep\.com/)
+        return new Response(JSON.stringify([{ symbol: "AAPL", price: null }]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      },
+    }
+  )
+
+  assert.equal(result.output, undefined)
+  assert.equal(result.error?.code, "QUOTE_UNAVAILABLE")
+  assert.equal(result.error?.provider, "fmp")
+})
+
 test("finance historical prices auto provider normalizes configured FMP data", async () => {
   const result = await runFinanceDataOperation(
     {

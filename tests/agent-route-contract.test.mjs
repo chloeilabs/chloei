@@ -101,6 +101,26 @@ test("agent runtime reserves the final loop step for synthesis", async () => {
   )
 })
 
+test("agent runtime passes runtime mode as a harness profile hint", async () => {
+  const runtimeSource = await readFile(runtimePath, "utf8")
+
+  assert.match(
+    runtimeSource,
+    /function getHarnessProfileHint[\s\S]*case "gdpval_workspace":[\s\S]*return "finance_analysis"/,
+    "Expected GDPVal runs to hint finance analysis while preserving specialized harness inference."
+  )
+  assert.match(
+    runtimeSource,
+    /createAgentHarnessRun\(\{[\s\S]*profileHint:\s*getHarnessProfileHint\(runtimeProfile\)/,
+    "Expected production harness setup to pass a profile hint instead of a hard runtime profile."
+  )
+  assert.doesNotMatch(
+    runtimeSource,
+    /createAgentHarnessRun\(\{[\s\S]*profile:\s*runtimeProfile\.id/,
+    "Expected runtime profile ids not to bypass harness-specific inference."
+  )
+})
+
 test("agent runtime extends the AI Gateway client timeout", async () => {
   const runtimeSource = await readFile(runtimePath, "utf8")
 

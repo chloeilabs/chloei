@@ -38,6 +38,7 @@ const {
   createAgentHarnessRun,
   createHarnessTraceEvents,
   getHarnessPromptContext,
+  resolveAgentHarnessProfile,
 } = await import(harnessUrl)
 const { routeCuratedFinanceRequest } = await import(routerUrl)
 const { addEvidence, createEvidenceLedger, verifyInvestmentMemoRequirements } =
@@ -107,6 +108,40 @@ test("agent harness avoids code execution guidance for text-tool models", () => 
   assert.equal(run.profile, "investment_memo")
   assert.equal(run.plan.candidateTools.includes("curated_finance"), true)
   assert.equal(run.plan.candidateTools.includes("code_execution"), false)
+})
+
+test("agent harness profile hints allow specialized production inference", () => {
+  const memoRun = createAgentHarnessRun({
+    model: "openai/gpt-5.5",
+    messages: [
+      {
+        role: "user",
+        content: "Build an investment memo for NVDA with DCF scenarios.",
+      },
+    ],
+    profileHint: "finance_analysis",
+  })
+  const genericFinanceRun = createAgentHarnessRun({
+    model: "openai/gpt-5.5",
+    messages: [
+      {
+        role: "user",
+        content: "Summarize this company in three bullets.",
+      },
+    ],
+    profileHint: "finance_analysis",
+  })
+
+  assert.equal(memoRun.profile, "investment_memo")
+  assert.equal(memoRun.budgets.maxToolCalls, 24)
+  assert.equal(genericFinanceRun.profile, "finance_analysis")
+  assert.equal(
+    resolveAgentHarnessProfile(
+      "Review CPI, treasury yields, and fed funds rate.",
+      "deep_research"
+    ),
+    "macro_research"
+  )
 })
 
 test("finance router prefers paid FMP and official fallbacks", () => {

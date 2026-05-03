@@ -139,6 +139,40 @@ function inferHarnessProfile(text: string): AgentHarnessProfileId {
   return "chat_default"
 }
 
+function isSpecializedFinanceProfile(profile: AgentHarnessProfileId): boolean {
+  return (
+    profile === "investment_memo" ||
+    profile === "earnings_research" ||
+    profile === "macro_research" ||
+    profile === "finance_analysis"
+  )
+}
+
+export function resolveAgentHarnessProfile(
+  text: string,
+  profileHint?: AgentHarnessProfileId
+): AgentHarnessProfileId {
+  const inferredProfile = inferHarnessProfile(text)
+
+  if (!profileHint || profileHint === "chat_default") {
+    return inferredProfile
+  }
+
+  if (profileHint === "finance_analysis") {
+    return isSpecializedFinanceProfile(inferredProfile)
+      ? inferredProfile
+      : "finance_analysis"
+  }
+
+  if (profileHint === "deep_research") {
+    return isSpecializedFinanceProfile(inferredProfile)
+      ? inferredProfile
+      : "deep_research"
+  }
+
+  return profileHint
+}
+
 function inferRiskLevel(text: string): AgentHarnessRiskLevel {
   if (
     /\b(should i buy|should i sell|tax|legal|retirement|portfolio)\b/i.test(
@@ -265,10 +299,13 @@ export function createAgentHarnessRun(params: {
   model: ModelType
   messages: readonly AgentInputMessage[]
   profile?: AgentHarnessProfileId
+  profileHint?: AgentHarnessProfileId
   userTimeZone?: string
 }): AgentHarnessRun {
   const lastUserMessage = getLastUserMessage(params.messages)
-  const profile = params.profile ?? inferHarnessProfile(lastUserMessage)
+  const profile =
+    params.profile ??
+    resolveAgentHarnessProfile(lastUserMessage, params.profileHint)
   const riskLevel = inferRiskLevel(lastUserMessage)
   const plan: AgentPlan = {
     objective: lastUserMessage || "Respond to the user's request.",
