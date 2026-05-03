@@ -80,3 +80,21 @@ test("tool call text sanitizer releases non-marker buffered text", () => {
   assert.equal(sanitize("Please invo"), "Please ")
   assert.equal(sanitize("ice the customer."), "invoice the customer.")
 })
+
+test("tool call text sanitizer flushes final visible marker-like prefixes", () => {
+  const sanitize = createToolCallTextSanitizer()
+
+  assert.equal(sanitize("Final total <"), "Final total ")
+  assert.equal(sanitize.flush(), "<")
+  assert.equal(sanitize.flush(), "")
+})
+
+test("tool call text sanitizer drops unfinished tool blocks on flush", () => {
+  const sanitize = createToolCallTextSanitizer()
+
+  assert.equal(
+    sanitize('<| DSML | tool_calls><| DSML | invoke name="code_execution">'),
+    ""
+  )
+  assert.equal(sanitize.flush(), "")
+})

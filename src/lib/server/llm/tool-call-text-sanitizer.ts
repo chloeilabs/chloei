@@ -13,6 +13,11 @@ const PSEUDO_TOOL_MARKER_PREFIXES = [
 ] as const
 const PSEUDO_TOOL_MARKER_PREFIX_MAX_CHARS = 64
 
+export interface ToolCallTextSanitizer {
+  (text: string): string
+  flush: () => string
+}
+
 function getPseudoToolBlockBoundary(text: string): RegExpExecArray | null {
   return PSEUDO_TOOL_BLOCK_BOUNDARY_PATTERN.exec(text)
 }
@@ -73,11 +78,11 @@ function splitTrailingPseudoToolMarkerPrefix(text: string): {
   return { output: text, prefix: "" }
 }
 
-export function createToolCallTextSanitizer() {
+export function createToolCallTextSanitizer(): ToolCallTextSanitizer {
   let isInsidePseudoToolBlock = false
   let bufferedPrefix = ""
 
-  return (text: string): string => {
+  const sanitize = ((text: string): string => {
     if (!text) {
       return ""
     }
@@ -127,5 +132,14 @@ export function createToolCallTextSanitizer() {
     }
 
     return returnWithBufferedPrefix(output)
+  }) as ToolCallTextSanitizer
+
+  sanitize.flush = (): string => {
+    const flushed = isInsidePseudoToolBlock ? "" : bufferedPrefix
+    bufferedPrefix = ""
+    isInsidePseudoToolBlock = false
+    return flushed
   }
+
+  return sanitize
 }

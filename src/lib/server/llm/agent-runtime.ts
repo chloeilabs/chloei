@@ -769,6 +769,10 @@ export async function* startAgentRuntimeStream(
       }
 
       if (part.type === "finish") {
+        const trailingDelta = sanitizeTextChunk.flush()
+        if (trailingDelta.length > 0) {
+          yield { type: "text_delta", delta: trailingDelta }
+        }
         logger.info("Agent runtime stream finished.", {
           requestId: params.requestId,
           model: params.model,
