@@ -16,6 +16,7 @@ RUN apt-get update && \
       python3 \
       ripgrep \
       sudo \
+      tmux \
       xz-utils && \
     rm -rf /var/lib/apt/lists/*
 
@@ -26,7 +27,13 @@ RUN mkdir -p /usr/local/node && \
     tar -xJf "/tmp/node-v${NODE_VERSION}-linux-x64.tar.xz" -C /usr/local/node --strip-components=1 && \
     rm "/tmp/node-v${NODE_VERSION}-linux-x64.tar.xz" /tmp/SHASUMS256.txt && \
     corepack enable && \
-    corepack prepare pnpm@10.32.1 --activate
+    corepack prepare pnpm@10.32.1 --activate && \
+    ln -sf /usr/local/node/bin/node /usr/local/bin/node && \
+    ln -sf /usr/local/node/bin/corepack /usr/local/bin/corepack && \
+    ln -sf /usr/local/node/bin/npm /usr/local/bin/npm && \
+    ln -sf /usr/local/node/bin/npx /usr/local/bin/npx && \
+    ln -sf /usr/local/node/bin/pnpm /usr/local/bin/pnpm && \
+    ln -sf /usr/local/node/bin/pnpx /usr/local/bin/pnpx
 
 RUN useradd -m -s /bin/bash cursor && \
     usermod -aG sudo cursor && \
