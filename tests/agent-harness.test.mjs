@@ -63,10 +63,7 @@ test("agent harness keeps Grok chat and finance tool loops focused", () => {
   const financeProfile = resolveAgentHarnessProfile("finance_analysis")
   const mathProfile = resolveAgentHarnessProfile("math_data")
 
-  assert.equal(
-    shouldEnableModelToolCalling("xai/grok-4.3", chatProfile),
-    false
-  )
+  assert.equal(shouldEnableModelToolCalling("xai/grok-4.3", chatProfile), false)
   assert.equal(
     shouldEnableAmbientFinanceTools("xai/grok-4.3", financeProfile),
     false

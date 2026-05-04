@@ -3,7 +3,10 @@ import { type NextRequest } from "next/server"
 import { getModels } from "@/lib/actions/api-keys"
 import { createLogger } from "@/lib/logger"
 import { buildAgentSystemInstruction } from "@/lib/server/agent-context"
-import { inferPromptTaskMode, resolvePromptProvider } from "@/lib/server/agent-prompt-steering"
+import {
+  inferPromptTaskMode,
+  resolvePromptProvider,
+} from "@/lib/server/agent-prompt-steering"
 import {
   createAgentStreamResponse,
   createJsonErrorResponse,
