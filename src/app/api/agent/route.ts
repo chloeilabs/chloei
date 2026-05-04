@@ -5,7 +5,6 @@ import { createLogger } from "@/lib/logger"
 import { buildAgentSystemInstruction } from "@/lib/server/agent-context"
 import {
   inferPromptTaskMode,
-  type PromptTaskMode,
   resolvePromptProvider,
 } from "@/lib/server/agent-prompt-steering"
 import {
@@ -31,7 +30,7 @@ import {
   createE2eAgentStreamResponse,
   isE2eMockModeEnabled,
 } from "@/lib/server/e2e-test-mode"
-import type { AgentRuntimeProfileId } from "@/lib/server/llm/agent-runtime"
+import { resolveAgentHarnessConfig } from "@/lib/server/llm/agent-harness"
 import {
   evaluateAndConsumeSlidingWindowRateLimit,
   tryAcquireConcurrencySlot,
@@ -41,24 +40,12 @@ import {
   observeRouteResponse,
 } from "@/lib/server/route-observability"
 import { isThreadStoreNotInitializedError } from "@/lib/server/threads"
-import type { AgentRunMode } from "@/lib/shared"
 
 export const runtime = "nodejs"
 export const maxDuration = 800
 
 function resolveRateLimitIdentifier(userId: string): string {
   return `user:${userId}`
-}
-
-function resolveRuntimeProfile(
-  taskMode: PromptTaskMode,
-  runMode: AgentRunMode
-): AgentRuntimeProfileId {
-  if (runMode === "research") {
-    return "deep_research"
-  }
-
-  return taskMode === "finance_analysis" ? "finance_analysis" : "chat_default"
 }
 
 export async function POST(request: NextRequest) {
@@ -187,6 +174,11 @@ export async function POST(request: NextRequest) {
         taskMode: promptTaskMode,
       }
     )
+    const harnessConfig = resolveAgentHarnessConfig({
+      taskMode: promptTaskMode,
+      runMode: parsedRequest.runMode,
+      model: selectedModel,
+    })
 
     if (isE2eMockRequest) {
       return observeRouteResponse(
@@ -257,10 +249,7 @@ export async function POST(request: NextRequest) {
         tavilyApiKey,
         fmpApiKey,
         userTimeZone,
-        runtimeProfile: resolveRuntimeProfile(
-          promptTaskMode,
-          parsedRequest.runMode
-        ),
+        runtimeProfile: harnessConfig.runtimeProfile,
         messages: parsedRequest.messages,
         systemInstruction,
         onStreamSettled: concurrencySlot?.release,

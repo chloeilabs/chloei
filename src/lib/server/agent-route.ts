@@ -33,7 +33,7 @@ import {
   AGENT_MAX_TOTAL_CHARS,
 } from "./agent-runtime-config"
 import { createApiErrorBody, createApiHeaders } from "./api-response"
-import type { AgentRuntimeProfileId } from "./llm/agent-runtime"
+import type { AgentRuntimeProfileId } from "./llm/agent-harness"
 import { startGatewayResponseStream } from "./llm/gateway-responses"
 import { withAiSdkInlineCitationInstruction } from "./llm/system-instruction-augmentations"
 
