@@ -134,3 +134,27 @@ test("prompt steering detects finance analysis without overriding personal advic
     "high_stakes"
   )
 })
+
+test("prompt steering detects math and data analysis before generic research", () => {
+  assert.equal(
+    inferPromptTaskMode([
+      {
+        role: "user",
+        content:
+          "Calculate a Monte Carlo simulation and plot the resulting distribution.",
+      },
+    ]),
+    "math_data"
+  )
+
+  assert.equal(
+    inferPromptTaskMode([
+      {
+        role: "user",
+        content:
+          "Use this CSV table to compute correlation, regression, and standard deviation.",
+      },
+    ]),
+    "math_data"
+  )
+})

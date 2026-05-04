@@ -8,6 +8,7 @@ const cwd = fileURLToPath(new URL("..", import.meta.url))
 const routePath = path.join(cwd, "src/app/api/agent/route.ts")
 const helperPath = path.join(cwd, "src/lib/server/agent-route.ts")
 const runtimePath = path.join(cwd, "src/lib/server/llm/agent-runtime.ts")
+const harnessPath = path.join(cwd, "src/lib/server/llm/agent-harness.ts")
 
 test("agent route validates model, threadId, and messages", async () => {
   const source = await readFile(helperPath, "utf8")
@@ -61,8 +62,13 @@ test("agent route streams through the extracted AI Gateway helper path", async (
 
   assert.match(
     routeSource,
-    /runtimeProfile: resolveRuntimeProfile\(\s*promptTaskMode,\s*parsedRequest\.runMode\s*\)/,
-    "Expected /api/agent to select a runtime profile from the inferred task mode and requested run mode."
+    /const harnessConfig = resolveAgentHarnessConfig\(\{[\s\S]*taskMode: promptTaskMode,[\s\S]*runMode: parsedRequest\.runMode,[\s\S]*model: selectedModel,[\s\S]*\}\)/,
+    "Expected /api/agent to select an agent harness config from the inferred task mode and requested run mode."
+  )
+  assert.match(
+    routeSource,
+    /runtimeProfile: harnessConfig\.runtimeProfile/,
+    "Expected /api/agent to pass the harness-selected runtime profile into the stream helper."
   )
 })
 
@@ -101,6 +107,22 @@ test("agent runtime reserves the final loop step for synthesis", async () => {
   )
 })
 
+test("agent runtime uses the AI SDK ToolLoopAgent harness", async () => {
+  const runtimeSource = await readFile(runtimePath, "utf8")
+  const harnessSource = await readFile(harnessPath, "utf8")
+
+  assert.match(
+    runtimeSource,
+    /new ToolLoopAgent\(\{[\s\S]*id: createAgentHarnessId\(runtimeProfile\),[\s\S]*instructions: systemInstruction,[\s\S]*stopWhen: stepCountIs\(runtimeProfile\.toolMaxSteps\),[\s\S]*\}\)/,
+    "Expected the runtime to create a reusable AI SDK ToolLoopAgent for Chloei runs."
+  )
+  assert.match(
+    harnessSource,
+    /export type AgentHarnessDomain =[\s\S]*"finance"[\s\S]*"math_data"[\s\S]*"research"/,
+    "Expected the harness to model domain-specific orchestration policy."
+  )
+})
+
 test("agent runtime extends the AI Gateway client timeout", async () => {
   const runtimeSource = await readFile(runtimePath, "utf8")
 
@@ -118,10 +140,11 @@ test("agent runtime extends the AI Gateway client timeout", async () => {
 
 test("agent runtime keeps Grok chat toolsets focused", async () => {
   const runtimeSource = await readFile(runtimePath, "utf8")
+  const harnessSource = await readFile(harnessPath, "utf8")
 
   assert.match(
-    runtimeSource,
-    /function shouldEnableAmbientFinanceTools[\s\S]*model\.startsWith\("xai\/"\)[\s\S]*runtimeProfile\.id === "chat_default"[\s\S]*runtimeProfile\.id === "finance_analysis"/,
+    harnessSource,
+    /function shouldUsePrefetchedEvidenceForModel[\s\S]*model\.startsWith\("xai\/"\)[\s\S]*profile\.id === "chat_default"[\s\S]*profile\.id === "finance_analysis"/,
     "Expected Grok chat and finance requests to avoid model-driven ambient finance tools."
   )
   assert.match(
@@ -135,8 +158,8 @@ test("agent runtime keeps Grok chat toolsets focused", async () => {
     "Expected finance data tools to respect the focused Grok chat toolset."
   )
   assert.match(
-    runtimeSource,
-    /function shouldEnableCodeExecutionTools[\s\S]*model\.startsWith\("xai\/"\)[\s\S]*runtimeProfile\.id === "chat_default"[\s\S]*runtimeProfile\.id === "finance_analysis"/,
+    harnessSource,
+    /function shouldEnableCodeExecutionTools[\s\S]*profile\.domain === "math_data"[\s\S]*shouldUsePrefetchedEvidenceForModel\(model,\s*profile\)/,
     "Expected Grok chat and finance requests to avoid model-driven code execution loops."
   )
   assert.match(
@@ -145,8 +168,8 @@ test("agent runtime keeps Grok chat toolsets focused", async () => {
     "Expected code execution tools to respect the focused Grok chat toolset."
   )
   assert.match(
-    runtimeSource,
-    /function shouldEnableModelToolCalling[\s\S]*model\.startsWith\("xai\/"\)[\s\S]*runtimeProfile\.id === "chat_default"[\s\S]*runtimeProfile\.id === "finance_analysis"/,
+    harnessSource,
+    /function shouldEnableModelToolCalling[\s\S]*shouldUsePrefetchedEvidenceForModel\(model,\s*profile\)/,
     "Expected Grok chat and finance requests to avoid model-initiated tool loops."
   )
   assert.match(

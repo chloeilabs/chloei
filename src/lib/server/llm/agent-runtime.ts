@@ -5,7 +5,7 @@ import { createGateway } from "@ai-sdk/gateway"
 import {
   type LanguageModelUsage,
   stepCountIs,
-  streamText,
+  ToolLoopAgent,
   type ToolSet,
 } from "ai"
 import { Agent, type Dispatcher, Dispatcher1Wrapper } from "undici"
@@ -13,12 +13,18 @@ import { Agent, type Dispatcher, Dispatcher1Wrapper } from "undici"
 import { createLogger } from "@/lib/logger"
 import {
   AGENT_EVAL_RESULTS_DIR,
-  AGENT_RESEARCH_TOOL_MAX_STEPS,
-  AGENT_TOOL_MAX_STEPS,
   AI_GATEWAY_CLIENT_TIMEOUT_MS,
 } from "@/lib/server/agent-runtime-config"
 import { type AgentStreamEvent, type ModelType } from "@/lib/shared"
 
+import {
+  type AgentRuntimeProfileId,
+  createAgentHarnessId,
+  resolveAgentHarnessProfile,
+  shouldEnableAmbientFinanceTools,
+  shouldEnableCodeExecutionTools,
+  shouldEnableModelToolCalling,
+} from "./agent-harness"
 import {
   type AgentInputMessage,
   toModelMessages,
@@ -47,7 +53,6 @@ import {
   isAiSdkTavilyToolName,
 } from "./ai-sdk-tavily-tools"
 import {
-  type CodeExecutionBackend,
   createAiSdkCodeExecutionTools,
   getAiSdkCodeExecutionToolCallMetadata,
   getAiSdkCodeExecutionToolResultMetadata,
@@ -73,21 +78,6 @@ const aiGatewayFetch: typeof fetch = (input, init) =>
     dispatcher: aiGatewayDispatcher,
   } as UndiciRequestInit)
 
-export type AgentRuntimeProfileId =
-  | "chat_default"
-  | "deep_research"
-  | "finance_analysis"
-  | "gdpval_workspace"
-
-interface AgentRuntimeProfile {
-  id: AgentRuntimeProfileId
-  codeExecutionBackend?: CodeExecutionBackend
-  codeExecutionWorkspaceMode?: "ephemeral" | "preserve"
-  fmpMcpEnabled: boolean
-  financeDataEnabled: boolean
-  toolMaxSteps: number
-}
-
 export interface StartAgentRuntimeStreamParams {
   requestId?: string
   model: ModelType
@@ -108,39 +98,6 @@ export interface StartAgentRuntimeStreamParams {
   }[]
 }
 
-const AGENT_RUNTIME_PROFILES: Record<
-  AgentRuntimeProfileId,
-  AgentRuntimeProfile
-> = {
-  chat_default: {
-    id: "chat_default",
-    fmpMcpEnabled: true,
-    financeDataEnabled: true,
-    toolMaxSteps: AGENT_TOOL_MAX_STEPS,
-  },
-  deep_research: {
-    id: "deep_research",
-    fmpMcpEnabled: true,
-    financeDataEnabled: true,
-    toolMaxSteps: AGENT_RESEARCH_TOOL_MAX_STEPS,
-  },
-  finance_analysis: {
-    id: "finance_analysis",
-    codeExecutionBackend: "finance",
-    fmpMcpEnabled: false,
-    financeDataEnabled: true,
-    toolMaxSteps: AGENT_TOOL_MAX_STEPS,
-  },
-  gdpval_workspace: {
-    id: "gdpval_workspace",
-    codeExecutionBackend: "finance",
-    codeExecutionWorkspaceMode: "preserve",
-    fmpMcpEnabled: false,
-    financeDataEnabled: true,
-    toolMaxSteps: AGENT_TOOL_MAX_STEPS,
-  },
-}
-
 const FINAL_SYNTHESIS_STEP_INSTRUCTION = [
   "You are on the final synthesis step for this request.",
   "Do not call any tools on this step.",
@@ -151,12 +108,6 @@ const XAI_CHAT_MAX_OUTPUT_TOKENS = 4096
 const XAI_PREFETCH_MAX_QUERY_CHARS = 500
 const XAI_WEB_PREFETCH_PATTERN =
   /\b(latest|current|today|recent|news|source|sources|cite|citation|link|look up|lookup|verify|check the web|right now|this week|this month)\b/i
-
-function resolveAgentRuntimeProfile(
-  id: AgentRuntimeProfileId | undefined
-): AgentRuntimeProfile {
-  return AGENT_RUNTIME_PROFILES[id ?? "chat_default"]
-}
 
 function shouldForceFinalSynthesisStep(
   stepNumber: number,
@@ -184,42 +135,9 @@ function shouldSkipReasoningChunk(text: string): boolean {
   return text.trim() === "[REDACTED]"
 }
 
-function shouldEnableAmbientFinanceTools(
-  model: ModelType,
-  runtimeProfile: AgentRuntimeProfile
-): boolean {
-  return !(
-    model.startsWith("xai/") &&
-    (runtimeProfile.id === "chat_default" ||
-      runtimeProfile.id === "finance_analysis")
-  )
-}
-
-function shouldEnableCodeExecutionTools(
-  model: ModelType,
-  runtimeProfile: AgentRuntimeProfile
-): boolean {
-  return !(
-    model.startsWith("xai/") &&
-    (runtimeProfile.id === "chat_default" ||
-      runtimeProfile.id === "finance_analysis")
-  )
-}
-
-function shouldEnableModelToolCalling(
-  model: ModelType,
-  runtimeProfile: AgentRuntimeProfile
-): boolean {
-  return !(
-    model.startsWith("xai/") &&
-    (runtimeProfile.id === "chat_default" ||
-      runtimeProfile.id === "finance_analysis")
-  )
-}
-
 function resolveMaxOutputTokens(
   model: ModelType,
-  runtimeProfile: AgentRuntimeProfile
+  runtimeProfile: ReturnType<typeof resolveAgentHarnessProfile>
 ): number | undefined {
   if (
     model.startsWith("xai/") &&
@@ -258,7 +176,7 @@ function getLastUserText(
 
 function shouldPrefetchWebEvidence(
   model: ModelType,
-  runtimeProfile: AgentRuntimeProfile,
+  runtimeProfile: ReturnType<typeof resolveAgentHarnessProfile>,
   messages: readonly AgentInputMessage[],
   tavilyApiKey: string | undefined
 ): boolean {
@@ -276,7 +194,7 @@ function shouldPrefetchWebEvidence(
 
 function shouldPrefetchFinanceEvidence(
   model: ModelType,
-  runtimeProfile: AgentRuntimeProfile,
+  runtimeProfile: ReturnType<typeof resolveAgentHarnessProfile>,
   messages: readonly AgentInputMessage[]
 ): boolean {
   const lastUserText = getLastUserText(messages)
@@ -290,7 +208,7 @@ function shouldPrefetchFinanceEvidence(
 
 function getWebEvidenceQuery(
   messages: readonly AgentInputMessage[],
-  runtimeProfile?: AgentRuntimeProfile
+  runtimeProfile?: ReturnType<typeof resolveAgentHarnessProfile>
 ): string {
   const query = getLastUserText(messages)
     ?.replace(/\s+/g, " ")
@@ -316,7 +234,7 @@ function getWebEvidenceQuery(
 
 function getWebEvidenceIncludeDomains(
   query: string,
-  runtimeProfile: AgentRuntimeProfile
+  runtimeProfile: ReturnType<typeof resolveAgentHarnessProfile>
 ): string[] | undefined {
   if (
     runtimeProfile.id === "finance_analysis" &&
@@ -412,7 +330,7 @@ export async function* startAgentRuntimeStream(
     return
   }
 
-  const runtimeProfile = resolveAgentRuntimeProfile(params.runtimeProfile)
+  const runtimeProfile = resolveAgentHarnessProfile(params.runtimeProfile)
   const normalizedTavilyApiKey = params.tavilyApiKey?.trim()
   const normalizedFmpApiKey = params.fmpApiKey?.trim()
   let fmpToolsContext: Awaited<
@@ -681,11 +599,10 @@ export async function* startAgentRuntimeStream(
       prefetchedFinanceEvidence
     )
 
-    const result = streamText({
+    const agent = new ToolLoopAgent({
+      id: createAgentHarnessId(runtimeProfile),
       model: gatewayProvider(params.model),
-      system: systemInstruction,
-      messages,
-      abortSignal: params.signal,
+      instructions: systemInstruction,
       ...(params.temperature !== undefined
         ? { temperature: params.temperature }
         : {}),
@@ -702,6 +619,10 @@ export async function* startAgentRuntimeStream(
             }
           : undefined,
       stopWhen: stepCountIs(runtimeProfile.toolMaxSteps),
+    })
+    const result = await agent.stream({
+      messages,
+      abortSignal: params.signal,
     })
 
     for await (const part of result.fullStream) {

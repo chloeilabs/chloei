@@ -13,6 +13,7 @@ export type PromptTaskMode =
   | "closed_answer"
   | "coding"
   | "finance_analysis"
+  | "math_data"
   | "research"
   | "high_stakes"
 
@@ -43,6 +44,8 @@ const FINANCE_ANALYSIS_PATTERN =
   /\b(stock|stocks|equity|equities|ticker|symbol|quote|quotes|company profile|finance data|financial data|finance provider|finance providers|structured finance|etf|fundamental|valuation|dcf|multiple|ev\/ebitda|ebitda|revenue|gross margin|operating margin|free cash flow|fcf|cash flow|income statement|balance sheet|financial statement|filing|10-k|10-q|earnings|guidance|dividend|buyback|market cap|enterprise value|treasury|yield curve|interest rate|fed funds|cpi|inflation|gdp|macro|fred|fx|foreign exchange|currency pair|commodity|commodities|oil|gold|crypto|bitcoin|ethereum|portfolio return|sharpe|beta|drawdown)\b/i
 const FINANCIAL_ADVICE_PATTERN =
   /\b(should i buy|should i sell|buy or sell|personal financial advice|retirement account|401k|ira|tax return|tax filing|tax deduction|my portfolio|my savings|my mortgage|my debt)\b/i
+const MATH_DATA_PATTERN =
+  /\b(calculate|compute|solve|equation|system of equations|integral|derivative|probability|statistics|regression|correlation|standard deviation|variance|matrix|linear algebra|optimize|optimization|simulate|simulation|monte carlo|dataset|dataframe|csv|spreadsheet|table|chart|plot|join tables|transform data)\b/i
 const CLOSED_ANSWER_PATTERN =
   /\b(multiple choice|choose one|which option|final answer|exact answer|boxed|answer:|confidence:|A\)|B\)|C\)|D\))\b/i
 const STRICT_OUTPUT_PATTERN =
@@ -132,6 +135,14 @@ This request is finance-analysis work.
 - Do not provide personalized investment, tax, legal, or trade-execution advice. Frame analysis as informational unless the user provided an institutional workflow.
 - When data is unavailable, stale, or provider-specific, say that plainly and do not fill gaps with invented figures.
 - Stay on the finance task. Do not narrate unrelated wording, country-name, or language-usage considerations.
+`.trim(),
+  math_data: `
+This request needs deterministic math, data analysis, or computation.
+- Use code execution for arithmetic, algebra checks, simulations, statistics, table transformations, chart data, and any calculation that could change the answer.
+- State assumptions, formulas, and units when they affect the result.
+- Prefer exact values when possible; otherwise include sensible precision and avoid false certainty.
+- For data tasks, distinguish raw inputs, transformations, computed outputs, and interpretation.
+- If a computation cannot be run or the data is insufficient, say that plainly instead of guessing.
 `.trim(),
   research: `
 This request needs deep research, freshness, sources, or verification.
@@ -225,6 +236,9 @@ export function inferPromptTaskMode(
   const financeAnalysis =
     FINANCE_ANALYSIS_PATTERN.test(lastUserMessage) ||
     FINANCE_ANALYSIS_PATTERN.test(fullUserText)
+  const mathData =
+    MATH_DATA_PATTERN.test(lastUserMessage) ||
+    MATH_DATA_PATTERN.test(fullUserText)
   const research =
     RESEARCH_PATTERN.test(lastUserMessage) ||
     RESEARCH_PATTERN.test(fullUserText)
@@ -242,6 +256,10 @@ export function inferPromptTaskMode(
 
   if (highStakes) {
     return "high_stakes"
+  }
+
+  if (mathData) {
+    return "math_data"
   }
 
   if (coding) {
