@@ -654,7 +654,7 @@ export function useAgentSession({
         return
       }
 
-      if (queue && submitLockRef.current) {
+      if (submitLockRef.current) {
         setQueuedSubmission({
           message: trimmedMessage,
           model,

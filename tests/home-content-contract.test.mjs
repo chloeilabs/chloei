@@ -28,3 +28,21 @@ test("home animated prompt forwards attachments from the initial prompt", async 
     "Expected every animated prompt branch to forward attachments."
   )
 })
+
+test("prompt submissions queue while the submit lock is still active", async () => {
+  const source = await readFile(
+    path.join(cwd, "src/components/agent/home/use-agent-session.ts"),
+    "utf8"
+  )
+
+  assert.match(
+    source,
+    /if \(submitLockRef\.current\) \{[\s\S]*setQueuedSubmission\(\{[\s\S]*message: trimmedMessage,[\s\S]*return[\s\S]*\}/,
+    "Expected follow-up submissions during the stream cleanup window to be queued."
+  )
+  assert.doesNotMatch(
+    source,
+    /if \(queue && submitLockRef\.current\)/,
+    "Expected queueing to depend on the actual submit lock, not only the PromptForm streaming prop."
+  )
+})
