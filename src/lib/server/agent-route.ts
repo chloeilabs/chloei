@@ -216,8 +216,9 @@ function shouldIncludeFinanceToolingInstruction(
   model: ModelType,
   runtimeProfile: AgentRuntimeProfileId | undefined
 ): boolean {
+  void model
   void runtimeProfile
-  return !model.startsWith("xai/")
+  return true
 }
 
 function isProviderAuthenticationError(error: unknown): boolean {

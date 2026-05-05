@@ -56,7 +56,31 @@ test("prompt steering tells Grok to complete tool-backed news answers", () => {
   )
 })
 
-test("prompt steering tells Grok finance to use prefetched evidence", () => {
+test("prompt steering adapts Grok verbosity to detailed requests", () => {
+  const blocks = createPromptSteeringBlocks({
+    provider: "xai",
+    taskMode: "general",
+  })
+  const overlayText = blocks.map((block) => block.body).join("\n\n")
+
+  assert.match(
+    overlayText,
+    /Match the user's requested level of detail/,
+    "Expected Grok to follow long-form detail requests instead of defaulting short."
+  )
+  assert.match(
+    overlayText,
+    /prioritize visible final-answer tokens/,
+    "Expected Grok to preserve visible answer budget on thorough prompts."
+  )
+  assert.doesNotMatch(
+    overlayText,
+    /Keep the final answer concise/,
+    "Expected Grok not to receive an unconditional concise-answer directive."
+  )
+})
+
+test("prompt steering tells Grok finance to use shared tool calling", () => {
   const blocks = createPromptSteeringBlocks({
     provider: "xai",
     taskMode: "finance_analysis",
@@ -65,18 +89,28 @@ test("prompt steering tells Grok finance to use prefetched evidence", () => {
 
   assert.match(
     overlayText,
-    /structured finance evidence supplied in the prompt/,
-    "Expected Grok finance prompts to rely on server-prefetched evidence."
+    /For ordinary public-company quote\/profile requests/,
+    "Expected Grok finance prompts to preserve shared provider-routing rules."
+  )
+  assert.match(
+    overlayText,
+    /For 10-K\/10-Q prompts/,
+    "Expected Grok finance prompts to preserve shared filing-routing rules."
+  )
+  assert.match(
+    overlayText,
+    /Additional Grok finance guidance/,
+    "Expected Grok finance prompts to append provider-specific guidance."
   )
   assert.match(
     overlayText,
     /Return only the user-facing answer/,
     "Expected Grok finance prompts to suppress visible planning text."
   )
-  assert.doesNotMatch(
+  assert.match(
     overlayText,
-    /call `finance_data`/,
-    "Expected Grok finance prompts to avoid model-driven finance tool calls."
+    /synthesize tool results into the final answer/,
+    "Expected Grok finance prompts to synthesize model-driven tool results."
   )
 })
 

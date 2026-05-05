@@ -84,7 +84,7 @@ Use OpenAI reasoning mode efficiently.
 `.trim(),
   xai: `
 Use Grok reasoning mode efficiently.
-- Keep the final answer concise and grounded in the actual task.
+- Match the user's requested level of detail. For thorough, detailed, long-form, guide, report, architecture, analysis, or comparison requests, prioritize visible final-answer tokens and write a complete answer with the requested sections and examples instead of compressing to a summary.
 - Prefer direct execution and verification over speculative narration.
 - On format-sensitive tasks, do a literal final-format check before finishing.
 - Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
@@ -154,16 +154,15 @@ This request is high-stakes.
 `.trim(),
 }
 
-const XAI_FINANCE_ANALYSIS_OVERLAY = `
-This request is finance-analysis work.
-- Use structured finance evidence supplied in the prompt when present; that evidence was retrieved before the model response.
-- Cite the evidence sources when the user asks for sources or current market facts.
-- If quote, profile, filing, statement, market-cap, or macro data is absent or stale, say that plainly instead of filling gaps with invented figures.
-- Distinguish reported facts, computed values, assumptions, and interpretation.
+const XAI_FINANCE_ANALYSIS_OVERLAY = [
+  TASK_MODE_OVERLAYS.finance_analysis,
+  `
+Additional Grok finance guidance:
+- Cite tool-provided evidence sources when the user asks for sources or current market facts.
 - Return only the user-facing answer. Do not include prompt analysis, planning text, confidence macros, or notes about internal instructions.
-- Do not provide personalized investment, tax, legal, or trade-execution advice. Frame analysis as informational unless the user provided an institutional workflow.
-- Stay on the finance task and complete the answer in one pass.
-`.trim()
+- Stay on the finance task and synthesize tool results into the final answer.
+`.trim(),
+].join("\n\n")
 
 function normalizeUserText(messages: readonly PromptSteeringMessage[]): string {
   return messages
