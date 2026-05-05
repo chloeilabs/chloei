@@ -2,6 +2,8 @@ import type { ModelMessage } from "ai"
 
 const SOURCE_BACKED_PROMPT_PATTERN =
   /\b(current|latest|search|web|source|sources|citation|citations|cite|link|links|documentation|release)\b/i
+const EXTERNAL_SOURCE_NEGATION_PATTERN =
+  /\b(?:do not|don't|without|no)\s+(?:use\s+)?(?:external\s+)?(?:sources?|web|search|citations?|links?)\b/i
 const FACT_COUNT_PATTERN =
   /\b(?:three|3)\b[\s\w-]*(?:facts?|points?|items?|updates?)\b/i
 const MIN_SOURCE_BACKED_ANSWER_CHARS = 900
@@ -36,6 +38,10 @@ export function getSourceBackedPromptQuery(
   }
 
   const lastUserText = getLastUserText(messages).trim()
+  if (EXTERNAL_SOURCE_NEGATION_PATTERN.test(lastUserText)) {
+    return null
+  }
+
   return SOURCE_BACKED_PROMPT_PATTERN.test(lastUserText) ? lastUserText : null
 }
 

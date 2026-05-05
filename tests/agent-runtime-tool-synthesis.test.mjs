@@ -23,6 +23,13 @@ const sourcePromptMessages = [
       "Search the web for the latest Vercel AI Gateway documentation and summarize three facts with links.",
   },
 ]
+const noSourcePromptMessages = [
+  {
+    role: "user",
+    content:
+      "Write a long answer about multi-step tool-calling agents. Do not use external sources.",
+  },
+]
 
 function createStep(text) {
   return {
@@ -30,6 +37,24 @@ function createStep(text) {
     toolResults: [{ toolName: "tavily_search" }],
   }
 }
+
+test("source prefetch respects explicit no-source prompts", () => {
+  assert.equal(
+    getSourceBackedPromptQuery("xai/grok-4.3", sourcePromptMessages),
+    sourcePromptMessages[0].content
+  )
+  assert.equal(
+    getSourceBackedPromptQuery("xai/grok-4.3", noSourcePromptMessages),
+    null
+  )
+  assert.equal(
+    getSourceBackedPromptQuery(
+      "anthropic/claude-sonnet-4.6",
+      sourcePromptMessages
+    ),
+    null
+  )
+})
 
 test("xAI tool synthesis runs for partial sourced answers", () => {
   assert.equal(
