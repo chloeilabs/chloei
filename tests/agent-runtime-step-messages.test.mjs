@@ -149,17 +149,20 @@ test("getCompatibleStepMessages only overrides Grok prompts when reasoning is pr
     getCompatibleStepMessages("xai/grok-4.3", cleanMessages),
     undefined
   )
-  assert.deepEqual(getCompatibleStepMessages("xai/grok-4.3", reasoningMessages), [
-    {
-      role: "assistant",
-      content: [
-        {
-          type: "tool-call",
-          toolCallId: "call-1",
-          toolName: "finance_data",
-          input: {},
-        },
-      ],
-    },
-  ])
+  assert.deepEqual(
+    getCompatibleStepMessages("xai/grok-4.3", reasoningMessages),
+    [
+      {
+        role: "assistant",
+        content: [
+          {
+            type: "tool-call",
+            toolCallId: "call-1",
+            toolName: "finance_data",
+            input: {},
+          },
+        ],
+      },
+    ]
+  )
 })
