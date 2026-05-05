@@ -25,6 +25,10 @@ import {
 } from "./agent-runtime-messages"
 import { getCompatibleStepMessages } from "./agent-runtime-step-messages"
 import {
+  buildToolSynthesisPrompt,
+  shouldForceToolSynthesisStep,
+} from "./agent-runtime-tool-synthesis"
+import {
   createAiSdkFinanceDataTools,
   getAiSdkFinanceDataToolCallMetadata,
   getAiSdkFinanceDataToolResultMetadata,
@@ -216,6 +220,10 @@ export async function* startAgentRuntimeStream(
   const finalizedToolCalls = new Set<string>()
   const seenSourceKeys = new Set<string>()
   const sanitizeInitialReasoningChunk = createInitialReasoningChunkSanitizer()
+  const toolResultStatuses = new Map<string, "success" | "error">()
+  let sourceCount = 0
+  let textCharCount = 0
+  let toolSynthesisStepUsed = false
 
   const createSourceEvent = (
     id: string,
@@ -230,6 +238,7 @@ export async function* startAgentRuntimeStream(
     }
 
     seenSourceKeys.add(key)
+    sourceCount += 1
     return getSourceEvent(id, normalizedUrl, normalizedTitle)
   }
 
@@ -300,7 +309,7 @@ export async function* startAgentRuntimeStream(
         deepResearch: runtimeProfile.id === "deep_research",
       }),
       tools,
-      prepareStep: ({ messages: stepMessages, stepNumber }) => {
+      prepareStep: ({ messages: stepMessages, stepNumber, steps }) => {
         const compatibleMessages = getCompatibleStepMessages(
           params.model,
           stepMessages
@@ -309,17 +318,50 @@ export async function* startAgentRuntimeStream(
           stepNumber,
           runtimeProfile.toolMaxSteps
         )
+        const toolSynthesisPrompt =
+          !forceFinalSynthesis &&
+          !toolSynthesisStepUsed &&
+          shouldForceToolSynthesisStep({
+            model: params.model,
+            messages,
+            steps,
+            sourceCount,
+            textCharCount,
+            toolResultStatuses,
+          })
+            ? buildToolSynthesisPrompt(systemInstruction)
+            : null
 
-        if (!compatibleMessages && !forceFinalSynthesis) {
+        if (toolSynthesisPrompt) {
+          logger.info("Forcing xAI tool synthesis step.", {
+            requestId: params.requestId,
+            model: params.model,
+            sourceCount,
+            textCharCount,
+            toolResultCount: toolResultStatuses.size,
+          })
+          toolSynthesisStepUsed = true
+        }
+
+        if (
+          !compatibleMessages &&
+          !forceFinalSynthesis &&
+          !toolSynthesisPrompt
+        ) {
           return undefined
         }
 
         return {
           ...(compatibleMessages ? { messages: compatibleMessages } : {}),
-          ...(forceFinalSynthesis
+          ...(forceFinalSynthesis || toolSynthesisPrompt
             ? {
                 toolChoice: "none" as const,
-                system: `${systemInstruction}\n\n${FINAL_SYNTHESIS_STEP_INSTRUCTION}`,
+                system:
+                  toolSynthesisPrompt ??
+                  `${systemInstruction}\n\n${FINAL_SYNTHESIS_STEP_INSTRUCTION}`,
+                ...(toolSynthesisPrompt
+                  ? { activeTools: [] as (keyof ToolSet)[] }
+                  : {}),
               }
             : {}),
         }
@@ -364,6 +406,7 @@ export async function* startAgentRuntimeStream(
 
       if (part.type === "text-delta") {
         if (part.text.length > 0) {
+          textCharCount += part.text.length
           yield { type: "text_delta", delta: part.text }
         }
         continue
@@ -438,6 +481,7 @@ export async function* startAgentRuntimeStream(
         }
 
         finalizedToolCalls.add(metadata.callId)
+        toolResultStatuses.set(metadata.callId, metadata.status)
         yield {
           type: "tool_result",
           callId: metadata.callId,
