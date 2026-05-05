@@ -23,6 +23,7 @@ import {
   type AgentInputMessage,
   toModelMessages,
 } from "./agent-runtime-messages"
+import { getCompatibleStepMessages } from "./agent-runtime-step-messages"
 import {
   createAiSdkFinanceDataTools,
   getAiSdkFinanceDataToolCallMetadata,
@@ -299,13 +300,30 @@ export async function* startAgentRuntimeStream(
         deepResearch: runtimeProfile.id === "deep_research",
       }),
       tools,
-      prepareStep: ({ stepNumber }) =>
-        shouldForceFinalSynthesisStep(stepNumber, runtimeProfile.toolMaxSteps)
-          ? {
-              toolChoice: "none",
-              system: `${systemInstruction}\n\n${FINAL_SYNTHESIS_STEP_INSTRUCTION}`,
-            }
-          : undefined,
+      prepareStep: ({ messages: stepMessages, stepNumber }) => {
+        const compatibleMessages = getCompatibleStepMessages(
+          params.model,
+          stepMessages
+        )
+        const forceFinalSynthesis = shouldForceFinalSynthesisStep(
+          stepNumber,
+          runtimeProfile.toolMaxSteps
+        )
+
+        if (!compatibleMessages && !forceFinalSynthesis) {
+          return undefined
+        }
+
+        return {
+          ...(compatibleMessages ? { messages: compatibleMessages } : {}),
+          ...(forceFinalSynthesis
+            ? {
+                toolChoice: "none" as const,
+                system: `${systemInstruction}\n\n${FINAL_SYNTHESIS_STEP_INSTRUCTION}`,
+              }
+            : {}),
+        }
+      },
       stopWhen: stepCountIs(runtimeProfile.toolMaxSteps),
     })
 
