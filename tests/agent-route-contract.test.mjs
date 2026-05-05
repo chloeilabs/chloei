@@ -172,7 +172,7 @@ test("agent runtime strips replayed reasoning from Grok tool steps", async () =>
   )
   assert.match(
     runtimeSource,
-    /prepareStep:\s*\(\{\s*messages: stepMessages,\s*stepNumber\s*\}\)[\s\S]*messages: compatibleMessages/,
+    /prepareStep:\s*\(\{[\s\S]*messages: stepMessages,[\s\S]*stepNumber[\s\S]*\}\)[\s\S]*messages: compatibleMessages/,
     "Expected prepared Grok steps to override only the sanitized messages."
   )
 })
