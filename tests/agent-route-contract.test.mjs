@@ -56,7 +56,7 @@ test("agent route streams through the extracted AI Gateway helper path", async (
   assert.match(
     helperSource,
     /withAiSdkInlineCitationInstruction\(\s*params\.systemInstruction,\s*\{[\s\S]*financeEnabled: shouldIncludeFinanceToolingInstruction\([\s\S]*fmpEnabled: Boolean\(params\.fmpApiKey\?\.trim\(\)\),[\s\S]*\}\s*\)/,
-    "Expected the helper to pass model-aware augmentation options."
+    "Expected the helper to pass finance tooling augmentation options."
   )
 
   assert.match(
@@ -116,48 +116,39 @@ test("agent runtime extends the AI Gateway client timeout", async () => {
   )
 })
 
-test("agent runtime keeps Grok chat toolsets focused", async () => {
+test("agent runtime gives Grok the same chat toolset as other selected models", async () => {
   const runtimeSource = await readFile(runtimePath, "utf8")
+  const helperSource = await readFile(helperPath, "utf8")
 
-  assert.match(
+  assert.doesNotMatch(
     runtimeSource,
-    /function shouldEnableAmbientFinanceTools[\s\S]*model\.startsWith\("xai\/"\)[\s\S]*runtimeProfile\.id === "chat_default"[\s\S]*runtimeProfile\.id === "finance_analysis"/,
-    "Expected Grok chat and finance requests to avoid model-driven ambient finance tools."
+    /shouldEnableAmbientFinanceTools|shouldEnableCodeExecutionTools|shouldEnableModelToolCalling|shouldPrefetchWebEvidence|shouldPrefetchFinanceEvidence|model\.startsWith\("xai\/"\)/,
+    "Expected Grok to avoid xAI-specific tool suppression or prefetch branches."
   )
   assert.match(
     runtimeSource,
-    /runtimeProfile\.fmpMcpEnabled && ambientFinanceToolsEnabled/,
-    "Expected FMP MCP tools to respect the focused Grok chat toolset."
+    /if \(runtimeProfile\.fmpMcpEnabled\) \{/,
+    "Expected FMP MCP tools to follow the same runtime profile gate for all models."
   )
   assert.match(
     runtimeSource,
-    /runtimeProfile\.financeDataEnabled && ambientFinanceToolsEnabled/,
-    "Expected finance data tools to respect the focused Grok chat toolset."
+    /runtimeProfile\.financeDataEnabled[\s\S]*createAiSdkFinanceDataTools/,
+    "Expected finance data tools to follow the same runtime profile gate for all models."
   )
   assert.match(
     runtimeSource,
-    /function shouldEnableCodeExecutionTools[\s\S]*model\.startsWith\("xai\/"\)[\s\S]*runtimeProfile\.id === "chat_default"[\s\S]*runtimeProfile\.id === "finance_analysis"/,
-    "Expected Grok chat and finance requests to avoid model-driven code execution loops."
+    /createAiSdkCodeExecutionTools\(\{[\s\S]*backend: runtimeProfile\.codeExecutionBackend/,
+    "Expected code execution tools to be created for all chat models."
   )
   assert.match(
     runtimeSource,
-    /codeExecutionToolsEnabled[\s\S]*createAiSdkCodeExecutionTools/,
-    "Expected code execution tools to respect the focused Grok chat toolset."
+    /createAiSdkTavilyTools\(normalizedTavilyApiKey\)/,
+    "Expected Tavily tools to be created for all chat models."
   )
   assert.match(
-    runtimeSource,
-    /function shouldEnableModelToolCalling[\s\S]*model\.startsWith\("xai\/"\)[\s\S]*runtimeProfile\.id === "chat_default"[\s\S]*runtimeProfile\.id === "finance_analysis"/,
-    "Expected Grok chat and finance requests to avoid model-initiated tool loops."
-  )
-  assert.match(
-    runtimeSource,
-    /createAiSdkTavilyEvidenceContext/,
-    "Expected Grok chat requests to prefetch Tavily evidence outside the model tool loop."
-  )
-  assert.match(
-    runtimeSource,
-    /createAiSdkFinanceDataEvidenceContext/,
-    "Expected Grok finance requests to prefetch finance evidence outside the model tool loop."
+    helperSource,
+    /function shouldIncludeFinanceToolingInstruction[\s\S]*return true/,
+    "Expected finance tooling instructions to be available to all selected models."
   )
   assert.doesNotMatch(
     runtimeSource,

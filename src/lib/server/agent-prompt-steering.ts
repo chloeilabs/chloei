@@ -156,13 +156,13 @@ This request is high-stakes.
 
 const XAI_FINANCE_ANALYSIS_OVERLAY = `
 This request is finance-analysis work.
-- Use structured finance evidence supplied in the prompt when present; that evidence was retrieved before the model response.
-- Cite the evidence sources when the user asks for sources or current market facts.
+- Use the available finance_data and code_execution tools when structured market data, filings, statements, macro data, or arithmetic checks are needed.
+- Cite tool-provided evidence sources when the user asks for sources or current market facts.
 - If quote, profile, filing, statement, market-cap, or macro data is absent or stale, say that plainly instead of filling gaps with invented figures.
 - Distinguish reported facts, computed values, assumptions, and interpretation.
 - Return only the user-facing answer. Do not include prompt analysis, planning text, confidence macros, or notes about internal instructions.
 - Do not provide personalized investment, tax, legal, or trade-execution advice. Frame analysis as informational unless the user provided an institutional workflow.
-- Stay on the finance task and complete the answer in one pass.
+- Stay on the finance task and synthesize tool results into the final answer.
 `.trim()
 
 function normalizeUserText(messages: readonly PromptSteeringMessage[]): string {

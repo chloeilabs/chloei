@@ -80,7 +80,7 @@ test("prompt steering adapts Grok verbosity to detailed requests", () => {
   )
 })
 
-test("prompt steering tells Grok finance to use prefetched evidence", () => {
+test("prompt steering tells Grok finance to use shared tool calling", () => {
   const blocks = createPromptSteeringBlocks({
     provider: "xai",
     taskMode: "finance_analysis",
@@ -89,18 +89,18 @@ test("prompt steering tells Grok finance to use prefetched evidence", () => {
 
   assert.match(
     overlayText,
-    /structured finance evidence supplied in the prompt/,
-    "Expected Grok finance prompts to rely on server-prefetched evidence."
+    /available finance_data and code_execution tools/,
+    "Expected Grok finance prompts to use the same tool-calling path as other models."
   )
   assert.match(
     overlayText,
     /Return only the user-facing answer/,
     "Expected Grok finance prompts to suppress visible planning text."
   )
-  assert.doesNotMatch(
+  assert.match(
     overlayText,
-    /call `finance_data`/,
-    "Expected Grok finance prompts to avoid model-driven finance tool calls."
+    /synthesize tool results into the final answer/,
+    "Expected Grok finance prompts to synthesize model-driven tool results."
   )
 })
 
