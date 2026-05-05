@@ -154,16 +154,15 @@ This request is high-stakes.
 `.trim(),
 }
 
-const XAI_FINANCE_ANALYSIS_OVERLAY = `
-This request is finance-analysis work.
-- Use the available finance_data and code_execution tools when structured market data, filings, statements, macro data, or arithmetic checks are needed.
+const XAI_FINANCE_ANALYSIS_OVERLAY = [
+  TASK_MODE_OVERLAYS.finance_analysis,
+  `
+Additional Grok finance guidance:
 - Cite tool-provided evidence sources when the user asks for sources or current market facts.
-- If quote, profile, filing, statement, market-cap, or macro data is absent or stale, say that plainly instead of filling gaps with invented figures.
-- Distinguish reported facts, computed values, assumptions, and interpretation.
 - Return only the user-facing answer. Do not include prompt analysis, planning text, confidence macros, or notes about internal instructions.
-- Do not provide personalized investment, tax, legal, or trade-execution advice. Frame analysis as informational unless the user provided an institutional workflow.
 - Stay on the finance task and synthesize tool results into the final answer.
-`.trim()
+`.trim(),
+].join("\n\n")
 
 function normalizeUserText(messages: readonly PromptSteeringMessage[]): string {
   return messages

@@ -89,8 +89,18 @@ test("prompt steering tells Grok finance to use shared tool calling", () => {
 
   assert.match(
     overlayText,
-    /available finance_data and code_execution tools/,
-    "Expected Grok finance prompts to use the same tool-calling path as other models."
+    /For ordinary public-company quote\/profile requests/,
+    "Expected Grok finance prompts to preserve shared provider-routing rules."
+  )
+  assert.match(
+    overlayText,
+    /For 10-K\/10-Q prompts/,
+    "Expected Grok finance prompts to preserve shared filing-routing rules."
+  )
+  assert.match(
+    overlayText,
+    /Additional Grok finance guidance/,
+    "Expected Grok finance prompts to append provider-specific guidance."
   )
   assert.match(
     overlayText,
