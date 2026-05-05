@@ -84,7 +84,7 @@ Use OpenAI reasoning mode efficiently.
 `.trim(),
   xai: `
 Use Grok reasoning mode efficiently.
-- Keep the final answer concise and grounded in the actual task.
+- Match the user's requested level of detail. For thorough, detailed, long-form, guide, report, architecture, analysis, or comparison requests, prioritize visible final-answer tokens and write a complete answer with the requested sections and examples instead of compressing to a summary.
 - Prefer direct execution and verification over speculative narration.
 - On format-sensitive tasks, do a literal final-format check before finishing.
 - Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
