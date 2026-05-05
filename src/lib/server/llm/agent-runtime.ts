@@ -26,6 +26,7 @@ import {
 import { getCompatibleStepMessages } from "./agent-runtime-step-messages"
 import {
   buildToolSynthesisPrompt,
+  getSourceBackedPromptQuery,
   shouldForceToolSynthesisStep,
 } from "./agent-runtime-tool-synthesis"
 import {
@@ -43,6 +44,7 @@ import {
   isAiSdkGatewaySearchToolName,
 } from "./ai-sdk-gateway-search-tools"
 import {
+  createAiSdkTavilyEvidenceContext,
   createAiSdkTavilyTools,
   getAiSdkTavilyToolCallMetadata,
   getAiSdkTavilyToolResultMetadata,
@@ -295,7 +297,53 @@ export async function* startAgentRuntimeStream(
       toolCount: toolNames.length,
       toolNames,
     })
-    const systemInstruction = params.systemInstruction
+    let systemInstruction = params.systemInstruction
+    const prefetchQuery = getSourceBackedPromptQuery(params.model, messages)
+    if (prefetchQuery && normalizedTavilyApiKey) {
+      const prefetchCallId = `prefetch-tavily-${randomUUID()}`
+      yield {
+        type: "tool_call",
+        callId: prefetchCallId,
+        toolName: "tavily_search",
+        label: "Searching with Tavily",
+        query: prefetchQuery,
+        operation: "prefetch",
+        provider: "tavily",
+      }
+
+      const evidence = await createAiSdkTavilyEvidenceContext({
+        apiKey: normalizedTavilyApiKey,
+        query: prefetchQuery,
+      })
+
+      yield {
+        type: "tool_result",
+        callId: prefetchCallId,
+        toolName: "tavily_search",
+        status: "success",
+        operation: "prefetch",
+        provider: "tavily",
+        retryable: false,
+      }
+
+      for (const source of evidence.sources) {
+        const sourceEvent = createSourceEvent(
+          source.id,
+          source.url,
+          source.title
+        )
+        if (sourceEvent) {
+          yield sourceEvent
+        }
+      }
+
+      systemInstruction = [
+        systemInstruction,
+        "",
+        "Use the following pre-fetched web evidence for the user's current source-backed request. Include source links/citations when making claims from this evidence.",
+        evidence.context,
+      ].join("\n")
+    }
 
     const result = streamText({
       model: gatewayProvider(params.model),

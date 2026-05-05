@@ -27,6 +27,18 @@ function getLastUserText(messages: readonly ModelMessage[]): string {
   return ""
 }
 
+export function getSourceBackedPromptQuery(
+  model: string,
+  messages: readonly ModelMessage[]
+): string | null {
+  if (!model.startsWith("xai/")) {
+    return null
+  }
+
+  const lastUserText = getLastUserText(messages).trim()
+  return SOURCE_BACKED_PROMPT_PATTERN.test(lastUserText) ? lastUserText : null
+}
+
 export function shouldForceToolSynthesisStep(params: {
   model: string
   messages: readonly ModelMessage[]

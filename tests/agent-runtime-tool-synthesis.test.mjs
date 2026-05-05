@@ -10,9 +10,11 @@ const moduleUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/llm/agent-runtime-tool-synthesis.ts")
 ).href
 
-const { shouldForceToolSynthesisStep, buildToolSynthesisPrompt } = await import(
-  moduleUrl
-)
+const {
+  buildToolSynthesisPrompt,
+  getSourceBackedPromptQuery,
+  shouldForceToolSynthesisStep,
+} = await import(moduleUrl)
 
 const sourcePromptMessages = [
   {
@@ -30,6 +32,11 @@ function createStep(text) {
 }
 
 test("xAI tool synthesis runs for partial sourced answers", () => {
+  assert.equal(
+    getSourceBackedPromptQuery("xai/grok-4.3", sourcePromptMessages),
+    sourcePromptMessages[0].content
+  )
+
   assert.equal(
     shouldForceToolSynthesisStep({
       model: "xai/grok-4.3",
