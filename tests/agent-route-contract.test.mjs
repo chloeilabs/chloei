@@ -159,15 +159,10 @@ test("agent runtime keeps Grok chat toolsets focused", async () => {
     /createAiSdkFinanceDataEvidenceContext/,
     "Expected Grok finance requests to prefetch finance evidence outside the model tool loop."
   )
-  assert.match(
+  assert.doesNotMatch(
     runtimeSource,
-    /XAI_CHAT_MAX_OUTPUT_TOKENS\s*=\s*4096/,
-    "Expected Grok chat requests to receive an explicit output budget."
-  )
-  assert.match(
-    runtimeSource,
-    /maxOutputTokens !== undefined \? \{ maxOutputTokens \} : \{\}/,
-    "Expected the runtime to pass explicit maxOutputTokens when configured."
+    /XAI_CHAT_MAX_OUTPUT_TOKENS|resolveMaxOutputTokens|maxOutputTokens/,
+    "Expected Grok chat requests to share the uncapped output budget used by other chat models."
   )
 })
 

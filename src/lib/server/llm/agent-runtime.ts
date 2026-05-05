@@ -147,7 +147,6 @@ const FINAL_SYNTHESIS_STEP_INSTRUCTION = [
   "Use the tool results and sources already gathered to write the final answer now.",
   "If the available evidence is incomplete, state the limitation directly and answer with the best supported facts; do not ask the user to retry.",
 ].join(" ")
-const XAI_CHAT_MAX_OUTPUT_TOKENS = 4096
 const XAI_PREFETCH_MAX_QUERY_CHARS = 500
 const XAI_WEB_PREFETCH_PATTERN =
   /\b(latest|current|today|recent|news|source|sources|cite|citation|link|look up|lookup|verify|check the web|right now|this week|this month)\b/i
@@ -215,21 +214,6 @@ function shouldEnableModelToolCalling(
     (runtimeProfile.id === "chat_default" ||
       runtimeProfile.id === "finance_analysis")
   )
-}
-
-function resolveMaxOutputTokens(
-  model: ModelType,
-  runtimeProfile: AgentRuntimeProfile
-): number | undefined {
-  if (
-    model.startsWith("xai/") &&
-    (runtimeProfile.id === "chat_default" ||
-      runtimeProfile.id === "finance_analysis")
-  ) {
-    return XAI_CHAT_MAX_OUTPUT_TOKENS
-  }
-
-  return undefined
 }
 
 function getUsageLogFields(usage: LanguageModelUsage | undefined) {
@@ -457,7 +441,6 @@ export async function* startAgentRuntimeStream(
       params.model,
       runtimeProfile
     )
-    const maxOutputTokens = resolveMaxOutputTokens(params.model, runtimeProfile)
     let prefetchedWebEvidence: string | null = null
     let prefetchedFinanceEvidence: string | null = null
 
@@ -666,7 +649,6 @@ export async function* startAgentRuntimeStream(
       runtimeProfile: runtimeProfile.id,
       toolCount: toolNames.length,
       toolNames,
-      maxOutputTokens,
       ambientFinanceToolsEnabled,
       codeExecutionToolsEnabled,
       modelToolCallingEnabled,
@@ -689,7 +671,6 @@ export async function* startAgentRuntimeStream(
       ...(params.temperature !== undefined
         ? { temperature: params.temperature }
         : {}),
-      ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
       providerOptions: getAiSdkGatewayProviderOptionsForMode({
         deepResearch: runtimeProfile.id === "deep_research",
       }),
