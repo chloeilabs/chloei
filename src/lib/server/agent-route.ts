@@ -681,7 +681,11 @@ export function createAgentStreamResponse(
         sawTerminalAgentStatus: false,
         textChunkCount: 0,
         textCharCount: 0,
+        sourceCount: 0,
         toolOutputCount: 0,
+        toolErrorCount: 0,
+        toolCallIds: new Set<string>(),
+        completedToolCallIds: new Set<string>(),
       }
       let streamOutcome = "completed"
 
@@ -729,10 +733,23 @@ export function createAgentStreamResponse(
             }
           } else if (event.type !== "agent_status") {
             streamState.hasStructuredOutput = true
+            if (event.type === "source") {
+              streamState.sourceCount += 1
+            }
             if (event.type === "tool_call" || event.type === "tool_result") {
               streamState.hasToolOutput = true
+              if (event.callId) {
+                if (event.type === "tool_call") {
+                  streamState.toolCallIds.add(event.callId)
+                } else {
+                  streamState.completedToolCallIds.add(event.callId)
+                }
+              }
               if (event.type === "tool_result") {
                 streamState.toolOutputCount += 1
+                if (event.status === "error") {
+                  streamState.toolErrorCount += 1
+                }
               }
             }
           }
@@ -772,8 +789,13 @@ export function createAgentStreamResponse(
           handleEvent(event)
         }
 
+        const hasUnresolvedToolCalls =
+          streamState.toolCallIds.size > streamState.completedToolCallIds.size
         const completedWithoutAnswer = !streamState.hasMeaningfulText
-        if (completedWithoutAnswer) {
+        const completedWithToolIssue =
+          !completedWithoutAnswer &&
+          (hasUnresolvedToolCalls || streamState.toolErrorCount > 0)
+        if (completedWithoutAnswer || completedWithToolIssue) {
           const fallbackText = streamState.hasStructuredOutput
             ? streamState.hasToolOutput
               ? TOOL_OUTPUT_ONLY_FALLBACK_TEXT
@@ -782,18 +804,23 @@ export function createAgentStreamResponse(
           streamOutcome = streamState.hasStructuredOutput
             ? "incomplete"
             : streamOutcome
+          const prefix = streamState.hasTextChunk ? "\n\n" : ""
+          const delta = completedWithToolIssue
+            ? `${prefix}${TOOL_OUTPUT_ONLY_FALLBACK_TEXT}`
+            : fallbackText
           streamState.hasTextChunk = true
           streamState.hasMeaningfulText = true
           streamState.textChunkCount += 1
-          streamState.textCharCount += fallbackText.length
-          enqueueEvent(textDeltaEvent(fallbackText))
+          streamState.textCharCount += delta.length
+          enqueueEvent(textDeltaEvent(delta))
         }
 
         if (!streamState.sawTerminalAgentStatus) {
           handleEvent({
             type: "agent_status",
             status:
-              completedWithoutAnswer && streamState.hasStructuredOutput
+              (completedWithoutAnswer || completedWithToolIssue) &&
+              streamState.hasStructuredOutput
                 ? "incomplete"
                 : "completed",
           })
@@ -868,7 +895,12 @@ export function createAgentStreamResponse(
           hadStructuredOutput: streamState.hasStructuredOutput,
           textChunkCount: streamState.textChunkCount,
           textCharCount: streamState.textCharCount,
+          sourceCount: streamState.sourceCount,
           toolOutputCount: streamState.toolOutputCount,
+          toolErrorCount: streamState.toolErrorCount,
+          unresolvedToolCallCount:
+            streamState.toolCallIds.size -
+            streamState.completedToolCallIds.size,
         })
         await settleStream()
         closeController()

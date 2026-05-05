@@ -85,6 +85,37 @@ function ToolStatusIcon({ status }: { status: ToolInvocationStatus }) {
   return <CircleX className="size-3.5 shrink-0 text-red-600" />
 }
 
+function SourceList({
+  sources,
+  showFavicon,
+}: {
+  sources: ReturnType<typeof getDedupedSources>
+  showFavicon: boolean
+}) {
+  if (sources.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {sources.map((source) => (
+        <Source href={source.url} key={`${source.id}:${source.url}`}>
+          <SourceTrigger
+            label={source.title}
+            showFavicon={showFavicon}
+            className="max-w-full"
+          />
+          <SourceContent
+            title={source.title}
+            description={source.url}
+            showFavicon={showFavicon}
+          />
+        </Source>
+      ))}
+    </div>
+  )
+}
+
 export function AssistantMessage({ message }: { message: Message }) {
   const content = useMemo(() => getAssistantContent(message), [message])
   const [activityVisibility, setActivityVisibility] = useState<
@@ -205,25 +236,10 @@ export function AssistantMessage({ message }: { message: Message }) {
                       key={entry.id}
                       className="rounded-none border bg-muted/40 px-2.5 py-2"
                     >
-                      <div className="flex flex-wrap gap-1.5">
-                        {entry.sources.map((source) => (
-                          <Source
-                            href={source.url}
-                            key={`${source.id}:${source.url}`}
-                          >
-                            <SourceTrigger
-                              label={source.title}
-                              showFavicon={showSourceFavicon}
-                              className="max-w-full"
-                            />
-                            <SourceContent
-                              title={source.title}
-                              description={source.url}
-                              showFavicon={showSourceFavicon}
-                            />
-                          </Source>
-                        ))}
-                      </div>
+                      <SourceList
+                        sources={entry.sources}
+                        showFavicon={showSourceFavicon}
+                      />
                     </div>
                   )
                 }
@@ -253,6 +269,15 @@ export function AssistantMessage({ message }: { message: Message }) {
             showSourceFavicon={showSourceFavicon}
             sources={sources}
           />
+        </div>
+      )}
+
+      {sources.length > 0 && (
+        <div className="px-3 pb-2">
+          <div className="mb-1 font-departureMono text-[11px] font-medium tracking-wide text-muted-foreground/80">
+            Sources
+          </div>
+          <SourceList sources={sources} showFavicon={showSourceFavicon} />
         </div>
       )}
 

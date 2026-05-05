@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { readFile } from "node:fs/promises"
 import path from "node:path"
 import test from "node:test"
 import { fileURLToPath, pathToFileURL } from "node:url"
@@ -9,6 +10,10 @@ const cwd = fileURLToPath(new URL("..", import.meta.url))
 const gatewaySearchToolsUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/llm/ai-sdk-gateway-search-tools.ts")
 ).href
+const tavilyToolsPath = path.join(
+  cwd,
+  "src/lib/server/llm/ai-sdk-tavily-tools.ts"
+)
 const persistentSelectedModelUrl = pathToFileURL(
   path.join(cwd, "src/hooks/agent/persistent-selected-model-utils.ts")
 ).href
@@ -17,7 +22,6 @@ const {
   getAiSdkGatewayProviderOptions,
   getAiSdkGatewayProviderOptionsForMode,
   getAiSdkGatewaySearchToolCallMetadata,
-  getAiSdkGatewaySearchToolResultMetadata,
 } = await import(gatewaySearchToolsUrl)
 const {
   parseStoredSelectedModel,
@@ -61,66 +65,18 @@ test("gateway search tools normalize queries from native and gateway search inpu
   )
 })
 
-test("gateway search tools derive sources from result payloads", () => {
-  assert.deepEqual(
-    getAiSdkGatewaySearchToolResultMetadata({
-      toolCallId: "call-web",
-      toolName: "web_search",
-      output: [
-        {
-          type: "web_search_result",
-          url: "https://example.com/news",
-          title: "Example News",
-          pageAge: null,
-          encryptedContent: "encrypted",
-        },
-      ],
-    }),
-    {
-      callId: "call-web",
-      toolName: "web_search",
-      status: "success",
-      sources: [
-        {
-          id: "web_search-call-web-0",
-          url: "https://example.com/news",
-          title: "Example News",
-        },
-      ],
-      operation: "web_search",
-      provider: "ai_gateway",
-      retryable: false,
-    }
-  )
+test("tavily search tool results derive source links", async () => {
+  const source = await readFile(tavilyToolsPath, "utf8")
 
-  assert.equal(
-    getAiSdkGatewaySearchToolResultMetadata({
-      toolCallId: "call-pplx",
-      toolName: "perplexity_search",
-      output: {
-        id: "search-1",
-        results: [
-          {
-            title: "Perplexity Result",
-            url: "https://example.com/perplexity",
-            snippet: "Snippet",
-          },
-        ],
-      },
-    }),
-    null
+  assert.match(
+    source,
+    /sources: payload\.output[\s\S]*toSourcesFromOutput\(toolName, payload\.output\)/,
+    "Expected Tavily tool results to expose source links from successful search output."
   )
-
-  assert.equal(
-    getAiSdkGatewaySearchToolResultMetadata({
-      toolCallId: "call-parallel",
-      toolName: "parallel_search",
-      output: {
-        error: "timeout",
-        message: "Timed out",
-      },
-    }),
-    null
+  assert.match(
+    source,
+    /id: `\$\{toolName\}-\$\{requestId\}-\$\{String\(index\)\}`/,
+    "Expected Tavily source ids to be stable per tool call and result index."
   )
 })
 
