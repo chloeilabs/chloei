@@ -645,10 +645,11 @@ export function useAgentSession({
     (
       message: string,
       model: ModelType,
-      _queue: boolean,
+      queue: boolean,
       runMode: AgentRunMode = "chat",
       attachments: AgentRequestAttachment[] = []
     ) => {
+      void queue
       const trimmedMessage = message.trim()
       if (!trimmedMessage) {
         return

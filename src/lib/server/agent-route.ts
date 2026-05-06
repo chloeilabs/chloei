@@ -743,20 +743,18 @@ export function createAgentStreamResponse(
             if (event.type === "source") {
               streamState.sourceCount += 1
             }
-            if (event.type === "tool_call" || event.type === "tool_result") {
+            if (event.type === "tool_call" && event.callId) {
+              streamState.toolCallIds.add(event.callId)
+            }
+
+            if (event.type === "tool_result") {
+              streamState.hasToolOutput = true
+              streamState.toolOutputCount += 1
               if (event.callId) {
-                if (event.type === "tool_call") {
-                  streamState.toolCallIds.add(event.callId)
-                } else {
-                  streamState.completedToolCallIds.add(event.callId)
-                }
+                streamState.completedToolCallIds.add(event.callId)
               }
-              if (event.type === "tool_result") {
-                streamState.hasToolOutput = true
-                streamState.toolOutputCount += 1
-                if (event.status === "error") {
-                  streamState.toolErrorCount += 1
-                }
+              if (event.status === "error") {
+                streamState.toolErrorCount += 1
               }
             }
           }

@@ -20,7 +20,7 @@ test("home animated prompt forwards attachments from the initial prompt", async 
   )
 
   const forwardedCalls = source.match(
-    /handlePromptSubmit\(message,\s*model,[\s\S]*?attachments\)/g
+    /handlePromptSubmit\(message,\s*model,\s*isStreaming,\s*runMode,\s*attachments\)/g
   )
   assert.equal(
     forwardedCalls?.length,
@@ -44,5 +44,15 @@ test("prompt submissions queue while the submit lock is still active", async () 
     source,
     /if \(queue && submitLockRef\.current\)/,
     "Expected queueing to depend on the actual submit lock, not only the PromptForm streaming prop."
+  )
+  assert.doesNotMatch(
+    source,
+    /if \(queue && submitLockRef\.current\)/,
+    "Expected queueing to depend on the actual submit lock, not only the PromptForm streaming prop."
+  )
+  assert.match(
+    source,
+    /void queue/,
+    "Expected the PromptForm streaming argument to be intentionally ignored by session submission."
   )
 })
