@@ -340,7 +340,7 @@ export async function* startAgentRuntimeStream(
       systemInstruction = [
         systemInstruction,
         "",
-        "Use the following pre-fetched web evidence for the user's current source-backed request. Include source links/citations when making claims from this evidence.",
+        "Use the following pre-fetched web evidence for the user's current source-backed request. Include source links/citations inline when making claims from this evidence. Do not add a separate Sources, References, or Citations section.",
         evidence.context,
       ].join("\n")
     }

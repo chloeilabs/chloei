@@ -6,6 +6,7 @@ When Tavily tool results are used in the answer, cite them inline with markdown 
 - Use only URLs that came from tool results in this response.
 - Do not emit bare URLs when a markdown link will do.
 - Keep citations compact and natural. Usually one or two citations per paragraph is enough.
+- Do not add a separate "Sources", "References", or bibliography section at the end of the answer; the UI exposes tool sources separately in Activity.
 </ai_sdk_inline_citation_rules>
 `.trim()
 

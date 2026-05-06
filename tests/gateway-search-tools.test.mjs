@@ -102,6 +102,21 @@ test("gateway provider options request the strongest supported reasoning levels"
   )
 })
 
+test("inline citation instructions avoid separate sources sections", async () => {
+  const source = await import("node:fs/promises").then((fs) =>
+    fs.readFile(
+      path.join(cwd, "src/lib/server/llm/system-instruction-augmentations.ts"),
+      "utf8"
+    )
+  )
+
+  assert.match(
+    source,
+    /Do not add a separate "Sources", "References", or bibliography section/,
+    "Expected source-backed answers to rely on inline citations and Activity instead of a footer."
+  )
+})
+
 test("stale and legacy default model ids fall back to GPT-5.5", () => {
   assert.equal(parseStoredSelectedModel("qwen/qwen3.6-plus"), null)
   assert.equal(parseStoredSelectedModel("anthropic/claude-sonnet-4.6"), null)
