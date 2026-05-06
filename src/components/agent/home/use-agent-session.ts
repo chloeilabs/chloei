@@ -158,23 +158,29 @@ export function useAgentSession({
         return
       }
 
-      setState({
-        messages: activeThread.messages,
-        isSubmitting: false,
-        isStreaming: false,
+      const activeMessages = activeThread.messages
+      const activeId = currentThreadId
+      queueMicrotask(() => {
+        setState({
+          messages: activeMessages,
+          isSubmitting: false,
+          isStreaming: false,
+        })
+        messagesRef.current = activeMessages
+        pruneThreadAttachmentPayloads(
+          attachmentPayloadsRef.current,
+          activeId,
+          activeMessages
+        )
       })
-      messagesRef.current = activeThread.messages
-      pruneThreadAttachmentPayloads(
-        attachmentPayloadsRef.current,
-        currentThreadId,
-        activeThread.messages
-      )
       return
     }
 
-    setState(INITIAL_STATE)
-    messagesRef.current = []
-    attachmentPayloadsRef.current.clear()
+    queueMicrotask(() => {
+      setState(INITIAL_STATE)
+      messagesRef.current = []
+      attachmentPayloadsRef.current.clear()
+    })
   }, [activeThread, currentThreadId])
 
   useEffect(() => {

@@ -11,6 +11,8 @@ export function ScrollToBottom() {
   const manualScrollInFlightRef = useRef(false)
   const { isAtBottom } = stickToBottom
 
+  /* use-stick-to-bottom: temporarily overrides targetScrollTop for a one-off scroll */
+  /* eslint-disable react-hooks/immutability -- library mutates context object by design */
   const handleScrollToBottom = useCallback(async () => {
     if (manualScrollInFlightRef.current) {
       return
@@ -27,6 +29,7 @@ export function ScrollToBottom() {
       manualScrollInFlightRef.current = false
     }
   }, [stickToBottom])
+  /* eslint-enable react-hooks/immutability */
 
   return (
     <Tooltip disableHoverableContent={isAtBottom}>

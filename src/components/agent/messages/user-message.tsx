@@ -146,22 +146,31 @@ export function UserMessage({
   const attachments = message.metadata?.attachments ?? []
 
   useEffect(() => {
-    setEditValue(message.content)
+    const content = message.content
+    queueMicrotask(() => {
+      setEditValue(content)
+    })
   }, [message.content])
 
   useEffect(() => {
-    setSelectedModel(initialModel)
+    queueMicrotask(() => {
+      setSelectedModel(initialModel)
+    })
   }, [initialModel])
 
   useEffect(() => {
-    setRunMode(initialRunMode)
+    queueMicrotask(() => {
+      setRunMode(initialRunMode)
+    })
   }, [initialRunMode])
 
   useEffect(() => {
     if (messageContentRef.current) {
-      setIsContentOverflowing(
+      const overflowing =
         messageContentRef.current.scrollHeight > MAX_CONTENT_HEIGHT
-      )
+      queueMicrotask(() => {
+        setIsContentOverflowing(overflowing)
+      })
     }
   }, [message.content])
 
