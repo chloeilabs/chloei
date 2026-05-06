@@ -359,7 +359,7 @@ export async function* startAgentRuntimeStream(
           type: "tool_result",
           callId: prefetchCallId,
           toolName: "tavily_search",
-          status: "success",
+          status: "error",
           operation: "prefetch",
           provider: "tavily",
           errorCode: "TAVILY_PREFETCH_FAILED",
