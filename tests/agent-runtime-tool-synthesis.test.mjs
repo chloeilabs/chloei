@@ -126,4 +126,9 @@ test("xAI source prefetch failure is treated as non-blocking", async () => {
     /operation: "prefetch"[\s\S]*status: "error"/,
     "Expected failed prefetch to emit a matching error result."
   )
+  assert.match(
+    source,
+    /XAI_SOURCE_PREFETCH_TIMEOUT_MS[\s\S]*withTimeout\([\s\S]*createAiSdkTavilyEvidenceContext/,
+    "Expected xAI Tavily prefetch to have a bounded timeout before model streaming."
+  )
 })

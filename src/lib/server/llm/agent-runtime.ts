@@ -77,6 +77,8 @@ const aiGatewayFetch: typeof fetch = (input, init) =>
     dispatcher: aiGatewayDispatcher,
   } as UndiciRequestInit)
 
+const XAI_SOURCE_PREFETCH_TIMEOUT_MS = 8_000
+
 export type AgentRuntimeProfileId =
   | "chat_default"
   | "deep_research"
@@ -198,6 +200,29 @@ function getUsageLogFields(usage: LanguageModelUsage | undefined) {
   }
 }
 
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(Object.assign(new Error(message), { name: "TimeoutError" }))
+    }, timeoutMs)
+
+    promise.then(
+      (value) => {
+        clearTimeout(timeoutId)
+        resolve(value)
+      },
+      (error: unknown) => {
+        clearTimeout(timeoutId)
+        reject(error instanceof Error ? error : new Error(String(error)))
+      }
+    )
+  })
+}
+
 export async function* startAgentRuntimeStream(
   params: StartAgentRuntimeStreamParams
 ): AsyncGenerator<AgentStreamEvent> {
@@ -312,10 +337,14 @@ export async function* startAgentRuntimeStream(
       }
 
       try {
-        const evidence = await createAiSdkTavilyEvidenceContext({
-          apiKey: normalizedTavilyApiKey,
-          query: prefetchQuery,
-        })
+        const evidence = await withTimeout(
+          createAiSdkTavilyEvidenceContext({
+            apiKey: normalizedTavilyApiKey,
+            query: prefetchQuery,
+          }),
+          XAI_SOURCE_PREFETCH_TIMEOUT_MS,
+          "Tavily source prefetch timed out."
+        )
 
         toolResultStatuses.set(prefetchCallId, "success")
         yield {
