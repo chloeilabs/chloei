@@ -20,12 +20,17 @@ test("home animated prompt forwards attachments from the initial prompt", async 
   )
 
   const forwardedCalls = source.match(
-    /handlePromptSubmit\(message,\s*model,\s*_isStreaming,\s*runMode,\s*attachments\)/g
+    /handlePromptSubmit\(message,\s*model,\s*runMode,\s*attachments\)/g
   )
   assert.equal(
     forwardedCalls?.length,
-    3,
+    4,
     "Expected every animated prompt branch to forward attachments."
+  )
+  assert.match(
+    source,
+    /const handlePromptFormSubmit = useCallback\([\s\S]*handlePromptSubmit\(message,\s*model,\s*runMode,\s*attachments\)/,
+    "Expected PromptForm's streaming argument to be adapted outside the session hook."
   )
 })
 

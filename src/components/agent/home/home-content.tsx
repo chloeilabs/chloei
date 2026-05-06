@@ -181,6 +181,19 @@ export function HomePageContent({
     handleEditMessage,
   } = useAgentSession(threadStore)
 
+  const handlePromptFormSubmit = useCallback(
+    (
+      message: string,
+      model: ModelType,
+      _isStreaming: boolean,
+      runMode: AgentRunMode,
+      attachments: AgentRequestAttachment[] = []
+    ) => {
+      handlePromptSubmit(message, model, runMode, attachments)
+    },
+    [handlePromptSubmit]
+  )
+
   const hasMessages = state.messages.length > 0
   const fallbackTransitionMs = isMobile
     ? MOBILE_FALLBACK_TRANSITION_MS
@@ -286,7 +299,7 @@ export function HomePageContent({
     ) => {
       if (isMobile) {
         startFallbackConversationTransition()
-        handlePromptSubmit(message, model, _isStreaming, runMode, attachments)
+        handlePromptSubmit(message, model, runMode, attachments)
         return
       }
 
@@ -301,13 +314,13 @@ export function HomePageContent({
 
       if (!startViewTransition) {
         startFallbackConversationTransition()
-        handlePromptSubmit(message, model, _isStreaming, runMode, attachments)
+        handlePromptSubmit(message, model, runMode, attachments)
         return
       }
 
       startViewTransition(() => {
         flushSync(() => {
-          handlePromptSubmit(message, model, _isStreaming, runMode, attachments)
+          handlePromptSubmit(message, model, runMode, attachments)
         })
       })
     },
@@ -574,7 +587,7 @@ export function HomePageContent({
 
               <PromptForm
                 isHome
-                onSubmit={handlePromptSubmit}
+                onSubmit={handlePromptFormSubmit}
                 onStopStream={handleStopStream}
                 dockToBottomOnHome
                 queuedMessage={queuedSubmission?.message ?? null}
