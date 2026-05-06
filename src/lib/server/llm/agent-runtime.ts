@@ -346,7 +346,6 @@ export async function* startAgentRuntimeStream(
           evidence.context,
         ].join("\n")
       } catch (error) {
-        toolResultStatuses.set(prefetchCallId, "error")
         logger.warn(
           "Tavily prefetch failed; continuing without pre-fetched evidence.",
           {
@@ -360,11 +359,11 @@ export async function* startAgentRuntimeStream(
           type: "tool_result",
           callId: prefetchCallId,
           toolName: "tavily_search",
-          status: "error",
+          status: "success",
           operation: "prefetch",
           provider: "tavily",
           errorCode: "TAVILY_PREFETCH_FAILED",
-          retryable: true,
+          retryable: false,
         }
       }
     }

@@ -280,14 +280,13 @@ export function HomePageContent({
     (
       message: string,
       model: ModelType,
-      isStreaming: boolean,
+      _isStreaming: boolean,
       runMode: AgentRunMode,
       attachments: AgentRequestAttachment[] = []
     ) => {
-      void isStreaming
       if (isMobile) {
         startFallbackConversationTransition()
-        handlePromptSubmit(message, model, isStreaming, runMode, attachments)
+        handlePromptSubmit(message, model, _isStreaming, runMode, attachments)
         return
       }
 
@@ -302,13 +301,13 @@ export function HomePageContent({
 
       if (!startViewTransition) {
         startFallbackConversationTransition()
-        handlePromptSubmit(message, model, isStreaming, runMode, attachments)
+        handlePromptSubmit(message, model, _isStreaming, runMode, attachments)
         return
       }
 
       startViewTransition(() => {
         flushSync(() => {
-          handlePromptSubmit(message, model, isStreaming, runMode, attachments)
+          handlePromptSubmit(message, model, _isStreaming, runMode, attachments)
         })
       })
     },

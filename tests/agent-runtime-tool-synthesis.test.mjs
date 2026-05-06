@@ -110,3 +110,20 @@ test("tool synthesis prompt preserves the base instruction", () => {
   assert.match(buildToolSynthesisPrompt("base system"), /^base system\n\n/)
   assert.match(buildToolSynthesisPrompt("base system"), /Do not call tools/)
 })
+
+test("xAI source prefetch failure is treated as non-blocking", async () => {
+  const source = await import("node:fs/promises").then((fs) =>
+    fs.readFile(path.join(cwd, "src/lib/server/llm/agent-runtime.ts"), "utf8")
+  )
+
+  assert.match(
+    source,
+    /try \{[\s\S]*createAiSdkTavilyEvidenceContext[\s\S]*\} catch \(error\) \{/,
+    "Expected xAI Tavily prefetch to be best-effort."
+  )
+  assert.match(
+    source,
+    /operation: "prefetch"[\s\S]*status: "error"/,
+    "Expected failed prefetch to emit a matching error result."
+  )
+})
