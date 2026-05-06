@@ -725,6 +725,111 @@ test("agent helper streams fallback output when the model yields no content", as
   })
 })
 
+test("agent helper marks tool-backed partial output incomplete when a tool call is unresolved", async () => {
+  setTestMocks({
+    gatewayResponses: {
+      startGatewayResponseStream(params) {
+        recorded.streamParams.push(params)
+        return (async function* () {
+          yield {
+            type: "tool_call",
+            callId: "call-search",
+            toolName: "tavily_search",
+            label: "Searching web",
+            query: "Vercel AI Gateway",
+          }
+          yield {
+            type: "text_delta",
+            delta: "One current fact is available.",
+          }
+        })()
+      },
+    },
+  })
+
+  const response = createAgentStreamResponse({
+    request: createRequest(),
+    requestId: "request-unresolved-tool",
+    timeoutMs: 30_000,
+    selectedModel: "xai/grok-4.3",
+    runMode: "chat",
+    aiGatewayApiKey: "ai-gateway-key",
+    tavilyApiKey: "tavily-key",
+    messages: [{ role: "user", content: "Search latest docs" }],
+    systemInstruction: "system",
+  })
+
+  const events = await readNdjsonEvents(response)
+
+  assert.deepEqual(events.at(-2), {
+    type: "text_delta",
+    delta:
+      "\n\nA tool request started, but no tool result was returned before the model stopped. Please retry or narrow the request.",
+  })
+  assert.deepEqual(events.at(-1), {
+    type: "agent_status",
+    status: "incomplete",
+  })
+  assert.equal(recorded.loggerInfos[0]?.details?.outcome, "incomplete")
+  assert.equal(recorded.loggerInfos[0]?.details?.unresolvedToolCallCount, 1)
+})
+
+test("agent helper marks tool-backed partial output incomplete when a tool result errors", async () => {
+  setTestMocks({
+    gatewayResponses: {
+      startGatewayResponseStream(params) {
+        recorded.streamParams.push(params)
+        return (async function* () {
+          yield {
+            type: "tool_call",
+            callId: "call-search",
+            toolName: "tavily_search",
+            label: "Searching web",
+            query: "Vercel AI Gateway",
+          }
+          yield {
+            type: "tool_result",
+            callId: "call-search",
+            toolName: "tavily_search",
+            status: "error",
+            errorCode: "TAVILY_ERROR",
+          }
+          yield {
+            type: "text_delta",
+            delta: "One current fact is available.",
+          }
+        })()
+      },
+    },
+  })
+
+  const response = createAgentStreamResponse({
+    request: createRequest(),
+    requestId: "request-tool-error",
+    timeoutMs: 30_000,
+    selectedModel: "xai/grok-4.3",
+    runMode: "chat",
+    aiGatewayApiKey: "ai-gateway-key",
+    tavilyApiKey: "tavily-key",
+    messages: [{ role: "user", content: "Search latest docs" }],
+    systemInstruction: "system",
+  })
+
+  const events = await readNdjsonEvents(response)
+
+  assert.deepEqual(events.at(-2), {
+    type: "text_delta",
+    delta:
+      "\n\nI gathered tool results, but the model ended before writing a final answer. Please retry or narrow the request; the tool output above is still available for inspection.",
+  })
+  assert.deepEqual(events.at(-1), {
+    type: "agent_status",
+    status: "incomplete",
+  })
+  assert.equal(recorded.loggerInfos[0]?.details?.outcome, "incomplete")
+  assert.equal(recorded.loggerInfos[0]?.details?.toolErrorCount, 1)
+})
+
 test("agent helper turns upstream body timeouts into visible timeout output", async () => {
   setTestMocks({
     gatewayResponses: {

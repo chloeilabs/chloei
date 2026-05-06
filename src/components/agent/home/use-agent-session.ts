@@ -645,7 +645,6 @@ export function useAgentSession({
     (
       message: string,
       model: ModelType,
-      queue: boolean,
       runMode: AgentRunMode = "chat",
       attachments: AgentRequestAttachment[] = []
     ) => {
@@ -654,7 +653,7 @@ export function useAgentSession({
         return
       }
 
-      if (queue && submitLockRef.current) {
+      if (submitLockRef.current) {
         setQueuedSubmission({
           message: trimmedMessage,
           model,

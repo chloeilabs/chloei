@@ -20,11 +20,34 @@ test("home animated prompt forwards attachments from the initial prompt", async 
   )
 
   const forwardedCalls = source.match(
-    /handlePromptSubmit\(message,\s*model,\s*queue,\s*runMode,\s*attachments\)/g
+    /handlePromptSubmit\(message,\s*model,\s*runMode,\s*attachments\)/g
   )
   assert.equal(
     forwardedCalls?.length,
     4,
     "Expected every animated prompt branch to forward attachments."
+  )
+  assert.match(
+    source,
+    /const handlePromptFormSubmit = useCallback\([\s\S]*handlePromptSubmit\(message,\s*model,\s*runMode,\s*attachments\)/,
+    "Expected PromptForm's streaming argument to be adapted outside the session hook."
+  )
+})
+
+test("prompt submissions queue while the submit lock is still active", async () => {
+  const source = await readFile(
+    path.join(cwd, "src/components/agent/home/use-agent-session.ts"),
+    "utf8"
+  )
+
+  assert.match(
+    source,
+    /if \(submitLockRef\.current\) \{[\s\S]*setQueuedSubmission\(\{[\s\S]*message: trimmedMessage,[\s\S]*return[\s\S]*\}/,
+    "Expected follow-up submissions during the stream cleanup window to be queued."
+  )
+  assert.doesNotMatch(
+    source,
+    /if \(queue && submitLockRef\.current\)/,
+    "Expected queueing to depend on the actual submit lock, not only the PromptForm streaming prop."
   )
 })

@@ -23,6 +23,12 @@ import {
   type AgentInputMessage,
   toModelMessages,
 } from "./agent-runtime-messages"
+import { getCompatibleStepMessages } from "./agent-runtime-step-messages"
+import {
+  buildToolSynthesisPrompt,
+  getSourceBackedPromptQuery,
+  shouldForceToolSynthesisStep,
+} from "./agent-runtime-tool-synthesis"
 import {
   createAiSdkFinanceDataTools,
   getAiSdkFinanceDataToolCallMetadata,
@@ -38,6 +44,7 @@ import {
   isAiSdkGatewaySearchToolName,
 } from "./ai-sdk-gateway-search-tools"
 import {
+  createAiSdkTavilyEvidenceContext,
   createAiSdkTavilyTools,
   getAiSdkTavilyToolCallMetadata,
   getAiSdkTavilyToolResultMetadata,
@@ -69,6 +76,8 @@ const aiGatewayFetch: typeof fetch = (input, init) =>
     ...init,
     dispatcher: aiGatewayDispatcher,
   } as UndiciRequestInit)
+
+const XAI_SOURCE_PREFETCH_TIMEOUT_MS = 8_000
 
 export type AgentRuntimeProfileId =
   | "chat_default"
@@ -191,6 +200,29 @@ function getUsageLogFields(usage: LanguageModelUsage | undefined) {
   }
 }
 
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(Object.assign(new Error(message), { name: "TimeoutError" }))
+    }, timeoutMs)
+
+    promise.then(
+      (value) => {
+        clearTimeout(timeoutId)
+        resolve(value)
+      },
+      (error: unknown) => {
+        clearTimeout(timeoutId)
+        reject(error instanceof Error ? error : new Error(String(error)))
+      }
+    )
+  })
+}
+
 export async function* startAgentRuntimeStream(
   params: StartAgentRuntimeStreamParams
 ): AsyncGenerator<AgentStreamEvent> {
@@ -215,6 +247,10 @@ export async function* startAgentRuntimeStream(
   const finalizedToolCalls = new Set<string>()
   const seenSourceKeys = new Set<string>()
   const sanitizeInitialReasoningChunk = createInitialReasoningChunkSanitizer()
+  const toolResultStatuses = new Map<string, "success" | "error">()
+  let sourceCount = 0
+  let textCharCount = 0
+  let toolSynthesisStepUsed = false
 
   const createSourceEvent = (
     id: string,
@@ -229,6 +265,7 @@ export async function* startAgentRuntimeStream(
     }
 
     seenSourceKeys.add(key)
+    sourceCount += 1
     return getSourceEvent(id, normalizedUrl, normalizedTitle)
   }
 
@@ -285,7 +322,80 @@ export async function* startAgentRuntimeStream(
       toolCount: toolNames.length,
       toolNames,
     })
-    const systemInstruction = params.systemInstruction
+    let systemInstruction = params.systemInstruction
+    const prefetchQuery = getSourceBackedPromptQuery(params.model, messages)
+    if (prefetchQuery && normalizedTavilyApiKey) {
+      const prefetchCallId = `prefetch-tavily-${randomUUID()}`
+      yield {
+        type: "tool_call",
+        callId: prefetchCallId,
+        toolName: "tavily_search",
+        label: "Searching with Tavily",
+        query: prefetchQuery,
+        operation: "prefetch",
+        provider: "tavily",
+      }
+
+      try {
+        const evidence = await withTimeout(
+          createAiSdkTavilyEvidenceContext({
+            apiKey: normalizedTavilyApiKey,
+            query: prefetchQuery,
+          }),
+          XAI_SOURCE_PREFETCH_TIMEOUT_MS,
+          "Tavily source prefetch timed out."
+        )
+
+        toolResultStatuses.set(prefetchCallId, "success")
+        yield {
+          type: "tool_result",
+          callId: prefetchCallId,
+          toolName: "tavily_search",
+          status: "success",
+          operation: "prefetch",
+          provider: "tavily",
+          retryable: false,
+        }
+
+        for (const source of evidence.sources) {
+          const sourceEvent = createSourceEvent(
+            source.id,
+            source.url,
+            source.title
+          )
+          if (sourceEvent) {
+            yield sourceEvent
+          }
+        }
+
+        systemInstruction = [
+          systemInstruction,
+          "",
+          "Use the following pre-fetched web evidence for the user's current source-backed request. Include source links/citations inline when making claims from this evidence. Do not add a separate Sources, References, or Citations section.",
+          evidence.context,
+        ].join("\n")
+      } catch (error) {
+        logger.warn(
+          "Tavily prefetch failed; continuing without pre-fetched evidence.",
+          {
+            requestId: params.requestId,
+            model: params.model,
+            error,
+            errorCode: "TAVILY_PREFETCH_FAILED",
+          }
+        )
+        yield {
+          type: "tool_result",
+          callId: prefetchCallId,
+          toolName: "tavily_search",
+          status: "error",
+          operation: "prefetch",
+          provider: "tavily",
+          errorCode: "TAVILY_PREFETCH_FAILED",
+          retryable: false,
+        }
+      }
+    }
 
     const result = streamText({
       model: gatewayProvider(params.model),
@@ -299,13 +409,63 @@ export async function* startAgentRuntimeStream(
         deepResearch: runtimeProfile.id === "deep_research",
       }),
       tools,
-      prepareStep: ({ stepNumber }) =>
-        shouldForceFinalSynthesisStep(stepNumber, runtimeProfile.toolMaxSteps)
-          ? {
-              toolChoice: "none",
-              system: `${systemInstruction}\n\n${FINAL_SYNTHESIS_STEP_INSTRUCTION}`,
-            }
-          : undefined,
+      prepareStep: ({ messages: stepMessages, stepNumber, steps }) => {
+        const compatibleMessages = getCompatibleStepMessages(
+          params.model,
+          stepMessages
+        )
+        const forceFinalSynthesis = shouldForceFinalSynthesisStep(
+          stepNumber,
+          runtimeProfile.toolMaxSteps
+        )
+        const toolSynthesisPrompt =
+          !forceFinalSynthesis &&
+          !toolSynthesisStepUsed &&
+          shouldForceToolSynthesisStep({
+            model: params.model,
+            messages,
+            steps,
+            sourceCount,
+            textCharCount,
+            toolResultStatuses,
+          })
+            ? buildToolSynthesisPrompt(systemInstruction)
+            : null
+
+        if (toolSynthesisPrompt) {
+          logger.info("Forcing xAI tool synthesis step.", {
+            requestId: params.requestId,
+            model: params.model,
+            sourceCount,
+            textCharCount,
+            toolResultCount: toolResultStatuses.size,
+          })
+          toolSynthesisStepUsed = true
+        }
+
+        if (
+          !compatibleMessages &&
+          !forceFinalSynthesis &&
+          !toolSynthesisPrompt
+        ) {
+          return undefined
+        }
+
+        return {
+          ...(compatibleMessages ? { messages: compatibleMessages } : {}),
+          ...(forceFinalSynthesis || toolSynthesisPrompt
+            ? {
+                toolChoice: "none" as const,
+                system:
+                  toolSynthesisPrompt ??
+                  `${systemInstruction}\n\n${FINAL_SYNTHESIS_STEP_INSTRUCTION}`,
+                ...(toolSynthesisPrompt
+                  ? { activeTools: [] as (keyof ToolSet)[] }
+                  : {}),
+              }
+            : {}),
+        }
+      },
       stopWhen: stepCountIs(runtimeProfile.toolMaxSteps),
     })
 
@@ -346,6 +506,7 @@ export async function* startAgentRuntimeStream(
 
       if (part.type === "text-delta") {
         if (part.text.length > 0) {
+          textCharCount += part.text.length
           yield { type: "text_delta", delta: part.text }
         }
         continue
@@ -420,6 +581,7 @@ export async function* startAgentRuntimeStream(
         }
 
         finalizedToolCalls.add(metadata.callId)
+        toolResultStatuses.set(metadata.callId, metadata.status)
         yield {
           type: "tool_result",
           callId: metadata.callId,
@@ -469,6 +631,7 @@ export async function* startAgentRuntimeStream(
         !finalizedToolCalls.has(part.toolCallId)
       ) {
         finalizedToolCalls.add(part.toolCallId)
+        toolResultStatuses.set(part.toolCallId, "error")
         const toolName =
           isAiSdkGatewaySearchToolName(part.toolName) ||
           isAiSdkCodeExecutionToolName(part.toolName) ||

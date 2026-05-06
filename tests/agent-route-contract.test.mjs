@@ -91,7 +91,7 @@ test("agent runtime reserves the final loop step for synthesis", async () => {
   )
   assert.match(
     runtimeSource,
-    /prepareStep:\s*\(\{\s*stepNumber\s*\}\)[\s\S]*shouldForceFinalSynthesisStep\(stepNumber,\s*runtimeProfile\.toolMaxSteps\)[\s\S]*toolChoice:\s*"none"/,
+    /prepareStep:\s*\(\{[\s\S]*stepNumber[\s\S]*\}\)[\s\S]*shouldForceFinalSynthesisStep\(\s*stepNumber,\s*runtimeProfile\.toolMaxSteps\s*\)[\s\S]*toolChoice:\s*"none"/,
     "Expected the last permitted model step to disable tools."
   )
   assert.match(
@@ -122,7 +122,7 @@ test("agent runtime gives Grok the same chat toolset as other selected models", 
 
   assert.doesNotMatch(
     runtimeSource,
-    /shouldEnableAmbientFinanceTools|shouldEnableCodeExecutionTools|shouldEnableModelToolCalling|shouldPrefetchWebEvidence|shouldPrefetchFinanceEvidence|model\.startsWith\("xai\/"\)/,
+    /shouldEnableAmbientFinanceTools|shouldEnableCodeExecutionTools|shouldEnableModelToolCalling|shouldPrefetchWebEvidence|shouldPrefetchFinanceEvidence/,
     "Expected Grok to avoid xAI-specific tool suppression or prefetch branches."
   )
   assert.match(
@@ -154,6 +154,26 @@ test("agent runtime gives Grok the same chat toolset as other selected models", 
     runtimeSource,
     /XAI_CHAT_MAX_OUTPUT_TOKENS|resolveMaxOutputTokens|maxOutputTokens/,
     "Expected Grok chat requests to share the uncapped output budget used by other chat models."
+  )
+})
+
+test("agent runtime strips replayed reasoning from Grok tool steps", async () => {
+  const runtimeSource = await readFile(runtimePath, "utf8")
+
+  assert.match(
+    runtimeSource,
+    /getCompatibleStepMessages\(\s*params\.model,\s*stepMessages\s*\)/,
+    "Expected Grok follow-up steps to receive model-compatible prompt messages."
+  )
+  assert.match(
+    runtimeSource,
+    /from "\.\/agent-runtime-step-messages"/,
+    "Expected replayed reasoning cleanup to live in the runtime step-message helper."
+  )
+  assert.match(
+    runtimeSource,
+    /prepareStep:\s*\(\{[\s\S]*messages: stepMessages,[\s\S]*stepNumber[\s\S]*\}\)[\s\S]*messages: compatibleMessages/,
+    "Expected prepared Grok steps to override only the sanitized messages."
   )
 })
 
