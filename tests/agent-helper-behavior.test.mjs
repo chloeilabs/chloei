@@ -764,7 +764,7 @@ test("agent helper marks tool-backed partial output incomplete when a tool call 
   assert.deepEqual(events.at(-2), {
     type: "text_delta",
     delta:
-      "\n\nI gathered tool results, but the model ended before writing a final answer. Please retry or narrow the request; the tool output above is still available for inspection.",
+      "\n\nA tool request started, but no tool result was returned before the model stopped. Please retry or narrow the request.",
   })
   assert.deepEqual(events.at(-1), {
     type: "agent_status",

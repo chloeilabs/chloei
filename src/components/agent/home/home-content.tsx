@@ -280,18 +280,13 @@ export function HomePageContent({
     (
       message: string,
       model: ModelType,
-      queue: boolean,
+      _isStreaming: boolean,
       runMode: AgentRunMode,
       attachments: AgentRequestAttachment[] = []
     ) => {
-      if (queue) {
-        handlePromptSubmit(message, model, queue, runMode, attachments)
-        return
-      }
-
       if (isMobile) {
         startFallbackConversationTransition()
-        handlePromptSubmit(message, model, queue, runMode, attachments)
+        handlePromptSubmit(message, model, _isStreaming, runMode, attachments)
         return
       }
 
@@ -306,13 +301,13 @@ export function HomePageContent({
 
       if (!startViewTransition) {
         startFallbackConversationTransition()
-        handlePromptSubmit(message, model, queue, runMode, attachments)
+        handlePromptSubmit(message, model, _isStreaming, runMode, attachments)
         return
       }
 
       startViewTransition(() => {
         flushSync(() => {
-          handlePromptSubmit(message, model, queue, runMode, attachments)
+          handlePromptSubmit(message, model, _isStreaming, runMode, attachments)
         })
       })
     },

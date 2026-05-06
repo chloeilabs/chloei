@@ -645,7 +645,7 @@ export function useAgentSession({
     (
       message: string,
       model: ModelType,
-      queue: boolean,
+      _queue: boolean,
       runMode: AgentRunMode = "chat",
       attachments: AgentRequestAttachment[] = []
     ) => {

@@ -45,6 +45,8 @@ const STRUCTURED_OUTPUT_ONLY_FALLBACK_TEXT =
   "I produced intermediate output, but the model ended before writing a final answer. Please retry or narrow the request."
 const TOOL_OUTPUT_ONLY_FALLBACK_TEXT =
   "I gathered tool results, but the model ended before writing a final answer. Please retry or narrow the request; the tool output above is still available for inspection."
+const TOOL_CALL_INCOMPLETE_FALLBACK_TEXT =
+  "A tool request started, but no tool result was returned before the model stopped. Please retry or narrow the request."
 
 const DATA_URL_BASE64_PREFIX_PATTERN = /^data:([^;,]+);base64,/i
 const BASE64_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/
@@ -722,6 +724,11 @@ export function createAgentStreamResponse(
         enqueueEvent(textDeltaEvent(fallbackText))
       }
 
+      const getUnresolvedToolCallCount = () =>
+        [...streamState.toolCallIds].filter(
+          (callId) => !streamState.completedToolCallIds.has(callId)
+        ).length
+
       try {
         const handleEvent = (event: AgentStreamEvent) => {
           if (event.type === "text_delta") {
@@ -737,7 +744,6 @@ export function createAgentStreamResponse(
               streamState.sourceCount += 1
             }
             if (event.type === "tool_call" || event.type === "tool_result") {
-              streamState.hasToolOutput = true
               if (event.callId) {
                 if (event.type === "tool_call") {
                   streamState.toolCallIds.add(event.callId)
@@ -746,6 +752,7 @@ export function createAgentStreamResponse(
                 }
               }
               if (event.type === "tool_result") {
+                streamState.hasToolOutput = true
                 streamState.toolOutputCount += 1
                 if (event.status === "error") {
                   streamState.toolErrorCount += 1
@@ -789,8 +796,8 @@ export function createAgentStreamResponse(
           handleEvent(event)
         }
 
-        const hasUnresolvedToolCalls =
-          streamState.toolCallIds.size > streamState.completedToolCallIds.size
+        const unresolvedToolCallCount = getUnresolvedToolCallCount()
+        const hasUnresolvedToolCalls = unresolvedToolCallCount > 0
         const completedWithoutAnswer = !streamState.hasMeaningfulText
         const completedWithToolIssue =
           !completedWithoutAnswer &&
@@ -799,14 +806,20 @@ export function createAgentStreamResponse(
           const fallbackText = streamState.hasStructuredOutput
             ? streamState.hasToolOutput
               ? TOOL_OUTPUT_ONLY_FALLBACK_TEXT
-              : STRUCTURED_OUTPUT_ONLY_FALLBACK_TEXT
+              : hasUnresolvedToolCalls
+                ? TOOL_CALL_INCOMPLETE_FALLBACK_TEXT
+                : STRUCTURED_OUTPUT_ONLY_FALLBACK_TEXT
             : ASSISTANT_EMPTY_RESPONSE_FALLBACK
           streamOutcome = streamState.hasStructuredOutput
             ? "incomplete"
             : streamOutcome
           const prefix = streamState.hasTextChunk ? "\n\n" : ""
           const delta = completedWithToolIssue
-            ? `${prefix}${TOOL_OUTPUT_ONLY_FALLBACK_TEXT}`
+            ? `${prefix}${
+                streamState.hasToolOutput
+                  ? TOOL_OUTPUT_ONLY_FALLBACK_TEXT
+                  : TOOL_CALL_INCOMPLETE_FALLBACK_TEXT
+              }`
             : fallbackText
           streamState.hasTextChunk = true
           streamState.hasMeaningfulText = true
@@ -898,9 +911,7 @@ export function createAgentStreamResponse(
           sourceCount: streamState.sourceCount,
           toolOutputCount: streamState.toolOutputCount,
           toolErrorCount: streamState.toolErrorCount,
-          unresolvedToolCallCount:
-            streamState.toolCallIds.size -
-            streamState.completedToolCallIds.size,
+          unresolvedToolCallCount: getUnresolvedToolCallCount(),
         })
         await settleStream()
         closeController()

@@ -20,11 +20,11 @@ test("home animated prompt forwards attachments from the initial prompt", async 
   )
 
   const forwardedCalls = source.match(
-    /handlePromptSubmit\(message,\s*model,\s*queue,\s*runMode,\s*attachments\)/g
+    /handlePromptSubmit\(message,\s*model,[\s\S]*?attachments\)/g
   )
   assert.equal(
     forwardedCalls?.length,
-    4,
+    3,
     "Expected every animated prompt branch to forward attachments."
   )
 })

@@ -311,38 +311,62 @@ export async function* startAgentRuntimeStream(
         provider: "tavily",
       }
 
-      const evidence = await createAiSdkTavilyEvidenceContext({
-        apiKey: normalizedTavilyApiKey,
-        query: prefetchQuery,
-      })
+      try {
+        const evidence = await createAiSdkTavilyEvidenceContext({
+          apiKey: normalizedTavilyApiKey,
+          query: prefetchQuery,
+        })
 
-      yield {
-        type: "tool_result",
-        callId: prefetchCallId,
-        toolName: "tavily_search",
-        status: "success",
-        operation: "prefetch",
-        provider: "tavily",
-        retryable: false,
-      }
+        toolResultStatuses.set(prefetchCallId, "success")
+        yield {
+          type: "tool_result",
+          callId: prefetchCallId,
+          toolName: "tavily_search",
+          status: "success",
+          operation: "prefetch",
+          provider: "tavily",
+          retryable: false,
+        }
 
-      for (const source of evidence.sources) {
-        const sourceEvent = createSourceEvent(
-          source.id,
-          source.url,
-          source.title
+        for (const source of evidence.sources) {
+          const sourceEvent = createSourceEvent(
+            source.id,
+            source.url,
+            source.title
+          )
+          if (sourceEvent) {
+            yield sourceEvent
+          }
+        }
+
+        systemInstruction = [
+          systemInstruction,
+          "",
+          "Use the following pre-fetched web evidence for the user's current source-backed request. Include source links/citations inline when making claims from this evidence. Do not add a separate Sources, References, or Citations section.",
+          evidence.context,
+        ].join("\n")
+      } catch (error) {
+        toolResultStatuses.set(prefetchCallId, "error")
+        logger.warn(
+          "Tavily prefetch failed; continuing without pre-fetched evidence.",
+          {
+            requestId: params.requestId,
+            model: params.model,
+            error,
+            errorCode: "TAVILY_PREFETCH_FAILED",
+          }
         )
-        if (sourceEvent) {
-          yield sourceEvent
+        yield {
+          type: "tool_result",
+          callId: prefetchCallId,
+          toolName: "tavily_search",
+          status: "error",
+          operation: "prefetch",
+          provider: "tavily",
+          errorCode: "TAVILY_PREFETCH_FAILED",
+          retryable: true,
         }
       }
-
-      systemInstruction = [
-        systemInstruction,
-        "",
-        "Use the following pre-fetched web evidence for the user's current source-backed request. Include source links/citations inline when making claims from this evidence. Do not add a separate Sources, References, or Citations section.",
-        evidence.context,
-      ].join("\n")
     }
 
     const result = streamText({
@@ -579,6 +603,7 @@ export async function* startAgentRuntimeStream(
         !finalizedToolCalls.has(part.toolCallId)
       ) {
         finalizedToolCalls.add(part.toolCallId)
+        toolResultStatuses.set(part.toolCallId, "error")
         const toolName =
           isAiSdkGatewaySearchToolName(part.toolName) ||
           isAiSdkCodeExecutionToolName(part.toolName) ||

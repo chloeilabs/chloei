@@ -100,11 +100,3 @@ export function buildToolSynthesisPrompt(systemInstruction: string): string {
     "Do not repeat completed material; continue from the missing details when possible.",
   ].join("\n")
 }
-
-export const XAI_TOOL_SYNTHESIS_INSTRUCTION = [
-  "The previous xAI tool-backed answer may be partial.",
-  "Continue and complete the final answer now using the existing tool results and sources already present in the conversation.",
-  "Do not call tools.",
-  "If the user requested source links or citations, include source-backed references in the final answer.",
-  "Do not repeat completed material; continue from the missing details when possible.",
-].join(" ")
