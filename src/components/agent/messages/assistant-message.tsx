@@ -272,15 +272,6 @@ export function AssistantMessage({ message }: { message: Message }) {
         </div>
       )}
 
-      {sources.length > 0 && (
-        <div className="px-3 pb-2">
-          <div className="mb-1 font-departureMono text-[11px] font-medium tracking-wide text-muted-foreground/80">
-            Sources
-          </div>
-          <SourceList sources={sources} showFavicon={showSourceFavicon} />
-        </div>
-      )}
-
       <div
         className="opacity-0 transition-opacity group-hover/assistant-message:opacity-100"
         hidden={!hasContent}
