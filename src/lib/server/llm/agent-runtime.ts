@@ -8,16 +8,18 @@ import {
   streamText,
   type ToolSet,
 } from "ai"
-import { Agent, type Dispatcher, Dispatcher1Wrapper } from "undici"
 
 import { createLogger } from "@/lib/logger"
 import {
   AGENT_EVAL_RESULTS_DIR,
   AGENT_RESEARCH_TOOL_MAX_STEPS,
   AGENT_TOOL_MAX_STEPS,
-  AI_GATEWAY_CLIENT_TIMEOUT_MS,
 } from "@/lib/server/agent-runtime-config"
-import { type AgentStreamEvent, type ModelType } from "@/lib/shared"
+import {
+  type AgentStreamEvent,
+  modelSupportsImageInput,
+  type ModelType,
+} from "@/lib/shared"
 
 import {
   type AgentInputMessage,
@@ -57,25 +59,11 @@ import {
   getAiSdkCodeExecutionToolResultMetadata,
   isAiSdkCodeExecutionToolName,
 } from "./code-execution-tools"
+import { aiGatewayFetch } from "./gateway-client"
+import { describeImagesForTextOnlyModel } from "./image-vision-preprocessor"
 import { createInitialReasoningChunkSanitizer } from "./initial-reasoning-chunk-sanitizer"
 
 const logger = createLogger("agent-runtime")
-const aiGatewayDispatcher = new Dispatcher1Wrapper(
-  new Agent({
-    bodyTimeout: AI_GATEWAY_CLIENT_TIMEOUT_MS,
-    headersTimeout: AI_GATEWAY_CLIENT_TIMEOUT_MS,
-  })
-)
-
-type UndiciRequestInit = RequestInit & {
-  dispatcher: Dispatcher
-}
-
-const aiGatewayFetch: typeof fetch = (input, init) =>
-  fetch(input, {
-    ...init,
-    dispatcher: aiGatewayDispatcher,
-  } as UndiciRequestInit)
 
 const XAI_SOURCE_PREFETCH_TIMEOUT_MS = 8_000
 
@@ -231,7 +219,15 @@ export async function* startAgentRuntimeStream(
     fetch: aiGatewayFetch,
   })
 
-  const messages = toModelMessages(params.messages)
+  const inputMessages = modelSupportsImageInput(params.model)
+    ? params.messages
+    : await describeImagesForTextOnlyModel({
+        messages: params.messages,
+        aiGatewayApiKey: params.aiGatewayApiKey,
+        signal: params.signal,
+      })
+
+  const messages = toModelMessages(inputMessages)
   if (messages.length === 0) {
     return
   }

@@ -127,7 +127,7 @@ test("attached user messages persist metadata but request transient data separat
   ])
 })
 
-test("agent request messages only resend raw attachments for the final user turn", () => {
+test("agent request messages resend raw attachments for every user turn that uploaded one", () => {
   const attachment = {
     id: "attachment-1",
     kind: "image",
@@ -165,6 +165,7 @@ test("agent request messages only resend raw attachments for the final user turn
     {
       role: "user",
       content: "Analyze this chart.",
+      attachments: [attachment],
     },
     {
       role: "assistant",

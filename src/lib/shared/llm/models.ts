@@ -87,3 +87,18 @@ export const ModelInfos: Record<ModelType, ModelInfo> = {
     name: "Grok 4.3",
   },
 }
+
+const VISION_CAPABLE_MODEL_SET: ReadonlySet<ModelType> = new Set([
+  AvailableModels.ANTHROPIC_CLAUDE_SONNET_4_6,
+  AvailableModels.DEEPSEEK_V4_PRO,
+  AvailableModels.MOONSHOTAI_KIMI_K2_6,
+  AvailableModels.OPENAI_GPT_5_5,
+  AvailableModels.XAI_GROK_4_3,
+])
+
+export function modelSupportsImageInput(model: ModelType): boolean {
+  return VISION_CAPABLE_MODEL_SET.has(model)
+}
+
+export const VISION_PREPROCESSOR_MODEL: ModelType =
+  AvailableModels.ANTHROPIC_CLAUDE_SONNET_4_6

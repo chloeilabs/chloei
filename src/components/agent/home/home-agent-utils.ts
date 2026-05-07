@@ -88,13 +88,9 @@ export function toRequestMessages(
     boundedMessages.shift()
   }
 
-  const finalUserMessageId = [...boundedMessages]
-    .reverse()
-    .find((message) => message.role === "user")?.id
-
   return boundedMessages.map((message) => {
     const attachments =
-      message.role === "user" && message.id === finalUserMessageId
+      message.role === "user"
         ? (options.attachmentsByMessageId?.get(message.id) ?? [])
         : []
 

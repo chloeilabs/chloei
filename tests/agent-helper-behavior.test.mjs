@@ -577,7 +577,7 @@ test("agent helper validates file attachments and preserves the selected model",
     requestId: "request-attachments-too-many-per-turn",
   })
 
-  const tooManyCrossConversationResult = parseAgentStreamRequest({
+  const crossConversationAttachmentsResult = parseAgentStreamRequest({
     body: {
       messages: [
         {
@@ -597,18 +597,81 @@ test("agent helper validates file attachments and preserves the selected model",
       ],
     },
     availableModels: [{ id: "openai/gpt-5.5" }],
-    requestId: "request-attachments-too-many-cross-convo",
+    requestId: "request-attachments-cross-convo",
   })
 
-  assert(tooManyCrossConversationResult instanceof Response)
-  assert.equal(tooManyCrossConversationResult.status, 400)
-  assert.deepEqual(await tooManyCrossConversationResult.json(), {
-    error: "Too many file attachments.",
-    errorCode: "AGENT_TOO_MANY_ATTACHMENTS",
-    requestId: "request-attachments-too-many-cross-convo",
-  })
+  assert(!(crossConversationAttachmentsResult instanceof Response))
+  assert.equal(
+    crossConversationAttachmentsResult.selectedModel,
+    "openai/gpt-5.5"
+  )
 
   const largePdfDataUrl = `data:application/pdf;base64,${Buffer.alloc(3 * 1024 * 1024).toString("base64")}`
+  const crossMessageLargeAttachmentsResult = parseAgentStreamRequest({
+    body: {
+      messages: [
+        {
+          role: "user",
+          content: "Analyze this older PDF.",
+          attachments: [
+            {
+              id: "attachment-cross-large-1",
+              kind: "pdf",
+              filename: "cross-large-1.pdf",
+              mediaType: "application/pdf",
+              sizeBytes: 3 * 1024 * 1024,
+              dataUrl: largePdfDataUrl,
+            },
+          ],
+        },
+        {
+          role: "assistant",
+          content: "Done.",
+        },
+        {
+          role: "user",
+          content: "Compare it to this PDF.",
+          attachments: [
+            {
+              id: "attachment-cross-large-2",
+              kind: "pdf",
+              filename: "cross-large-2.pdf",
+              mediaType: "application/pdf",
+              sizeBytes: 3 * 1024 * 1024,
+              dataUrl: largePdfDataUrl,
+            },
+          ],
+        },
+        {
+          role: "assistant",
+          content: "Done.",
+        },
+        {
+          role: "user",
+          content: "Now include one more PDF.",
+          attachments: [
+            {
+              id: "attachment-cross-large-3",
+              kind: "pdf",
+              filename: "cross-large-3.pdf",
+              mediaType: "application/pdf",
+              sizeBytes: 3 * 1024 * 1024,
+              dataUrl: largePdfDataUrl,
+            },
+          ],
+        },
+      ],
+    },
+    availableModels: [{ id: "openai/gpt-5.5" }],
+    requestId: "request-attachments-cross-message-large",
+  })
+
+  assert(!(crossMessageLargeAttachmentsResult instanceof Response))
+  assert.equal(
+    crossMessageLargeAttachmentsResult.selectedModel,
+    "openai/gpt-5.5"
+  )
+
   const priorAttachmentPayloadsResult = parseAgentStreamRequest({
     body: {
       messages: [

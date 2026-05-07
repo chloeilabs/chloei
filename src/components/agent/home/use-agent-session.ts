@@ -20,6 +20,11 @@ import {
 } from "@/lib/shared"
 
 import {
+  loadThreadAttachmentPayloads,
+  persistMessageAttachments,
+  pruneThreadAttachmentsToMessages,
+} from "./agent-attachment-store"
+import {
   type AttachmentPayloadsByThread,
   createAssistantMessageFromAccumulator,
   getThreadAttachmentPayloads,
@@ -111,11 +116,6 @@ export function useAgentSession({
 
   const setCurrentThreadId = useCallback(
     (id: string | null) => {
-      const previousThreadId = currentThreadIdRef.current
-      if (previousThreadId && previousThreadId !== id) {
-        attachmentPayloadsRef.current.delete(previousThreadId)
-      }
-
       currentThreadIdRef.current = id
       baseSetCurrentThreadId(id)
     },
@@ -124,12 +124,41 @@ export function useAgentSession({
 
   useEffect(() => {
     if (currentThreadId !== currentThreadIdRef.current) {
-      const previousThreadId = currentThreadIdRef.current
-      if (previousThreadId && previousThreadId !== currentThreadId) {
-        attachmentPayloadsRef.current.delete(previousThreadId)
+      currentThreadIdRef.current = currentThreadId
+    }
+  }, [currentThreadId])
+
+  useEffect(() => {
+    if (!currentThreadId) {
+      return
+    }
+
+    if (attachmentPayloadsRef.current.has(currentThreadId)) {
+      return
+    }
+
+    const hydration = { cancelled: false }
+    void (async () => {
+      const stored = await loadThreadAttachmentPayloads(currentThreadId)
+      if (hydration.cancelled || stored.size === 0) {
+        return
       }
 
-      currentThreadIdRef.current = currentThreadId
+      const existing = attachmentPayloadsRef.current.get(currentThreadId)
+      if (!existing) {
+        attachmentPayloadsRef.current.set(currentThreadId, stored)
+        return
+      }
+
+      for (const [messageId, attachments] of stored) {
+        if (!existing.has(messageId)) {
+          existing.set(messageId, attachments)
+        }
+      }
+    })()
+
+    return () => {
+      hydration.cancelled = true
     }
   }, [currentThreadId])
 
@@ -168,6 +197,14 @@ export function useAgentSession({
         attachmentPayloadsRef.current,
         currentThreadId,
         activeThread.messages
+      )
+      void pruneThreadAttachmentsToMessages(
+        currentThreadId,
+        new Set(
+          activeThread.messages
+            .filter((message) => message.role === "user")
+            .map((message) => message.id)
+        )
       )
       return
     }
@@ -563,6 +600,11 @@ export function useAgentSession({
           attachmentPayloadsRef.current,
           activeThreadId
         ).set(userMessage.id, attachments)
+        void persistMessageAttachments(
+          activeThreadId,
+          userMessage.id,
+          attachments
+        )
       }
 
       await runAgentRequest(nextMessages, model, runMode, activeThreadId)
@@ -621,6 +663,14 @@ export function useAgentSession({
           attachmentPayloadsRef.current,
           activeThreadId,
           nextMessages
+        )
+        void pruneThreadAttachmentsToMessages(
+          activeThreadId,
+          new Set(
+            nextMessages
+              .filter((message) => message.role === "user")
+              .map((message) => message.id)
+          )
         )
 
         saveThread(
