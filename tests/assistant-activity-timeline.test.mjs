@@ -156,6 +156,32 @@ test("normalizeAssistantActivityTimeline repairs legacy reasoning spacing from a
   assert.equal(timeline[2]?.text, "The quote returned MSFT.")
 })
 
+test("normalizeAssistantActivityTimeline repairs spacing around non-BMP characters", () => {
+  const rocket = "\u{1F680}"
+  const timeline = normalizeAssistantActivityTimeline({
+    id: "assistant-legacy-non-bmp",
+    role: "assistant",
+    content: "",
+    llmModel: "anthropic/claude-sonnet-4.6",
+    createdAt: "2026-04-20T12:00:00.000Z",
+    metadata: {
+      reasoning: `Review ${rocket}financial data for MSFT.`,
+      activityTimeline: [
+        {
+          id: "reasoning-1",
+          kind: "reasoning",
+          order: 0,
+          createdAt: "2026-04-20T12:00:00.000Z",
+          text: `Review ${rocket}fin ancial data for MS FT.`,
+        },
+      ],
+    },
+  })
+
+  assert.equal(timeline[0]?.kind, "reasoning")
+  assert.equal(timeline[0]?.text, `Review ${rocket}financial data for MSFT.`)
+})
+
 test("normalizeAssistantActivityTimeline appends missing sources after legacy fallback entries", () => {
   const timeline = normalizeAssistantActivityTimeline({
     id: "assistant-2",

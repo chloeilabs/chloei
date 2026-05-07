@@ -58,13 +58,17 @@ function createReasoningAggregateCursor(reasoning: string | undefined) {
   }
 
   const sourceChars: string[] = []
-  const sourceIndexes: number[] = []
+  const sourceStartIndexes: number[] = []
+  const sourceEndIndexes: number[] = []
 
-  for (let index = 0; index < source.length; index += 1) {
-    const char = source[index]
-    if (char && !/\s/.test(char)) {
+  let sourceOffset = 0
+  for (const char of source) {
+    const startIndex = sourceOffset
+    sourceOffset += char.length
+    if (!/\s/.test(char)) {
       sourceChars.push(char)
-      sourceIndexes.push(index)
+      sourceStartIndexes.push(startIndex)
+      sourceEndIndexes.push(sourceOffset)
     }
   }
 
@@ -99,16 +103,16 @@ function createReasoningAggregateCursor(reasoning: string | undefined) {
         }
       }
 
-      const startIndex = sourceIndexes[cursor]
-      const lastIndex = sourceIndexes[end - 1]
-      cursor = end
+      const startIndex = sourceStartIndexes[cursor]
+      const endIndex = sourceEndIndexes[end - 1]
 
-      if (startIndex === undefined || lastIndex === undefined) {
+      if (startIndex === undefined || endIndex === undefined) {
         active = false
         return null
       }
 
-      return normalizeThinkingEntry(source.slice(startIndex, lastIndex + 1))
+      cursor = end
+      return normalizeThinkingEntry(source.slice(startIndex, endIndex))
     },
   }
 }
