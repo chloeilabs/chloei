@@ -107,6 +107,114 @@ test("normalizeAssistantActivityTimeline preserves streamed event order", () => 
   })
 })
 
+test("normalizeAssistantActivityTimeline repairs legacy reasoning spacing from aggregate reasoning", () => {
+  const timeline = normalizeAssistantActivityTimeline({
+    id: "assistant-legacy-spacing",
+    role: "assistant",
+    content: "",
+    llmModel: "anthropic/claude-sonnet-4.6",
+    createdAt: "2026-04-20T12:00:00.000Z",
+    metadata: {
+      reasoning:
+        "Let me get current quotes/financial data for SCHD.\n\nThe quote returned MSFT.",
+      activityTimeline: [
+        {
+          id: "reasoning-1",
+          kind: "reasoning",
+          order: 0,
+          createdAt: "2026-04-20T12:00:00.000Z",
+          text: "Let me get current quotes/fin ancial data for SCH D.",
+        },
+        {
+          id: "search-1",
+          kind: "tool",
+          order: 1,
+          createdAt: "2026-04-20T12:00:01.000Z",
+          callId: "call-1",
+          toolName: "web_search",
+          label: "latest quote",
+          status: "running",
+        },
+        {
+          id: "reasoning-2",
+          kind: "reasoning",
+          order: 2,
+          createdAt: "2026-04-20T12:00:02.000Z",
+          text: "The quote returned MS FT.",
+        },
+      ],
+    },
+  })
+
+  assert.equal(timeline[0]?.kind, "reasoning")
+  assert.equal(
+    timeline[0]?.text,
+    "Let me get current quotes/financial data for SCHD."
+  )
+  assert.equal(timeline[1]?.kind, "search")
+  assert.equal(timeline[2]?.kind, "reasoning")
+  assert.equal(timeline[2]?.text, "The quote returned MSFT.")
+})
+
+test("normalizeAssistantActivityTimeline repairs spacing around non-BMP characters", () => {
+  const rocket = "\u{1F680}"
+  const timeline = normalizeAssistantActivityTimeline({
+    id: "assistant-legacy-non-bmp",
+    role: "assistant",
+    content: "",
+    llmModel: "anthropic/claude-sonnet-4.6",
+    createdAt: "2026-04-20T12:00:00.000Z",
+    metadata: {
+      reasoning: `Review ${rocket}financial data for MSFT.`,
+      activityTimeline: [
+        {
+          id: "reasoning-1",
+          kind: "reasoning",
+          order: 0,
+          createdAt: "2026-04-20T12:00:00.000Z",
+          text: `Review ${rocket}fin ancial data for MS FT.`,
+        },
+      ],
+    },
+  })
+
+  assert.equal(timeline[0]?.kind, "reasoning")
+  assert.equal(timeline[0]?.text, `Review ${rocket}financial data for MSFT.`)
+})
+
+test("normalizeAssistantActivityTimeline skips redacted entries before aggregate repair", () => {
+  const timeline = normalizeAssistantActivityTimeline({
+    id: "assistant-redacted-repair",
+    role: "assistant",
+    content: "",
+    llmModel: "anthropic/claude-sonnet-4.6",
+    createdAt: "2026-04-20T12:00:00.000Z",
+    metadata: {
+      reasoning: "Visible repaired text for MSFT.",
+      activityTimeline: [
+        {
+          id: "reasoning-redacted",
+          kind: "reasoning",
+          order: 0,
+          createdAt: "2026-04-20T12:00:00.000Z",
+          text: "[REDACTED]",
+        },
+        {
+          id: "reasoning-visible",
+          kind: "reasoning",
+          order: 1,
+          createdAt: "2026-04-20T12:00:01.000Z",
+          text: "Visible repaired text for MS FT.",
+        },
+      ],
+    },
+  })
+
+  assert.equal(timeline.length, 1)
+  assert.equal(timeline[0]?.kind, "reasoning")
+  assert.equal(timeline[0]?.text, "Visible repaired text for MSFT.")
+})
+
 test("normalizeAssistantActivityTimeline appends missing sources after legacy fallback entries", () => {
   const timeline = normalizeAssistantActivityTimeline({
     id: "assistant-2",

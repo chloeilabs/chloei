@@ -51,6 +51,72 @@ function toReasoningEntries(reasoning: string): string[] {
     .filter((entry) => entry.length > 0 && !isRedactedReasoningEntry(entry))
 }
 
+function createReasoningAggregateCursor(reasoning: string | undefined) {
+  const source = normalizeThinkingEntry(reasoning ?? "")
+  if (!source) {
+    return null
+  }
+
+  const sourceChars: string[] = []
+  const sourceStartIndexes: number[] = []
+  const sourceEndIndexes: number[] = []
+
+  let sourceOffset = 0
+  for (const char of source) {
+    const startIndex = sourceOffset
+    sourceOffset += char.length
+    if (!/\s/.test(char)) {
+      sourceChars.push(char)
+      sourceStartIndexes.push(startIndex)
+      sourceEndIndexes.push(sourceOffset)
+    }
+  }
+
+  if (sourceChars.length === 0) {
+    return null
+  }
+
+  let cursor = 0
+  let active = true
+
+  return {
+    take(text: string): string | null {
+      if (!active) {
+        return null
+      }
+
+      const needleChars = Array.from(text).filter((char) => !/\s/.test(char))
+      if (needleChars.length === 0) {
+        return null
+      }
+
+      const end = cursor + needleChars.length
+      if (end > sourceChars.length) {
+        active = false
+        return null
+      }
+
+      for (let index = 0; index < needleChars.length; index += 1) {
+        if (sourceChars[cursor + index] !== needleChars[index]) {
+          active = false
+          return null
+        }
+      }
+
+      const startIndex = sourceStartIndexes[cursor]
+      const endIndex = sourceEndIndexes[end - 1]
+
+      if (startIndex === undefined || endIndex === undefined) {
+        active = false
+        return null
+      }
+
+      cursor = end
+      return normalizeThinkingEntry(source.slice(startIndex, endIndex))
+    },
+  }
+}
+
 function appendMissingSourcesToTimeline(
   timeline: ActivityTimelineEntry[],
   sources: MessageSource[],
@@ -84,6 +150,9 @@ export function normalizeAssistantActivityTimeline(
 ): ActivityTimelineEntry[] {
   const dedupedSources = getDedupedSources(message.metadata?.sources)
   const timeline = message.metadata?.activityTimeline
+  const reasoningAggregateCursor = createReasoningAggregateCursor(
+    message.metadata?.reasoning
+  )
 
   if (Array.isArray(timeline) && timeline.length > 0) {
     const normalizedTimeline = [...timeline]
@@ -98,7 +167,13 @@ export function normalizeAssistantActivityTimeline(
             return entries
           }
 
-          entries.push({ ...entry, text: normalizedText })
+          const sourceText =
+            reasoningAggregateCursor?.take(normalizedText) ?? normalizedText
+          if (sourceText.length === 0 || isRedactedReasoningEntry(sourceText)) {
+            return entries
+          }
+
+          entries.push({ ...entry, text: sourceText })
           return entries
         }
 

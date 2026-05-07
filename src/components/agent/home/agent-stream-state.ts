@@ -556,31 +556,11 @@ function appendReasoningToTimeline(
   delta: string,
   nextOrder: () => number
 ): ActivityTimelineEntry[] {
-  const mergeReasoningText = (
-    currentText: string,
-    nextText: string
-  ): string => {
-    if (currentText.length === 0 || nextText.length === 0) {
-      return `${currentText}${nextText}`
-    }
-
-    if (/\s$/.test(currentText) || /^\s/.test(nextText)) {
-      return `${currentText}${nextText}`
-    }
-
-    if (/[A-Za-z0-9)]$/.test(currentText) && /^[A-Za-z0-9(]/.test(nextText)) {
-      return `${currentText} ${nextText}`
-    }
-
-    return `${currentText}${nextText}`
-  }
-
   const normalizeReasoningText = (text: string): string =>
     text
       .replace(/\r\n/g, "\n")
       .replace(/[ \t]+\n/g, "\n")
       .replace(/\n{3,}/g, "\n\n")
-      .trimEnd()
 
   if (delta.length === 0) {
     return current
@@ -588,10 +568,8 @@ function appendReasoningToTimeline(
 
   const lastEntry = current[current.length - 1]
   if (lastEntry?.kind === "reasoning") {
-    const mergedText = normalizeReasoningText(
-      mergeReasoningText(lastEntry.text, delta)
-    )
-    if (mergedText.length === 0) {
+    const mergedText = normalizeReasoningText(`${lastEntry.text}${delta}`)
+    if (mergedText.trim().length === 0) {
       return current.slice(0, -1)
     }
 
@@ -604,7 +582,7 @@ function appendReasoningToTimeline(
   }
 
   const initialText = normalizeReasoningText(delta)
-  if (initialText.length === 0) {
+  if (initialText.trim().length === 0) {
     return current
   }
 
