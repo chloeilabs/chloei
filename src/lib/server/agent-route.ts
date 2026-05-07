@@ -440,16 +440,6 @@ function validateAgentRequestAttachments(
     }
   }
 
-  if (attachments.length > AGENT_ATTACHMENT_MAX_FILES) {
-    return createJsonErrorResponse({
-      requestId: params.requestId,
-      error: "Too many file attachments.",
-      errorCode: "AGENT_TOO_MANY_ATTACHMENTS",
-      status: 400,
-      rateLimitDecision: params.rateLimitDecision,
-    })
-  }
-
   if (getTotalAttachmentBytes(attachments) > AGENT_ATTACHMENT_MAX_TOTAL_BYTES) {
     return createJsonErrorResponse({
       requestId: params.requestId,

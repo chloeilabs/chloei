@@ -87,4 +87,20 @@ test("shared model registry includes the curated gateway models", async () => {
     /\[AvailableModels\.XAI_GROK_4_3\]:\s*\{[\s\S]*name:\s*"Grok 4\.3"/,
     "Expected ModelInfos to define display metadata for XAI_GROK_4_3."
   )
+
+  for (const modelKey of [
+    "ANTHROPIC_CLAUDE_SONNET_4_6",
+    "DEEPSEEK_V4_PRO",
+    "MOONSHOTAI_KIMI_K2_6",
+    "OPENAI_GPT_5_5",
+    "XAI_GROK_4_3",
+  ]) {
+    assert.match(
+      source,
+      new RegExp(
+        `VISION_CAPABLE_MODEL_SET[\\s\\S]*AvailableModels\\.${modelKey}`
+      ),
+      `Expected ${modelKey} to be treated as image-capable based on current Gateway endpoint modalities.`
+    )
+  }
 })

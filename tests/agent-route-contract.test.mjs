@@ -103,11 +103,16 @@ test("agent runtime reserves the final loop step for synthesis", async () => {
 
 test("agent runtime extends the AI Gateway client timeout", async () => {
   const runtimeSource = await readFile(runtimePath, "utf8")
+  const gatewayClientPath = path.join(
+    cwd,
+    "src/lib/server/llm/gateway-client.ts"
+  )
+  const gatewayClientSource = await readFile(gatewayClientPath, "utf8")
 
   assert.match(
-    runtimeSource,
+    gatewayClientSource,
     /new Dispatcher1Wrapper\(\s*new Agent\(\{\s*bodyTimeout: AI_GATEWAY_CLIENT_TIMEOUT_MS,\s*headersTimeout: AI_GATEWAY_CLIENT_TIMEOUT_MS,\s*\}\)\s*\)/,
-    "Expected the AI Gateway runtime to use a custom Undici timeout dispatcher."
+    "Expected the gateway client to use a custom Undici timeout dispatcher."
   )
   assert.match(
     runtimeSource,

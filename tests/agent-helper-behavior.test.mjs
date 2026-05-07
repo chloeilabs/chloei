@@ -577,7 +577,7 @@ test("agent helper validates file attachments and preserves the selected model",
     requestId: "request-attachments-too-many-per-turn",
   })
 
-  const tooManyCrossConversationResult = parseAgentStreamRequest({
+  const crossConversationAttachmentsResult = parseAgentStreamRequest({
     body: {
       messages: [
         {
@@ -597,16 +597,14 @@ test("agent helper validates file attachments and preserves the selected model",
       ],
     },
     availableModels: [{ id: "openai/gpt-5.5" }],
-    requestId: "request-attachments-too-many-cross-convo",
+    requestId: "request-attachments-cross-convo",
   })
 
-  assert(tooManyCrossConversationResult instanceof Response)
-  assert.equal(tooManyCrossConversationResult.status, 400)
-  assert.deepEqual(await tooManyCrossConversationResult.json(), {
-    error: "Too many file attachments.",
-    errorCode: "AGENT_TOO_MANY_ATTACHMENTS",
-    requestId: "request-attachments-too-many-cross-convo",
-  })
+  assert(!(crossConversationAttachmentsResult instanceof Response))
+  assert.equal(
+    crossConversationAttachmentsResult.selectedModel,
+    "openai/gpt-5.5"
+  )
 
   const largePdfDataUrl = `data:application/pdf;base64,${Buffer.alloc(3 * 1024 * 1024).toString("base64")}`
   const priorAttachmentPayloadsResult = parseAgentStreamRequest({

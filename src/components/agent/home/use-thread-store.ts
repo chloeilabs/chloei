@@ -10,6 +10,8 @@ import { createLogger } from "@/lib/logger"
 import { createRequestHeaders } from "@/lib/request-id"
 import { sortThreadsNewestFirst, type Thread } from "@/lib/shared"
 
+import { deleteThreadAttachments } from "./agent-attachment-store"
+
 const THREAD_SYNC_DEBOUNCE_MS = 800
 const THREAD_SYNC_RETRY_MS = 3_000
 const THREAD_SYNC_ERROR_TOAST_ID = "thread-sync-error"
@@ -251,6 +253,7 @@ export function useThreadStore(initialThreads: Thread[] = []) {
       }
 
       setThreads(remainingThreads)
+      void deleteThreadAttachments(id)
 
       if (currentThreadId === id) {
         setCurrentThreadIdState(null)
