@@ -9,11 +9,15 @@ const cwd = fileURLToPath(new URL("..", import.meta.url))
 const runtimeUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/llm/agent-runtime-messages.ts")
 ).href
+const modelsUrl = pathToFileURL(
+  path.join(cwd, "src/lib/shared/llm/models.ts")
+).href
 const visionPreprocessorUtilsUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/llm/image-vision-preprocessor-utils.ts")
 ).href
 
 const { toModelMessages } = await import(runtimeUrl)
+const { AvailableModels, modelSupportsImageInput } = await import(modelsUrl)
 const { escapeAttachmentFilenameForPrompt } = await import(
   visionPreprocessorUtilsUrl
 )
@@ -76,4 +80,12 @@ test("vision preprocessor escapes attachment filenames for prompt wrappers", () 
 
   assert.equal(escaped, "a&amp;b &lt;chart&gt; &quot;q&quot;\\nrow\\t2.png")
   assert.equal(escapeAttachmentFilenameForPrompt(escaped), escaped)
+})
+
+test("DeepSeek image attachments are routed through preprocessing", () => {
+  assert.equal(modelSupportsImageInput(AvailableModels.DEEPSEEK_V4_PRO), false)
+  assert.equal(
+    modelSupportsImageInput(AvailableModels.MOONSHOTAI_KIMI_K2_6),
+    true
+  )
 })

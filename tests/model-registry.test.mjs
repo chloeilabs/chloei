@@ -90,7 +90,6 @@ test("shared model registry includes the curated gateway models", async () => {
 
   for (const modelKey of [
     "ANTHROPIC_CLAUDE_SONNET_4_6",
-    "DEEPSEEK_V4_PRO",
     "MOONSHOTAI_KIMI_K2_6",
     "OPENAI_GPT_5_5",
     "XAI_GROK_4_3",
@@ -103,4 +102,10 @@ test("shared model registry includes the curated gateway models", async () => {
       `Expected ${modelKey} to be treated as image-capable based on current Gateway endpoint modalities.`
     )
   }
+
+  assert.doesNotMatch(
+    source.match(/VISION_CAPABLE_MODEL_SET[\s\S]*?\]\)/)?.[0] ?? "",
+    /AvailableModels\.DEEPSEEK_V4_PRO/,
+    "Expected DeepSeek V4 Pro to use image preprocessing because Gateway does not mark it as a vision model."
+  )
 })
