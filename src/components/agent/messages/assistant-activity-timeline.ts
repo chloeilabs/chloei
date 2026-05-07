@@ -160,6 +160,13 @@ export function normalizeAssistantActivityTimeline(
       .reduce<ActivityTimelineEntry[]>((entries, entry) => {
         if (entry.kind === "reasoning") {
           const normalizedText = normalizeThinkingEntry(entry.text)
+          if (
+            normalizedText.length === 0 ||
+            isRedactedReasoningEntry(normalizedText)
+          ) {
+            return entries
+          }
+
           const sourceText =
             reasoningAggregateCursor?.take(normalizedText) ?? normalizedText
           if (sourceText.length === 0 || isRedactedReasoningEntry(sourceText)) {
