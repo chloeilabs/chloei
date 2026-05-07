@@ -9,6 +9,7 @@ import {
 
 import type { AgentInputMessage } from "./agent-runtime-messages"
 import { aiGatewayFetch } from "./gateway-client"
+import { escapeAttachmentFilenameForPrompt } from "./image-vision-preprocessor-utils"
 
 const PREPROCESSOR_PROMPT =
   "Describe this image in detail for someone who cannot see it. Transcribe any visible text exactly. Note key visual elements, layout, colors, and anything else relevant for analysis. Be thorough but concise."
@@ -67,10 +68,6 @@ interface PreprocessParams {
   signal?: AbortSignal
 }
 
-function escapeFilename(filename: string): string {
-  return filename.replace(/"/g, '\\"')
-}
-
 export async function describeImagesForTextOnlyModel(
   params: PreprocessParams
 ): Promise<AgentInputMessage[]> {
@@ -115,7 +112,7 @@ export async function describeImagesForTextOnlyModel(
       .map((attachment, index) => {
         const description =
           descriptions[index] ?? "(image description unavailable)"
-        return `<attached_image filename="${escapeFilename(attachment.filename)}">\n${description}\n</attached_image>`
+        return `<attached_image filename="${escapeAttachmentFilenameForPrompt(attachment.filename)}">\n${description}\n</attached_image>`
       })
       .join("\n\n")
 

@@ -253,7 +253,6 @@ export function useThreadStore(initialThreads: Thread[] = []) {
       }
 
       setThreads(remainingThreads)
-      void deleteThreadAttachments(id)
 
       if (currentThreadId === id) {
         setCurrentThreadIdState(null)
@@ -276,6 +275,7 @@ export function useThreadStore(initialThreads: Thread[] = []) {
             )
           }
 
+          void deleteThreadAttachments(id)
           toast.dismiss(THREAD_DELETE_ERROR_TOAST_ID)
         } catch (error) {
           if (isAbortError(error)) {

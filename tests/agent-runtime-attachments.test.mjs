@@ -9,8 +9,14 @@ const cwd = fileURLToPath(new URL("..", import.meta.url))
 const runtimeUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/llm/agent-runtime-messages.ts")
 ).href
+const visionPreprocessorUtilsUrl = pathToFileURL(
+  path.join(cwd, "src/lib/server/llm/image-vision-preprocessor-utils.ts")
+).href
 
 const { toModelMessages } = await import(runtimeUrl)
+const { escapeAttachmentFilenameForPrompt } = await import(
+  visionPreprocessorUtilsUrl
+)
 
 test("agent runtime converts image and PDF attachments to model message parts", () => {
   const messages = toModelMessages([
@@ -62,4 +68,12 @@ test("agent runtime converts image and PDF attachments to model message parts", 
       filename: "letter.pdf",
     },
   ])
+})
+
+test("vision preprocessor escapes attachment filenames for prompt wrappers", () => {
+  const filename = 'a&b <chart> "q"\nrow\t2.png'
+  const escaped = escapeAttachmentFilenameForPrompt(filename)
+
+  assert.equal(escaped, "a&amp;b &lt;chart&gt; &quot;q&quot;\\nrow\\t2.png")
+  assert.equal(escapeAttachmentFilenameForPrompt(escaped), escaped)
 })

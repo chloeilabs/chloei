@@ -440,16 +440,6 @@ function validateAgentRequestAttachments(
     }
   }
 
-  if (getTotalAttachmentBytes(attachments) > AGENT_ATTACHMENT_MAX_TOTAL_BYTES) {
-    return createJsonErrorResponse({
-      requestId: params.requestId,
-      error: "Attached files are too large.",
-      errorCode: "AGENT_ATTACHMENTS_TOO_LARGE",
-      status: 413,
-      rateLimitDecision: params.rateLimitDecision,
-    })
-  }
-
   for (const message of params.messages) {
     for (const attachment of message.attachments ?? []) {
       if (attachment.kind !== getAgentAttachmentKind(attachment.mediaType)) {
