@@ -11,6 +11,8 @@ export function ScrollToBottom() {
   const manualScrollInFlightRef = useRef(false)
   const { isAtBottom } = stickToBottom
 
+  // use-stick-to-bottom exposes targetScrollTop as a mutable override point.
+  // eslint-disable-next-line react-hooks/immutability
   const handleScrollToBottom = useCallback(async () => {
     if (manualScrollInFlightRef.current) {
       return
@@ -18,6 +20,7 @@ export function ScrollToBottom() {
 
     manualScrollInFlightRef.current = true
     const previousTargetScrollTop = stickToBottom.targetScrollTop
+    // eslint-disable-next-line react-hooks/immutability
     stickToBottom.targetScrollTop = (targetScrollTop) => targetScrollTop
 
     try {

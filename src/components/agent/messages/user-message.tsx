@@ -146,18 +146,6 @@ export function UserMessage({
   const attachments = message.metadata?.attachments ?? []
 
   useEffect(() => {
-    setEditValue(message.content)
-  }, [message.content])
-
-  useEffect(() => {
-    setSelectedModel(initialModel)
-  }, [initialModel])
-
-  useEffect(() => {
-    setRunMode(initialRunMode)
-  }, [initialRunMode])
-
-  useEffect(() => {
     if (messageContentRef.current) {
       setIsContentOverflowing(
         messageContentRef.current.scrollHeight > MAX_CONTENT_HEIGHT
@@ -179,6 +167,13 @@ export function UserMessage({
       setSelectedModel(model)
     }
   }, [])
+
+  const handleStartEditing = useCallback(() => {
+    setEditValue(message.content)
+    setSelectedModel(initialModel)
+    setRunMode(initialRunMode)
+    setIsEditing(true)
+  }, [initialModel, initialRunMode, message.content])
 
   const handleStopEditing = useCallback(() => {
     setIsEditing(false)
@@ -365,13 +360,13 @@ export function UserMessage({
             tabIndex={disableEditing || isEditPending ? -1 : 0}
             onClick={() => {
               if (!disableEditing) {
-                setIsEditing(true)
+                handleStartEditing()
               }
             }}
             onKeyDown={(e) => {
               if ((e.key === "Enter" || e.key === " ") && !disableEditing) {
                 e.preventDefault()
-                setIsEditing(true)
+                handleStartEditing()
               }
             }}
           >
