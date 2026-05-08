@@ -68,43 +68,6 @@ export async function insertMemory(params: {
   return id
 }
 
-export async function deleteMemory(params: {
-  userId: string
-  id: string
-}): Promise<void> {
-  const db = getDatabase()
-  await sql`
-    DELETE FROM agent_memory
-    WHERE id = ${params.id} AND "userId" = ${params.userId}
-  `.execute(db)
-}
-
-export async function listRecentMemories(params: {
-  userId: string
-  limit: number
-}): Promise<MemoryRecord[]> {
-  const db = getDatabase()
-  const rows = await sql<MemoryRow>`
-    SELECT
-      id,
-      fact,
-      "createdAt",
-      "updatedAt",
-      NULL::float8 AS similarity
-    FROM agent_memory
-    WHERE "userId" = ${params.userId}
-    ORDER BY "updatedAt" DESC
-    LIMIT ${params.limit}
-  `.execute(db)
-
-  return rows.rows.map((row) => ({
-    id: row.id,
-    fact: row.fact,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-  }))
-}
-
 export function isMemoryStoreNotInitializedError(
   error: unknown
 ): error is Error {
