@@ -124,6 +124,7 @@ An `automation` table is also created by the migration but has no active route h
 4. Task mode overlay (`TASK MODE OVERLAY: <MODE>`) — mode-specific guidance (see below)
 5. `SHARED CONTEXT FILE: SOUL.md` — from `DEFAULT_SOUL_FALLBACK_INSTRUCTION` in `src/lib/shared`
 6. `AUTH USER CONTEXT` — authenticated user id, name, email
+7. `USER MEMORY` (optional) — top-K durable facts retrieved from `agent_memory` for the authenticated user; rendered only when `AGENT_MEMORY_ENABLED` is true and pgvector is provisioned
 
 After assembly, `withAiSdkInlineCitationInstruction` appends inline citation rules and optionally FMP tool rules when `FMP_API_KEY` is set.
 

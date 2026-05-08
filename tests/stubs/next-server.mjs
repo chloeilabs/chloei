@@ -18,6 +18,4 @@ export class NextResponse extends Response {
   }
 }
 
-export function after(callback) {
-  void callback
-}
+export function after() {}
