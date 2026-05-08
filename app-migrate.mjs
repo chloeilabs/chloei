@@ -68,6 +68,18 @@ CREATE TABLE IF NOT EXISTS agent_rate_limit (
 CREATE INDEX IF NOT EXISTS agent_rate_limit_last_seen_at_idx
 ON agent_rate_limit ("lastSeenAt");
 
+DROP TABLE IF EXISTS agent_job;
+DROP TABLE IF EXISTS ${LEGACY_EVENT_TABLE};
+
+ALTER TABLE thread
+DROP COLUMN IF EXISTS "${LEGACY_THREAD_CONFIG_COLUMN}";
+
+-- Finance shares the auth database and stores additional thread metadata in
+-- the shared thread table. Preserve compatible columns when Chloei migrations
+-- rerun so cross-app storage stays stable.
+`
+
+const MEMORY_SCHEMA_SQL = `
 CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE TABLE IF NOT EXISTS agent_memory (
@@ -86,16 +98,6 @@ ON agent_memory ("userId", "updatedAt" DESC);
 CREATE INDEX IF NOT EXISTS agent_memory_embedding_idx
 ON agent_memory
 USING hnsw (embedding vector_cosine_ops);
-
-DROP TABLE IF EXISTS agent_job;
-DROP TABLE IF EXISTS ${LEGACY_EVENT_TABLE};
-
-ALTER TABLE thread
-DROP COLUMN IF EXISTS "${LEGACY_THREAD_CONFIG_COLUMN}";
-
--- Finance shares the auth database and stores additional thread metadata in
--- the shared thread table. Preserve compatible columns when Chloei migrations
--- rerun so cross-app storage stays stable.
 `
 
 if (!databaseUrl) {
@@ -114,6 +116,22 @@ try {
   await client.query(APP_STORAGE_SCHEMA_SQL)
   await client.query("COMMIT")
   console.log("Applied app storage schema.")
+
+  try {
+    await client.query("BEGIN")
+    await client.query(MEMORY_SCHEMA_SQL)
+    await client.query("COMMIT")
+    console.log("Applied long-term memory schema (pgvector).")
+  } catch (memoryError) {
+    await client.query("ROLLBACK").catch(() => undefined)
+    console.warn(
+      "Skipping long-term memory schema: pgvector extension is unavailable.",
+      memoryError instanceof Error ? memoryError.message : memoryError
+    )
+    console.warn(
+      "Memory features will be disabled. Use a Postgres image that ships pgvector (e.g. pgvector/pgvector:pg16) to enable them."
+    )
+  }
 } catch (error) {
   await client.query("ROLLBACK").catch(() => undefined)
   throw error

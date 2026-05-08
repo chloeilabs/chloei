@@ -17,3 +17,7 @@ export class NextResponse extends Response {
     return new NextResponse(JSON.stringify(body), normalizedInit)
   }
 }
+
+export function after(callback) {
+  void callback
+}

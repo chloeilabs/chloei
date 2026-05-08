@@ -1,4 +1,4 @@
-import { type NextRequest } from "next/server"
+import { after, type NextRequest } from "next/server"
 
 import { getModels } from "@/lib/actions/api-keys"
 import { createLogger } from "@/lib/logger"
@@ -269,18 +269,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const onStreamSettled = async () => {
-      try {
-        await concurrencySlot?.release()
-      } finally {
-        if (lastUserMessageContent.trim().length > 0) {
-          await recordUserMemory({
-            userId: session.user.id,
-            userMessage: lastUserMessageContent,
-            aiGatewayApiKey,
-          })
-        }
-      }
+    if (lastUserMessageContent.trim().length > 0) {
+      after(async () => {
+        await recordUserMemory({
+          userId: session.user.id,
+          userMessage: lastUserMessageContent,
+          aiGatewayApiKey,
+        })
+      })
     }
 
     return observeRouteResponse(
@@ -301,7 +297,7 @@ export async function POST(request: NextRequest) {
         ),
         messages: parsedRequest.messages,
         systemInstruction,
-        onStreamSettled,
+        onStreamSettled: concurrencySlot?.release,
       }),
       {
         outcome: "stream_started",
