@@ -21,6 +21,7 @@ interface AgentContextOverrides {
   operatingInstruction?: string
   providerOverlaysEnabled?: boolean
   taskModeOverlaysEnabled?: boolean
+  userMemoryBlock?: string
 }
 
 function formatPromptBlock(label: string, body: string): string {
@@ -102,6 +103,7 @@ function composeSystemInstruction(params: {
   operatingInstruction?: string
   providerOverlaysEnabled?: boolean
   taskModeOverlaysEnabled?: boolean
+  userMemoryBlock?: string
 }): string {
   const blocks = [
     formatPromptBlock(
@@ -134,6 +136,11 @@ function composeSystemInstruction(params: {
 
   blocks.push(formatPromptBlock("AUTH USER CONTEXT", params.authUserContext))
 
+  const memoryBody = params.userMemoryBlock?.trim()
+  if (memoryBody) {
+    blocks.push(formatPromptBlock("USER MEMORY", memoryBody))
+  }
+
   return blocks.join("\n\n")
 }
 
@@ -148,5 +155,6 @@ export function buildAgentSystemInstruction(
     operatingInstruction: overrides.operatingInstruction,
     providerOverlaysEnabled: overrides.providerOverlaysEnabled,
     taskModeOverlaysEnabled: overrides.taskModeOverlaysEnabled,
+    userMemoryBlock: overrides.userMemoryBlock,
   })
 }

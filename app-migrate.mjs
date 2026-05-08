@@ -68,6 +68,25 @@ CREATE TABLE IF NOT EXISTS agent_rate_limit (
 CREATE INDEX IF NOT EXISTS agent_rate_limit_last_seen_at_idx
 ON agent_rate_limit ("lastSeenAt");
 
+CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE IF NOT EXISTS agent_memory (
+  id text PRIMARY KEY,
+  "userId" text NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+  fact text NOT NULL,
+  embedding vector(1536) NOT NULL,
+  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+  "createdAt" timestamp(3) without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" timestamp(3) without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS agent_memory_user_updated_at_idx
+ON agent_memory ("userId", "updatedAt" DESC);
+
+CREATE INDEX IF NOT EXISTS agent_memory_embedding_idx
+ON agent_memory
+USING hnsw (embedding vector_cosine_ops);
+
 DROP TABLE IF EXISTS agent_job;
 DROP TABLE IF EXISTS ${LEGACY_EVENT_TABLE};
 

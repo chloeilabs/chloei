@@ -33,6 +33,11 @@ import {
 } from "@/lib/server/e2e-test-mode"
 import type { AgentRuntimeProfileId } from "@/lib/server/llm/agent-runtime"
 import {
+  formatMemoryBlock,
+  recordUserMemory,
+  searchUserMemory,
+} from "@/lib/server/memory"
+import {
   evaluateAndConsumeSlidingWindowRateLimit,
   tryAcquireConcurrencySlot,
 } from "@/lib/server/rate-limit"
@@ -174,6 +179,22 @@ export async function POST(request: NextRequest) {
       parsedRequest.runMode === "research"
         ? "research"
         : inferPromptTaskMode(parsedRequest.messages)
+
+    const lastUserMessage =
+      parsedRequest.messages[parsedRequest.messages.length - 1]
+    const lastUserMessageContent =
+      lastUserMessage?.role === "user" ? lastUserMessage.content : ""
+
+    const userMemoryBlock = aiGatewayApiKey
+      ? formatMemoryBlock(
+          await searchUserMemory({
+            userId: session.user.id,
+            query: lastUserMessageContent,
+            aiGatewayApiKey,
+          })
+        )
+      : ""
+
     const systemInstruction = buildAgentSystemInstruction(
       {
         id: session.user.id,
@@ -185,6 +206,9 @@ export async function POST(request: NextRequest) {
         userTimeZone,
         provider: promptProvider,
         taskMode: promptTaskMode,
+      },
+      {
+        userMemoryBlock,
       }
     )
 
@@ -245,6 +269,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const onStreamSettled = async () => {
+      try {
+        await concurrencySlot?.release()
+      } finally {
+        if (lastUserMessageContent.trim().length > 0) {
+          await recordUserMemory({
+            userId: session.user.id,
+            userMessage: lastUserMessageContent,
+            aiGatewayApiKey,
+          })
+        }
+      }
+    }
+
     return observeRouteResponse(
       observation,
       createAgentStreamResponse({
@@ -263,7 +301,7 @@ export async function POST(request: NextRequest) {
         ),
         messages: parsedRequest.messages,
         systemInstruction,
-        onStreamSettled: concurrencySlot?.release,
+        onStreamSettled,
       }),
       {
         outcome: "stream_started",

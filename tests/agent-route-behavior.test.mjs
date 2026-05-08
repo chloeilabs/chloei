@@ -35,6 +35,7 @@ setTestModuleStubs({
   ),
   "@/lib/server/auth": toProjectFileUrl("tests/stubs/auth.mjs"),
   "@/lib/server/auth-session": toProjectFileUrl("tests/stubs/auth-session.mjs"),
+  "@/lib/server/memory": toProjectFileUrl("tests/stubs/memory.mjs"),
   "@/lib/server/rate-limit": toProjectFileUrl("tests/stubs/rate-limit.mjs"),
   "@/lib/server/threads": toProjectFileUrl("tests/stubs/threads.mjs"),
   "next/server": toProjectFileUrl("tests/stubs/next-server.mjs"),
