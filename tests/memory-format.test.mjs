@@ -40,7 +40,10 @@ test("formatMemoryBlock renders a labeled bullet list with guidance", () => {
   assert.match(block, /durable facts about the authenticated user/)
   assert.match(block, /- The user prefers Python for data analysis\./)
   assert.match(block, /- The user lives in Austin, Texas\./)
-  assert.match(block, /If a fact contradicts new information from the user, trust the user\./)
+  assert.match(
+    block,
+    /If a fact contradicts new information from the user, trust the user\./
+  )
 })
 
 test("buildAgentSystemInstruction wraps the user memory block in delimiters", () => {
