@@ -176,3 +176,33 @@ test("preserved code execution workspace does not overwrite mounted inputs", asy
     await rm(tempRoot, { recursive: true, force: true })
   }
 })
+
+test("preserved code execution workspace excludes nested mounted inputs from artifacts", async () => {
+  const tempRoot = await mkdtemp(path.join(tmpdir(), "chloei-code-test-"))
+  try {
+    const inputSource = path.join(tempRoot, "source.xlsx")
+    await writeFile(inputSource, "original")
+
+    const tools = createAiSdkCodeExecutionTools({
+      backend: "finance",
+      workspaceMode: "preserve",
+      workspaceRoot: tempRoot,
+      inputFiles: [
+        {
+          sourcePath: inputSource,
+          relativePath: "models/input.xlsx",
+        },
+      ],
+    })
+
+    const result = await tools.code_execution.execute({
+      language: "python",
+      code: "print('noop')",
+    })
+
+    assert.equal(result.error, undefined)
+    assert.deepEqual(result.output?.artifactManifest, [])
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true })
+  }
+})

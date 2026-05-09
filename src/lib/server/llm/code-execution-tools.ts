@@ -419,18 +419,29 @@ async function collectArtifactManifest(
 }
 
 function normalizeInputFileRelativePath(value: string): string | null {
-  const normalized = path.normalize(value.trim())
+  const normalized = value.trim().replaceAll("\\", "/")
   if (
     !normalized ||
-    path.isAbsolute(normalized) ||
-    normalized === "." ||
-    normalized.startsWith("..") ||
-    normalized.split(path.sep).includes("..")
+    normalized.startsWith("/") ||
+    /^[A-Za-z]:\//.test(normalized)
   ) {
     return null
   }
 
-  return normalized
+  const segments = normalized.split("/")
+  if (
+    segments.some(
+      (segment) =>
+        !segment ||
+        segment === "." ||
+        segment === ".." ||
+        segment.includes("\0")
+    )
+  ) {
+    return null
+  }
+
+  return segments.join("/")
 }
 
 async function copyInputFiles(
