@@ -25,6 +25,10 @@ interface DescribeImageParams {
 export async function describeAttachmentImage(
   params: DescribeImageParams
 ): Promise<string> {
+  if (!params.attachment.dataUrl) {
+    throw new Error("Image attachment payload is missing.")
+  }
+
   const gatewayProvider = createGateway({
     apiKey: params.aiGatewayApiKey,
     fetch: aiGatewayFetch,

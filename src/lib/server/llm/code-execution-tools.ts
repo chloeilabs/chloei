@@ -1,7 +1,15 @@
 import { spawn } from "node:child_process"
 import { createHash, randomUUID } from "node:crypto"
 import { createReadStream } from "node:fs"
-import { copyFile, mkdir, mkdtemp, readdir, rm, stat } from "node:fs/promises"
+import {
+  copyFile,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  stat,
+} from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
@@ -13,6 +21,12 @@ import {
   AGENT_CODE_EXECUTION_BACKEND,
   AGENT_CODE_EXECUTION_PYTHON_VENV_PATH,
 } from "@/lib/server/agent-runtime-config"
+import {
+  buildAuthenticatedPrivateBlobDownloadUrl,
+  buildPrivateBlobArtifactPathname,
+  isPrivateBlobConfigured,
+  uploadPrivateBlob,
+} from "@/lib/server/private-blob-storage"
 import type { CodeExecutionArtifactMetadata, ToolName } from "@/lib/shared"
 
 const CODE_EXECUTION_TOOL_NAME = "code_execution" as const
@@ -39,6 +53,7 @@ interface CodeExecutionToolArgs {
   workspaceMode: CodeExecutionWorkspaceMode
   workspaceRoot?: string
   artifactBaseUrl?: string
+  artifactUpload?: CodeExecutionArtifactUploadOptions
   exposeArtifactDirectory?: boolean
   inputFiles?: CodeExecutionInputFile[]
 }
@@ -46,6 +61,11 @@ interface CodeExecutionToolArgs {
 interface CodeExecutionInputFile {
   sourcePath: string
   relativePath: string
+}
+
+interface CodeExecutionArtifactUploadOptions {
+  artifactId: string
+  userId: string
 }
 
 interface CodeExecutionArtifact {
@@ -104,6 +124,7 @@ interface CreateAiSdkCodeExecutionToolsOptions {
   workspaceMode?: CodeExecutionWorkspaceMode
   workspaceRoot?: string
   artifactBaseUrl?: string
+  artifactUpload?: CodeExecutionArtifactUploadOptions
   exposeArtifactDirectory?: boolean
   inputFiles?: CodeExecutionInputFile[]
 }
@@ -184,6 +205,28 @@ const PYTHON_FINANCE_ALLOWED_IMPORTS = new Set([
 
 const PYTHON_STRING_LITERAL_PATTERN =
   /(?:^|[^A-Za-z0-9_])(?:[rRuUbBfF]{0,3})(["'])((?:\\.|(?!\1)[^\\\r\n])*)\1/g
+
+const ARTIFACT_CONTENT_TYPES_BY_EXTENSION: Record<string, string> = {
+  ".csv": "text/csv; charset=utf-8",
+  ".gif": "image/gif",
+  ".jpeg": "image/jpeg",
+  ".jpg": "image/jpeg",
+  ".json": "application/json; charset=utf-8",
+  ".pdf": "application/pdf",
+  ".png": "image/png",
+  ".pptx":
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  ".txt": "text/plain; charset=utf-8",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+}
+
+function inferArtifactContentType(relativePath: string): string {
+  return (
+    ARTIFACT_CONTENT_TYPES_BY_EXTENSION[
+      path.extname(relativePath).toLowerCase()
+    ] ?? "application/octet-stream"
+  )
+}
 
 function clampTimeoutMs(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -363,7 +406,8 @@ function appendWithLimit(
 async function collectArtifactManifest(
   rootDir: string,
   excludedPathHashes: ReadonlyMap<string, string> = new Map(),
-  artifactBaseUrl?: string
+  artifactBaseUrl?: string,
+  artifactUpload?: CodeExecutionArtifactUploadOptions
 ): Promise<CodeExecutionArtifact[]> {
   const artifacts: CodeExecutionArtifact[] = []
   const normalizedArtifactBaseUrl = artifactBaseUrl?.replace(/\/+$/, "")
@@ -404,17 +448,39 @@ async function collectArtifactManifest(
         }
       }
 
+      let artifactUrl = normalizedArtifactBaseUrl
+        ? `${normalizedArtifactBaseUrl}/${relativePath
+            .split("/")
+            .map((segment) => encodeURIComponent(segment))
+            .join("/")}`
+        : undefined
+
+      if (artifactUpload && isPrivateBlobConfigured()) {
+        const blobPathname = buildPrivateBlobArtifactPathname({
+          artifactId: artifactUpload.artifactId,
+          userId: artifactUpload.userId,
+          relativePath,
+        })
+        if (blobPathname) {
+          const artifactBody = await readFile(fullPath).catch(() => null)
+          const uploaded = artifactBody
+            ? await uploadPrivateBlob({
+                pathname: blobPathname,
+                body: artifactBody,
+                contentType: inferArtifactContentType(relativePath),
+              }).catch(() => null)
+            : null
+          const downloadUrl = uploaded
+            ? buildAuthenticatedPrivateBlobDownloadUrl(uploaded.pathname)
+            : null
+          artifactUrl = downloadUrl ?? artifactUrl
+        }
+      }
+
       artifacts.push({
         path: relativePath,
         sizeBytes: fileStats.size,
-        ...(normalizedArtifactBaseUrl
-          ? {
-              url: `${normalizedArtifactBaseUrl}/${relativePath
-                .split("/")
-                .map((segment) => encodeURIComponent(segment))
-                .join("/")}`,
-            }
-          : {}),
+        ...(artifactUrl ? { url: artifactUrl } : {}),
       })
     }
   }
@@ -607,6 +673,7 @@ async function runProcess(args: {
   workspaceMode: CodeExecutionWorkspaceMode
   workspaceRoot?: string
   artifactBaseUrl?: string
+  artifactUpload?: CodeExecutionArtifactUploadOptions
   exposeArtifactDirectory?: boolean
   inputFiles?: CodeExecutionInputFile[]
 }): Promise<CodeExecutionToolResultPayload> {
@@ -649,7 +716,8 @@ async function runProcess(args: {
     collectArtifactManifest(
       workspaceDir,
       mountedInputFileHashes,
-      args.artifactBaseUrl
+      args.artifactBaseUrl,
+      args.artifactUpload
     )
 
   try {
@@ -819,6 +887,7 @@ async function executeCode(
       workspaceMode: args.workspaceMode,
       workspaceRoot: args.workspaceRoot,
       artifactBaseUrl: args.artifactBaseUrl,
+      artifactUpload: args.artifactUpload,
       exposeArtifactDirectory: args.exposeArtifactDirectory,
       inputFiles: args.inputFiles,
     })
@@ -843,6 +912,7 @@ async function executeCode(
     workspaceMode: args.workspaceMode,
     workspaceRoot: args.workspaceRoot,
     artifactBaseUrl: args.artifactBaseUrl,
+    artifactUpload: args.artifactUpload,
     exposeArtifactDirectory: args.exposeArtifactDirectory,
     inputFiles: args.inputFiles,
   })
@@ -916,6 +986,7 @@ export function createAiSdkCodeExecutionTools(
           workspaceMode,
           workspaceRoot,
           artifactBaseUrl: options.artifactBaseUrl,
+          artifactUpload: options.artifactUpload,
           exposeArtifactDirectory: options.exposeArtifactDirectory,
           inputFiles: options.inputFiles,
         }),

@@ -12,6 +12,10 @@ interface AgentTextModelMessagePart {
 }
 
 function toModelMessageAttachmentPart(attachment: AgentRequestAttachment) {
+  if (!attachment.dataUrl) {
+    throw new Error("Attachment payload is missing.")
+  }
+
   if (attachment.kind === "image") {
     return {
       type: "image" as const,

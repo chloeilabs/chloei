@@ -35,6 +35,10 @@ const MODEL_TYPE_SCHEMA = z.custom<ModelType>(
   "Invalid model type."
 )
 const AGENT_ATTACHMENT_MIME_TYPE_SCHEMA = z.enum(AGENT_ATTACHMENT_MIME_TYPES)
+const SHA256_HEX_SCHEMA = z
+  .string()
+  .trim()
+  .regex(/^[a-f0-9]{64}$/i)
 
 const messageSourceSchema = z
   .object({
@@ -187,6 +191,9 @@ const attachmentMetadataSchema = z
         message: "Attachment preview must be a supported image data URL.",
       })
       .optional(),
+    blobPathname: z.string().trim().min(1).max(800).optional(),
+    sha256: SHA256_HEX_SCHEMA.optional(),
+    downloadUrl: z.string().trim().min(1).max(2048).optional(),
   })
   .strict()
   .refine(
@@ -370,6 +377,13 @@ function sanitizeAttachmentMetadata(value: unknown) {
     sizeBytes: attachment.sizeBytes,
     ...(attachment.detail !== undefined ? { detail: attachment.detail } : {}),
     ...(previewDataUrl ? { previewDataUrl } : {}),
+    ...(attachment.blobPathname !== undefined
+      ? { blobPathname: attachment.blobPathname }
+      : {}),
+    ...(attachment.sha256 !== undefined ? { sha256: attachment.sha256 } : {}),
+    ...(attachment.downloadUrl !== undefined
+      ? { downloadUrl: attachment.downloadUrl }
+      : {}),
   })
 
   if (!parsed.success) {

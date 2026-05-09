@@ -14,11 +14,17 @@ import {
   buildAgentArtifactDownloadUrl,
   getAgentArtifactRunRoot,
 } from "@/lib/server/agent-artifacts"
+import { hydrateBlobBackedAttachments } from "@/lib/server/agent-attachment-blobs"
 import {
   AGENT_EVAL_RESULTS_DIR,
   AGENT_RESEARCH_TOOL_MAX_STEPS,
   AGENT_TOOL_MAX_STEPS,
 } from "@/lib/server/agent-runtime-config"
+import {
+  type AgentFeatureFlags,
+  getDefaultAgentFeatureFlags,
+} from "@/lib/server/integration-flags"
+import { hashUserId } from "@/lib/server/privacy"
 import {
   type AgentStreamEvent,
   modelSupportsImageInput,
@@ -36,6 +42,12 @@ import {
   shouldForceToolSynthesisStep,
 } from "./agent-runtime-tool-synthesis"
 import {
+  createAiSdkBrowserResearchTools,
+  getAiSdkBrowserResearchToolCallMetadata,
+  getAiSdkBrowserResearchToolResultMetadata,
+  isAiSdkBrowserResearchToolName,
+} from "./ai-sdk-browser-research-tools"
+import {
   createAiSdkFinanceDataTools,
   getAiSdkFinanceDataToolCallMetadata,
   getAiSdkFinanceDataToolResultMetadata,
@@ -49,6 +61,12 @@ import {
   getAiSdkGatewaySearchToolResultMetadata,
   isAiSdkGatewaySearchToolName,
 } from "./ai-sdk-gateway-search-tools"
+import {
+  createAiSdkKnowledgeSearchTools,
+  getAiSdkKnowledgeSearchToolCallMetadata,
+  getAiSdkKnowledgeSearchToolResultMetadata,
+  isAiSdkKnowledgeSearchToolName,
+} from "./ai-sdk-knowledge-search-tools"
 import {
   createAiSdkTavilyEvidenceContext,
   createAiSdkTavilyTools,
@@ -102,6 +120,8 @@ export interface StartAgentRuntimeStreamParams {
   temperature?: number
   signal?: AbortSignal
   artifactOwnerId?: string
+  userId?: string
+  featureFlags?: AgentFeatureFlags
   codeExecutionInputFiles?: {
     sourcePath: string
     relativePath: string
@@ -235,15 +255,22 @@ function withTimeout<T>(
 export async function* startAgentRuntimeStream(
   params: StartAgentRuntimeStreamParams
 ): AsyncGenerator<AgentStreamEvent> {
+  const userId = params.userId ?? params.artifactOwnerId
+  const featureFlags = params.featureFlags ?? getDefaultAgentFeatureFlags()
   const gatewayProvider = createGateway({
     apiKey: params.aiGatewayApiKey,
     fetch: aiGatewayFetch,
   })
 
+  const blobHydratedMessages = await hydrateBlobBackedAttachments({
+    messages: params.messages,
+    userId,
+    signal: params.signal,
+  })
   const inputMessages = modelSupportsImageInput(params.model)
-    ? params.messages
+    ? blobHydratedMessages
     : await describeImagesForTextOnlyModel({
-        messages: params.messages,
+        messages: blobHydratedMessages,
         aiGatewayApiKey: params.aiGatewayApiKey,
         signal: params.signal,
       })
@@ -327,6 +354,13 @@ export async function* startAgentRuntimeStream(
             ? codeExecutionWorkspaceRoot
             : undefined,
         artifactBaseUrl,
+        artifactUpload:
+          artifactRunId && userId
+            ? {
+                artifactId: artifactRunId,
+                userId,
+              }
+            : undefined,
         exposeArtifactDirectory: runtimeProfile.id === "gdpval_workspace",
         inputFiles:
           runtimeProfile.id === "gdpval_workspace"
@@ -338,6 +372,15 @@ export async function* startAgentRuntimeStream(
         userTimeZone: params.userTimeZone,
       }),
       ...createAiSdkTavilyTools(normalizedTavilyApiKey),
+      ...createAiSdkKnowledgeSearchTools({
+        enabled: featureFlags.knowledgeSearchEnabled,
+        userId,
+      }),
+      ...createAiSdkBrowserResearchTools({
+        enabled: featureFlags.browserbaseEnabled,
+        userId,
+        requestId: params.requestId,
+      }),
       ...(runtimeProfile.financeDataEnabled
         ? createAiSdkFinanceDataTools({
             fmpApiKey: normalizedFmpApiKey,
@@ -442,6 +485,19 @@ export async function* startAgentRuntimeStream(
       providerOptions: getAiSdkGatewayProviderOptionsForMode({
         deepResearch: runtimeProfile.id === "deep_research",
       }),
+      experimental_telemetry: {
+        isEnabled: true,
+        recordInputs: featureFlags.telemetryRecordIo,
+        recordOutputs: featureFlags.telemetryRecordIo,
+        functionId: "chloei.agent.stream",
+        metadata: {
+          requestId: params.requestId ?? "",
+          modelId: params.model,
+          runtimeProfile: runtimeProfile.id,
+          toolNames: toolNames.join(","),
+          userHash: userId ? hashUserId(userId) : "",
+        },
+      },
       tools,
       prepareStep: ({ messages: stepMessages, stepNumber, steps }) => {
         const compatibleMessages = getCompatibleStepMessages(
@@ -571,6 +627,8 @@ export async function* startAgentRuntimeStream(
           getAiSdkGatewaySearchToolCallMetadata(part) ??
           getAiSdkCodeExecutionToolCallMetadata(part) ??
           getAiSdkTavilyToolCallMetadata(part) ??
+          getAiSdkKnowledgeSearchToolCallMetadata(part) ??
+          getAiSdkBrowserResearchToolCallMetadata(part) ??
           getAiSdkFinanceDataToolCallMetadata(part) ??
           fmpToolsContext?.getToolCallMetadata(part)
         if (!metadata || seenToolCalls.has(metadata.callId)) {
@@ -608,6 +666,8 @@ export async function* startAgentRuntimeStream(
           getAiSdkGatewaySearchToolResultMetadata(part) ??
           getAiSdkCodeExecutionToolResultMetadata(part) ??
           getAiSdkTavilyToolResultMetadata(part) ??
+          getAiSdkKnowledgeSearchToolResultMetadata(part) ??
+          getAiSdkBrowserResearchToolResultMetadata(part) ??
           getAiSdkFinanceDataToolResultMetadata(part) ??
           fmpToolsContext?.getToolResultMetadata(part)
         if (!metadata || finalizedToolCalls.has(metadata.callId)) {
@@ -664,6 +724,8 @@ export async function* startAgentRuntimeStream(
         (isAiSdkGatewaySearchToolName(part.toolName) ||
           isAiSdkCodeExecutionToolName(part.toolName) ||
           isAiSdkTavilyToolName(part.toolName) ||
+          isAiSdkKnowledgeSearchToolName(part.toolName) ||
+          isAiSdkBrowserResearchToolName(part.toolName) ||
           isAiSdkFinanceDataToolName(part.toolName) ||
           fmpToolsContext?.isToolName(part.toolName)) &&
         !finalizedToolCalls.has(part.toolCallId)
@@ -674,6 +736,8 @@ export async function* startAgentRuntimeStream(
           isAiSdkGatewaySearchToolName(part.toolName) ||
           isAiSdkCodeExecutionToolName(part.toolName) ||
           isAiSdkTavilyToolName(part.toolName) ||
+          isAiSdkKnowledgeSearchToolName(part.toolName) ||
+          isAiSdkBrowserResearchToolName(part.toolName) ||
           isAiSdkFinanceDataToolName(part.toolName)
             ? part.toolName
             : "fmp_mcp"

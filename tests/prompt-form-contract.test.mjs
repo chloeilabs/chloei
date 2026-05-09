@@ -10,7 +10,7 @@ const promptFormPath = path.join(
   "src/components/agent/prompt-form/prompt-form.tsx"
 )
 
-test("prompt form gates submit while attachment files are still reading", async () => {
+test("prompt form queues submit while attachment files are still reading", async () => {
   const source = await readFile(promptFormPath, "utf8")
 
   assert.match(
@@ -25,8 +25,13 @@ test("prompt form gates submit while attachment files are still reading", async 
   )
   assert.match(
     source,
-    /isFormPending \|\|\s+isReadingAttachments\s+\) \{\s+return/,
-    "Expected submit handling to return while attachment reads are in flight."
+    /const submitAfterAttachmentsRef = useRef\(false\)/,
+    "Expected PromptForm to track submit intent during attachment reads."
+  )
+  assert.match(
+    source,
+    /if \(isReadingAttachmentsRef\.current\) \{\s+submitAfterAttachmentsRef\.current = true\s+return\s+\}/,
+    "Expected submit handling to queue submits while attachment reads are in flight."
   )
 })
 

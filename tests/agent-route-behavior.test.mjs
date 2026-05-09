@@ -48,6 +48,8 @@ const { POST } = await import(routeUrl)
 const originalAiGatewayApiKey = process.env.AI_GATEWAY_API_KEY
 const originalTavilyApiKey = process.env.TAVILY_API_KEY
 const originalFmpApiKey = process.env.FMP_API_KEY
+const originalFinanceWorkflowsEnabled =
+  process.env.AGENT_FINANCE_WORKFLOWS_ENABLED
 
 let recorded
 
@@ -107,6 +109,7 @@ beforeEach(() => {
   process.env.AI_GATEWAY_API_KEY = "ai-gateway-key"
   process.env.TAVILY_API_KEY = "tavily-key"
   process.env.FMP_API_KEY = "fmp-key"
+  delete process.env.AGENT_FINANCE_WORKFLOWS_ENABLED
 
   resetTestMocks()
   setTestMocks({
@@ -230,6 +233,12 @@ after(() => {
   process.env.AI_GATEWAY_API_KEY = originalAiGatewayApiKey
   process.env.TAVILY_API_KEY = originalTavilyApiKey
   process.env.FMP_API_KEY = originalFmpApiKey
+  if (originalFinanceWorkflowsEnabled === undefined) {
+    delete process.env.AGENT_FINANCE_WORKFLOWS_ENABLED
+  } else {
+    process.env.AGENT_FINANCE_WORKFLOWS_ENABLED =
+      originalFinanceWorkflowsEnabled
+  }
 })
 
 test("agent route returns auth unavailable when auth is disabled", async () => {
@@ -386,6 +395,8 @@ test("agent route passes the resolved prompt context into stream creation", asyn
 })
 
 test("agent route injects financial services workflow and uses finance runtime", async () => {
+  process.env.AGENT_FINANCE_WORKFLOWS_ENABLED = "true"
+
   setTestMocks({
     agentPromptSteering: {
       inferPromptTaskMode() {
