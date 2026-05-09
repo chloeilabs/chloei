@@ -50,6 +50,7 @@ function createFetchRecorder(responseFactory) {
       body: init?.body ? JSON.parse(init.body) : undefined,
       headers: new Headers(init?.headers),
       method: init?.method,
+      signal: init?.signal,
       url: String(url),
     })
     return responseFactory()
@@ -359,6 +360,32 @@ test("commitLongTermMemory supports Mem0 Platform API request shape", async () =
       user_id: "user-1",
     },
   })
+})
+
+test("commitLongTermMemory uses an independent post-stream timeout signal", async () => {
+  const requestController = new AbortController()
+  requestController.abort()
+  const { calls, fetchFn } = createFetchRecorder(() =>
+    Response.json({ event_id: "event-1", status: "PENDING" })
+  )
+
+  const committed = await commitLongTermMemory({
+    assistantContent: "Assistant answer with durable preference.",
+    config: createConfig({
+      mem0ApiKey: "m0-platform-key",
+      mem0ApiUrl: "https://api.mem0.ai",
+    }),
+    fetchFn,
+    messages: [{ role: "user", content: "Latest user preference" }],
+    requestId: "request-1",
+    signal: requestController.signal,
+    threadId: "thread-1",
+    userId: "user-1",
+  })
+
+  assert.equal(committed, true)
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].signal.aborted, false)
 })
 
 test("commitLongTermMemory skips sensitive content and failed writes", async () => {

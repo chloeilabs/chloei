@@ -304,7 +304,6 @@ export async function POST(request: NextRequest) {
                   assistantContent,
                   messages: parsedRequest.messages,
                   requestId,
-                  signal: request.signal,
                   threadId,
                   userId: session.user.id,
                 })
