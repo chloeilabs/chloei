@@ -32,6 +32,9 @@ const agentAttachmentBlobsUrl = pathToFileURL(
 const knowledgeSearchUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/llm/ai-sdk-knowledge-search-tools.ts")
 ).href
+const knowledgeIndexingUrl = pathToFileURL(
+  path.join(cwd, "src/lib/server/knowledge-indexing.ts")
+).href
 const integrationFlagsUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/integration-flags.ts")
 ).href
@@ -61,6 +64,13 @@ const {
   getAiSdkKnowledgeSearchToolResultMetadata,
 } = await import(knowledgeSearchUrl)
 const {
+  buildUploadedDocumentSearchRecords,
+  chunkKnowledgeText,
+  extractSimplePdfText,
+  indexUploadedDocument,
+  normalizeExtractedKnowledgeText,
+} = await import(knowledgeIndexingUrl)
+const {
   resolveAgentFeatureFlags,
   resolveIntegrationBooleanFlag,
   toEdgeConfigFlagKey,
@@ -75,9 +85,11 @@ const {
 const { scrubPostHogEvent, scrubPostHogProperties } = await import(
   postHogScrubbingUrl
 )
-const { resolveInngestEnvironmentName, shouldSendInngestEvents } = await import(
-  inngestEnvironmentUrl
-)
+const {
+  resolveInngestEnvironmentName,
+  shouldRunInngestInlineFallback,
+  shouldSendInngestEvents,
+} = await import(inngestEnvironmentUrl)
 
 test("private Blob path helpers keep downloads user-scoped", () => {
   const attachmentId = "01989a40-465d-45c2-8506-b8ddb940b9ad"
@@ -155,6 +167,134 @@ test("knowledge search filter scopes private results to the user", () => {
   assert(
     JSON.stringify(filter).includes("@metadata.visibility"),
     "Expected public visibility to remain searchable."
+  )
+})
+
+test("uploaded document indexing builds private user-scoped search records", () => {
+  const records = buildUploadedDocumentSearchRecords({
+    userId: "user-1",
+    documentId: "document-1",
+    pathname:
+      "users/0a041b9462caa4a31bac3567e0b6e6fd9100787d4d01cf6d1ad9d4731ca8f42f/attachments/document-1/statement.pdf",
+    filename: "statement.pdf",
+    contentType: "application/pdf",
+    sizeBytes: 1200,
+    sha256: "a".repeat(64),
+    text: "Investment policy statement. EBITDA covenant threshold is 3.5x.",
+    asOfDate: "2026-05-09",
+  })
+
+  assert.equal(records.length, 1)
+  assert.equal(
+    records[0].id,
+    `uploaded-document:${records[0].metadata.ownerKey}:document-1:chunk:0`
+  )
+  assert.equal(records[0].content.sourceType, "uploaded_document")
+  assert.equal(records[0].metadata.visibility, "private")
+  assert.equal(records[0].metadata.corpus, "uploads")
+  assert.equal(records[0].metadata.ownerId, "user-1")
+  assert.equal(records[0].metadata.userId, "user-1")
+  assert.equal(records[0].metadata.documentId, "document-1")
+  assert.equal(records[0].metadata.asOfDate, "2026-05-09")
+  assert.equal(
+    records[0].metadata.artifactUrl,
+    "/api/uploads/users/0a041b9462caa4a31bac3567e0b6e6fd9100787d4d01cf6d1ad9d4731ca8f42f/attachments/document-1/statement.pdf"
+  )
+})
+
+test("knowledge text normalization and chunking cap unsafe document payloads", () => {
+  const text = `first\u0000 paragraph\n\n${"middle ".repeat(900)}last`
+  const normalized = normalizeExtractedKnowledgeText(text)
+  const chunks = chunkKnowledgeText(normalized, {
+    chunkChars: 800,
+    overlapChars: 80,
+    maxChunks: 3,
+  })
+
+  assert.equal(normalized.includes("\u0000"), false)
+  assert.equal(chunks.length, 3)
+  assert(chunks.every((chunk) => chunk.length <= 800))
+  assert.match(chunks[0], /^first paragraph/)
+})
+
+test("uploaded document indexing accepts PDF parameters and caps parse size", async () => {
+  const originalUrl = process.env.UPSTASH_SEARCH_REST_URL
+  const originalToken = process.env.UPSTASH_SEARCH_REST_TOKEN
+  try {
+    delete process.env.UPSTASH_SEARCH_REST_URL
+    delete process.env.UPSTASH_SEARCH_REST_TOKEN
+
+    const parameterizedMimeResult = await indexUploadedDocument({
+      userId: "user-1",
+      documentId: "document-1",
+      pathname: "users/user-1/attachments/document-1/statement.bin",
+      filename: "statement.bin",
+      contentType: "application/pdf; charset=binary",
+      sizeBytes: 100,
+      sha256: "b".repeat(64),
+      buffer: Buffer.from("%PDF-1.4", "latin1"),
+    })
+    assert.deepEqual(parameterizedMimeResult, {
+      indexed: false,
+      documentId: "document-1",
+      reason: "Upstash Search is not configured.",
+    })
+
+    const oversizedResult = await indexUploadedDocument({
+      userId: "user-1",
+      documentId: "document-large",
+      pathname: "users/user-1/attachments/document-large/statement.pdf",
+      filename: "statement.pdf",
+      contentType: "application/pdf",
+      sizeBytes: 26 * 1024 * 1024,
+      sha256: "c".repeat(64),
+      buffer: Buffer.from("%PDF-1.4", "latin1"),
+    })
+    assert.deepEqual(oversizedResult, {
+      indexed: false,
+      documentId: "document-large",
+      reason: "PDF too large to parse for indexing.",
+    })
+  } finally {
+    if (originalUrl === undefined) {
+      delete process.env.UPSTASH_SEARCH_REST_URL
+    } else {
+      process.env.UPSTASH_SEARCH_REST_URL = originalUrl
+    }
+
+    if (originalToken === undefined) {
+      delete process.env.UPSTASH_SEARCH_REST_TOKEN
+    } else {
+      process.env.UPSTASH_SEARCH_REST_TOKEN = originalToken
+    }
+  }
+})
+
+test("simple PDF fallback extracts uncompressed text operators", () => {
+  const pdf = Buffer.from(
+    `%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 91 >>
+stream
+BT (Chloei smoke SMOKETEST) Tj [( and governed ) 20 (fallback indexing.)] TJ ET
+endstream
+endobj
+%%EOF`,
+    "latin1"
+  )
+
+  assert.equal(
+    extractSimplePdfText(pdf),
+    "Chloei smoke SMOKETEST and governed fallback indexing."
   )
 })
 
@@ -498,6 +638,33 @@ test("async report enqueue failure isolates status update failures", () => {
   )
 })
 
+test("Inngest inline fallback is explicit and covers report/upload routes", () => {
+  assert.equal(shouldRunInngestInlineFallback({}), false)
+  assert.equal(
+    shouldRunInngestInlineFallback({ INNGEST_INLINE_FALLBACK: "true" }),
+    true
+  )
+
+  const reportRouteSource = readFileSync(
+    path.join(cwd, "src/app/api/jobs/report/route.ts"),
+    "utf8"
+  )
+  assert.match(reportRouteSource, /JOB_REPORT_INLINE_FALLBACK/)
+  assert.match(
+    reportRouteSource,
+    /const shouldRunInlineFallback = shouldRunInngestInlineFallback\(\)/
+  )
+  assert.match(reportRouteSource, /} else {\n\s+let enqueueError: unknown/)
+  assert.match(
+    readFileSync(path.join(cwd, "src/app/api/uploads/route.ts"), "utf8"),
+    /UPLOAD_INLINE_INDEX_FAILED/
+  )
+  assert.match(
+    readFileSync(path.join(cwd, "src/app/api/uploads/route.ts"), "utf8"),
+    /UPLOAD_INLINE_INDEX_SKIPPED/
+  )
+})
+
 test("private upload route validates client-supplied attachment ids", () => {
   const source = readFileSync(
     path.join(cwd, "src/app/api/uploads/route.ts"),
@@ -634,13 +801,54 @@ test("Inngest environment resolver uses explicit and branch names", () => {
   assert.equal(
     resolveInngestEnvironmentName({
       INNGEST_ENV: "preview-a",
+      VERCEL_ENV: "production",
       VERCEL_GIT_COMMIT_REF: "main",
     }),
     "preview-a"
   )
   assert.equal(
     resolveInngestEnvironmentName({
+      VERCEL_ENV: "production",
+      VERCEL_GIT_COMMIT_REF: "main",
+    }),
+    undefined
+  )
+  assert.equal(
+    resolveInngestEnvironmentName({
+      VERCEL_ENV: "preview",
+      VERCEL_GIT_COMMIT_REF: "main",
+      VERCEL_GIT_PRODUCTION_BRANCH: "main",
+    }),
+    undefined
+  )
+  assert.equal(
+    resolveInngestEnvironmentName({
+      VERCEL_ENV: "preview",
       VERCEL_GIT_COMMIT_REF: "feature/chloei",
+      VERCEL_GIT_PRODUCTION_BRANCH: "main",
+    }),
+    "feature/chloei"
+  )
+  assert.equal(
+    resolveInngestEnvironmentName({
+      VERCEL_TARGET_ENV: "production",
+      VERCEL_GIT_COMMIT_REF: "main",
+    }),
+    undefined
+  )
+  assert.equal(
+    resolveInngestEnvironmentName({
+      VERCEL_TARGET_ENV: "preview",
+      VERCEL_GIT_COMMIT_REF: "main",
+      VERCEL_GIT_PRODUCTION_BRANCH: "main",
+    }),
+    undefined
+  )
+  assert.equal(
+    resolveInngestEnvironmentName({
+      VERCEL_TARGET_ENV: "preview",
+      VERCEL_GIT_COMMIT_REF: "feature/chloei",
+      VERCEL_GIT_PRODUCTION_BRANCH: "main",
     }),
     "feature/chloei"
   )

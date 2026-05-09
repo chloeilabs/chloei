@@ -48,6 +48,7 @@ const securityHeaders = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  serverExternalPackages: ["@napi-rs/canvas"],
   outputFileTracingExcludes: {
     "/api/agent": [
       "./CLAUDE.md",

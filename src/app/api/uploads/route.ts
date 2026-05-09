@@ -15,7 +15,11 @@ import {
 } from "@/lib/server/auth"
 import { getRequestSession } from "@/lib/server/auth-session"
 import { inngest } from "@/lib/server/inngest/client"
-import { shouldSendInngestEvents } from "@/lib/server/inngest/environment"
+import {
+  shouldRunInngestInlineFallback,
+  shouldSendInngestEvents,
+} from "@/lib/server/inngest/environment"
+import { indexUploadedDocument } from "@/lib/server/knowledge-indexing"
 import {
   capturePostHogProductEvent,
   toPostHogSizeBucket,
@@ -177,9 +181,10 @@ export async function POST(request: NextRequest) {
       filename: file.name || "attachment",
       attachmentId,
     })
+    const fileBuffer = Buffer.from(await file.arrayBuffer())
     const uploaded = await uploadPrivateBlob({
       pathname,
-      body: Buffer.from(await file.arrayBuffer()),
+      body: fileBuffer,
       contentType: mediaType,
       signal: request.signal,
     })
@@ -210,6 +215,33 @@ export async function POST(request: NextRequest) {
             requestId,
           })
         })
+    }
+
+    if (shouldRunInngestInlineFallback()) {
+      const fallbackResult = await indexUploadedDocument({
+        userId: session.user.id,
+        documentId: attachmentId,
+        pathname: uploaded.pathname,
+        filename: file.name || "attachment",
+        contentType: mediaType,
+        sizeBytes: uploaded.sizeBytes,
+        sha256: uploaded.sha256,
+        buffer: fileBuffer,
+      }).catch((error: unknown) => {
+        logger.warn("Inline document indexing fallback failed.", {
+          error,
+          errorCode: "UPLOAD_INLINE_INDEX_FAILED",
+          requestId,
+        })
+        return null
+      })
+      if (fallbackResult && !fallbackResult.indexed) {
+        logger.warn("Inline document indexing fallback skipped.", {
+          errorCode: "UPLOAD_INLINE_INDEX_SKIPPED",
+          reason: fallbackResult.reason,
+          requestId,
+        })
+      }
     }
 
     void capturePostHogProductEvent({

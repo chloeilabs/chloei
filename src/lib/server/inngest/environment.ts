@@ -13,9 +13,19 @@ export function resolveInngestEnvironmentName(
     return explicitEnvironment
   }
 
+  const vercelEnvironment =
+    trimmed(env.VERCEL_ENV) ?? trimmed(env.VERCEL_TARGET_ENV)
+  if (vercelEnvironment === "production") {
+    return undefined
+  }
+
   const branchEnvironment =
     trimmed(env.BRANCH_NAME) ?? trimmed(env.VERCEL_GIT_COMMIT_REF)
-  if (branchEnvironment) {
+  const productionBranch = trimmed(env.VERCEL_GIT_PRODUCTION_BRANCH) ?? "main"
+  if (
+    branchEnvironment &&
+    (vercelEnvironment !== "preview" || branchEnvironment !== productionBranch)
+  ) {
     return branchEnvironment
   }
 
@@ -35,4 +45,11 @@ export function shouldSendInngestEvents(
   }
 
   return Boolean(resolveInngestEnvironmentName(env)) || env.VERCEL === "1"
+}
+
+export function shouldRunInngestInlineFallback(
+  env: Environment = process.env
+): boolean {
+  const value = trimmed(env.INNGEST_INLINE_FALLBACK)
+  return value === "1" || value === "true"
 }
