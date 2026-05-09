@@ -44,6 +44,14 @@ const messageSourceSchema = z
   })
   .strict()
 
+const codeExecutionArtifactMetadataSchema = z
+  .object({
+    path: z.string().trim().min(1).max(500),
+    sizeBytes: z.number().int().nonnegative(),
+    url: z.string().trim().min(1).max(2048).optional(),
+  })
+  .strict()
+
 const toolRunMetadataSchema = {
   operation: z.string().trim().min(1).max(200).optional(),
   provider: z.string().trim().min(1).max(200).optional(),
@@ -51,6 +59,7 @@ const toolRunMetadataSchema = {
   durationMs: z.number().nonnegative().optional(),
   errorCode: z.string().trim().min(1).max(200).optional(),
   retryable: z.boolean().optional(),
+  artifactManifest: z.array(codeExecutionArtifactMetadataSchema).optional(),
 } as const
 
 const toolInvocationSchema = z

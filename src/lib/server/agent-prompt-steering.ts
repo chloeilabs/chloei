@@ -1,5 +1,12 @@
 import type { ModelType } from "@/lib/shared"
 
+import {
+  getLastUserMessage,
+  hasPersonalFinancialAdviceIntent,
+  normalizeUserText,
+  type PromptTextMessage,
+} from "./prompt-message-utils"
+
 export type PromptProvider =
   | "anthropic"
   | "deepseek"
@@ -16,10 +23,7 @@ export type PromptTaskMode =
   | "research"
   | "high_stakes"
 
-interface PromptSteeringMessage {
-  role: "user" | "assistant"
-  content: string
-}
+type PromptSteeringMessage = PromptTextMessage
 
 interface PromptSteeringBlock {
   label: string
@@ -41,8 +45,6 @@ const HIGH_STAKES_PATTERN =
   /\b(bank|password|phishing|security|medical|doctor|symptom|symptoms|dose|dosage|prescription|pregnant|lawsuit|legal|tax|suicid|self-harm|chest pain|emergency|infection)\b/i
 const FINANCE_ANALYSIS_PATTERN =
   /\b(stock|stocks|equity|equities|ticker|symbol|quote|quotes|company profile|finance data|financial data|finance provider|finance providers|structured finance|etf|fundamental|valuation|dcf|multiple|ev\/ebitda|ebitda|revenue|gross margin|operating margin|free cash flow|fcf|cash flow|income statement|balance sheet|financial statement|filing|10-k|10-q|earnings|guidance|dividend|buyback|market cap|enterprise value|treasury|yield curve|interest rate|fed funds|cpi|inflation|gdp|macro|fred|fx|foreign exchange|currency pair|commodity|commodities|oil|gold|crypto|bitcoin|ethereum|portfolio return|sharpe|beta|drawdown)\b/i
-const FINANCIAL_ADVICE_PATTERN =
-  /\b(should i buy|should i sell|buy or sell|personal financial advice|retirement account|401k|ira|tax return|tax filing|tax deduction|my portfolio|my savings|my mortgage|my debt)\b/i
 const CLOSED_ANSWER_PATTERN =
   /\b(multiple choice|choose one|which option|final answer|exact answer|boxed|answer:|confidence:|A\)|B\)|C\)|D\))\b/i
 const STRICT_OUTPUT_PATTERN =
@@ -164,24 +166,6 @@ Additional Grok finance guidance:
 `.trim(),
 ].join("\n\n")
 
-function normalizeUserText(messages: readonly PromptSteeringMessage[]): string {
-  return messages
-    .filter((message) => message.role === "user")
-    .map((message) => message.content.trim())
-    .filter(Boolean)
-    .join("\n\n")
-}
-
-function getLastUserMessage(
-  messages: readonly PromptSteeringMessage[]
-): string | null {
-  const lastUserMessage = [...messages]
-    .reverse()
-    .find((message) => message.role === "user" && message.content.trim())
-
-  return lastUserMessage?.content.trim() ?? null
-}
-
 export function resolvePromptProvider(model: ModelType): PromptProvider {
   if (model.startsWith("anthropic/")) {
     return "anthropic"
@@ -220,7 +204,7 @@ export function inferPromptTaskMode(
     STRICT_OUTPUT_PATTERN.test(lastUserMessage) ||
     STRICT_OUTPUT_PATTERN.test(fullUserText)
   const highStakes = HIGH_STAKES_PATTERN.test(lastUserMessage)
-  const financialAdvice = FINANCIAL_ADVICE_PATTERN.test(lastUserMessage)
+  const financialAdvice = hasPersonalFinancialAdviceIntent(lastUserMessage)
   const financeAnalysis =
     FINANCE_ANALYSIS_PATTERN.test(lastUserMessage) ||
     FINANCE_ANALYSIS_PATTERN.test(fullUserText)

@@ -65,3 +65,31 @@ test("reasoning timeline ignores whitespace-only initial chunks", () => {
   assert.equal(accumulator.activityTimeline[0]?.kind, "reasoning")
   assert.equal(accumulator.activityTimeline[0]?.text, expected)
 })
+
+test("tool result events clear artifact manifests with explicit empty arrays", () => {
+  const started = applyAgentStreamEvent(createAgentStreamAccumulator(), {
+    type: "tool_call",
+    callId: "call-1",
+    toolName: "code_execution",
+    label: "Running Python",
+    artifactManifest: [
+      {
+        path: "model.xlsx",
+        sizeBytes: 10,
+        url: "/api/agent/artifacts/run-1/model.xlsx",
+      },
+    ],
+  })
+
+  const completed = applyAgentStreamEvent(started, {
+    type: "tool_result",
+    callId: "call-1",
+    toolName: "code_execution",
+    status: "success",
+    artifactManifest: [],
+  })
+
+  assert.deepEqual(completed.toolInvocations[0]?.artifactManifest, [])
+  assert.equal(completed.activityTimeline[0]?.kind, "tool")
+  assert.deepEqual(completed.activityTimeline[0]?.artifactManifest, [])
+})

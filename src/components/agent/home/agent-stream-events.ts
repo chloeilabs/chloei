@@ -4,6 +4,7 @@ import {
   AGENT_RUN_STATUSES,
   type AgentRunStatus,
   type AgentStreamEvent,
+  type CodeExecutionArtifactMetadata,
   isToolName,
 } from "@/lib/shared"
 
@@ -95,6 +96,9 @@ function parseOptionalToolMetadata(record: Record<string, unknown>) {
     return null
   }
 
+  const artifactManifest = parseArtifactManifest(record.artifactManifest)
+  if (artifactManifest === null) return null
+
   return {
     ...(operation ? { operation } : {}),
     ...(provider ? { provider } : {}),
@@ -102,7 +106,57 @@ function parseOptionalToolMetadata(record: Record<string, unknown>) {
     ...(typeof durationMs === "number" ? { durationMs } : {}),
     ...(errorCode ? { errorCode } : {}),
     ...(typeof retryable === "boolean" ? { retryable } : {}),
+    ...(artifactManifest?.length ? { artifactManifest } : {}),
   }
+}
+
+function parseArtifactManifest(
+  value: unknown
+): CodeExecutionArtifactMetadata[] | null | undefined {
+  if (value === undefined || value === null) {
+    return undefined
+  }
+
+  if (!Array.isArray(value) || value.length > 50) {
+    return null
+  }
+
+  const artifacts: CodeExecutionArtifactMetadata[] = []
+  for (const entry of value) {
+    const record = asRecord(entry)
+    if (!record) {
+      return null
+    }
+
+    const artifactPath = asString(record.path)?.trim()
+    const artifactSegments = artifactPath?.replaceAll("\\", "/").split("/")
+    const sizeBytes = record.sizeBytes
+    const artifactUrlValue = record.url
+    const artifactUrl = asString(artifactUrlValue)?.trim()
+    const hasInvalidArtifactUrl =
+      artifactUrlValue !== undefined &&
+      artifactUrlValue !== null &&
+      artifactUrl?.startsWith("/api/agent/artifacts/") !== true
+    if (
+      !artifactPath ||
+      artifactPath.startsWith("/") ||
+      artifactSegments?.includes("..") ||
+      typeof sizeBytes !== "number" ||
+      !Number.isInteger(sizeBytes) ||
+      sizeBytes < 0 ||
+      hasInvalidArtifactUrl
+    ) {
+      return null
+    }
+
+    artifacts.push({
+      path: artifactPath,
+      sizeBytes,
+      ...(artifactUrl ? { url: artifactUrl } : {}),
+    })
+  }
+
+  return artifacts
 }
 
 export function parseStreamEventLine(line: string): AgentStreamEvent | null {

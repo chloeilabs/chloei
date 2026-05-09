@@ -2,6 +2,8 @@ import {
   type AuthViewer,
   DEFAULT_OPERATING_INSTRUCTION,
   DEFAULT_SOUL_FALLBACK_INSTRUCTION,
+  type FinancialServicesSkillId,
+  type FinancialServicesWorkflowId,
 } from "@/lib/shared"
 
 import {
@@ -11,6 +13,11 @@ import {
 } from "./agent-prompt-steering"
 
 interface RuntimePromptContext {
+  financialServicesWorkflow?: {
+    workflow: FinancialServicesWorkflowId
+    skillIds: readonly FinancialServicesSkillId[]
+    promptBlock: string
+  }
   longTermMemoryEnabled?: boolean
   longTermMemoryContext?: string
   now: Date
@@ -140,6 +147,15 @@ function composeSystemInstruction(params: {
 
   for (const block of promptSteeringBlocks) {
     blocks.push(formatPromptBlock(block.label, block.body))
+  }
+
+  if (params.runtimeContext.financialServicesWorkflow) {
+    blocks.push(
+      formatPromptBlock(
+        "FINANCIAL SERVICES WORKFLOW",
+        params.runtimeContext.financialServicesWorkflow.promptBlock
+      )
+    )
   }
 
   blocks.push(

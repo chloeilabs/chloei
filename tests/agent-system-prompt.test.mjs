@@ -144,3 +144,40 @@ test("agent system prompt advertises long-term memory only when enabled", () => 
   )
   assert(soulIndex > contextIndex, "SOUL.md should follow memory context")
 })
+
+test("agent system prompt injects financial services workflow after task steering", () => {
+  const prompt = buildAgentSystemInstruction(
+    {
+      id: "user-1",
+      name: "Chloei",
+      email: "user@example.com",
+    },
+    {
+      now: new Date("2026-05-03T12:34:56.000Z"),
+      provider: "openai",
+      taskMode: "finance_analysis",
+      financialServicesWorkflow: {
+        workflow: "financial_modeling",
+        skillIds: ["model-builder", "dcf-model"],
+        promptBlock:
+          "# Chloei Financial Services Workflow\n\nSelected workflow: financial_modeling\n\n## Selected Skills\n## Skill: dcf-model",
+      },
+    }
+  )
+
+  const operatingIndex = prompt.indexOf("--- BEGIN OPERATING INSTRUCTIONS ---")
+  const taskIndex = prompt.indexOf(
+    "--- BEGIN TASK MODE OVERLAY: FINANCE_ANALYSIS ---"
+  )
+  const workflowIndex = prompt.indexOf(
+    "--- BEGIN FINANCIAL SERVICES WORKFLOW ---"
+  )
+  const soulIndex = prompt.indexOf("--- BEGIN SHARED CONTEXT FILE: SOUL.md ---")
+
+  assert(operatingIndex >= 0, "OPERATING INSTRUCTIONS block not found")
+  assert(taskIndex >= 0, "FINANCE_ANALYSIS task block not found")
+  assert(workflowIndex > taskIndex, "Workflow should follow task steering")
+  assert(soulIndex > workflowIndex, "SOUL.md should follow workflow block")
+  assert.match(prompt, /Selected workflow: financial_modeling/)
+  assert.match(prompt, /Skill: dcf-model/)
+})

@@ -42,6 +42,8 @@ test("finance code execution reports workspace spreadsheet artifacts", async () 
       backend: "finance",
       workspaceMode: "preserve",
       workspaceRoot: tempRoot,
+      artifactBaseUrl: "/api/agent/artifacts/run-1",
+      exposeArtifactDirectory: true,
     })
     const result = await tools.code_execution.execute({
       language: "python",
@@ -57,7 +59,9 @@ test("finance code execution reports workspace spreadsheet artifacts", async () 
     assert.equal(result.output?.backend, "finance")
     assert.equal(
       result.output?.artifactManifest.some(
-        (artifact) => artifact.path === "finance_artifact.xlsx"
+        (artifact) =>
+          artifact.path === "finance_artifact.xlsx" &&
+          artifact.url === "/api/agent/artifacts/run-1/finance_artifact.xlsx"
       ),
       true
     )
@@ -90,6 +94,15 @@ test("finance code execution reports workspace spreadsheet artifacts", async () 
         durationMs: result.output.durationMs,
         errorCode: undefined,
         retryable: false,
+        artifactManifest: [
+          {
+            path: "finance_artifact.xlsx",
+            sizeBytes: result.output.artifactManifest.find(
+              (artifact) => artifact.path === "finance_artifact.xlsx"
+            ).sizeBytes,
+            url: "/api/agent/artifacts/run-1/finance_artifact.xlsx",
+          },
+        ],
         sources: [],
       }
     )
@@ -142,6 +155,12 @@ test("preserved code execution workspace does not overwrite mounted inputs", asy
     })
 
     assert.equal(writeResult.error, undefined)
+    assert.equal(
+      writeResult.output?.artifactManifest.some(
+        (artifact) => artifact.path === "mounted.xlsx"
+      ),
+      true
+    )
 
     const readResult = await tools.code_execution.execute({
       language: "python",
@@ -160,6 +179,56 @@ test("preserved code execution workspace does not overwrite mounted inputs", asy
       ),
       false
     )
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true })
+  }
+})
+
+test("preserved code execution workspace hides raw artifact directory by default", async () => {
+  const tempRoot = await mkdtemp(path.join(tmpdir(), "chloei-code-test-"))
+  try {
+    const tools = createAiSdkCodeExecutionTools({
+      backend: "finance",
+      workspaceMode: "preserve",
+      workspaceRoot: tempRoot,
+    })
+    const result = await tools.code_execution.execute({
+      language: "python",
+      code: "print('ok')",
+    })
+
+    assert.equal(result.error, undefined)
+    assert.equal(result.output?.artifactDirectory, undefined)
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true })
+  }
+})
+
+test("preserved code execution workspace excludes nested mounted inputs from artifacts", async () => {
+  const tempRoot = await mkdtemp(path.join(tmpdir(), "chloei-code-test-"))
+  try {
+    const inputSource = path.join(tempRoot, "source.xlsx")
+    await writeFile(inputSource, "original")
+
+    const tools = createAiSdkCodeExecutionTools({
+      backend: "finance",
+      workspaceMode: "preserve",
+      workspaceRoot: tempRoot,
+      inputFiles: [
+        {
+          sourcePath: inputSource,
+          relativePath: "models/input.xlsx",
+        },
+      ],
+    })
+
+    const result = await tools.code_execution.execute({
+      language: "python",
+      code: "print('noop')",
+    })
+
+    assert.equal(result.error, undefined)
+    assert.deepEqual(result.output?.artifactManifest, [])
   } finally {
     await rm(tempRoot, { recursive: true, force: true })
   }

@@ -11,6 +11,10 @@ import {
 
 import { createLogger } from "@/lib/logger"
 import {
+  buildAgentArtifactDownloadUrl,
+  getAgentArtifactRunRoot,
+} from "@/lib/server/agent-artifacts"
+import {
   AGENT_EVAL_RESULTS_DIR,
   AGENT_RESEARCH_TOOL_MAX_STEPS,
   AGENT_TOOL_MAX_STEPS,
@@ -66,6 +70,7 @@ import { createInitialReasoningChunkSanitizer } from "./initial-reasoning-chunk-
 const logger = createLogger("agent-runtime")
 
 const XAI_SOURCE_PREFETCH_TIMEOUT_MS = 8_000
+const AGENT_ARTIFACT_BASE_URL_PLACEHOLDER = "__artifact_base__"
 
 export type AgentRuntimeProfileId =
   | "chat_default"
@@ -96,6 +101,7 @@ export interface StartAgentRuntimeStreamParams {
   runtimeProfile?: AgentRuntimeProfileId
   temperature?: number
   signal?: AbortSignal
+  artifactOwnerId?: string
   codeExecutionInputFiles?: {
     sourcePath: string
     relativePath: string
@@ -133,6 +139,21 @@ const AGENT_RUNTIME_PROFILES: Record<
     financeDataEnabled: true,
     toolMaxSteps: AGENT_TOOL_MAX_STEPS,
   },
+}
+
+function buildAgentArtifactBaseUrl(artifactId: string): string | undefined {
+  const placeholderUrl = buildAgentArtifactDownloadUrl(
+    artifactId,
+    AGENT_ARTIFACT_BASE_URL_PLACEHOLDER
+  )
+  if (!placeholderUrl) {
+    return undefined
+  }
+
+  const placeholderSuffix = `/${AGENT_ARTIFACT_BASE_URL_PLACEHOLDER}`
+  return placeholderUrl.endsWith(placeholderSuffix)
+    ? placeholderUrl.slice(0, -placeholderSuffix.length)
+    : undefined
 }
 
 const FINAL_SYNTHESIS_STEP_INSTRUCTION = [
@@ -266,10 +287,25 @@ export async function* startAgentRuntimeStream(
   }
 
   try {
+    const artifactRunId =
+      runtimeProfile.id === "finance_analysis" && params.artifactOwnerId
+        ? randomUUID()
+        : undefined
     const codeExecutionWorkspaceRoot =
       runtimeProfile.id === "gdpval_workspace" && AGENT_EVAL_RESULTS_DIR
         ? path.join(AGENT_EVAL_RESULTS_DIR, "workspaces", randomUUID())
-        : undefined
+        : artifactRunId && params.artifactOwnerId
+          ? getAgentArtifactRunRoot({
+              artifactId: artifactRunId,
+              userId: params.artifactOwnerId,
+            })
+          : undefined
+    const codeExecutionWorkspaceMode =
+      runtimeProfile.codeExecutionWorkspaceMode ??
+      (artifactRunId ? "preserve" : undefined)
+    const artifactBaseUrl = artifactRunId
+      ? buildAgentArtifactBaseUrl(artifactRunId)
+      : undefined
     if (runtimeProfile.fmpMcpEnabled) {
       try {
         fmpToolsContext =
@@ -285,11 +321,13 @@ export async function* startAgentRuntimeStream(
     const tools = {
       ...createAiSdkCodeExecutionTools({
         backend: runtimeProfile.codeExecutionBackend,
-        workspaceMode: runtimeProfile.codeExecutionWorkspaceMode,
+        workspaceMode: codeExecutionWorkspaceMode,
         workspaceRoot:
-          runtimeProfile.id === "gdpval_workspace"
+          runtimeProfile.id === "gdpval_workspace" || artifactRunId
             ? codeExecutionWorkspaceRoot
             : undefined,
+        artifactBaseUrl,
+        exposeArtifactDirectory: runtimeProfile.id === "gdpval_workspace",
         inputFiles:
           runtimeProfile.id === "gdpval_workspace"
             ? params.codeExecutionInputFiles
@@ -600,6 +638,10 @@ export async function* startAgentRuntimeStream(
             : {}),
           ...("retryable" in metadata && metadata.retryable !== undefined
             ? { retryable: metadata.retryable }
+            : {}),
+          ...("artifactManifest" in metadata &&
+          metadata.artifactManifest?.length
+            ? { artifactManifest: metadata.artifactManifest }
             : {}),
         }
 

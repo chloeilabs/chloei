@@ -32,6 +32,7 @@ import {
   createE2eAgentStreamResponse,
   isE2eMockModeEnabled,
 } from "@/lib/server/e2e-test-mode"
+import { resolveFinancialServicesWorkflow } from "@/lib/server/financial-services-workflows"
 import type { AgentRuntimeProfileId } from "@/lib/server/llm/agent-runtime"
 import {
   commitLongTermMemory,
@@ -47,7 +48,7 @@ import {
   observeRouteResponse,
 } from "@/lib/server/route-observability"
 import { isThreadStoreNotInitializedError } from "@/lib/server/threads"
-import type { AgentRunMode } from "@/lib/shared"
+import type { AgentRunMode, FinancialServicesWorkflowId } from "@/lib/shared"
 
 export const runtime = "nodejs"
 export const maxDuration = 800
@@ -58,8 +59,13 @@ function resolveRateLimitIdentifier(userId: string): string {
 
 function resolveRuntimeProfile(
   taskMode: PromptTaskMode,
-  runMode: AgentRunMode
+  runMode: AgentRunMode,
+  financialServicesWorkflow?: FinancialServicesWorkflowId
 ): AgentRuntimeProfileId {
+  if (financialServicesWorkflow) {
+    return "finance_analysis"
+  }
+
   if (runMode === "research") {
     return "deep_research"
   }
@@ -176,10 +182,23 @@ export async function POST(request: NextRequest) {
     const requestNow = new Date()
     const userTimeZone = resolveUserTimeZone(request)
     const promptProvider = resolvePromptProvider(selectedModel)
-    const promptTaskMode =
+    const inferredPromptTaskMode =
       parsedRequest.runMode === "research"
         ? "research"
         : inferPromptTaskMode(parsedRequest.messages)
+    const financialServicesWorkflow = resolveFinancialServicesWorkflow({
+      messages: parsedRequest.messages,
+      taskMode: inferredPromptTaskMode,
+      tools: {
+        fmpEnabled: Boolean(fmpApiKey?.trim()),
+        tavilyEnabled: Boolean(tavilyApiKey?.trim()),
+        fredEnabled: Boolean(process.env.FRED_API_KEY?.trim()),
+        secUserAgentConfigured: Boolean(process.env.SEC_API_USER_AGENT?.trim()),
+      },
+    })
+    const promptTaskMode = financialServicesWorkflow
+      ? "finance_analysis"
+      : inferredPromptTaskMode
     const longTermMemoryEnabled =
       !isE2eMockRequest && isLongTermMemoryEnabled(MEMORY_RUNTIME_CONFIG)
     const latestUserMessage =
@@ -214,6 +233,7 @@ export async function POST(request: NextRequest) {
         userTimeZone,
         provider: promptProvider,
         taskMode: promptTaskMode,
+        ...(financialServicesWorkflow ? { financialServicesWorkflow } : {}),
         ...(longTermMemoryEnabled ? { longTermMemoryEnabled } : {}),
         ...(longTermMemoryContext ? { longTermMemoryContext } : {}),
       }
@@ -292,8 +312,10 @@ export async function POST(request: NextRequest) {
         userTimeZone,
         runtimeProfile: resolveRuntimeProfile(
           promptTaskMode,
-          parsedRequest.runMode
+          parsedRequest.runMode,
+          financialServicesWorkflow?.workflow
         ),
+        artifactOwnerId: session.user.id,
         messages: parsedRequest.messages,
         systemInstruction,
         ...(longTermMemoryEnabled && threadId
