@@ -145,7 +145,12 @@ interface CreateAgentStreamResponseParams {
   userTimeZone?: string
   runtimeProfile?: AgentRuntimeProfileId
   messages: AgentStreamRequest["messages"]
+  memoryCommitMaxChars?: number
   systemInstruction: string
+  onAssistantResponseSettled?: (params: {
+    assistantContent: string
+    outcome: "completed" | "incomplete"
+  }) => Promise<void> | void
   onStreamSettled?: () => Promise<void> | void
 }
 
@@ -670,6 +675,7 @@ export function createAgentStreamResponse(
         completedToolCallIds: new Set<string>(),
       }
       let streamOutcome = "completed"
+      let assistantMemoryText = ""
 
       const closeController = () => {
         if (streamClosed) {
@@ -680,6 +686,20 @@ export function createAgentStreamResponse(
         try {
           controller.close()
         } catch {}
+      }
+
+      const appendAssistantMemoryText = (delta: string) => {
+        if (!params.onAssistantResponseSettled) {
+          return
+        }
+
+        const maxChars = params.memoryCommitMaxChars ?? 0
+        const remainingChars = maxChars - assistantMemoryText.length
+        if (remainingChars <= 0) {
+          return
+        }
+
+        assistantMemoryText += delta.slice(0, remainingChars)
       }
 
       const enqueueEvent = (event: AgentStreamEvent) => {
@@ -715,6 +735,7 @@ export function createAgentStreamResponse(
             streamState.hasTextChunk = true
             streamState.textChunkCount += 1
             streamState.textCharCount += event.delta.length
+            appendAssistantMemoryText(event.delta)
             if (event.delta.trim().length > 0) {
               streamState.hasMeaningfulText = true
             }
@@ -877,6 +898,10 @@ export function createAgentStreamResponse(
           logger.error("Agent stream failed.", streamFailureDetails)
         }
       } finally {
+        const assistantMemoryOutcome =
+          streamOutcome === "completed" || streamOutcome === "incomplete"
+            ? streamOutcome
+            : null
         logger.info("Agent stream settled.", {
           requestId: params.requestId,
           model: params.selectedModel,
@@ -893,6 +918,20 @@ export function createAgentStreamResponse(
         })
         await settleStream()
         closeController()
+        if (assistantMemoryOutcome && assistantMemoryText.trim().length > 0) {
+          try {
+            await params.onAssistantResponseSettled?.({
+              assistantContent: assistantMemoryText,
+              outcome: assistantMemoryOutcome,
+            })
+          } catch (error) {
+            logger.warn("Assistant response settlement callback failed.", {
+              error,
+              errorCode: "AGENT_ASSISTANT_RESPONSE_SETTLEMENT_FAILED",
+              requestId: params.requestId,
+            })
+          }
+        }
       }
     },
     async cancel() {

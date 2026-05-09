@@ -122,10 +122,14 @@ An `automation` table is also created by the migration but has no active route h
 2. `RUNTIME DATE CONTEXT` — current UTC timestamp + user timezone (from `X-User-Timezone` header)
 3. Provider overlay (`PROVIDER OVERLAY: ANTHROPIC`) — Claude-specific reasoning guidance
 4. Task mode overlay (`TASK MODE OVERLAY: <MODE>`) — mode-specific guidance (see below)
-5. `SHARED CONTEXT FILE: SOUL.md` — from `DEFAULT_SOUL_FALLBACK_INSTRUCTION` in `src/lib/shared`
-6. `AUTH USER CONTEXT` — authenticated user id, name, email
+5. `LONG-TERM MEMORY CAPABILITY` — optional block shown only when Mem0 is fully configured, instructing the model that memory writes are available
+6. `LONG-TERM MEMORY CONTEXT` — optional Mem0-retrieved user memory, treated as context rather than instructions
+7. `SHARED CONTEXT FILE: SOUL.md` — from `DEFAULT_SOUL_FALLBACK_INSTRUCTION` in `src/lib/shared`
+8. `AUTH USER CONTEXT` — authenticated user id, name, email
 
 After assembly, `withAiSdkInlineCitationInstruction` appends inline citation rules and optionally FMP tool rules when `FMP_API_KEY` is set.
+
+Long-term memory is opt-in through `src/lib/server/long-term-memory.ts`. Chloei calls a self-hosted Mem0 OSS REST server before agent runs and commits only the latest text-only user/assistant turn after meaningful completed or incomplete streams.
 
 **Task modes** (auto-inferred by `inferPromptTaskMode` from message content patterns):
 
@@ -354,6 +358,14 @@ All other variables are optional — the code has safe defaults. See `.env.examp
 | `FMP_API_KEY`                              | Enables Financial Modeling Prep MCP finance tools                                                       |
 | `FRED_API_KEY`                             | Enables FRED macro/rates lookups through `finance_data`                                                 |
 | `SEC_API_USER_AGENT`                       | User agent for SEC public company-facts requests                                                        |
+| `MEMORY_PROVIDER`                          | `disabled` or `mem0` (default: `disabled`)                                                              |
+| `MEM0_API_URL`                             | Mem0 REST API origin (default: `http://localhost:8888`; use `https://api.mem0.ai` for Mem0 Platform)     |
+| `MEM0_API_KEY`                             | Mem0 key; self-hosted OSS uses `X-API-Key`, Mem0 Platform uses `Authorization: Token ...`                |
+| `MEMORY_AGENT_ID`                          | Mem0 agent scope (default: `chloei`)                                                                    |
+| `MEMORY_TOP_K`                             | Number of Mem0 memories to retrieve (default: 6)                                                        |
+| `MEMORY_THRESHOLD`                         | Minimum memory similarity threshold (default: 0.3)                                                      |
+| `MEMORY_CONTEXT_MAX_CHARS`                 | Max retrieved memory prompt chars (default: 3,000)                                                      |
+| `MEMORY_COMMIT_MAX_CHARS`                  | Max assistant chars eligible for memory commit (default: 12,000)                                        |
 | `OPENAI_API_KEY`                           | Enables OpenAI judge for prompt evals                                                                   |
 | `OPENAI_EVAL_JUDGE_MODEL`                  | Judge model override (default: `gpt-5.4-mini`)                                                          |
 | `PYTHON3_PATH`                             | Override `python3` binary for code execution                                                            |

@@ -21,6 +21,7 @@ import {
   AGENT_RATE_LIMIT_MAX_REQUESTS,
   AGENT_RATE_LIMIT_WINDOW_MS,
   AGENT_STREAM_TIMEOUT_MS,
+  MEMORY_RUNTIME_CONFIG,
 } from "@/lib/server/agent-runtime-config"
 import {
   createAuthUnavailableResponse,
@@ -32,6 +33,11 @@ import {
   isE2eMockModeEnabled,
 } from "@/lib/server/e2e-test-mode"
 import type { AgentRuntimeProfileId } from "@/lib/server/llm/agent-runtime"
+import {
+  commitLongTermMemory,
+  getLongTermMemoryContext,
+  isLongTermMemoryEnabled,
+} from "@/lib/server/long-term-memory"
 import {
   evaluateAndConsumeSlidingWindowRateLimit,
   tryAcquireConcurrencySlot,
@@ -174,6 +180,29 @@ export async function POST(request: NextRequest) {
       parsedRequest.runMode === "research"
         ? "research"
         : inferPromptTaskMode(parsedRequest.messages)
+    const longTermMemoryEnabled =
+      !isE2eMockRequest && isLongTermMemoryEnabled(MEMORY_RUNTIME_CONFIG)
+    const latestUserMessage =
+      [...parsedRequest.messages]
+        .reverse()
+        .find((message) => message.role === "user")?.content ?? ""
+    let longTermMemoryContext: string | undefined
+    if (!isE2eMockRequest) {
+      try {
+        longTermMemoryContext = await getLongTermMemoryContext({
+          query: latestUserMessage,
+          requestId,
+          signal: request.signal,
+          userId: session.user.id,
+        })
+      } catch (error) {
+        logger.warn("Long-term memory context failed; continuing without it.", {
+          error,
+          errorCode: "AGENT_LONG_TERM_MEMORY_CONTEXT_FAILED",
+          requestId,
+        })
+      }
+    }
     const systemInstruction = buildAgentSystemInstruction(
       {
         id: session.user.id,
@@ -185,6 +214,8 @@ export async function POST(request: NextRequest) {
         userTimeZone,
         provider: promptProvider,
         taskMode: promptTaskMode,
+        ...(longTermMemoryEnabled ? { longTermMemoryEnabled } : {}),
+        ...(longTermMemoryContext ? { longTermMemoryContext } : {}),
       }
     )
 
@@ -245,6 +276,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const threadId = parsedRequest.threadId
+
     return observeRouteResponse(
       observation,
       createAgentStreamResponse({
@@ -262,7 +295,22 @@ export async function POST(request: NextRequest) {
           parsedRequest.runMode
         ),
         messages: parsedRequest.messages,
+        memoryCommitMaxChars: MEMORY_RUNTIME_CONFIG.commitMaxChars,
         systemInstruction,
+        ...(threadId
+          ? {
+              onAssistantResponseSettled: async ({ assistantContent }) => {
+                await commitLongTermMemory({
+                  assistantContent,
+                  messages: parsedRequest.messages,
+                  requestId,
+                  signal: request.signal,
+                  threadId,
+                  userId: session.user.id,
+                })
+              },
+            }
+          : {}),
         onStreamSettled: concurrencySlot?.release,
       }),
       {

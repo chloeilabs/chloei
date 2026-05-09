@@ -35,6 +35,9 @@ setTestModuleStubs({
   ),
   "@/lib/server/auth": toProjectFileUrl("tests/stubs/auth.mjs"),
   "@/lib/server/auth-session": toProjectFileUrl("tests/stubs/auth-session.mjs"),
+  "@/lib/server/long-term-memory": toProjectFileUrl(
+    "tests/stubs/long-term-memory.mjs"
+  ),
   "@/lib/server/rate-limit": toProjectFileUrl("tests/stubs/rate-limit.mjs"),
   "@/lib/server/threads": toProjectFileUrl("tests/stubs/threads.mjs"),
   "next/server": toProjectFileUrl("tests/stubs/next-server.mjs"),
@@ -94,6 +97,9 @@ beforeEach(() => {
     jsonErrors: [],
     loggerInfos: [],
     loggerErrors: [],
+    loggerWarnings: [],
+    memoryCommitCalls: [],
+    memoryContextCalls: [],
     buildInstructionCalls: [],
     streamCalls: [],
   }
@@ -182,11 +188,26 @@ beforeEach(() => {
           info(message, details) {
             recorded.loggerInfos.push({ scope, message, details })
           },
-          warn() {},
+          warn(message, details) {
+            recorded.loggerWarnings.push({ scope, message, details })
+          },
           error(message, error) {
             recorded.loggerErrors.push({ scope, message, error })
           },
         }
+      },
+    },
+    longTermMemory: {
+      async getLongTermMemoryContext(params) {
+        recorded.memoryContextCalls.push(params)
+        return undefined
+      },
+      isLongTermMemoryEnabled() {
+        return false
+      },
+      async commitLongTermMemory(params) {
+        recorded.memoryCommitCalls.push(params)
+        return true
       },
     },
     rateLimit: {
@@ -347,6 +368,9 @@ test("agent route passes the resolved prompt context into stream creation", asyn
       taskMode: "multi-turn",
     },
   })
+  assert.equal(recorded.memoryContextCalls.length, 1)
+  assert.equal(recorded.memoryContextCalls[0]?.query, "What changed?")
+  assert.equal(recorded.memoryContextCalls[0]?.userId, "user-1")
   assert.deepEqual(recorded.streamCalls[0]?.messages, [
     { role: "user", content: "What changed?" },
     { role: "assistant", content: "Here is the summary." },
@@ -359,4 +383,106 @@ test("agent route passes the resolved prompt context into stream creation", asyn
 
   recorded.streamCalls[0].onStreamSettled()
   assert.deepEqual(released, ["released"])
+})
+
+test("agent route injects long-term memory context and wires memory commit callback", async () => {
+  setTestMocks({
+    agentRoute: {
+      ...getTestMocks().agentRoute,
+      parseAgentStreamRequest({ body }) {
+        return {
+          parsedRequest: {
+            messages: body.messages,
+            runMode: "chat",
+            threadId: body.threadId,
+          },
+          selectedModel: "anthropic/claude-sonnet-4.6",
+        }
+      },
+    },
+    longTermMemory: {
+      async getLongTermMemoryContext(params) {
+        recorded.memoryContextCalls.push(params)
+        return "User prefers terse finance answers."
+      },
+      isLongTermMemoryEnabled() {
+        return true
+      },
+      async commitLongTermMemory(params) {
+        recorded.memoryCommitCalls.push(params)
+        return true
+      },
+    },
+  })
+
+  const response = await POST(
+    createRequest({
+      json: async () => ({
+        messages: [{ role: "user", content: "What should I remember?" }],
+        threadId: "thread-1",
+      }),
+    })
+  )
+
+  assert.equal(response.status, 200)
+  assert.equal(recorded.buildInstructionCalls.length, 1)
+  assert.equal(
+    recorded.buildInstructionCalls[0]?.context.longTermMemoryContext,
+    "User prefers terse finance answers."
+  )
+  assert.equal(
+    recorded.buildInstructionCalls[0]?.context.longTermMemoryEnabled,
+    true
+  )
+  assert.equal(recorded.streamCalls[0]?.memoryCommitMaxChars, 12_000)
+  assert.equal(
+    typeof recorded.streamCalls[0]?.onAssistantResponseSettled,
+    "function"
+  )
+
+  await recorded.streamCalls[0].onAssistantResponseSettled({
+    assistantContent: "I will remember the durable preference.",
+    outcome: "completed",
+  })
+
+  assert.equal(recorded.memoryCommitCalls.length, 1)
+  assert.deepEqual(recorded.memoryCommitCalls[0], {
+    assistantContent: "I will remember the durable preference.",
+    messages: [{ role: "user", content: "What should I remember?" }],
+    requestId: "request-1",
+    signal: recorded.memoryCommitCalls[0].signal,
+    threadId: "thread-1",
+    userId: "user-1",
+  })
+})
+
+test("agent route continues without long-term memory when retrieval fails", async () => {
+  setTestMocks({
+    longTermMemory: {
+      async getLongTermMemoryContext(params) {
+        recorded.memoryContextCalls.push(params)
+        throw new Error("Mem0 unavailable")
+      },
+    },
+  })
+
+  const response = await POST(
+    createRequest({
+      json: async () => ({
+        messages: [{ role: "user", content: "Keep chatting." }],
+      }),
+    })
+  )
+
+  assert.equal(response.status, 200)
+  assert.equal(await response.text(), "stream")
+  assert.equal(recorded.memoryContextCalls.length, 1)
+  assert.equal(
+    recorded.buildInstructionCalls[0]?.context.longTermMemoryContext,
+    undefined
+  )
+  assert.equal(
+    recorded.loggerWarnings[0]?.message,
+    "Long-term memory context failed; continuing without it."
+  )
 })
