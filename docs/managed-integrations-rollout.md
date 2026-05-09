@@ -77,9 +77,9 @@ Runtime flag resolution is implemented in
 `src/lib/server/integration-flags.ts`. Effective precedence is:
 
 1. Explicit `AGENT_*` or `POSTHOG_*` environment variables.
-2. Internal-user defaults when
+2. Edge Config values from `agent_flags`, `analytics_flags`, or `flags`.
+3. Internal-user defaults when
    `AGENT_ENABLE_NEW_CAPABILITIES_FOR_INTERNAL_USERS=true`.
-3. Edge Config values from `agent_flags`, `analytics_flags`, or `flags`.
 4. Built-in defaults.
 
 Edge Config values for a capability key override internal-user defaults. During
@@ -122,7 +122,7 @@ fully locked-down state:
    internally enabled:
 
    ```bash
-   vercel edge-config update chloei-flags --scope chloei --patch '{"items":[{"operation":"update","key":"agent_flags","value":{"agent.browserbase.enabled":false,"agent.telemetry.record_io":false}},{"operation":"update","key":"flags","value":{"agent-browserbase-enabled":false,"agent-telemetry-record-io":false,"analytics-posthog-enabled":false}}]}'
+   vercel edge-config update chloei-flags --scope chloei --patch '{"items":[{"operation":"update","key":"agent_flags","value":{"agent.browserbase.enabled":false,"agent.telemetry.record_io":false}},{"operation":"update","key":"flags","value":{"agent-browserbase-enabled":false,"agent-telemetry-record-io":false,"analytics-posthog-enabled":false}},{"operation":"update","key":"analytics_flags","value":{"analytics.posthog.enabled":false}}]}'
    ```
 
 3. Remove the explicit production env overrides for the capabilities being
@@ -225,7 +225,7 @@ printf '%s' false | vercel env add AGENT_ASYNC_REPORTS_ENABLED production --forc
 printf '%s' false | vercel env add AGENT_TELEMETRY_RECORD_IO production --force --yes
 printf '%s' false | vercel env add AGENT_FINANCE_WORKFLOWS_ENABLED production --force --yes
 printf '%s' false | vercel env add POSTHOG_ANALYTICS_ENABLED production --force --yes
-vercel edge-config update chloei-flags --scope chloei --patch '{"items":[{"operation":"update","key":"agent_flags","value":{"agent.knowledge_search.enabled":false,"agent.browserbase.enabled":false,"agent.async_reports.enabled":false,"agent.telemetry.record_io":false,"agent.finance_workflows.enabled":false}},{"operation":"update","key":"flags","value":{"agent-knowledge-search-enabled":false,"agent-browserbase-enabled":false,"agent-async-reports-enabled":false,"agent-telemetry-record-io":false,"agent-finance-workflows-enabled":false,"analytics-posthog-enabled":false}}]}'
+vercel edge-config update chloei-flags --scope chloei --patch '{"items":[{"operation":"update","key":"agent_flags","value":{"agent.knowledge_search.enabled":false,"agent.browserbase.enabled":false,"agent.async_reports.enabled":false,"agent.telemetry.record_io":false,"agent.finance_workflows.enabled":false}},{"operation":"update","key":"flags","value":{"agent-knowledge-search-enabled":false,"agent-browserbase-enabled":false,"agent-async-reports-enabled":false,"agent-telemetry-record-io":false,"agent-finance-workflows-enabled":false,"analytics-posthog-enabled":false}},{"operation":"update","key":"analytics_flags","value":{"analytics.posthog.enabled":false}}]}'
 vercel redeploy https://chloei.ai
 ```
 
