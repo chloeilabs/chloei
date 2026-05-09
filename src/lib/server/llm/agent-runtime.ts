@@ -11,7 +11,7 @@ import {
 
 import { createLogger } from "@/lib/logger"
 import {
-  buildAgentArtifactBaseUrl,
+  buildAgentArtifactDownloadUrl,
   getAgentArtifactRunRoot,
 } from "@/lib/server/agent-artifacts"
 import {
@@ -70,6 +70,7 @@ import { createInitialReasoningChunkSanitizer } from "./initial-reasoning-chunk-
 const logger = createLogger("agent-runtime")
 
 const XAI_SOURCE_PREFETCH_TIMEOUT_MS = 8_000
+const AGENT_ARTIFACT_BASE_URL_PLACEHOLDER = "__artifact_base__"
 
 export type AgentRuntimeProfileId =
   | "chat_default"
@@ -138,6 +139,21 @@ const AGENT_RUNTIME_PROFILES: Record<
     financeDataEnabled: true,
     toolMaxSteps: AGENT_TOOL_MAX_STEPS,
   },
+}
+
+function buildAgentArtifactBaseUrl(artifactId: string): string | undefined {
+  const placeholderUrl = buildAgentArtifactDownloadUrl(
+    artifactId,
+    AGENT_ARTIFACT_BASE_URL_PLACEHOLDER
+  )
+  if (!placeholderUrl) {
+    return undefined
+  }
+
+  const placeholderSuffix = `/${AGENT_ARTIFACT_BASE_URL_PLACEHOLDER}`
+  return placeholderUrl.endsWith(placeholderSuffix)
+    ? placeholderUrl.slice(0, -placeholderSuffix.length)
+    : undefined
 }
 
 const FINAL_SYNTHESIS_STEP_INSTRUCTION = [
@@ -288,7 +304,7 @@ export async function* startAgentRuntimeStream(
       runtimeProfile.codeExecutionWorkspaceMode ??
       (artifactRunId ? "preserve" : undefined)
     const artifactBaseUrl = artifactRunId
-      ? (buildAgentArtifactBaseUrl(artifactRunId) ?? undefined)
+      ? buildAgentArtifactBaseUrl(artifactRunId)
       : undefined
     if (runtimeProfile.fmpMcpEnabled) {
       try {

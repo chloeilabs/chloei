@@ -11,7 +11,6 @@ const moduleUrl = pathToFileURL(
 ).href
 
 const {
-  buildAgentArtifactBaseUrl,
   buildAgentArtifactDownloadUrl,
   getAgentArtifactFilePath,
   getAgentArtifactWorkspaceRoot,
@@ -28,10 +27,6 @@ test("agent artifact helpers build scoped download paths", () => {
   )
   assert.equal(normalizeAgentArtifactPath("../output.xlsx"), null)
 
-  assert.equal(
-    buildAgentArtifactBaseUrl("run_123"),
-    "/api/agent/artifacts/run_123"
-  )
   assert.equal(
     buildAgentArtifactDownloadUrl("run_123", "models/output sheet.xlsx"),
     "/api/agent/artifacts/run_123/models/output%20sheet.xlsx"

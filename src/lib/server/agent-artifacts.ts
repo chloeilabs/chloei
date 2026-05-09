@@ -114,19 +114,3 @@ export function buildAgentArtifactDownloadUrl(
 
   return `/api/agent/artifacts/${encodeURIComponent(normalizedArtifactId)}/${encodedPath}`
 }
-
-export function buildAgentArtifactBaseUrl(artifactId: string): string | null {
-  const placeholderPath = "__artifact_base__"
-  const placeholderUrl = buildAgentArtifactDownloadUrl(
-    artifactId,
-    placeholderPath
-  )
-  if (!placeholderUrl) {
-    return null
-  }
-
-  const placeholderSuffix = `/${placeholderPath}`
-  return placeholderUrl.endsWith(placeholderSuffix)
-    ? placeholderUrl.slice(0, -placeholderSuffix.length)
-    : null
-}
