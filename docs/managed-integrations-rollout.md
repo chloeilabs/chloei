@@ -1,6 +1,6 @@
 # Managed Integrations Rollout
 
-Last verified: May 9, 2026, 4:30 PM CDT.
+Last verified: May 9, 2026, 5:13 PM CDT.
 
 This runbook covers the Chloei managed integration stack for financial-services
 agent capabilities. The default posture is privacy-first: all new production
@@ -35,16 +35,17 @@ validation is working.
 
 ## Environment Scope
 
-Production is intentionally locked down:
+Production is in internal-only rollout for governed knowledge search, async
+reports, and finance workflows:
 
 ```text
-AGENT_ENABLE_NEW_CAPABILITIES_FOR_INTERNAL_USERS=false
-AGENT_KNOWLEDGE_SEARCH_ENABLED=false
+AGENT_ENABLE_NEW_CAPABILITIES_FOR_INTERNAL_USERS=true
+AGENT_KNOWLEDGE_SEARCH_ENABLED=<unset>
 AGENT_BROWSERBASE_ENABLED=false
-AGENT_ASYNC_REPORTS_ENABLED=false
+AGENT_ASYNC_REPORTS_ENABLED=<unset>
 AGENT_TELEMETRY_RECORD_IO=false
-AGENT_FINANCE_WORKFLOWS_ENABLED=false
-POSTHOG_ANALYTICS_ENABLED=false
+AGENT_FINANCE_WORKFLOWS_ENABLED=<unset>
+POSTHOG_ANALYTICS_ENABLED=true
 NEXT_PUBLIC_POSTHOG_ANALYTICS_ENABLED=false
 POSTHOG_ANALYTICS_INTERNAL_USERS_ONLY=true
 INNGEST_INLINE_FALLBACK=<unset>
@@ -73,27 +74,35 @@ value in Production and Development on May 9, 2026.
 ## Flag Sources
 
 Runtime flag resolution is implemented in
-`src/lib/server/integration-flags.ts`. Resolution order matters:
+`src/lib/server/integration-flags.ts`. Effective precedence is:
 
 1. Explicit `AGENT_*` or `POSTHOG_*` environment variables.
 2. Edge Config values from `agent_flags`, `analytics_flags`, or `flags`.
-3. Built-in defaults.
+3. Internal-user defaults when
+   `AGENT_ENABLE_NEW_CAPABILITIES_FOR_INTERNAL_USERS=true`.
+4. Built-in defaults.
 
-Because Production currently has explicit `AGENT_*_ENABLED=false` values, those
-values override Edge Config and PostHog flag changes. This is intentional while
-the rollout is paused.
+Edge Config values for a capability key override internal-user defaults. During
+the internal-only production rollout, the global rollout keys for knowledge
+search, async reports, and finance workflows must stay absent from Edge Config.
+Browserbase and raw telemetry IO remain explicitly false in both environment
+variables and Edge Config.
 
-Edge Config store `chloei-flags` should contain these false values:
+Edge Config store `chloei-flags` should contain:
 
 ```json
 {
+  "agent_flags": {
+    "agent.browserbase.enabled": false,
+    "agent.telemetry.record_io": false
+  },
   "flags": {
-    "agent-knowledge-search-enabled": false,
     "agent-browserbase-enabled": false,
-    "agent-async-reports-enabled": false,
     "agent-telemetry-record-io": false,
-    "agent-finance-workflows-enabled": false,
     "analytics-posthog-enabled": false
+  },
+  "analytics_flags": {
+    "analytics.posthog.enabled": false
   }
 }
 ```
@@ -104,12 +113,19 @@ Config and environment variables remain the enforcement layer.
 
 ## Production Rollout
 
-For internal-only production rollout of knowledge search, async reports, and
-finance workflows:
+The internal-only rollout is already active in Production. To recreate it from a
+fully locked-down state:
 
 1. Confirm `AGENT_INTERNAL_USER_EMAILS` or `AGENT_INTERNAL_USER_EMAIL_DOMAINS`
    only includes internal test users.
-2. Remove the explicit production env overrides for the capabilities being
+2. Remove the global Edge Config false values for the capabilities being
+   internally enabled:
+
+   ```bash
+   vercel edge-config update chloei-flags --scope chloei --patch '{"items":[{"operation":"update","key":"agent_flags","value":{"agent.browserbase.enabled":false,"agent.telemetry.record_io":false}},{"operation":"update","key":"flags","value":{"agent-browserbase-enabled":false,"agent-telemetry-record-io":false,"analytics-posthog-enabled":false}},{"operation":"update","key":"analytics_flags","value":{"analytics.posthog.enabled":false}}]}'
+   ```
+
+3. Remove the explicit production env overrides for the capabilities being
    internally enabled:
 
    ```bash
@@ -118,29 +134,32 @@ finance workflows:
    vercel env rm AGENT_FINANCE_WORKFLOWS_ENABLED production --yes
    ```
 
-3. Enable internal defaults:
+4. Enable internal defaults and internal-only server-side analytics:
 
    ```bash
    printf '%s' true | vercel env add AGENT_ENABLE_NEW_CAPABILITIES_FOR_INTERNAL_USERS production --force --yes
+   printf '%s' true | vercel env add POSTHOG_ANALYTICS_ENABLED production --force --yes
+   printf '%s' true | vercel env add POSTHOG_ANALYTICS_INTERNAL_USERS_ONLY production --force --yes
    ```
 
-4. Redeploy production so the runtime sees the new env set:
+5. Redeploy production so the runtime sees the new env set:
 
    ```bash
    vercel redeploy https://chloei.ai
    ```
 
+6. Sync the Inngest app after production deploy:
+
+   ```bash
+   curl -sS -X PUT https://chloei.ai/api/inngest
+   ```
+
+   Expected response includes `"Successfully registered"`.
+
 Keep `AGENT_BROWSERBASE_ENABLED=false` until there is an explicit user-consent
 smoke for allowlisted domains. Keep `AGENT_TELEMETRY_RECORD_IO=false` unless a
 separate privacy review approves raw prompt/output capture for a controlled
 non-production eval cohort.
-
-For PostHog server-side product analytics, prefer:
-
-```bash
-printf '%s' true | vercel env add POSTHOG_ANALYTICS_ENABLED production --force --yes
-printf '%s' true | vercel env add POSTHOG_ANALYTICS_INTERNAL_USERS_ONLY production --force --yes
-```
 
 Leave `NEXT_PUBLIC_POSTHOG_ANALYTICS_ENABLED=false` for production unless client
 analytics receives a separate privacy review.
@@ -173,9 +192,8 @@ Authenticated rollout smoke after internal production flags are enabled:
 4. Enqueue a report through `POST /api/jobs/report` and poll `GET /api/jobs/:id`.
 5. Verify Sentry receives errors/traces without PII and that PostHog receives
    only scrubbed internal-user product events if analytics is enabled.
-6. Flip each flag off and confirm the capability disappears without redeploy
-   when the flag is Edge Config controlled; redeploy is required when the change
-   is an environment variable.
+6. Confirm an external test user still receives `JOB_REPORT_DISABLED` for async
+   reports.
 
 ## Quality Gates
 
@@ -207,6 +225,7 @@ printf '%s' false | vercel env add AGENT_ASYNC_REPORTS_ENABLED production --forc
 printf '%s' false | vercel env add AGENT_TELEMETRY_RECORD_IO production --force --yes
 printf '%s' false | vercel env add AGENT_FINANCE_WORKFLOWS_ENABLED production --force --yes
 printf '%s' false | vercel env add POSTHOG_ANALYTICS_ENABLED production --force --yes
+vercel edge-config update chloei-flags --scope chloei --patch '{"items":[{"operation":"update","key":"agent_flags","value":{"agent.knowledge_search.enabled":false,"agent.browserbase.enabled":false,"agent.async_reports.enabled":false,"agent.telemetry.record_io":false,"agent.finance_workflows.enabled":false}},{"operation":"update","key":"flags","value":{"agent-knowledge-search-enabled":false,"agent-browserbase-enabled":false,"agent-async-reports-enabled":false,"agent-telemetry-record-io":false,"agent-finance-workflows-enabled":false,"analytics-posthog-enabled":false}},{"operation":"update","key":"analytics_flags","value":{"analytics.posthog.enabled":false}}]}'
 vercel redeploy https://chloei.ai
 ```
 
@@ -247,5 +266,6 @@ vercel env ls
 vercel env pull /tmp/chloei-production.env --environment=production --yes
 vercel edge-config items chloei-flags
 vercel inspect https://chloei.ai
+curl -sS -X PUT https://chloei.ai/api/inngest
 vercel logs https://chloei.ai --since 30m --level error --no-follow
 ```
