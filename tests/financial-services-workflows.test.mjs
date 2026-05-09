@@ -40,7 +40,8 @@ test("financial services workflow detection selects modeling for workbook artifa
     messages: [
       {
         role: "user",
-        content: "Create a minimal workbook artifact named smoke_model.xlsx.",
+        content:
+          "Create a minimal finance workbook artifact named smoke_model.xlsx.",
       },
     ],
     taskMode: "general",
@@ -48,6 +49,34 @@ test("financial services workflow detection selects modeling for workbook artifa
 
   assert.equal(context?.workflow, "financial_modeling")
   assert.match(context?.promptBlock ?? "", /Skill: xlsx-author/)
+})
+
+test("financial services workflow detection ignores non-finance generic model prompts", () => {
+  assert.equal(
+    resolveFinancialServicesWorkflow({
+      messages: [
+        {
+          role: "user",
+          content: "Build a model in Python to classify images.",
+        },
+      ],
+      taskMode: "coding",
+    }),
+    null
+  )
+
+  assert.equal(
+    resolveFinancialServicesWorkflow({
+      messages: [
+        {
+          role: "user",
+          content: "Create a workbook to track my workout plan.",
+        },
+      ],
+      taskMode: "general",
+    }),
+    null
+  )
 })
 
 test("financial services workflow detection selects market research", () => {

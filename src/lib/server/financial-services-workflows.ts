@@ -4,11 +4,14 @@ import type {
 } from "@/lib/shared"
 
 import type { PromptTaskMode } from "./agent-prompt-steering"
+import {
+  getLastUserMessage,
+  hasPersonalFinancialAdviceIntent,
+  normalizeUserText,
+  type PromptTextMessage,
+} from "./prompt-message-utils"
 
-interface FinancialServicesWorkflowMessage {
-  role: "user" | "assistant"
-  content: string
-}
+type FinancialServicesWorkflowMessage = PromptTextMessage
 
 interface FinancialServicesToolAvailability {
   tavilyEnabled?: boolean
@@ -29,11 +32,14 @@ export interface FinancialServicesWorkflowContext {
   promptBlock: string
 }
 
-const FINANCIAL_ADVICE_PATTERN =
-  /\b(should i buy|should i sell|buy or sell|personal financial advice|retirement account|401k|ira|tax return|tax filing|tax deduction|my portfolio|my savings|my mortgage|my debt)\b/i
-
 const FINANCIAL_MODELING_PATTERN =
-  /\b(dcf|discounted cash flow|lbo|leveraged buyout|three[- ]statement|3[- ]statement|trading comps?|comps analysis|precedent transactions?|valuation model|financial model|model builder|build (?:a |an )?(?:model|workbook)|create (?:a |an )?(?:model|workbook|spreadsheet)|excel valuation|workbook artifact|spreadsheet artifact|xlsx artifact|\.xlsx|football field|wacc|terminal value|sensitivity table)\b/i
+  /\b(dcf|discounted cash flow|lbo|leveraged buyout|three[- ]statement|3[- ]statement|trading comps?|comps analysis|precedent transactions?|valuation model|financial model|model builder|excel valuation|football field|wacc|terminal value|sensitivity table)\b/i
+
+const FINANCIAL_MODELING_CONTEXT_PATTERN =
+  /\b(finance|financial|valuation|dcf|discounted cash flow|lbo|comps?|precedent transactions?|stock|stocks|ticker|market cap|capital markets|enterprise value|ev\/ebitda|ebitda|revenue|cash flow|fcf|wacc|terminal value|sensitivity|investment banking|10-k|10-q|filing|sec)\b/i
+
+const GENERIC_MODELING_ARTIFACT_PATTERN =
+  /\b(?:build|create|draft|generate|make)\s+(?:a |an )?(?:model|workbook|spreadsheet)\b|\b(?:model|workbook|spreadsheet|xlsx) artifact\b|\.xlsx\b/i
 
 const MARKET_RESEARCH_PATTERN =
   /\b(market research|sector (?:overview|primer|research)|industry (?:overview|primer|research)|theme research|competitive landscape|peer landscape|market map|company snapshot|equity research|ideas? shortlist|research this sector)\b/i
@@ -134,35 +140,24 @@ Rules:
 `.trim(),
 }
 
-function getLastUserMessage(
-  messages: readonly FinancialServicesWorkflowMessage[]
-): string {
-  return (
-    [...messages]
-      .reverse()
-      .find((message) => message.role === "user" && message.content.trim())
-      ?.content.trim() ?? ""
-  )
-}
-
-function normalizeUserText(
-  messages: readonly FinancialServicesWorkflowMessage[]
-): string {
-  return messages
-    .filter((message) => message.role === "user")
-    .map((message) => message.content.trim())
-    .filter(Boolean)
-    .join("\n\n")
-}
-
 function inferFinancialServicesWorkflow(
-  text: string
+  text: string,
+  taskMode: PromptTaskMode
 ): FinancialServicesWorkflowId | null {
   if (PITCH_MATERIALS_PATTERN.test(text)) {
     return "pitch_materials"
   }
 
-  if (FINANCIAL_MODELING_PATTERN.test(text)) {
+  const hasGenericModelingArtifact =
+    GENERIC_MODELING_ARTIFACT_PATTERN.test(text)
+  const hasFinancialModelingContext =
+    taskMode === "finance_analysis" ||
+    FINANCIAL_MODELING_CONTEXT_PATTERN.test(text)
+
+  if (
+    FINANCIAL_MODELING_PATTERN.test(text) ||
+    (hasGenericModelingArtifact && hasFinancialModelingContext)
+  ) {
     return "financial_modeling"
   }
 
@@ -230,12 +225,13 @@ export function resolveFinancialServicesWorkflow(
   }
 
   const lastUserMessage = getLastUserMessage(params.messages)
-  if (!lastUserMessage || FINANCIAL_ADVICE_PATTERN.test(lastUserMessage)) {
+  if (!lastUserMessage || hasPersonalFinancialAdviceIntent(lastUserMessage)) {
     return null
   }
 
   const workflow = inferFinancialServicesWorkflow(
-    `${lastUserMessage}\n\n${normalizeUserText(params.messages)}`
+    `${lastUserMessage}\n\n${normalizeUserText(params.messages)}`,
+    params.taskMode
   )
   if (!workflow) {
     return null
