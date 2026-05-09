@@ -61,8 +61,8 @@ test("agent route streams through the extracted AI Gateway helper path", async (
 
   assert.match(
     routeSource,
-    /runtimeProfile: resolveRuntimeProfile\(\s*promptTaskMode,\s*parsedRequest\.runMode\s*\)/,
-    "Expected /api/agent to select a runtime profile from the inferred task mode and requested run mode."
+    /runtimeProfile: resolveRuntimeProfile\(\s*promptTaskMode,\s*parsedRequest\.runMode,\s*financialServicesWorkflow\?\.workflow\s*\)/,
+    "Expected /api/agent to select a runtime profile from the inferred task mode, requested run mode, and finance workflow."
   )
 })
 

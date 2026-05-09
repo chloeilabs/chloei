@@ -42,6 +42,7 @@ test("finance code execution reports workspace spreadsheet artifacts", async () 
       backend: "finance",
       workspaceMode: "preserve",
       workspaceRoot: tempRoot,
+      artifactBaseUrl: "/api/agent/artifacts/run-1",
     })
     const result = await tools.code_execution.execute({
       language: "python",
@@ -57,7 +58,9 @@ test("finance code execution reports workspace spreadsheet artifacts", async () 
     assert.equal(result.output?.backend, "finance")
     assert.equal(
       result.output?.artifactManifest.some(
-        (artifact) => artifact.path === "finance_artifact.xlsx"
+        (artifact) =>
+          artifact.path === "finance_artifact.xlsx" &&
+          artifact.url === "/api/agent/artifacts/run-1/finance_artifact.xlsx"
       ),
       true
     )
@@ -90,6 +93,15 @@ test("finance code execution reports workspace spreadsheet artifacts", async () 
         durationMs: result.output.durationMs,
         errorCode: undefined,
         retryable: false,
+        artifactManifest: [
+          {
+            path: "finance_artifact.xlsx",
+            sizeBytes: result.output.artifactManifest.find(
+              (artifact) => artifact.path === "finance_artifact.xlsx"
+            ).sizeBytes,
+            url: "/api/agent/artifacts/run-1/finance_artifact.xlsx",
+          },
+        ],
         sources: [],
       }
     )

@@ -385,6 +385,64 @@ test("agent route passes the resolved prompt context into stream creation", asyn
   assert.deepEqual(released, ["released"])
 })
 
+test("agent route injects financial services workflow and uses finance runtime", async () => {
+  setTestMocks({
+    agentPromptSteering: {
+      inferPromptTaskMode() {
+        return "finance_analysis"
+      },
+      resolvePromptProvider(model) {
+        return `provider:${model}`
+      },
+    },
+    agentRoute: {
+      ...getTestMocks().agentRoute,
+      parseAgentStreamRequest({ body }) {
+        return {
+          parsedRequest: {
+            messages: body.messages,
+            runMode: "chat",
+          },
+          selectedModel: "anthropic/claude-sonnet-4.6",
+        }
+      },
+    },
+  })
+
+  const response = await POST(
+    createRequest({
+      json: async () => ({
+        messages: [
+          {
+            role: "user",
+            content: "Build a DCF model and trading comps workbook for AAPL.",
+          },
+        ],
+      }),
+    })
+  )
+
+  assert.equal(response.status, 200)
+  const promptContext = recorded.buildInstructionCalls[0]?.context
+  assert.equal(promptContext?.taskMode, "finance_analysis")
+  assert.equal(
+    promptContext?.financialServicesWorkflow?.workflow,
+    "financial_modeling"
+  )
+  assert.deepEqual(promptContext?.financialServicesWorkflow?.skillIds, [
+    "model-builder",
+    "dcf-model",
+    "comps-analysis",
+    "audit-xls",
+    "xlsx-author",
+  ])
+  assert.match(
+    promptContext?.financialServicesWorkflow?.promptBlock ?? "",
+    /Skill: dcf-model/
+  )
+  assert.equal(recorded.streamCalls[0]?.runtimeProfile, "finance_analysis")
+})
+
 test("agent route skips long-term memory work when memory is disabled", async () => {
   setTestMocks({
     agentRoute: {

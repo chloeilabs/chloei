@@ -144,6 +144,7 @@ interface CreateAgentStreamResponseParams {
   fmpApiKey?: string
   userTimeZone?: string
   runtimeProfile?: AgentRuntimeProfileId
+  artifactOwnerId?: string
   messages: AgentStreamRequest["messages"]
   memoryCommitMaxChars?: number
   systemInstruction: string
@@ -777,6 +778,7 @@ export function createAgentStreamResponse(
           fmpApiKey: params.fmpApiKey,
           userTimeZone: params.userTimeZone,
           runtimeProfile: params.runtimeProfile,
+          artifactOwnerId: params.artifactOwnerId,
           messages: params.messages,
           systemInstruction: withAiSdkInlineCitationInstruction(
             params.systemInstruction,
@@ -798,10 +800,9 @@ export function createAgentStreamResponse(
         const unresolvedToolCallCount = getUnresolvedToolCallCount()
         const hasUnresolvedToolCalls = unresolvedToolCallCount > 0
         const completedWithoutAnswer = !streamState.hasMeaningfulText
-        const completedWithToolIssue =
-          !completedWithoutAnswer &&
-          (hasUnresolvedToolCalls || streamState.toolErrorCount > 0)
-        if (completedWithoutAnswer || completedWithToolIssue) {
+        const completedWithUnresolvedToolCall =
+          !completedWithoutAnswer && hasUnresolvedToolCalls
+        if (completedWithoutAnswer || completedWithUnresolvedToolCall) {
           const fallbackText = streamState.hasStructuredOutput
             ? streamState.hasToolOutput
               ? TOOL_OUTPUT_ONLY_FALLBACK_TEXT
@@ -813,12 +814,8 @@ export function createAgentStreamResponse(
             ? "incomplete"
             : streamOutcome
           const prefix = streamState.hasTextChunk ? "\n\n" : ""
-          const delta = completedWithToolIssue
-            ? `${prefix}${
-                streamState.hasToolOutput
-                  ? TOOL_OUTPUT_ONLY_FALLBACK_TEXT
-                  : TOOL_CALL_INCOMPLETE_FALLBACK_TEXT
-              }`
+          const delta = completedWithUnresolvedToolCall
+            ? `${prefix}${TOOL_CALL_INCOMPLETE_FALLBACK_TEXT}`
             : fallbackText
           streamState.hasTextChunk = true
           streamState.hasMeaningfulText = true
@@ -831,7 +828,7 @@ export function createAgentStreamResponse(
           handleEvent({
             type: "agent_status",
             status:
-              (completedWithoutAnswer || completedWithToolIssue) &&
+              (completedWithoutAnswer || completedWithUnresolvedToolCall) &&
               streamState.hasStructuredOutput
                 ? "incomplete"
                 : "completed",

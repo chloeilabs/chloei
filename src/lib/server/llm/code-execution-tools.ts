@@ -12,7 +12,7 @@ import {
   AGENT_CODE_EXECUTION_BACKEND,
   AGENT_CODE_EXECUTION_PYTHON_VENV_PATH,
 } from "@/lib/server/agent-runtime-config"
-import type { ToolName } from "@/lib/shared"
+import type { CodeExecutionArtifactMetadata, ToolName } from "@/lib/shared"
 
 const CODE_EXECUTION_TOOL_NAME = "code_execution" as const
 const CODE_EXECUTION_LABEL = "Running code" as const
@@ -37,6 +37,8 @@ interface CodeExecutionToolArgs {
   backend: CodeExecutionBackend
   workspaceMode: CodeExecutionWorkspaceMode
   workspaceRoot?: string
+  artifactBaseUrl?: string
+  exposeArtifactDirectory?: boolean
   inputFiles?: CodeExecutionInputFile[]
 }
 
@@ -48,6 +50,7 @@ interface CodeExecutionInputFile {
 interface CodeExecutionArtifact {
   path: string
   sizeBytes: number
+  url?: string
 }
 
 interface CodeExecutionToolOutput {
@@ -92,12 +95,15 @@ interface AiSdkCodeExecutionToolResultMetadata {
   durationMs?: number
   errorCode?: string
   retryable?: boolean
+  artifactManifest?: CodeExecutionArtifactMetadata[]
 }
 
 interface CreateAiSdkCodeExecutionToolsOptions {
   backend?: CodeExecutionBackend
   workspaceMode?: CodeExecutionWorkspaceMode
   workspaceRoot?: string
+  artifactBaseUrl?: string
+  exposeArtifactDirectory?: boolean
   inputFiles?: CodeExecutionInputFile[]
 }
 
@@ -355,9 +361,11 @@ function appendWithLimit(
 
 async function collectArtifactManifest(
   rootDir: string,
-  excludedPaths: ReadonlySet<string> = new Set()
+  excludedPaths: ReadonlySet<string> = new Set(),
+  artifactBaseUrl?: string
 ): Promise<CodeExecutionArtifact[]> {
   const artifacts: CodeExecutionArtifact[] = []
+  const normalizedArtifactBaseUrl = artifactBaseUrl?.replace(/\/+$/, "")
 
   async function walk(directory: string) {
     const entries = await readdir(directory, { withFileTypes: true }).catch(
@@ -384,7 +392,9 @@ async function collectArtifactManifest(
         continue
       }
 
-      const relativePath = path.relative(rootDir, fullPath)
+      const relativePath = path
+        .relative(rootDir, fullPath)
+        .replaceAll(path.sep, "/")
       if (excludedPaths.has(relativePath)) {
         continue
       }
@@ -392,6 +402,14 @@ async function collectArtifactManifest(
       artifacts.push({
         path: relativePath,
         sizeBytes: fileStats.size,
+        ...(normalizedArtifactBaseUrl
+          ? {
+              url: `${normalizedArtifactBaseUrl}/${relativePath
+                .split("/")
+                .map((segment) => encodeURIComponent(segment))
+                .join("/")}`,
+            }
+          : {}),
       })
     }
   }
@@ -538,6 +556,8 @@ async function runProcess(args: {
   backend: CodeExecutionBackend
   workspaceMode: CodeExecutionWorkspaceMode
   workspaceRoot?: string
+  artifactBaseUrl?: string
+  exposeArtifactDirectory?: boolean
   inputFiles?: CodeExecutionInputFile[]
 }): Promise<CodeExecutionToolResultPayload> {
   const startedAt = Date.now()
@@ -573,7 +593,11 @@ async function runProcess(args: {
   let timedOut = false
 
   const collectManifest = async (): Promise<CodeExecutionArtifact[]> =>
-    collectArtifactManifest(workspaceDir, mountedInputFiles)
+    collectArtifactManifest(
+      workspaceDir,
+      mountedInputFiles,
+      args.artifactBaseUrl
+    )
 
   try {
     return await new Promise<CodeExecutionToolResultPayload>((resolve) => {
@@ -635,7 +659,10 @@ async function runProcess(args: {
           const combinedOutput = buildCombinedOutput(stdout, stderr)
           const artifactManifest = await collectManifest()
           const artifactDirectory =
-            args.workspaceMode === "preserve" ? workspaceDir : undefined
+            args.workspaceMode === "preserve" &&
+            args.exposeArtifactDirectory !== false
+              ? workspaceDir
+              : undefined
 
           if (timedOut) {
             finish({
@@ -738,6 +765,8 @@ async function executeCode(
       backend: args.backend,
       workspaceMode: args.workspaceMode,
       workspaceRoot: args.workspaceRoot,
+      artifactBaseUrl: args.artifactBaseUrl,
+      exposeArtifactDirectory: args.exposeArtifactDirectory,
       inputFiles: args.inputFiles,
     })
 
@@ -760,6 +789,8 @@ async function executeCode(
     backend: args.backend,
     workspaceMode: args.workspaceMode,
     workspaceRoot: args.workspaceRoot,
+    artifactBaseUrl: args.artifactBaseUrl,
+    exposeArtifactDirectory: args.exposeArtifactDirectory,
     inputFiles: args.inputFiles,
   })
 
@@ -820,7 +851,7 @@ export function createAiSdkCodeExecutionTools(
     code_execution: tool({
       description:
         backend === "finance"
-          ? "Execute small self-contained JavaScript or curated Python finance-analysis snippets for arithmetic, statistics, table transformations, spreadsheet generation, chart generation, or quick validation. Network, subprocess, and host filesystem access are blocked. In finance/eval mode, mounted reference files may be read by relative path with libraries such as pandas/openpyxl, and generated workspace artifacts are reported in an artifact manifest. For spreadsheet deliverables, write relative filenames directly with library save APIs such as DataFrame.to_excel('deliverable.xlsx'), Workbook.save('deliverable.xlsx'), or plt.savefig('chart.png'). Do not create scratch/test/probe files; every generated file may be treated as a submitted artifact. Avoid blocked APIs such as open(), pathlib, os, subprocess, requests, urllib, and sockets."
+          ? "Execute small self-contained JavaScript or curated Python finance-analysis snippets for arithmetic, statistics, table transformations, spreadsheet generation, chart generation, or quick validation. Network, subprocess, and host filesystem access are blocked. In finance/eval mode, mounted reference files may be read by relative path with libraries such as pandas/openpyxl, and generated workspace artifacts are reported in an artifact manifest that may include download URLs. For spreadsheet deliverables, write relative filenames directly with library save APIs such as DataFrame.to_excel('deliverable.xlsx'), Workbook.save('deliverable.xlsx'), or plt.savefig('chart.png'). Do not create scratch/test/probe files; every generated file may be treated as a submitted artifact. Avoid blocked APIs such as open(), pathlib, os, subprocess, requests, urllib, and sockets."
           : "Execute small self-contained JavaScript or Python snippets for arithmetic, logic checks, data transformations, or quick validation. This tool cannot access the network, filesystem, or subprocesses.",
       inputSchema: codeExecutionInputSchema,
       execute: async (input) =>
@@ -831,6 +862,8 @@ export function createAiSdkCodeExecutionTools(
           backend,
           workspaceMode,
           workspaceRoot,
+          artifactBaseUrl: options.artifactBaseUrl,
+          exposeArtifactDirectory: options.exposeArtifactDirectory,
           inputFiles: options.inputFiles,
         }),
     }),
@@ -873,6 +906,8 @@ export function getAiSdkCodeExecutionToolResultMetadata(
   }
 
   const payload = parseAiSdkResultPayload(part.output)
+  const artifactManifest =
+    payload?.output?.artifactManifest ?? payload?.error?.artifactManifest
   return {
     callId: part.toolCallId,
     toolName: CODE_EXECUTION_TOOL_NAME,
@@ -882,6 +917,7 @@ export function getAiSdkCodeExecutionToolResultMetadata(
     durationMs: payload?.output?.durationMs ?? payload?.error?.durationMs,
     errorCode: payload?.error?.code,
     retryable: payload?.error?.timedOut === true,
+    ...(artifactManifest?.length ? { artifactManifest } : {}),
     sources: [],
   }
 }

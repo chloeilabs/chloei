@@ -55,6 +55,13 @@ test("parseStreamEventLine parses extended tool result metadata", () => {
     durationMs: 42,
     errorCode: "HTTP_429",
     retryable: true,
+    artifactManifest: [
+      {
+        path: "finance_artifact.xlsx",
+        sizeBytes: 1024,
+        url: "/api/agent/artifacts/run-1/finance_artifact.xlsx",
+      },
+    ],
   })
 
   assert.deepEqual(parseStreamEventLine(line), {
@@ -67,6 +74,13 @@ test("parseStreamEventLine parses extended tool result metadata", () => {
     durationMs: 42,
     errorCode: "HTTP_429",
     retryable: true,
+    artifactManifest: [
+      {
+        path: "finance_artifact.xlsx",
+        sizeBytes: 1024,
+        url: "/api/agent/artifacts/run-1/finance_artifact.xlsx",
+      },
+    ],
   })
 })
 
@@ -102,6 +116,38 @@ test("parseStreamEventLine rejects malformed checkpoint and tool data", () => {
         toolName: "finance_data",
         status: "error",
         operation: "   ",
+      })
+    ),
+    null
+  )
+
+  assert.equal(
+    parseStreamEventLine(
+      JSON.stringify({
+        type: "tool_result",
+        callId: "call-1",
+        toolName: "code_execution",
+        status: "success",
+        artifactManifest: [{ path: "../escape.xlsx", sizeBytes: 1 }],
+      })
+    ),
+    null
+  )
+
+  assert.equal(
+    parseStreamEventLine(
+      JSON.stringify({
+        type: "tool_result",
+        callId: "call-1",
+        toolName: "code_execution",
+        status: "success",
+        artifactManifest: [
+          {
+            path: "finance_artifact.xlsx",
+            sizeBytes: 1,
+            url: "https://example.com/finance_artifact.xlsx",
+          },
+        ],
       })
     ),
     null

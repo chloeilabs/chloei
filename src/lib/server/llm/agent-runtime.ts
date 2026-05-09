@@ -11,6 +11,10 @@ import {
 
 import { createLogger } from "@/lib/logger"
 import {
+  buildAgentArtifactBaseUrl,
+  getAgentArtifactRunRoot,
+} from "@/lib/server/agent-artifacts"
+import {
   AGENT_EVAL_RESULTS_DIR,
   AGENT_RESEARCH_TOOL_MAX_STEPS,
   AGENT_TOOL_MAX_STEPS,
@@ -96,6 +100,7 @@ export interface StartAgentRuntimeStreamParams {
   runtimeProfile?: AgentRuntimeProfileId
   temperature?: number
   signal?: AbortSignal
+  artifactOwnerId?: string
   codeExecutionInputFiles?: {
     sourcePath: string
     relativePath: string
@@ -266,10 +271,25 @@ export async function* startAgentRuntimeStream(
   }
 
   try {
+    const artifactRunId =
+      runtimeProfile.id === "finance_analysis" && params.artifactOwnerId
+        ? randomUUID()
+        : undefined
     const codeExecutionWorkspaceRoot =
       runtimeProfile.id === "gdpval_workspace" && AGENT_EVAL_RESULTS_DIR
         ? path.join(AGENT_EVAL_RESULTS_DIR, "workspaces", randomUUID())
-        : undefined
+        : artifactRunId && params.artifactOwnerId
+          ? getAgentArtifactRunRoot({
+              artifactId: artifactRunId,
+              userId: params.artifactOwnerId,
+            })
+          : undefined
+    const codeExecutionWorkspaceMode =
+      runtimeProfile.codeExecutionWorkspaceMode ??
+      (artifactRunId ? "preserve" : undefined)
+    const artifactBaseUrl = artifactRunId
+      ? (buildAgentArtifactBaseUrl(artifactRunId) ?? undefined)
+      : undefined
     if (runtimeProfile.fmpMcpEnabled) {
       try {
         fmpToolsContext =
@@ -285,11 +305,13 @@ export async function* startAgentRuntimeStream(
     const tools = {
       ...createAiSdkCodeExecutionTools({
         backend: runtimeProfile.codeExecutionBackend,
-        workspaceMode: runtimeProfile.codeExecutionWorkspaceMode,
+        workspaceMode: codeExecutionWorkspaceMode,
         workspaceRoot:
-          runtimeProfile.id === "gdpval_workspace"
+          runtimeProfile.id === "gdpval_workspace" || artifactRunId
             ? codeExecutionWorkspaceRoot
             : undefined,
+        artifactBaseUrl,
+        exposeArtifactDirectory: runtimeProfile.id === "gdpval_workspace",
         inputFiles:
           runtimeProfile.id === "gdpval_workspace"
             ? params.codeExecutionInputFiles
@@ -600,6 +622,10 @@ export async function* startAgentRuntimeStream(
             : {}),
           ...("retryable" in metadata && metadata.retryable !== undefined
             ? { retryable: metadata.retryable }
+            : {}),
+          ...("artifactManifest" in metadata &&
+          metadata.artifactManifest?.length
+            ? { artifactManifest: metadata.artifactManifest }
             : {}),
         }
 

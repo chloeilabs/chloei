@@ -837,7 +837,7 @@ test("agent helper marks tool-backed partial output incomplete when a tool call 
   assert.equal(recorded.loggerInfos[0]?.details?.unresolvedToolCallCount, 1)
 })
 
-test("agent helper marks tool-backed partial output incomplete when a tool result errors", async () => {
+test("agent helper does not add an incomplete fallback when a meaningful answer follows a tool error", async () => {
   setTestMocks({
     gatewayResponses: {
       startGatewayResponseStream(params) {
@@ -880,16 +880,15 @@ test("agent helper marks tool-backed partial output incomplete when a tool resul
 
   const events = await readNdjsonEvents(response)
 
-  assert.deepEqual(events.at(-2), {
-    type: "text_delta",
-    delta:
-      "\n\nI gathered tool results, but the model ended before writing a final answer. Please retry or narrow the request; the tool output above is still available for inspection.",
-  })
   assert.deepEqual(events.at(-1), {
     type: "agent_status",
-    status: "incomplete",
+    status: "completed",
   })
-  assert.equal(recorded.loggerInfos[0]?.details?.outcome, "incomplete")
+  assert.equal(
+    events.filter((event) => event.type === "text_delta").at(-1)?.delta,
+    "One current fact is available."
+  )
+  assert.equal(recorded.loggerInfos[0]?.details?.outcome, "completed")
   assert.equal(recorded.loggerInfos[0]?.details?.toolErrorCount, 1)
 })
 
