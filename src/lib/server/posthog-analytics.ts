@@ -217,7 +217,7 @@ export async function capturePostHogProductEvent({
       disableGeoip: true,
     })
     await withTimeout(
-      client._shutdown(POSTHOG_CAPTURE_TIMEOUT_MS),
+      client.shutdown(POSTHOG_CAPTURE_TIMEOUT_MS),
       POSTHOG_CAPTURE_TIMEOUT_MS
     )
   } catch (error) {

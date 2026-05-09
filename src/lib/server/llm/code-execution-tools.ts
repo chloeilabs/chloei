@@ -462,11 +462,14 @@ async function collectArtifactManifest(
           relativePath,
         })
         if (blobPathname) {
-          const uploaded = await uploadPrivateBlob({
-            pathname: blobPathname,
-            body: await readFile(fullPath),
-            contentType: inferArtifactContentType(relativePath),
-          }).catch(() => null)
+          const artifactBody = await readFile(fullPath).catch(() => null)
+          const uploaded = artifactBody
+            ? await uploadPrivateBlob({
+                pathname: blobPathname,
+                body: artifactBody,
+                contentType: inferArtifactContentType(relativePath),
+              }).catch(() => null)
+            : null
           const downloadUrl = uploaded
             ? buildAuthenticatedPrivateBlobDownloadUrl(uploaded.pathname)
             : null

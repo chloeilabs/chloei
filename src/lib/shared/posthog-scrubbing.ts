@@ -76,12 +76,42 @@ function scrubValue(value: unknown): unknown {
 export function scrubPostHogProperties(
   properties: Record<string, unknown>
 ): PostHogSafeProperties {
-  const scrubbed = scrubValue(properties)
-  return scrubbed && typeof scrubbed === "object" && !Array.isArray(scrubbed)
-    ? (scrubbed as PostHogSafeProperties)
-    : {}
+  const output: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(properties)) {
+    if (isAllowedSafeProperty(key)) {
+      output[key] = scrubValue(value)
+      continue
+    }
+
+    if (SENSITIVE_FIELD_PATTERN.test(key)) {
+      output[key] = "[Filtered]"
+    }
+  }
+
+  return output as PostHogSafeProperties
 }
 
-export function scrubPostHogEvent<T>(event: T): T | null {
-  return scrubValue(event) as T
+export function scrubPostHogEvent<T>(event: T): T {
+  if (!event || typeof event !== "object" || Array.isArray(event)) {
+    return scrubValue(event) as T
+  }
+
+  const scrubbed = scrubValue(event)
+  if (!scrubbed || typeof scrubbed !== "object" || Array.isArray(scrubbed)) {
+    return scrubbed as T
+  }
+
+  const output = scrubbed as Record<string, unknown>
+  const properties = (event as Record<string, unknown>).properties
+  if (
+    properties &&
+    typeof properties === "object" &&
+    !Array.isArray(properties)
+  ) {
+    output.properties = scrubPostHogProperties(
+      properties as Record<string, unknown>
+    )
+  }
+
+  return output as T
 }

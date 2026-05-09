@@ -101,22 +101,32 @@ function normalizeDomain(value: string): string | null {
 }
 
 function isPrivateIpAddress(hostname: string): boolean {
-  const ipVersion = net.isIP(hostname)
+  const normalizedHostname = hostname
+    .trim()
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "")
+    .replace(/%.+$/, "")
+  const ipVersion = net.isIP(normalizedHostname)
   if (ipVersion === 0) {
     return false
   }
 
   if (ipVersion === 6) {
-    const normalized = hostname.toLowerCase()
+    const mappedIpv4 = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(normalizedHostname)
+    if (mappedIpv4?.[1]) {
+      return isPrivateIpAddress(mappedIpv4[1])
+    }
+
     return (
-      normalized === "::1" ||
-      normalized.startsWith("fc") ||
-      normalized.startsWith("fd") ||
-      normalized.startsWith("fe80:")
+      normalizedHostname === "::" ||
+      normalizedHostname === "::1" ||
+      normalizedHostname.startsWith("fc") ||
+      normalizedHostname.startsWith("fd") ||
+      /^fe[89ab]/.test(normalizedHostname)
     )
   }
 
-  const octets = hostname.split(".").map((part) => Number(part))
+  const octets = normalizedHostname.split(".").map((part) => Number(part))
   const [first, second] = octets
   return (
     first === 10 ||
@@ -142,7 +152,10 @@ export function isAllowedBrowserResearchUrl(params: {
     return false
   }
 
-  const hostname = url.hostname.toLowerCase()
+  const hostname = url.hostname
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "")
+    .replace(/%.+$/, "")
   if (
     hostname === "localhost" ||
     hostname.endsWith(".local") ||
@@ -265,6 +278,20 @@ async function runBrowserResearch(params: {
   const browser = await chromium.connectOverCDP(session.connectUrl)
   try {
     const context = browser.contexts()[0] ?? (await browser.newContext())
+    await context.route("**/*", async (route) => {
+      const requestUrl = route.request().url()
+      if (
+        isAllowedBrowserResearchUrl({
+          startUrl: requestUrl,
+          allowedDomains: params.allowedDomains,
+        })
+      ) {
+        await route.continue().catch(() => undefined)
+        return
+      }
+
+      await route.abort("blockedbyclient").catch(() => undefined)
+    })
     const page = context.pages()[0] ?? (await context.newPage())
     page.setDefaultTimeout(15_000)
 
@@ -286,6 +313,20 @@ async function runBrowserResearch(params: {
       .trim()
       .slice(0, MAX_PAGE_TEXT_CHARS)
     const finalUrl = page.url()
+    if (
+      !isAllowedBrowserResearchUrl({
+        startUrl: finalUrl,
+        allowedDomains: params.allowedDomains,
+      })
+    ) {
+      return {
+        error: {
+          message:
+            "Browser research final URL is outside the consented allowlist.",
+          code: "BROWSER_RESEARCH_FINAL_URL_NOT_ALLOWED",
+        },
+      }
+    }
 
     return {
       output: {

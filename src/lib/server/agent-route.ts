@@ -494,10 +494,13 @@ function validateAgentRequestAttachments(
       }
 
       const hasInlinePayload = Boolean(attachment.dataUrl)
-      const hasBlobPayload = Boolean(
-        attachment.blobPathname && attachment.sha256
-      )
-      if (!hasInlinePayload && !hasBlobPayload) {
+      const hasBlobPathname = Boolean(attachment.blobPathname)
+      const hasBlobSha256 = Boolean(attachment.sha256)
+      const hasBlobPayload = hasBlobPathname && hasBlobSha256
+      if (
+        hasInlinePayload === hasBlobPayload ||
+        hasBlobPathname !== hasBlobSha256
+      ) {
         return createAttachmentValidationError(params)
       }
 

@@ -2,10 +2,13 @@ import { Buffer } from "node:buffer"
 import { createHash, randomUUID } from "node:crypto"
 import path from "node:path"
 
+import { z } from "zod"
+
 import { hashUserId } from "@/lib/server/privacy"
 
 const SAFE_FILENAME_PATTERN = /[^A-Za-z0-9._-]+/g
 const MAX_FILENAME_CHARS = 120
+const ATTACHMENT_ID_SCHEMA = z.uuid()
 
 export interface PrivateBlobUploadResult {
   pathname: string
@@ -81,7 +84,7 @@ export function buildPrivateBlobAttachmentPathname(params: {
   const requestedAttachmentId = params.attachmentId?.trim()
   const attachmentId =
     requestedAttachmentId && requestedAttachmentId.length > 0
-      ? requestedAttachmentId
+      ? ATTACHMENT_ID_SCHEMA.parse(requestedAttachmentId)
       : randomUUID()
   return `${getPrivateBlobUserPrefix(params.userId)}/attachments/${attachmentId}/${sanitizeFilename(params.filename)}`
 }
@@ -146,10 +149,15 @@ export async function uploadPrivateBlob(params: {
     abortSignal: params.signal,
   })
 
+  const downloadUrl = buildAuthenticatedPrivateBlobDownloadUrl(result.pathname)
+  if (!downloadUrl) {
+    throw new Error("Invalid private blob download pathname.")
+  }
+
   return {
     pathname: result.pathname,
     url: result.url,
-    downloadUrl: result.downloadUrl,
+    downloadUrl,
     sha256,
     sizeBytes: buffer.byteLength,
     contentType: result.contentType,

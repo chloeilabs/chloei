@@ -155,14 +155,25 @@ export async function POST(request: NextRequest) {
           errorCode: "JOB_REPORT_ENQUEUE_FAILED",
           requestId,
         })
-        await updateAgentJobStatus({
-          jobId: job.id,
-          status: "failed",
-          error: "Report job could not be enqueued.",
-        })
+        try {
+          await updateAgentJobStatus({
+            jobId: job.id,
+            status: "failed",
+            error: "Report job could not be enqueued.",
+          })
+        } catch (statusError) {
+          logger.error(
+            "Failed to mark report job as failed after enqueue error.",
+            {
+              error: statusError,
+              errorCode: "JOB_REPORT_STATUS_UPDATE_FAILED",
+              requestId,
+            }
+          )
+        }
       })
 
-    await capturePostHogProductEvent({
+    void capturePostHogProductEvent({
       event: "async_report_requested",
       featureFlags: flags,
       requestId,

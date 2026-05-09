@@ -112,6 +112,27 @@ const knowledgeSearchInputSchema = z.object({
   corpus: z.string().trim().min(1).max(120).optional(),
   limit: z.number().int().min(1).max(MAX_LIMIT).optional(),
 })
+const knowledgeSearchResultSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  snippet: z.string(),
+  sourceUrl: z.string().optional(),
+  artifactUrl: z.string().optional(),
+  sourceType: z.string(),
+  asOfDate: z.string().optional(),
+  corpus: z.string().optional(),
+  score: z.number(),
+  citationMarkdown: z.string(),
+})
+const knowledgeSearchToolOutputSchema = z.object({
+  query: z.string(),
+  requestId: z.string(),
+  results: z.array(knowledgeSearchResultSchema),
+})
+const knowledgeSearchToolErrorPayloadSchema = z.object({
+  message: z.string(),
+  code: z.string().optional(),
+})
 
 async function getConfiguredSearchClient(): Promise<UpstashSearchClient | null> {
   const url = process.env.UPSTASH_SEARCH_REST_URL?.trim()
@@ -251,13 +272,17 @@ function parseToolResultPayload(
     return null
   }
 
+  const output = knowledgeSearchToolOutputSchema.safeParse(normalized.output)
+  const error = knowledgeSearchToolErrorPayloadSchema.safeParse(
+    normalized.error
+  )
+  if (!output.success && !error.success) {
+    return null
+  }
+
   return {
-    ...(asRecord(normalized.output)
-      ? { output: normalized.output as KnowledgeSearchToolOutput }
-      : {}),
-    ...(asRecord(normalized.error)
-      ? { error: normalized.error as KnowledgeSearchToolErrorPayload }
-      : {}),
+    ...(output.success ? { output: output.data } : {}),
+    ...(error.success ? { error: error.data } : {}),
   }
 }
 

@@ -204,7 +204,7 @@ export async function resolveIntegrationBooleanFlag({
 export async function resolveAgentFeatureFlags(
   params: ResolveAgentFeatureFlagsParams = {}
 ): Promise<AgentFeatureFlags> {
-  const flags: AgentFeatureFlags = getInternalDefaultFlags(params)
+  const flags: AgentFeatureFlags = { ...getInternalDefaultFlags(params) }
 
   for (const key of Object.keys(flags) as (keyof AgentFeatureFlags)[]) {
     const envValue = getEnvFlag(ENV_FLAG_NAMES[key])

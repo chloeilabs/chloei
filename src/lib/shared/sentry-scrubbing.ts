@@ -15,7 +15,7 @@ function scrubValue(value: unknown): unknown {
   }
 
   if (Array.isArray(value)) {
-    return value.slice(0, 50).map(scrubValue)
+    return value.map(scrubValue)
   }
 
   const output: Record<string, unknown> = {}
@@ -30,6 +30,6 @@ function scrubValue(value: unknown): unknown {
   return output
 }
 
-export function scrubSentryEvent<T>(event: T): T | null {
+export function scrubSentryEvent<T>(event: T): T {
   return scrubValue(event) as T
 }

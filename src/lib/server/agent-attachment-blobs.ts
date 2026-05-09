@@ -1,8 +1,14 @@
 import { type Buffer } from "node:buffer"
 
-import type { AgentRequestAttachment } from "@/lib/shared"
+import { createLogger } from "@/lib/logger"
+import {
+  type AgentRequestAttachment,
+  normalizeAgentAttachmentMimeType,
+} from "@/lib/shared"
 
 import { readPrivateBlob } from "./private-blob-storage"
+
+const logger = createLogger("agent-attachment-blobs")
 
 function toDataUrl(contentType: string, buffer: Buffer): string {
   return `data:${contentType};base64,${buffer.toString("base64")}`
@@ -39,21 +45,37 @@ export async function hydrateBlobBackedAttachments(params: {
             pathname: attachment.blobPathname,
             userId,
             signal: params.signal,
-          })
+          }).catch(() => null)
           if (!blob) {
-            throw new Error("Blob-backed attachment could not be read.")
+            logger.warn(
+              "Blob-backed attachment could not be hydrated; omitting attachment.",
+              {
+                attachmentId: attachment.id,
+                errorCode: "ATTACHMENT_BLOB_READ_FAILED",
+                mediaType: attachment.mediaType,
+              }
+            )
+            return null
           }
+
+          const mediaType =
+            normalizeAgentAttachmentMimeType(blob.contentType) ??
+            attachment.mediaType
 
           return {
             ...attachment,
-            dataUrl: toDataUrl(attachment.mediaType, blob.buffer),
+            mediaType,
+            dataUrl: toDataUrl(mediaType, blob.buffer),
           }
         })
       )
 
       return {
         ...message,
-        attachments: hydratedAttachments,
+        attachments: hydratedAttachments.filter(
+          (attachment): attachment is AgentRequestAttachment =>
+            attachment !== null
+        ),
       }
     })
   )

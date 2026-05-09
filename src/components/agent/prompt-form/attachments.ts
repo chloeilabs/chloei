@@ -1,13 +1,35 @@
+import { z } from "zod"
+
 import {
   AGENT_ATTACHMENT_MAX_PREVIEW_DATA_URL_CHARS,
+  AGENT_ATTACHMENT_MIME_TYPES,
+  AGENT_IMAGE_DETAIL_VALUES,
   type AgentAttachmentKind,
-  type AgentAttachmentMetadata,
   type AgentAttachmentMimeType,
   type AgentRequestAttachment,
   normalizeAgentAttachmentMimeType,
 } from "@/lib/shared"
 
 const IMAGE_PREVIEW_MAX_EDGE = 160
+const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/i
+
+const UploadAttachmentResponseSchema = z.object({
+  attachment: z.object({
+    id: z.string().trim().min(1),
+    kind: z.enum(["image", "pdf"] satisfies [
+      AgentAttachmentKind,
+      ...AgentAttachmentKind[],
+    ]),
+    filename: z.string().trim().min(1),
+    mediaType: z.enum(AGENT_ATTACHMENT_MIME_TYPES),
+    sizeBytes: z.number().int().nonnegative(),
+    detail: z.enum(AGENT_IMAGE_DETAIL_VALUES).optional(),
+    previewDataUrl: z.string().optional(),
+    blobPathname: z.string().trim().min(1).optional(),
+    sha256: z.string().trim().regex(SHA256_HEX_PATTERN).optional(),
+    downloadUrl: z.string().trim().min(1).optional(),
+  }),
+})
 
 export function formatFileSize(sizeBytes: number): string {
   if (sizeBytes < 1024) {
@@ -90,12 +112,6 @@ export function getNormalizedFileMediaType(
   return normalizeAgentAttachmentMimeType(file.type)
 }
 
-interface UploadAttachmentResponse {
-  attachment?: AgentAttachmentMetadata & {
-    kind: AgentAttachmentKind
-  }
-}
-
 export async function uploadAttachmentFile(params: {
   file: File
   attachmentId: string
@@ -113,11 +129,13 @@ export async function uploadAttachmentFile(params: {
     throw new Error("Attachment upload failed.")
   }
 
-  const payload = (await response.json()) as UploadAttachmentResponse
-  const attachment = payload.attachment
-  if (!attachment) {
+  const payload = UploadAttachmentResponseSchema.safeParse(
+    await response.json()
+  )
+  if (!payload.success) {
     throw new Error("Attachment upload response was invalid.")
   }
+  const attachment = payload.data.attachment
 
   return {
     ...attachment,

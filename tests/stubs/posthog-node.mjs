@@ -18,7 +18,7 @@ export class PostHog {
     globalThis[capturesKey] = captures
   }
 
-  async _shutdown() {
+  async shutdown() {
     return undefined
   }
 }

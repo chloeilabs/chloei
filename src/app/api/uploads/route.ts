@@ -212,7 +212,7 @@ export async function POST(request: NextRequest) {
         })
     }
 
-    await capturePostHogProductEvent({
+    void capturePostHogProductEvent({
       event: "document_uploaded",
       requestId,
       userEmail: session.user.email,

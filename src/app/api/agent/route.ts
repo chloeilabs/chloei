@@ -311,7 +311,7 @@ export async function POST(request: NextRequest) {
       0
     )
 
-    await capturePostHogProductEvent({
+    void capturePostHogProductEvent({
       event: "agent_request_started",
       featureFlags,
       requestId,
