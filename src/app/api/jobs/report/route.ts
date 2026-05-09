@@ -5,6 +5,7 @@ import { z } from "zod"
 
 import { createLogger } from "@/lib/logger"
 import { resolveRequestIdFromHeaders } from "@/lib/request-id"
+import { completeReportPlaceholderJob } from "@/lib/server/agent-report-jobs"
 import {
   createApiErrorResponse,
   createApiHeaders,
@@ -15,6 +16,7 @@ import {
 } from "@/lib/server/auth"
 import { getRequestSession } from "@/lib/server/auth-session"
 import { inngest } from "@/lib/server/inngest/client"
+import { shouldRunInngestInlineFallback } from "@/lib/server/inngest/environment"
 import { resolveAgentFeatureFlags } from "@/lib/server/integration-flags"
 import { createAgentJob, updateAgentJobStatus } from "@/lib/server/jobs"
 import { capturePostHogProductEvent } from "@/lib/server/posthog-analytics"
@@ -132,6 +134,7 @@ export async function POST(request: NextRequest) {
       parsed.data.threadId ?? "adhoc",
       reportId,
     ].join(":")
+    let responseJobStatus: "queued" | "completed" = "queued"
     const job = await createAgentJob({
       userId: session.user.id,
       type: "agent/report.requested",
@@ -139,6 +142,7 @@ export async function POST(request: NextRequest) {
       idempotencyKey,
     })
 
+    let enqueueError: unknown
     await inngest
       .send({
         id: `agent/report.requested:${session.user.id}:${job.id}`,
@@ -149,29 +153,45 @@ export async function POST(request: NextRequest) {
           ...reportPayload,
         },
       })
-      .catch(async (error: unknown) => {
+      .catch((error: unknown) => {
+        enqueueError = error
         logger.error("Report job enqueue failed.", {
           error,
           errorCode: "JOB_REPORT_ENQUEUE_FAILED",
           requestId,
         })
-        try {
-          await updateAgentJobStatus({
-            jobId: job.id,
-            status: "failed",
-            error: "Report job could not be enqueued.",
-          })
-        } catch (statusError) {
-          logger.error(
-            "Failed to mark report job as failed after enqueue error.",
-            {
-              error: statusError,
-              errorCode: "JOB_REPORT_STATUS_UPDATE_FAILED",
-              requestId,
-            }
-          )
-        }
       })
+
+    if (shouldRunInngestInlineFallback()) {
+      logger.warn("Running report job through inline Inngest fallback.", {
+        errorCode: "JOB_REPORT_INLINE_FALLBACK",
+        requestId,
+      })
+      await completeReportPlaceholderJob({
+        jobId: job.id,
+        reportId,
+        threadId: parsed.data.threadId,
+        title: parsed.data.title,
+      })
+      responseJobStatus = "completed"
+    } else if (enqueueError) {
+      try {
+        await updateAgentJobStatus({
+          jobId: job.id,
+          status: "failed",
+          error: "Report job could not be enqueued.",
+        })
+      } catch (statusError) {
+        logger.error(
+          "Failed to mark report job as failed after enqueue error.",
+          {
+            error: statusError,
+            errorCode: "JOB_REPORT_STATUS_UPDATE_FAILED",
+            requestId,
+          }
+        )
+      }
+    }
 
     void capturePostHogProductEvent({
       event: "async_report_requested",
@@ -191,7 +211,7 @@ export async function POST(request: NextRequest) {
         {
           jobId: job.id,
           reportId,
-          status: job.status,
+          status: responseJobStatus,
         },
         {
           status: 202,

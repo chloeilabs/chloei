@@ -1,6 +1,7 @@
 import { z } from "zod"
 
-import { updateAgentJobStatus } from "@/lib/server/jobs"
+import { completeReportPlaceholderJob } from "@/lib/server/agent-report-jobs"
+import { indexUploadedDocument } from "@/lib/server/knowledge-indexing"
 
 import { inngest } from "./client"
 
@@ -40,11 +41,9 @@ export const documentUploaded = inngest.createFunction(
   async ({ event, step }) => {
     const data = documentUploadedSchema.parse(event.data)
     await step.run("record-document-metadata", () => data)
-    return {
-      indexed: false,
-      reason:
-        "Binary uploaded; text extraction/indexing should run after a parser extracts governed text chunks.",
-    }
+    return step.run("index-uploaded-document", () =>
+      indexUploadedDocument(data)
+    )
   }
 )
 
@@ -56,30 +55,14 @@ export const reportRequested = inngest.createFunction(
   },
   async ({ event, step }) => {
     const data = reportRequestedSchema.parse(event.data)
-    await step.run("mark-running", () =>
-      updateAgentJobStatus({
+    return step.run("complete-report-placeholder", () =>
+      completeReportPlaceholderJob({
         jobId: data.jobId,
-        status: "running",
+        reportId: data.reportId,
+        threadId: data.threadId,
+        title: data.title,
       })
     )
-
-    const result = await step.run("prepare-report-placeholder", () => ({
-      title: data.title ?? "Async report",
-      reportId: data.reportId ?? null,
-      threadId: data.threadId ?? null,
-      message:
-        "Report job accepted. Connect this function to the agent runtime to generate the final artifact.",
-    }))
-
-    await step.run("mark-completed", () =>
-      updateAgentJobStatus({
-        jobId: data.jobId,
-        status: "completed",
-        result,
-      })
-    )
-
-    return result
   }
 )
 
