@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
-import { beforeEach, test } from "node:test"
 import path from "node:path"
+import { beforeEach, test } from "node:test"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { ZodError } from "zod"
@@ -24,6 +24,9 @@ setTestModuleStubs({
   "@/lib/logger": toProjectFileUrl("tests/stubs/logger.mjs"),
   "@/lib/server/auth": toProjectFileUrl("tests/stubs/auth.mjs"),
   "@/lib/server/auth-session": toProjectFileUrl("tests/stubs/auth-session.mjs"),
+  "@/lib/server/long-term-memory": toProjectFileUrl(
+    "tests/stubs/long-term-memory.mjs"
+  ),
   "@/lib/server/threads": toProjectFileUrl("tests/stubs/threads.mjs"),
   "next/server": toProjectFileUrl("tests/stubs/next-server.mjs"),
 })
@@ -36,6 +39,7 @@ function createRequest(overrides = {}) {
   return {
     headers: new Headers(overrides.headers),
     json: overrides.json ?? (async () => ({})),
+    signal: overrides.signal ?? new AbortController().signal,
   }
 }
 
@@ -56,6 +60,8 @@ beforeEach(() => {
     deleted: [],
     loggerInfos: [],
     loggerErrors: [],
+    loggerWarnings: [],
+    memoryDeletes: [],
   }
 
   resetTestMocks()
@@ -102,11 +108,19 @@ beforeEach(() => {
           info(message, details) {
             recorded.loggerInfos.push({ scope, message, details })
           },
-          warn() {},
+          warn(message, details) {
+            recorded.loggerWarnings.push({ scope, message, details })
+          },
           error(message, error) {
             recorded.loggerErrors.push({ scope, message, error })
           },
         }
+      },
+    },
+    longTermMemory: {
+      async deleteLongTermMemoriesForThread(params) {
+        recorded.memoryDeletes.push(params)
+        return true
       },
     },
     threads: {
@@ -184,6 +198,52 @@ test("threads DELETE returns 204 and forwards the user and thread ids", async ()
       threadId: "thread-1",
     },
   ])
+})
+
+test("thread deletion best-effort deletes long-term memories by run id", async () => {
+  const signal = new AbortController().signal
+  const response = await DELETE(
+    createRequest({
+      headers: { "x-request-id": "request-threads" },
+      json: async () => ({ id: "thread-1" }),
+      signal,
+    })
+  )
+
+  assert.equal(response.status, 204)
+  assert.equal(recorded.memoryDeletes.length, 1)
+  assert.deepEqual(recorded.memoryDeletes[0], {
+    requestId: "request-threads",
+    signal,
+    threadId: "thread-1",
+    userId: "user-1",
+  })
+})
+
+test("thread deletion succeeds when long-term memory cleanup fails", async () => {
+  setTestMocks({
+    longTermMemory: {
+      async deleteLongTermMemoriesForThread(params) {
+        recorded.memoryDeletes.push(params)
+        throw new Error("Mem0 unavailable")
+      },
+    },
+  })
+
+  const response = await DELETE(
+    createRequest({
+      json: async () => ({ id: "thread-1" }),
+    })
+  )
+
+  assert.equal(response.status, 204)
+  assert.equal(recorded.deleted.length, 1)
+  assert.equal(recorded.memoryDeletes.length, 1)
+  assert.equal(
+    recorded.loggerWarnings[0]?.message,
+    "Failed to clean up long-term memories for deleted thread."
+  )
+  assert.equal(recorded.loggerInfos.at(-1)?.details?.outcome, "success")
 })
 
 test("threads GET surfaces thread-store initialization errors", async () => {

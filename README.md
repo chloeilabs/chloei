@@ -1,6 +1,6 @@
 # Chloei
 
-Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently exposes a curated model selector with Kimi K2.6, DeepSeek V4 Pro, and Grok 4.3, uses GPT-5.5 for deep research runs, supports Claude Sonnet 4.6, and offers file attachments, native web search, local code execution, optional Tavily retrieval, optional Financial Modeling Prep MCP tools, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
+Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently exposes a curated model selector with Kimi K2.6, DeepSeek V4 Pro, and Grok 4.3, uses GPT-5.5 for deep research runs, supports Claude Sonnet 4.6, and offers file attachments, native web search, local code execution, optional Tavily retrieval, optional Financial Modeling Prep MCP tools, optional self-hosted Mem0 long-term memory, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
 
 ## Requirements
 
@@ -16,7 +16,7 @@ pnpm migrate
 pnpm dev
 ```
 
-Add `AI_GATEWAY_API_KEY` to `.env.local` before starting the app. Add `TAVILY_API_KEY` if you want Tavily search and extract tools. Add `FMP_API_KEY` if you want the curated finance tools. The app runs on [http://localhost:3000](http://localhost:3000).
+Add `AI_GATEWAY_API_KEY` to `.env.local` before starting the app. Add `TAVILY_API_KEY` if you want Tavily search and extract tools. Add `FMP_API_KEY` if you want the curated finance tools. Add the Mem0 memory variables documented below if you want long-term memory. The app runs on [http://localhost:3000](http://localhost:3000).
 
 To enable auth locally, provision PostgreSQL and add:
 
@@ -74,6 +74,10 @@ Optional variables let you override the built-in safe defaults for message limit
 - `FMP_API_KEY`: enables curated Financial Modeling Prep MCP tools for structured finance data
 - `FRED_API_KEY`: enables macro/rates series through the normalized `finance_data` tool
 - `SEC_API_USER_AGENT`: identifies Chloei for SEC public company-facts requests
+- `MEMORY_PROVIDER=mem0`: enables long-term memory through a separate self-hosted Mem0 OSS REST server. The default is `disabled`.
+- `MEM0_API_URL`: Mem0 REST API origin, defaulting to `http://localhost:8888`. Use `https://api.mem0.ai` for Mem0 Platform keys.
+- `MEM0_API_KEY`: Mem0 key value. Self-hosted OSS uses `X-API-Key`; Mem0 Platform uses `Authorization: Token ...`.
+- `MEMORY_AGENT_ID`, `MEMORY_TOP_K`, `MEMORY_THRESHOLD`, `MEMORY_CONTEXT_MAX_CHARS`, and `MEMORY_COMMIT_MAX_CHARS`: optional memory scoping, retrieval, and prompt/commit bounds. Mem0 Platform scores can be lower for generic queries; `MEMORY_THRESHOLD=0.1` is a practical local setting.
 
 By default, Chloei enforces safe built-in agent limits even if you leave all optional `AGENT_*` env vars unset.
 `AGENT_RATE_LIMIT_STORE` defaults to `auto`, which uses PostgreSQL when `DATABASE_URL` is configured and falls back to process memory for local/no-database runs. Allowed values: `auto`, `postgres`, `memory`.
@@ -88,6 +92,7 @@ By default, Chloei enforces safe built-in agent limits even if you leave all opt
 - `src/app/api/models/route.ts`: available-models endpoint
 - `src/components/agent`: chat UI, prompt form, markdown rendering, and session state
 - `src/lib/server`: Better Auth config, PostgreSQL setup, runtime config, rate limiting, and model streaming
+- `src/lib/server/long-term-memory.ts`: Mem0 REST client, retrieval formatting, and memory commit helpers
 
 ## Notes
 
@@ -95,6 +100,8 @@ By default, Chloei enforces safe built-in agent limits even if you leave all opt
 - `/`, `/api/agent`, and `/api/models` require an authenticated Better Auth session.
 - Native `web_search` is available through AI Gateway alongside Tavily, FMP, and local code execution.
 - `finance_data` normalizes finance operations across FMP, SEC public company facts, and optional FRED macro/rates data. FMP MCP remains available as a migration compatibility path for chat-default runs.
+- Long-term memory is opt-in and best effort. When `MEMORY_PROVIDER=mem0`, Chloei retrieves user-scoped memories before each agent run and writes the latest user/assistant turn after meaningful completed or incomplete responses. Memory failures never block chat. Self-hosted OSS and Mem0 Platform are both supported through `MEM0_API_URL`; Platform mode uses a private per-user `app_id` scope for reliable retrieval.
+- Run Mem0 separately with its REST API and dashboard. For a low-friction shared provider setup, configure Mem0's OpenAI-compatible LLM/embedder through Vercel AI Gateway with `OPENAI_BASE_URL=https://ai-gateway.vercel.sh/v1`, `OPENAI_API_KEY=$AI_GATEWAY_API_KEY`, `openai/text-embedding-3-small` for embeddings, and a low-cost GPT model for memory extraction. Prefer private networking and HTTPS outside local development.
 - Finance eval fixtures and GDPval-style harness scripts live in `evals/finance`.
 - To share logins with another Chloei app, point both apps at the same Better Auth database and secret, set `BETTER_AUTH_COOKIE_DOMAIN` to the shared parent domain, and include every live subdomain in `BETTER_AUTH_TRUSTED_ORIGINS`.
 - Rate limiting and concurrency protection are PostgreSQL-backed when `DATABASE_URL` is configured. Local/no-database runs fall back to in-memory limits unless `AGENT_RATE_LIMIT_STORE=postgres` is set.

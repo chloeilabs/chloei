@@ -91,3 +91,56 @@ test("agent system prompt composes trusted blocks in priority order", () => {
   assert.match(prompt, /Email: user@example.com/)
   assert(prompt.includes(DEFAULT_SOUL_FALLBACK_INSTRUCTION))
 })
+
+test("agent system prompt advertises long-term memory only when enabled", () => {
+  const disabledPrompt = buildAgentSystemInstruction(
+    {
+      id: "user-1",
+      name: "Chloei",
+      email: "user@example.com",
+    },
+    {
+      now: new Date("2026-05-03T12:34:56.000Z"),
+    }
+  )
+  const enabledPrompt = buildAgentSystemInstruction(
+    {
+      id: "user-1",
+      name: "Chloei",
+      email: "user@example.com",
+    },
+    {
+      longTermMemoryContext: "User prefers concise finance answers.",
+      longTermMemoryEnabled: true,
+      now: new Date("2026-05-03T12:34:56.000Z"),
+    }
+  )
+
+  assert.equal(
+    disabledPrompt.includes("--- BEGIN LONG-TERM MEMORY CAPABILITY ---"),
+    false
+  )
+  assert.match(
+    enabledPrompt,
+    /If the user asks you to remember, save, retain, or use a stable preference\/fact/
+  )
+  assert.match(enabledPrompt, /Do not claim that you lack persistent memory/)
+  assert.match(enabledPrompt, /User prefers concise finance answers/)
+
+  const capabilityIndex = enabledPrompt.indexOf(
+    "--- BEGIN LONG-TERM MEMORY CAPABILITY ---"
+  )
+  const contextIndex = enabledPrompt.indexOf(
+    "--- BEGIN LONG-TERM MEMORY CONTEXT ---"
+  )
+  const soulIndex = enabledPrompt.indexOf(
+    "--- BEGIN SHARED CONTEXT FILE: SOUL.md ---"
+  )
+
+  assert(capabilityIndex >= 0, "Memory capability block not found")
+  assert(
+    contextIndex > capabilityIndex,
+    "Memory context should follow capability"
+  )
+  assert(soulIndex > contextIndex, "SOUL.md should follow memory context")
+})
