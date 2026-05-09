@@ -142,27 +142,8 @@ export async function POST(request: NextRequest) {
       idempotencyKey,
     })
 
-    let enqueueError: unknown
-    await inngest
-      .send({
-        id: `agent/report.requested:${session.user.id}:${job.id}`,
-        name: "agent/report.requested",
-        data: {
-          userId: session.user.id,
-          jobId: job.id,
-          ...reportPayload,
-        },
-      })
-      .catch((error: unknown) => {
-        enqueueError = error
-        logger.error("Report job enqueue failed.", {
-          error,
-          errorCode: "JOB_REPORT_ENQUEUE_FAILED",
-          requestId,
-        })
-      })
-
-    if (shouldRunInngestInlineFallback()) {
+    const shouldRunInlineFallback = shouldRunInngestInlineFallback()
+    if (shouldRunInlineFallback) {
       logger.warn("Running report job through inline Inngest fallback.", {
         errorCode: "JOB_REPORT_INLINE_FALLBACK",
         requestId,
@@ -174,22 +155,44 @@ export async function POST(request: NextRequest) {
         title: parsed.data.title,
       })
       responseJobStatus = "completed"
-    } else if (enqueueError) {
-      try {
-        await updateAgentJobStatus({
-          jobId: job.id,
-          status: "failed",
-          error: "Report job could not be enqueued.",
+    } else {
+      let enqueueError: unknown
+      await inngest
+        .send({
+          id: `agent/report.requested:${session.user.id}:${job.id}`,
+          name: "agent/report.requested",
+          data: {
+            userId: session.user.id,
+            jobId: job.id,
+            ...reportPayload,
+          },
         })
-      } catch (statusError) {
-        logger.error(
-          "Failed to mark report job as failed after enqueue error.",
-          {
-            error: statusError,
-            errorCode: "JOB_REPORT_STATUS_UPDATE_FAILED",
+        .catch((error: unknown) => {
+          enqueueError = error
+          logger.error("Report job enqueue failed.", {
+            error,
+            errorCode: "JOB_REPORT_ENQUEUE_FAILED",
             requestId,
-          }
-        )
+          })
+        })
+
+      if (enqueueError) {
+        try {
+          await updateAgentJobStatus({
+            jobId: job.id,
+            status: "failed",
+            error: "Report job could not be enqueued.",
+          })
+        } catch (statusError) {
+          logger.error(
+            "Failed to mark report job as failed after enqueue error.",
+            {
+              error: statusError,
+              errorCode: "JOB_REPORT_STATUS_UPDATE_FAILED",
+              requestId,
+            }
+          )
+        }
       }
     }
 

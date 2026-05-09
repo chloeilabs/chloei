@@ -645,10 +645,16 @@ test("Inngest inline fallback is explicit and covers report/upload routes", () =
     true
   )
 
-  assert.match(
-    readFileSync(path.join(cwd, "src/app/api/jobs/report/route.ts"), "utf8"),
-    /JOB_REPORT_INLINE_FALLBACK/
+  const reportRouteSource = readFileSync(
+    path.join(cwd, "src/app/api/jobs/report/route.ts"),
+    "utf8"
   )
+  assert.match(reportRouteSource, /JOB_REPORT_INLINE_FALLBACK/)
+  assert.match(
+    reportRouteSource,
+    /const shouldRunInlineFallback = shouldRunInngestInlineFallback\(\)/
+  )
+  assert.match(reportRouteSource, /} else {\n\s+let enqueueError: unknown/)
   assert.match(
     readFileSync(path.join(cwd, "src/app/api/uploads/route.ts"), "utf8"),
     /UPLOAD_INLINE_INDEX_FAILED/
