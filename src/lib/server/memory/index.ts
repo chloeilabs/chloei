@@ -72,7 +72,6 @@ export async function searchUserMemory(
 interface RecordParams {
   userId: string
   userMessage: string
-  assistantMessage?: string
   aiGatewayApiKey: string
   signal?: AbortSignal
 }
@@ -94,7 +93,6 @@ export async function recordUserMemory(params: RecordParams): Promise<{
   try {
     facts = await extractMemoryFacts({
       userMessage: trimmed,
-      assistantMessage: params.assistantMessage,
       aiGatewayApiKey: params.aiGatewayApiKey,
       signal: params.signal,
     })
