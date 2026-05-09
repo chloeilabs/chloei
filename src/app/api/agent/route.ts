@@ -187,7 +187,7 @@ export async function POST(request: NextRequest) {
         .reverse()
         .find((message) => message.role === "user")?.content ?? ""
     let longTermMemoryContext: string | undefined
-    if (!isE2eMockRequest) {
+    if (longTermMemoryEnabled) {
       try {
         longTermMemoryContext = await getLongTermMemoryContext({
           query: latestUserMessage,
@@ -295,10 +295,10 @@ export async function POST(request: NextRequest) {
           parsedRequest.runMode
         ),
         messages: parsedRequest.messages,
-        memoryCommitMaxChars: MEMORY_RUNTIME_CONFIG.commitMaxChars,
         systemInstruction,
-        ...(threadId
+        ...(longTermMemoryEnabled && threadId
           ? {
+              memoryCommitMaxChars: MEMORY_RUNTIME_CONFIG.commitMaxChars,
               onAssistantResponseSettled: async ({ assistantContent }) => {
                 await commitLongTermMemory({
                   assistantContent,

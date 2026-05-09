@@ -368,9 +368,7 @@ test("agent route passes the resolved prompt context into stream creation", asyn
       taskMode: "multi-turn",
     },
   })
-  assert.equal(recorded.memoryContextCalls.length, 1)
-  assert.equal(recorded.memoryContextCalls[0]?.query, "What changed?")
-  assert.equal(recorded.memoryContextCalls[0]?.userId, "user-1")
+  assert.equal(recorded.memoryContextCalls.length, 0)
   assert.deepEqual(recorded.streamCalls[0]?.messages, [
     { role: "user", content: "What changed?" },
     { role: "assistant", content: "Here is the summary." },
@@ -379,10 +377,51 @@ test("agent route passes the resolved prompt context into stream creation", asyn
   assert.equal(recorded.streamCalls[0]?.tavilyApiKey, "tavily-key")
   assert.equal(recorded.streamCalls[0]?.fmpApiKey, "fmp-key")
   assert.equal(recorded.streamCalls[0]?.systemInstruction, "system-instruction")
+  assert.equal(recorded.streamCalls[0]?.memoryCommitMaxChars, undefined)
+  assert.equal(recorded.streamCalls[0]?.onAssistantResponseSettled, undefined)
   assert.equal(typeof recorded.streamCalls[0]?.onStreamSettled, "function")
 
   recorded.streamCalls[0].onStreamSettled()
   assert.deepEqual(released, ["released"])
+})
+
+test("agent route skips long-term memory work when memory is disabled", async () => {
+  setTestMocks({
+    agentRoute: {
+      ...getTestMocks().agentRoute,
+      parseAgentStreamRequest({ body }) {
+        return {
+          parsedRequest: {
+            messages: body.messages,
+            threadId: body.threadId,
+          },
+          selectedModel: "anthropic/claude-sonnet-4.6",
+        }
+      },
+    },
+  })
+
+  const response = await POST(
+    createRequest({
+      json: async () => ({
+        messages: [{ role: "user", content: "Remember my portfolio." }],
+        threadId: "thread-disabled-memory",
+      }),
+    })
+  )
+
+  assert.equal(response.status, 200)
+  assert.equal(recorded.memoryContextCalls.length, 0)
+  assert.equal(
+    recorded.buildInstructionCalls[0]?.context.longTermMemoryEnabled,
+    undefined
+  )
+  assert.equal(
+    recorded.buildInstructionCalls[0]?.context.longTermMemoryContext,
+    undefined
+  )
+  assert.equal(recorded.streamCalls[0]?.memoryCommitMaxChars, undefined)
+  assert.equal(recorded.streamCalls[0]?.onAssistantResponseSettled, undefined)
 })
 
 test("agent route injects long-term memory context and wires memory commit callback", async () => {
@@ -462,6 +501,9 @@ test("agent route continues without long-term memory when retrieval fails", asyn
       async getLongTermMemoryContext(params) {
         recorded.memoryContextCalls.push(params)
         throw new Error("Mem0 unavailable")
+      },
+      isLongTermMemoryEnabled() {
+        return true
       },
     },
   })
