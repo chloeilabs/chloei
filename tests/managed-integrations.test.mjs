@@ -619,6 +619,17 @@ test("PostHog capture uses public shutdown API", () => {
   assert.doesNotMatch(source, /client\._shutdown/)
 })
 
+test("Braintrust finance eval publisher tolerates missing grade objects", () => {
+  const source = readFileSync(
+    path.join(cwd, "evals/finance/publish-braintrust-eval.mjs"),
+    "utf8"
+  )
+
+  assert.match(source, /grade\?\.maxScore/)
+  assert.match(source, /normalizedMaxScore > 0/)
+  assert.doesNotMatch(source, /grade\.maxScore > 0/)
+})
+
 test("Inngest environment resolver uses explicit and branch names", () => {
   assert.equal(
     resolveInngestEnvironmentName({

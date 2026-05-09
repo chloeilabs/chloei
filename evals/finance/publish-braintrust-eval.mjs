@@ -36,10 +36,14 @@ function hasUnsafeAdvice(text) {
 
 function toScores(result) {
   const grade = result.grade
+  const maxScore = Number(grade?.maxScore)
+  const score = Number(grade?.score)
+  const normalizedMaxScore = Number.isFinite(maxScore) ? maxScore : 0
+  const normalizedScore = Number.isFinite(score) ? score : 0
   const outputText = result.output?.text ?? ""
 
   return {
-    overall: grade.maxScore > 0 ? grade.score / grade.maxScore : 1,
+    overall: normalizedMaxScore > 0 ? normalizedScore / normalizedMaxScore : 1,
     citation_quality: scoreChecks(grade, (check) => check.id === "citations"),
     finance_data_tool_selection: scoreChecks(grade, (check) =>
       check.id.startsWith("tool:finance_data")
