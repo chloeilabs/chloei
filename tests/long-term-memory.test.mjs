@@ -392,6 +392,16 @@ test("commitLongTermMemory skips sensitive content and failed writes", async () 
     threadId: "thread-1",
     userId: "user-1",
   })
+  const skippedBareTokenValue = await commitLongTermMemory({
+    assistantContent: "I will remember it.",
+    config: createConfig(),
+    fetchFn,
+    messages: [
+      { role: "user", content: "My token is abcdefghijklmnop12345678" },
+    ],
+    threadId: "thread-1",
+    userId: "user-1",
+  })
   const skippedAuthHeader = await commitLongTermMemory({
     assistantContent: "Authorization: Token service-token-value",
     config: createConfig(),
@@ -412,9 +422,39 @@ test("commitLongTermMemory skips sensitive content and failed writes", async () 
   assert.equal(skipped, false)
   assert.equal(skippedMem0Key, false)
   assert.equal(skippedNaturalLanguageSecret, false)
+  assert.equal(skippedBareTokenValue, false)
   assert.equal(skippedAuthHeader, false)
   assert.equal(failed, false)
   assert.equal(calls.length, 0)
+})
+
+test("commitLongTermMemory allows non-secret finance phrases", async () => {
+  const { calls, fetchFn } = createFetchRecorder(() =>
+    Response.json({ results: [] })
+  )
+
+  const committedTokenPhrase = await commitLongTermMemory({
+    assistantContent: "I will remember the token research note.",
+    config: createConfig(),
+    fetchFn,
+    messages: [{ role: "user", content: "The token is listed on Binance." }],
+    threadId: "thread-1",
+    userId: "user-1",
+  })
+  const committedSecretPhrase = await commitLongTermMemory({
+    assistantContent: "I will remember the diversification preference.",
+    config: createConfig(),
+    fetchFn,
+    messages: [
+      { role: "user", content: "The secret is to diversify over time." },
+    ],
+    threadId: "thread-1",
+    userId: "user-1",
+  })
+
+  assert.equal(committedTokenPhrase, true)
+  assert.equal(committedSecretPhrase, true)
+  assert.equal(calls.length, 2)
 })
 
 test("deleteLongTermMemoriesForThread calls scoped Mem0 delete", async () => {

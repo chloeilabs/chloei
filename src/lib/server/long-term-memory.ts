@@ -11,7 +11,9 @@ const MEMORY_REQUEST_TIMEOUT_MS = 5_000
 const MAX_MEMORY_ITEM_CHARS = 700
 const SECRET_PATTERNS = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/i,
-  /\b(?:api[_-]?key|secret|token|password|passwd|pwd)\b\s*(?::|=|\bis\b|\bare\b)/i,
+  /\b(?:api[_-]?key|password|passwd|pwd)\b\s*(?::|=|\bis\b|\bare\b)/i,
+  /\b(?:(?:personal\s+access|access|auth(?:entication)?|bearer|refresh|session|github)\s+token|(?:client|api|access|auth(?:entication)?|github)\s+secret|secret\s+key)\b\s*(?::|=|\bis\b|\bare\b)/i,
+  /\b(?:secret|token)\b\s*(?::|=|\bis\b|\bare\b)\s*[A-Za-z0-9_./+=-]{12,}\b/i,
   /\bAuthorization:\s*(?:Bearer|Token)\s+\S+/i,
   /\b(?:sk|m0sk|ghp|github_pat)_[A-Za-z0-9_=-]{12,}\b/,
   /\bm0-[A-Za-z0-9]{20,}\b/,
