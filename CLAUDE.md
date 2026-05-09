@@ -13,7 +13,7 @@ pnpm start                # Run production server
 # Database (must run before first request)
 pnpm migrate              # Run both auth + app migrations
 pnpm auth:migrate         # Better Auth schema only
-pnpm app:migrate          # Thread/automation tables only
+pnpm app:migrate          # Thread and app storage tables only
 pnpm threads:migrate      # Alias for pnpm app:migrate
 
 # Quality checks
@@ -111,8 +111,6 @@ CREATE TABLE thread (
 );
 -- Index: thread_user_updated_at_idx ON ("userId", "updatedAt" DESC)
 ```
-
-An `automation` table is also created by the migration but has no active route handlers yet.
 
 ### System Prompt Composition
 

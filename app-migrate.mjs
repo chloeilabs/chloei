@@ -44,20 +44,6 @@ END
 WHERE BTRIM(COALESCE(title, '')) = ''
    OR title = 'New Conversation';
 
-CREATE TABLE IF NOT EXISTS automation (
-  id text PRIMARY KEY,
-  "userId" text NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
-  name text NOT NULL,
-  model text,
-  config jsonb NOT NULL,
-  "isEnabled" boolean NOT NULL DEFAULT true,
-  "createdAt" timestamp(3) without time zone NOT NULL,
-  "updatedAt" timestamp(3) without time zone NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS automation_user_updated_at_idx
-ON automation ("userId", "updatedAt" DESC);
-
 CREATE TABLE IF NOT EXISTS agent_rate_limit (
   identifier text PRIMARY KEY,
   hits jsonb NOT NULL DEFAULT '[]'::jsonb,
@@ -89,6 +75,8 @@ CREATE INDEX IF NOT EXISTS agent_job_status_updated_at_idx
 ON agent_job (status, "updatedAt" DESC);
 
 DROP TABLE IF EXISTS ${LEGACY_EVENT_TABLE};
+
+DROP TABLE IF EXISTS automation;
 
 ALTER TABLE thread
 DROP COLUMN IF EXISTS "${LEGACY_THREAD_CONFIG_COLUMN}";
