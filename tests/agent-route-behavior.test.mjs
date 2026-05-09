@@ -489,10 +489,10 @@ test("agent route injects long-term memory context and wires memory commit callb
     assistantContent: "I will remember the durable preference.",
     messages: [{ role: "user", content: "What should I remember?" }],
     requestId: "request-1",
-    signal: recorded.memoryCommitCalls[0].signal,
     threadId: "thread-1",
     userId: "user-1",
   })
+  assert.equal("signal" in recorded.memoryCommitCalls[0], false)
 })
 
 test("agent route continues without long-term memory when retrieval fails", async () => {

@@ -7,7 +7,9 @@ import {
 } from "./agent-runtime-config"
 
 const logger = createLogger("long-term-memory")
-const MEMORY_REQUEST_TIMEOUT_MS = 5_000
+const MEMORY_SEARCH_TIMEOUT_MS = 5_000
+const MEMORY_COMMIT_TIMEOUT_MS = 30_000
+const MEMORY_DELETE_TIMEOUT_MS = 10_000
 const MAX_MEMORY_ITEM_CHARS = 700
 const SECRET_PATTERNS = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/i,
@@ -44,7 +46,10 @@ interface GetLongTermMemoryContextParams extends MemoryRequestOptions {
   userId: string
 }
 
-interface CommitLongTermMemoryParams extends MemoryRequestOptions {
+interface CommitLongTermMemoryParams extends Omit<
+  MemoryRequestOptions,
+  "signal"
+> {
   assistantContent: string
   messages: readonly {
     role: "user" | "assistant"
@@ -151,13 +156,16 @@ function getMem0Url(config: MemoryRuntimeConfig, pathname: string): URL {
   return new URL(pathname.replace(/^\//, ""), baseUrl)
 }
 
-function createMemoryRequestSignal(signal: AbortSignal | undefined) {
-  const timeoutSignal = AbortSignal.timeout(MEMORY_REQUEST_TIMEOUT_MS)
-  if (!signal) {
+function createMemoryRequestSignal(params: {
+  signal?: AbortSignal
+  timeoutMs: number
+}) {
+  const timeoutSignal = AbortSignal.timeout(params.timeoutMs)
+  if (!params.signal) {
     return timeoutSignal
   }
 
-  return AbortSignal.any([signal, timeoutSignal])
+  return AbortSignal.any([params.signal, timeoutSignal])
 }
 
 function createMem0Headers(
@@ -385,7 +393,10 @@ export async function searchLongTermMemories(
         ),
         headers: createMem0Headers(config, mode),
         method: "POST",
-        signal: createMemoryRequestSignal(params.signal),
+        signal: createMemoryRequestSignal({
+          signal: params.signal,
+          timeoutMs: MEMORY_SEARCH_TIMEOUT_MS,
+        }),
       }
     )
 
@@ -466,7 +477,11 @@ export async function commitLongTermMemory(
         ),
         headers: createMem0Headers(config, mode),
         method: "POST",
-        signal: createMemoryRequestSignal(params.signal),
+        // Commits run after the response stream settles, so client disconnects
+        // should not cancel the best-effort memory write.
+        signal: createMemoryRequestSignal({
+          timeoutMs: MEMORY_COMMIT_TIMEOUT_MS,
+        }),
       }
     )
 
@@ -517,7 +532,10 @@ export async function deleteLongTermMemoriesForThread(
     const response = await (params.fetchFn ?? fetch)(url, {
       headers: createMem0Headers(config, mode),
       method: "DELETE",
-      signal: createMemoryRequestSignal(params.signal),
+      signal: createMemoryRequestSignal({
+        signal: params.signal,
+        timeoutMs: MEMORY_DELETE_TIMEOUT_MS,
+      }),
     })
 
     if (!response.ok) {
