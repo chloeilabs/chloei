@@ -22,7 +22,7 @@ test.describe("authenticated chat smoke", () => {
   }) => {
     await page.goto("/sign-in?redirectTo=/")
     await page.getByLabel("Email").fill(smokeEmail)
-    await page.getByLabel("Password").fill(smokePassword)
+    await page.locator("#sign-in-password").fill(smokePassword)
     await page.getByRole("button", { name: "Sign In" }).click()
 
     await expect(page).toHaveURL(/\/(?:$|\?)/, { timeout: 30_000 })
@@ -31,8 +31,15 @@ test.describe("authenticated chat smoke", () => {
       page.getByRole("button", { name: "Open threads" })
     ).toBeVisible()
 
-    await page.getByPlaceholder("Ask anything").fill(smokePrompt)
-    await page.keyboard.press("Enter")
+    const promptInput = page.getByPlaceholder("Ask anything")
+    await promptInput.click()
+    await promptInput.pressSequentially(smokePrompt)
+    await expect(promptInput).toHaveValue(smokePrompt)
+    const submitButton = page.locator(
+      "[data-prompt-form] button[type='submit']"
+    )
+    await expect(submitButton).toBeEnabled()
+    await submitButton.click()
 
     await expect(page.locator("[data-message-role='user']")).toContainText(
       smokePrompt
