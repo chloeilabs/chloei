@@ -11,7 +11,7 @@ const MEMORY_REQUEST_TIMEOUT_MS = 5_000
 const MAX_MEMORY_ITEM_CHARS = 700
 const SECRET_PATTERNS = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/i,
-  /\b(?:api[_-]?key|secret|token|password|passwd|pwd)\b\s*[:=]/i,
+  /\b(?:api[_-]?key|secret|token|password|passwd|pwd)\b\s*(?::|=|\bis\b|\bare\b)/i,
   /\bAuthorization:\s*(?:Bearer|Token)\s+\S+/i,
   /\b(?:sk|m0sk|ghp|github_pat)_[A-Za-z0-9_=-]{12,}\b/,
   /\bm0-[A-Za-z0-9]{20,}\b/,
@@ -187,9 +187,7 @@ async function readJson(response: Response): Promise<unknown> {
 }
 
 function getFiniteNumber(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value)
-    ? value
-    : undefined
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined
 }
 
 function getMemoryText(record: Record<string, unknown>): string | undefined {
@@ -451,10 +449,7 @@ export async function commitLongTermMemory(
   try {
     const mode = getMem0ApiMode(config)
     const response = await (params.fetchFn ?? fetch)(
-      getMem0Url(
-        config,
-        mode === "platform" ? "v3/memories/add/" : "memories"
-      ),
+      getMem0Url(config, mode === "platform" ? "v3/memories/add/" : "memories"),
       {
         body: JSON.stringify(
           createMemoryCommitBody({
@@ -511,7 +506,10 @@ export async function deleteLongTermMemoriesForThread(
       url.searchParams.set("run_id", params.threadId)
     } else {
       url.searchParams.set("app_id", getPlatformAppId(config, params.userId))
-      url.searchParams.set("metadata", JSON.stringify({ run_id: params.threadId }))
+      url.searchParams.set(
+        "metadata",
+        JSON.stringify({ run_id: params.threadId })
+      )
     }
 
     const response = await (params.fetchFn ?? fetch)(url, {

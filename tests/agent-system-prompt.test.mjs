@@ -138,6 +138,9 @@ test("agent system prompt advertises long-term memory only when enabled", () => 
   )
 
   assert(capabilityIndex >= 0, "Memory capability block not found")
-  assert(contextIndex > capabilityIndex, "Memory context should follow capability")
+  assert(
+    contextIndex > capabilityIndex,
+    "Memory context should follow capability"
+  )
   assert(soulIndex > contextIndex, "SOUL.md should follow memory context")
 })

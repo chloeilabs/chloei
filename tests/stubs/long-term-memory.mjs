@@ -5,7 +5,9 @@ export async function getLongTermMemoryContext(params) {
 }
 
 export function isLongTermMemoryEnabled(config) {
-  return getTestMocks().longTermMemory?.isLongTermMemoryEnabled?.(config) ?? false
+  return (
+    getTestMocks().longTermMemory?.isLongTermMemoryEnabled?.(config) ?? false
+  )
 }
 
 export async function commitLongTermMemory(params) {

@@ -359,8 +359,8 @@ All other variables are optional — the code has safe defaults. See `.env.examp
 | `FRED_API_KEY`                             | Enables FRED macro/rates lookups through `finance_data`                                                 |
 | `SEC_API_USER_AGENT`                       | User agent for SEC public company-facts requests                                                        |
 | `MEMORY_PROVIDER`                          | `disabled` or `mem0` (default: `disabled`)                                                              |
-| `MEM0_API_URL`                             | Mem0 REST API origin (default: `http://localhost:8888`; use `https://api.mem0.ai` for Mem0 Platform)     |
-| `MEM0_API_KEY`                             | Mem0 key; self-hosted OSS uses `X-API-Key`, Mem0 Platform uses `Authorization: Token ...`                |
+| `MEM0_API_URL`                             | Mem0 REST API origin (default: `http://localhost:8888`; use `https://api.mem0.ai` for Mem0 Platform)    |
+| `MEM0_API_KEY`                             | Mem0 key; self-hosted OSS uses `X-API-Key`, Mem0 Platform uses `Authorization: Token ...`               |
 | `MEMORY_AGENT_ID`                          | Mem0 agent scope (default: `chloei`)                                                                    |
 | `MEMORY_TOP_K`                             | Number of Mem0 memories to retrieve (default: 6)                                                        |
 | `MEMORY_THRESHOLD`                         | Minimum memory similarity threshold (default: 0.3)                                                      |
