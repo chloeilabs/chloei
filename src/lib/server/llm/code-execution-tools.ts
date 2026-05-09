@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process"
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
+import { createReadStream } from "node:fs"
 import { copyFile, mkdir, mkdtemp, readdir, rm, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -361,7 +362,7 @@ function appendWithLimit(
 
 async function collectArtifactManifest(
   rootDir: string,
-  excludedPaths: ReadonlySet<string> = new Set(),
+  excludedPathHashes: ReadonlyMap<string, string> = new Map(),
   artifactBaseUrl?: string
 ): Promise<CodeExecutionArtifact[]> {
   const artifacts: CodeExecutionArtifact[] = []
@@ -395,8 +396,12 @@ async function collectArtifactManifest(
       const relativePath = path
         .relative(rootDir, fullPath)
         .replaceAll(path.sep, "/")
-      if (excludedPaths.has(relativePath)) {
-        continue
+      const excludedHash = excludedPathHashes.get(relativePath)
+      if (excludedHash) {
+        const currentHash = await computeFileHash(fullPath)
+        if (currentHash === excludedHash) {
+          continue
+        }
       }
 
       artifacts.push({
@@ -416,6 +421,21 @@ async function collectArtifactManifest(
 
   await walk(rootDir)
   return artifacts.sort((a, b) => a.path.localeCompare(b.path))
+}
+
+async function computeFileHash(filePath: string): Promise<string | null> {
+  const hash = createHash("sha256")
+  const stream = createReadStream(filePath)
+
+  try {
+    for await (const chunk of stream as AsyncIterable<Buffer>) {
+      hash.update(chunk)
+    }
+
+    return hash.digest("hex")
+  } catch {
+    return null
+  }
 }
 
 function normalizeInputFileRelativePath(value: string): string | null {
@@ -489,6 +509,25 @@ function getMountedInputFilePaths(
   }
 
   return mounted
+}
+
+async function getMountedInputFileHashes(
+  workspaceDir: string,
+  inputFiles: CodeExecutionInputFile[] | undefined
+): Promise<Map<string, string>> {
+  const mounted = getMountedInputFilePaths(inputFiles)
+  const hashes = new Map<string, string>()
+
+  for (const relativePath of mounted) {
+    const fileHash = await computeFileHash(
+      path.join(workspaceDir, relativePath)
+    )
+    if (fileHash) {
+      hashes.set(relativePath, fileHash)
+    }
+  }
+
+  return hashes
 }
 
 function validatePythonImports(
@@ -584,8 +623,11 @@ async function runProcess(args: {
       : await mkdtemp(path.join(tempRoot, "chloei-code-exec-"))
   const workspaceDir = path.join(tempDir, "workspace")
   await mkdir(workspaceDir, { recursive: true })
-  const mountedInputFiles = getMountedInputFilePaths(args.inputFiles)
   await copyInputFiles(workspaceDir, args.inputFiles)
+  const mountedInputFileHashes = await getMountedInputFileHashes(
+    workspaceDir,
+    args.inputFiles
+  )
   const commandArgs =
     args.language === "python" &&
     args.commandArgs[0] === "-I" &&
@@ -606,7 +648,7 @@ async function runProcess(args: {
   const collectManifest = async (): Promise<CodeExecutionArtifact[]> =>
     collectArtifactManifest(
       workspaceDir,
-      mountedInputFiles,
+      mountedInputFileHashes,
       args.artifactBaseUrl
     )
 
@@ -671,7 +713,7 @@ async function runProcess(args: {
           const artifactManifest = await collectManifest()
           const artifactDirectory =
             args.workspaceMode === "preserve" &&
-            args.exposeArtifactDirectory !== false
+            args.exposeArtifactDirectory === true
               ? workspaceDir
               : undefined
 

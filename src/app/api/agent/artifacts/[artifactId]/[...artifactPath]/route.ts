@@ -1,5 +1,7 @@
-import { readFile, stat } from "node:fs/promises"
+import { createReadStream } from "node:fs"
+import { stat } from "node:fs/promises"
 import path from "node:path"
+import { Readable } from "node:stream"
 
 import { type NextRequest } from "next/server"
 
@@ -170,18 +172,29 @@ export async function GET(request: NextRequest, context: ArtifactRouteContext) {
       )
     }
 
-    const artifact = await readFile(artifactPath)
     const headers = createApiHeaders({ requestId })
     headers.set("Content-Type", getContentType(relativePath))
     headers.set("Content-Length", String(artifactStats.size))
+    headers.set("Cache-Control", "private, no-store")
     headers.set(
       "Content-Disposition",
       `attachment; filename="${getDownloadFilename(relativePath)}"`
     )
+    const artifactStream = createReadStream(artifactPath)
+    artifactStream.on("error", (error) => {
+      logger.error("Artifact stream failed.", {
+        error,
+        errorCode: "AGENT_ARTIFACT_STREAM_FAILED",
+        requestId,
+      })
+    })
+    const webStream = Readable.toWeb(
+      artifactStream
+    ) as ReadableStream<Uint8Array>
 
     return observeRouteResponse(
       observation,
-      new Response(artifact, {
+      new Response(webStream, {
         headers,
       }),
       {

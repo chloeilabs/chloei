@@ -43,6 +43,7 @@ test("finance code execution reports workspace spreadsheet artifacts", async () 
       workspaceMode: "preserve",
       workspaceRoot: tempRoot,
       artifactBaseUrl: "/api/agent/artifacts/run-1",
+      exposeArtifactDirectory: true,
     })
     const result = await tools.code_execution.execute({
       language: "python",
@@ -154,6 +155,12 @@ test("preserved code execution workspace does not overwrite mounted inputs", asy
     })
 
     assert.equal(writeResult.error, undefined)
+    assert.equal(
+      writeResult.output?.artifactManifest.some(
+        (artifact) => artifact.path === "mounted.xlsx"
+      ),
+      true
+    )
 
     const readResult = await tools.code_execution.execute({
       language: "python",
@@ -172,6 +179,26 @@ test("preserved code execution workspace does not overwrite mounted inputs", asy
       ),
       false
     )
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true })
+  }
+})
+
+test("preserved code execution workspace hides raw artifact directory by default", async () => {
+  const tempRoot = await mkdtemp(path.join(tmpdir(), "chloei-code-test-"))
+  try {
+    const tools = createAiSdkCodeExecutionTools({
+      backend: "finance",
+      workspaceMode: "preserve",
+      workspaceRoot: tempRoot,
+    })
+    const result = await tools.code_execution.execute({
+      language: "python",
+      code: "print('ok')",
+    })
+
+    assert.equal(result.error, undefined)
+    assert.equal(result.output?.artifactDirectory, undefined)
   } finally {
     await rm(tempRoot, { recursive: true, force: true })
   }
