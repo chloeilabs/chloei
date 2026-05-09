@@ -121,7 +121,7 @@ finance workflows:
 3. Enable internal defaults:
 
    ```bash
-   vercel env add AGENT_ENABLE_NEW_CAPABILITIES_FOR_INTERNAL_USERS production --value true --force --yes
+   printf '%s' true | vercel env add AGENT_ENABLE_NEW_CAPABILITIES_FOR_INTERNAL_USERS production --force --yes
    ```
 
 4. Redeploy production so the runtime sees the new env set:
@@ -138,8 +138,8 @@ non-production eval cohort.
 For PostHog server-side product analytics, prefer:
 
 ```bash
-vercel env add POSTHOG_ANALYTICS_ENABLED production --value true --force --yes
-vercel env add POSTHOG_ANALYTICS_INTERNAL_USERS_ONLY production --value true --force --yes
+printf '%s' true | vercel env add POSTHOG_ANALYTICS_ENABLED production --force --yes
+printf '%s' true | vercel env add POSTHOG_ANALYTICS_INTERNAL_USERS_ONLY production --force --yes
 ```
 
 Leave `NEXT_PUBLIC_POSTHOG_ANALYTICS_ENABLED=false` for production unless client
@@ -201,12 +201,12 @@ tool selection for live market facts.
 Fastest capability rollback:
 
 ```bash
-vercel env add AGENT_KNOWLEDGE_SEARCH_ENABLED production --value false --force --yes
-vercel env add AGENT_BROWSERBASE_ENABLED production --value false --force --yes
-vercel env add AGENT_ASYNC_REPORTS_ENABLED production --value false --force --yes
-vercel env add AGENT_TELEMETRY_RECORD_IO production --value false --force --yes
-vercel env add AGENT_FINANCE_WORKFLOWS_ENABLED production --value false --force --yes
-vercel env add POSTHOG_ANALYTICS_ENABLED production --value false --force --yes
+printf '%s' false | vercel env add AGENT_KNOWLEDGE_SEARCH_ENABLED production --force --yes
+printf '%s' false | vercel env add AGENT_BROWSERBASE_ENABLED production --force --yes
+printf '%s' false | vercel env add AGENT_ASYNC_REPORTS_ENABLED production --force --yes
+printf '%s' false | vercel env add AGENT_TELEMETRY_RECORD_IO production --force --yes
+printf '%s' false | vercel env add AGENT_FINANCE_WORKFLOWS_ENABLED production --force --yes
+printf '%s' false | vercel env add POSTHOG_ANALYTICS_ENABLED production --force --yes
 vercel redeploy https://chloei.ai
 ```
 
