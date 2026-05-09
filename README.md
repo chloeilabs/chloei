@@ -59,6 +59,8 @@ To enable auth locally, provision PostgreSQL and add:
 5. Merge to `main` after the preview passes, then confirm production is aliased to [chloei.ai](https://chloei.ai).
 6. Run one authenticated production smoke test: sign in, load models, send a prompt, and verify an existing thread still reopens cleanly.
 
+Managed integration rollout, rollback, and smoke-test steps live in [docs/managed-integrations-rollout.md](docs/managed-integrations-rollout.md).
+
 ## Environment
 
 `.env.example` documents the supported environment variables. Required variables are:
