@@ -44,7 +44,7 @@ export async function proxy(request: NextRequest) {
   const logger = createLogger(`proxy:${requestId}`)
   const { pathname } = request.nextUrl
 
-  if (pathname.startsWith("/api/auth")) {
+  if (pathname.startsWith("/api/auth") || pathname === "/api/inngest") {
     return NextResponse.next()
   }
 
