@@ -1,6 +1,6 @@
 # Chloei
 
-Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently exposes a curated model selector with Kimi K2.6, DeepSeek V4 Pro, and Grok 4.3, uses GPT-5.5 for deep research runs, supports Claude Sonnet 4.6, and offers file attachments, native web search, local code execution, optional Tavily retrieval, optional Financial Modeling Prep MCP tools, optional self-hosted Mem0 long-term memory, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
+Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently exposes a curated model selector with Kimi K2.6, DeepSeek V4 Pro, and Grok 4.3, uses GPT-5.5 for deep research runs, supports Claude Sonnet 4.6, and offers private Blob-backed file attachments, native web search, local code execution, optional Tavily retrieval, optional governed Upstash Search knowledge retrieval, optional Browserbase dynamic browsing, optional Inngest jobs, optional Financial Modeling Prep MCP tools, optional self-hosted Mem0 long-term memory, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
 
 ## Requirements
 
@@ -41,6 +41,9 @@ To enable auth locally, provision PostgreSQL and add:
 - `pnpm test`: run regression tests
 - `pnpm test:smoke`: run opt-in Playwright browser smoke tests against `SMOKE_BASE_URL`
 - `pnpm test:smoke:mock`: run the credential-free mocked Playwright smoke test used by CI
+- `pnpm eval:finance`: run the finance benchmark harness
+- `pnpm eval:finance:grade`: grade finance benchmark outputs
+- `pnpm eval:finance:braintrust`: publish finance grade signals to Braintrust
 - `pnpm lint`: run blocking ESLint checks
 - `pnpm lint:fix`: apply autofixable ESLint changes
 - `pnpm format`: write Prettier formatting changes
@@ -71,6 +74,14 @@ To enable auth locally, provision PostgreSQL and add:
 Optional variables let you override the built-in safe defaults for message limits, response timeout, rate limiting, concurrent requests per client, rate-limit storage, and Next.js request body limits.
 
 - `TAVILY_API_KEY`: enables Tavily search and extract callable tools for chat requests
+- `UPSTASH_SEARCH_REST_URL`, `UPSTASH_SEARCH_REST_TOKEN`, `UPSTASH_SEARCH_INDEX`, `UPSTASH_DISABLE_TELEMETRY=1`: enable governed internal `knowledge_search`
+- `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY`, `INNGEST_DEV`: enable `/api/inngest` and async job orchestration
+- `BROWSERBASE_API_KEY`, `BROWSERBASE_PROJECT_ID`: enable flag-gated consented `browser_research`
+- `BLOB_READ_WRITE_TOKEN`: enables private Blob upload/download and private agent artifact URLs
+- `AGENT_KNOWLEDGE_SEARCH_ENABLED`, `AGENT_BROWSERBASE_ENABLED`, `AGENT_ASYNC_REPORTS_ENABLED`, `AGENT_TELEMETRY_RECORD_IO`, `AGENT_FINANCE_WORKFLOWS_ENABLED`: feature gates; defaults are off unless explicitly set or synced through Edge Config
+- `POSTHOG_ANALYTICS_ENABLED`, `POSTHOG_ANALYTICS_INTERNAL_USERS_ONLY`, `NEXT_PUBLIC_POSTHOG_ANALYTICS_ENABLED`, `NEXT_PUBLIC_POSTHOG_HOST`, `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN`: enable privacy-safe PostHog product analytics. Browser autocapture, pageviews, surveys, heatmaps, feature-flag requests, and replay are disabled; server events use hashed user ids, no GeoIP, and no PostHog person profiles. Server-side capture is restricted to `AGENT_INTERNAL_USER_EMAILS`/`AGENT_INTERNAL_USER_EMAIL_DOMAINS` unless `POSTHOG_ANALYTICS_INTERNAL_USERS_ONLY=false`.
+- `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_TRACES_SAMPLE_RATE`, `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE`: Sentry error/performance telemetry with PII scrubbing and no replay sampling
+- `BRAINTRUST_API_KEY`, `BRAINTRUST_PROJECT_NAME`, `BRAINTRUST_EXPERIMENT_NAME`: finance eval publication and trace correlation
 - `FMP_API_KEY`: enables curated Financial Modeling Prep MCP tools for structured finance data
 - `FRED_API_KEY`: enables macro/rates series through the normalized `finance_data` tool
 - `SEC_API_USER_AGENT`: identifies Chloei for SEC public company-facts requests
@@ -99,6 +110,10 @@ By default, Chloei enforces safe built-in agent limits even if you leave all opt
 - The current model list is defined in `src/lib/shared/llm/models.ts`.
 - `/`, `/api/agent`, and `/api/models` require an authenticated Better Auth session.
 - Native `web_search` is available through AI Gateway alongside Tavily, FMP, and local code execution.
+- `knowledge_search` is for governed static/internal material only. Live financial facts stay routed through `finance_data`, SEC/FRED/FMP, Tavily, and AI Gateway web search.
+- `browser_research` requires the Browserbase flag, credentials, explicit consent, and an allowed-domain URL. It is not used for routine search and must not collect credentials.
+- PostHog is used for coarse product analytics and rollout analysis only when `analytics.posthog.enabled` or `POSTHOG_ANALYTICS_ENABLED` is on, and server-side capture remains internal-user gated by default. Do not capture prompt text, model output, uploaded filenames, blob paths, document hashes, emails, account data, or credentials in PostHog events.
+- `POST /api/jobs/report` accepts an optional client-generated `reportId` UUID for retry idempotency. Idempotency keys must use report/thread identifiers, not prompt text or document contents.
 - `finance_data` normalizes finance operations across FMP, SEC public company facts, and optional FRED macro/rates data. FMP MCP remains available as a migration compatibility path for chat-default runs.
 - Long-term memory is opt-in and best effort. When `MEMORY_PROVIDER=mem0`, Chloei retrieves user-scoped memories before each agent run and writes the latest user/assistant turn after meaningful completed or incomplete responses. Memory failures never block chat. Self-hosted OSS and Mem0 Platform are both supported through `MEM0_API_URL`; Platform mode uses a private per-user `app_id` scope for reliable retrieval.
 - Run Mem0 separately with its REST API and dashboard. For a low-friction shared provider setup, configure Mem0's OpenAI-compatible LLM/embedder through Vercel AI Gateway with `OPENAI_BASE_URL=https://ai-gateway.vercel.sh/v1`, `OPENAI_API_KEY=$AI_GATEWAY_API_KEY`, `openai/text-embedding-3-small` for embeddings, and a low-cost GPT model for memory extraction. Prefer private networking and HTTPS outside local development.

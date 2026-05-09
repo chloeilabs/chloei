@@ -7,6 +7,7 @@ import { asRecord, asString, isAbortError } from "@/lib/cast"
 import { ASSISTANT_EMPTY_RESPONSE_FALLBACK } from "@/lib/constants"
 import { createLogger } from "@/lib/logger"
 import { resolveRequestIdFromHeaders } from "@/lib/request-id"
+import type { AgentFeatureFlags } from "@/lib/server/integration-flags"
 import {
   AGENT_ATTACHMENT_MAX_DATA_URL_CHARS,
   AGENT_ATTACHMENT_MAX_FILE_BYTES,
@@ -50,6 +51,7 @@ const TOOL_CALL_INCOMPLETE_FALLBACK_TEXT =
 
 const DATA_URL_BASE64_PREFIX_PATTERN = /^data:([^;,]+);base64,/i
 const BASE64_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/
+const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/i
 const TIMEOUT_ERROR_CODES = new Set([
   "UND_ERR_BODY_TIMEOUT",
   "UND_ERR_CONNECT_TIMEOUT",
@@ -80,7 +82,15 @@ const agentAttachmentSchema = z
         message: "Attachment preview must be a supported image data URL.",
       })
       .optional(),
-    dataUrl: z.string().trim().min(1).max(AGENT_ATTACHMENT_MAX_DATA_URL_CHARS),
+    dataUrl: z
+      .string()
+      .trim()
+      .min(1)
+      .max(AGENT_ATTACHMENT_MAX_DATA_URL_CHARS)
+      .optional(),
+    blobPathname: z.string().trim().min(1).max(800).optional(),
+    sha256: z.string().trim().regex(SHA256_HEX_PATTERN).optional(),
+    downloadUrl: z.string().trim().min(1).max(2048).optional(),
   })
   .strict()
 
@@ -145,6 +155,8 @@ interface CreateAgentStreamResponseParams {
   userTimeZone?: string
   runtimeProfile?: AgentRuntimeProfileId
   artifactOwnerId?: string
+  userId?: string
+  featureFlags?: AgentFeatureFlags
   messages: AgentStreamRequest["messages"]
   memoryCommitMaxChars?: number
   systemInstruction: string
@@ -361,6 +373,23 @@ function isValidBase64Payload(value: string): boolean {
   return normalizeBase64Payload(value) !== null
 }
 
+function isValidBlobPathname(value: string): boolean {
+  const normalized = value.trim().replaceAll("\\", "/")
+  if (
+    !normalized ||
+    normalized.startsWith("/") ||
+    normalized.startsWith("~/") ||
+    normalized.includes("\0") ||
+    /^[A-Za-z]:\//.test(normalized)
+  ) {
+    return false
+  }
+
+  return normalized
+    .split("/")
+    .every((segment) => segment && segment !== "." && segment !== "..")
+}
+
 function isValidAttachmentPreviewDataUrl(dataUrl: string): boolean {
   const mediaType = getDataUrlMediaType(dataUrl)
   if (!mediaType) {
@@ -464,26 +493,43 @@ function validateAgentRequestAttachments(
         return createAttachmentValidationError(params)
       }
 
-      if (getDataUrlMediaType(attachment.dataUrl) !== attachment.mediaType) {
-        return createAttachmentValidationError(params)
-      }
-
-      const base64Payload = getBase64Payload(attachment.dataUrl)
-      const normalizedBase64Payload = base64Payload
-        ? normalizeBase64Payload(base64Payload)
-        : null
-      if (
-        !normalizedBase64Payload ||
-        !isValidBase64Payload(normalizedBase64Payload)
-      ) {
+      const hasInlinePayload = Boolean(attachment.dataUrl)
+      const hasBlobPayload = Boolean(
+        attachment.blobPathname && attachment.sha256
+      )
+      if (!hasInlinePayload && !hasBlobPayload) {
         return createAttachmentValidationError(params)
       }
 
       if (
-        Buffer.byteLength(normalizedBase64Payload, "base64") !==
-        attachment.sizeBytes
+        attachment.blobPathname &&
+        !isValidBlobPathname(attachment.blobPathname)
       ) {
         return createAttachmentValidationError(params)
+      }
+
+      if (attachment.dataUrl) {
+        if (getDataUrlMediaType(attachment.dataUrl) !== attachment.mediaType) {
+          return createAttachmentValidationError(params)
+        }
+
+        const base64Payload = getBase64Payload(attachment.dataUrl)
+        const normalizedBase64Payload = base64Payload
+          ? normalizeBase64Payload(base64Payload)
+          : null
+        if (
+          !normalizedBase64Payload ||
+          !isValidBase64Payload(normalizedBase64Payload)
+        ) {
+          return createAttachmentValidationError(params)
+        }
+
+        if (
+          Buffer.byteLength(normalizedBase64Payload, "base64") !==
+          attachment.sizeBytes
+        ) {
+          return createAttachmentValidationError(params)
+        }
       }
     }
   }
@@ -779,6 +825,8 @@ export function createAgentStreamResponse(
           userTimeZone: params.userTimeZone,
           runtimeProfile: params.runtimeProfile,
           artifactOwnerId: params.artifactOwnerId,
+          userId: params.userId,
+          featureFlags: params.featureFlags,
           messages: params.messages,
           systemInstruction: withAiSdkInlineCitationInstruction(
             params.systemInstruction,

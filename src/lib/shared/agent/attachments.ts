@@ -43,10 +43,13 @@ export interface AgentAttachmentMetadata {
   sizeBytes: number
   detail?: AgentImageDetail
   previewDataUrl?: string
+  blobPathname?: string
+  sha256?: string
+  downloadUrl?: string
 }
 
 export interface AgentRequestAttachment extends AgentAttachmentMetadata {
-  dataUrl: string
+  dataUrl?: string
 }
 
 const IMAGE_MIME_TYPE_SET: ReadonlySet<string> = new Set(
@@ -157,5 +160,10 @@ export function toAgentAttachmentMetadata(
     ...(attachment.previewDataUrl
       ? { previewDataUrl: attachment.previewDataUrl }
       : {}),
+    ...(attachment.blobPathname
+      ? { blobPathname: attachment.blobPathname }
+      : {}),
+    ...(attachment.sha256 ? { sha256: attachment.sha256 } : {}),
+    ...(attachment.downloadUrl ? { downloadUrl: attachment.downloadUrl } : {}),
   }
 }

@@ -60,6 +60,7 @@ import {
   formatFileSize,
   getNormalizedFileMediaType,
   readFileAsDataUrl,
+  uploadAttachmentFile,
 } from "./attachments"
 import { ModelSelector } from "./model-selector"
 
@@ -122,6 +123,7 @@ export function PromptForm({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const isReadingAttachmentsRef = useRef(false)
+  const submitAfterAttachmentsRef = useRef(false)
   const shouldPreventToolsCloseAutoFocusRef = useRef(false)
   const attachmentAccept = useMemo(
     () => getAgentAttachmentAcceptAttribute(),
@@ -199,6 +201,63 @@ export function PromptForm({
     setIsToolsOpen(false)
   }, [isFormPending])
 
+  const submitPrompt = useCallback(
+    (attachmentsOverride?: AgentRequestAttachment[]) => {
+      const nextMessage = message.trim()
+      const nextAttachments = attachmentsOverride ?? pendingAttachments
+
+      if (isStreaming && !nextMessage && nextAttachments.length === 0) {
+        onStopStream?.()
+        return true
+      }
+
+      if (
+        (!nextMessage && nextAttachments.length === 0) ||
+        !resolvedSelectedModel ||
+        isFormPending
+      ) {
+        return false
+      }
+
+      if (dismissKeyboardOnSubmit) {
+        textareaRef.current?.blur()
+
+        if (document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur()
+        }
+      }
+
+      const activeRunMode = runMode
+      onSubmit?.(
+        nextMessage || DEFAULT_ATTACHMENT_PROMPT,
+        resolvedSelectedModel,
+        isStreaming,
+        activeRunMode,
+        nextAttachments
+      )
+      setMessage("")
+      setPendingAttachments([])
+      clearFileInput()
+      if (activeRunMode === "research") {
+        setRunMode("chat")
+      }
+
+      return true
+    },
+    [
+      clearFileInput,
+      dismissKeyboardOnSubmit,
+      isFormPending,
+      isStreaming,
+      message,
+      onStopStream,
+      onSubmit,
+      pendingAttachments,
+      resolvedSelectedModel,
+      runMode,
+    ]
+  )
+
   const handleFiles = useCallback(
     async (files: FileList | File[]) => {
       if (isFormPending || isReadingAttachmentsRef.current) {
@@ -263,15 +322,27 @@ export function PromptForm({
               kind === "image"
                 ? await createImagePreviewDataUrl(dataUrl)
                 : undefined
+            const attachmentId = crypto.randomUUID()
+            let blobBackedAttachment: AgentRequestAttachment | null = null
+            try {
+              blobBackedAttachment = await uploadAttachmentFile({
+                file,
+                attachmentId,
+                ...(previewDataUrl ? { previewDataUrl } : {}),
+              })
+            } catch {
+              blobBackedAttachment = null
+            }
             nextAttachments.push({
-              id: crypto.randomUUID(),
+              ...(blobBackedAttachment ?? {}),
+              id: attachmentId,
               kind,
               filename: file.name || "attachment",
               mediaType,
               sizeBytes: file.size,
               ...(kind === "image" ? { detail: "auto" } : {}),
               ...(previewDataUrl ? { previewDataUrl } : {}),
-              dataUrl,
+              ...(blobBackedAttachment ? {} : { dataUrl }),
             })
             nextCount += 1
             nextTotalBytes += file.size
@@ -282,8 +353,21 @@ export function PromptForm({
           }
         }
 
+        const shouldSubmitAfterAttachments = submitAfterAttachmentsRef.current
+        submitAfterAttachmentsRef.current = false
+
         if (nextAttachments.length > 0) {
-          setPendingAttachments((current) => [...current, ...nextAttachments])
+          const attachmentsToSubmit = [
+            ...pendingAttachments,
+            ...nextAttachments,
+          ]
+          if (!shouldSubmitAfterAttachments) {
+            setPendingAttachments((current) => [...current, ...nextAttachments])
+          } else if (!submitPrompt(attachmentsToSubmit)) {
+            setPendingAttachments((current) => [...current, ...nextAttachments])
+          }
+        } else if (shouldSubmitAfterAttachments) {
+          void submitPrompt()
         }
       } finally {
         isReadingAttachmentsRef.current = false
@@ -295,7 +379,8 @@ export function PromptForm({
       clearFileInput,
       isFormPending,
       pendingAttachmentBytes,
-      pendingAttachments.length,
+      pendingAttachments,
+      submitPrompt,
     ]
   )
 
@@ -303,59 +388,14 @@ export function PromptForm({
     (e: { preventDefault: () => void }) => {
       e.preventDefault()
 
-      const nextMessage = message.trim()
-      const nextAttachments = pendingAttachments
-
-      if (isStreaming && !nextMessage && nextAttachments.length === 0) {
-        onStopStream?.()
+      if (isReadingAttachmentsRef.current) {
+        submitAfterAttachmentsRef.current = true
         return
       }
 
-      if (
-        (!nextMessage && nextAttachments.length === 0) ||
-        !resolvedSelectedModel ||
-        isFormPending ||
-        isReadingAttachments
-      ) {
-        return
-      }
-
-      if (dismissKeyboardOnSubmit) {
-        textareaRef.current?.blur()
-
-        if (document.activeElement instanceof HTMLElement) {
-          document.activeElement.blur()
-        }
-      }
-
-      const activeRunMode = runMode
-      onSubmit?.(
-        nextMessage || DEFAULT_ATTACHMENT_PROMPT,
-        resolvedSelectedModel,
-        isStreaming,
-        activeRunMode,
-        nextAttachments
-      )
-      setMessage("")
-      setPendingAttachments([])
-      clearFileInput()
-      if (activeRunMode === "research") {
-        setRunMode("chat")
-      }
+      void submitPrompt()
     },
-    [
-      dismissKeyboardOnSubmit,
-      isStreaming,
-      message,
-      onStopStream,
-      resolvedSelectedModel,
-      runMode,
-      isFormPending,
-      isReadingAttachments,
-      onSubmit,
-      pendingAttachments,
-      clearFileInput,
-    ]
+    [submitPrompt]
   )
 
   const onKeyDown = useCallback(

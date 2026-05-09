@@ -1,0 +1,10 @@
+import { createHash } from "node:crypto"
+
+export function hashPrivacyValue(value: string, prefix = "sha256"): string {
+  const digest = createHash("sha256").update(value).digest("hex")
+  return `${prefix}:${digest}`
+}
+
+export function hashUserId(userId: string): string {
+  return hashPrivacyValue(userId)
+}

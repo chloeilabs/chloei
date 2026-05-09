@@ -1,6 +1,9 @@
 import {
   AGENT_ATTACHMENT_MAX_PREVIEW_DATA_URL_CHARS,
+  type AgentAttachmentKind,
+  type AgentAttachmentMetadata,
   type AgentAttachmentMimeType,
+  type AgentRequestAttachment,
   normalizeAgentAttachmentMimeType,
 } from "@/lib/shared"
 
@@ -85,4 +88,39 @@ export function getNormalizedFileMediaType(
   file: File
 ): AgentAttachmentMimeType | null {
   return normalizeAgentAttachmentMimeType(file.type)
+}
+
+interface UploadAttachmentResponse {
+  attachment?: AgentAttachmentMetadata & {
+    kind: AgentAttachmentKind
+  }
+}
+
+export async function uploadAttachmentFile(params: {
+  file: File
+  attachmentId: string
+  previewDataUrl?: string
+}): Promise<AgentRequestAttachment> {
+  const formData = new FormData()
+  formData.set("file", params.file)
+  formData.set("attachmentId", params.attachmentId)
+
+  const response = await fetch("/api/uploads", {
+    method: "POST",
+    body: formData,
+  })
+  if (!response.ok) {
+    throw new Error("Attachment upload failed.")
+  }
+
+  const payload = (await response.json()) as UploadAttachmentResponse
+  const attachment = payload.attachment
+  if (!attachment) {
+    throw new Error("Attachment upload response was invalid.")
+  }
+
+  return {
+    ...attachment,
+    ...(params.previewDataUrl ? { previewDataUrl: params.previewDataUrl } : {}),
+  }
 }
