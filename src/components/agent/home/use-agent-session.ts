@@ -187,6 +187,7 @@ export function useAgentSession({
         return
       }
 
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- selected thread changes must hydrate local session state before user input resumes
       setState({
         messages: activeThread.messages,
         isSubmitting: false,
