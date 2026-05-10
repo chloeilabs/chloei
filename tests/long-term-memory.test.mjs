@@ -643,3 +643,47 @@ test("deleteLongTermMemoriesForThread supports Mem0 Platform API request shape",
     run_id: "thread-1",
   })
 })
+
+test("deleteLongTermMemoriesForThread continues Platform legacy cleanup after partial failure", async () => {
+  let responseCount = 0
+  const { calls, fetchFn } = createFetchRecorder(() => {
+    responseCount += 1
+    return responseCount === 1
+      ? new Response("delete failed", { status: 500 })
+      : new Response(null)
+  })
+
+  const deleted = await deleteLongTermMemoriesForThread({
+    config: createConfig({
+      mem0ApiKey: "m0-platform-key",
+      mem0ApiUrl: "https://api.mem0.ai",
+    }),
+    fetchFn,
+    requestId: "request-1",
+    threadId: "thread-1",
+    userId: "user-1",
+  })
+
+  assert.equal(deleted, true)
+  assert.equal(calls.length, 4)
+
+  const canonicalRunUrl = new URL(calls[1].url)
+  assert.equal(calls[1].method, "DELETE")
+  assert.equal(canonicalRunUrl.searchParams.get("user_id"), "user-1")
+  assert.equal(canonicalRunUrl.searchParams.get("agent_id"), "chloei")
+  assert.equal(canonicalRunUrl.searchParams.get("run_id"), "thread-1")
+
+  const legacyUrl = new URL(calls[2].url)
+  assert.equal(calls[2].method, "DELETE")
+  assert.equal(legacyUrl.searchParams.get("app_id"), "chloei:user-1")
+  assert.deepEqual(JSON.parse(legacyUrl.searchParams.get("metadata")), {
+    thread_id: "thread-1",
+  })
+
+  const legacyRunUrl = new URL(calls[3].url)
+  assert.equal(calls[3].method, "DELETE")
+  assert.equal(legacyRunUrl.searchParams.get("app_id"), "chloei:user-1")
+  assert.deepEqual(JSON.parse(legacyRunUrl.searchParams.get("metadata")), {
+    run_id: "thread-1",
+  })
+})

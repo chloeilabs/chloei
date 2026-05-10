@@ -77,6 +77,12 @@ interface DeleteLongTermMemoriesForThreadParams extends MemoryRequestOptions {
 }
 
 type Mem0ApiMode = "oss" | "platform"
+type LegacyPlatformDeleteScope = "appThread" | "appRun" | "canonicalRun" | false
+type LoggedLegacyPlatformScope =
+  | boolean
+  | "appThread"
+  | "appRun"
+  | "canonicalRun"
 
 interface MemoryCommitMessage {
   role: "user" | "assistant"
@@ -483,7 +489,7 @@ function createMem0HttpError(message: string, response: Response): Error {
 
 function logMemoryOperationSuccess(params: {
   durationMs: number
-  legacyPlatformScope?: boolean
+  legacyPlatformScope?: LoggedLegacyPlatformScope
   mode: Mem0ApiMode
   operation: "search" | "commit" | "delete"
   requestId?: string
@@ -507,7 +513,7 @@ function logMemoryOperationFailure(params: {
   durationMs: number
   error: unknown
   errorCode: string
-  legacyPlatformScope?: boolean
+  legacyPlatformScope?: LoggedLegacyPlatformScope
   message: string
   mode: Mem0ApiMode
   operation: "search" | "commit" | "delete"
@@ -624,6 +630,8 @@ export async function searchLongTermMemories(
     return memories
   }
 
+  const operationStartedAt = Date.now()
+
   try {
     const memories = await fetchMemories()
     if (mode !== "platform" || memories.length > 0) {
@@ -634,7 +642,7 @@ export async function searchLongTermMemories(
       return await fetchMemories(true)
     } catch (error) {
       logMemoryOperationFailure({
-        durationMs: 0,
+        durationMs: Date.now() - operationStartedAt,
         error,
         errorCode: "LONG_TERM_MEMORY_LEGACY_SEARCH_FAILED",
         legacyPlatformScope: true,
@@ -648,7 +656,7 @@ export async function searchLongTermMemories(
     }
   } catch (error) {
     logMemoryOperationFailure({
-      durationMs: 0,
+      durationMs: Date.now() - operationStartedAt,
       error,
       errorCode: "LONG_TERM_MEMORY_SEARCH_FAILED",
       message: "Long-term memory search failed; continuing without it.",
@@ -773,91 +781,109 @@ export async function deleteLongTermMemoriesForThread(
     return false
   }
 
-  try {
-    const mode = getMem0ApiMode(config)
-    const deleteScopedMemories = async (
-      legacyPlatformScope:
-        | "appThread"
-        | "appRun"
-        | "canonicalRun"
-        | false = false
-    ) => {
-      const url = getMem0Url(
-        config,
-        mode === "platform" ? "v1/memories/" : "memories"
+  const mode = getMem0ApiMode(config)
+  const operationStartedAt = Date.now()
+
+  const deleteScopedMemories = async (
+    legacyPlatformScope: LegacyPlatformDeleteScope = false
+  ) => {
+    const scopeStartedAt = Date.now()
+    const url = getMem0Url(
+      config,
+      mode === "platform" ? "v1/memories/" : "memories"
+    )
+    if (mode === "oss") {
+      url.searchParams.set("user_id", params.userId)
+      url.searchParams.set("agent_id", config.agentId)
+      url.searchParams.set("run_id", params.threadId)
+    } else if (legacyPlatformScope === "appThread") {
+      url.searchParams.set("app_id", getPlatformAppId(config, params.userId))
+      url.searchParams.set(
+        "metadata",
+        JSON.stringify({ thread_id: params.threadId })
       )
-      if (mode === "oss") {
-        url.searchParams.set("user_id", params.userId)
-        url.searchParams.set("agent_id", config.agentId)
-        url.searchParams.set("run_id", params.threadId)
-      } else if (legacyPlatformScope === "appThread") {
-        url.searchParams.set("app_id", getPlatformAppId(config, params.userId))
-        url.searchParams.set(
-          "metadata",
-          JSON.stringify({ thread_id: params.threadId })
-        )
-      } else if (legacyPlatformScope === "appRun") {
-        url.searchParams.set("app_id", getPlatformAppId(config, params.userId))
-        url.searchParams.set(
-          "metadata",
-          JSON.stringify({ run_id: params.threadId })
-        )
-      } else if (legacyPlatformScope === "canonicalRun") {
-        url.searchParams.set("user_id", params.userId)
-        url.searchParams.set("agent_id", config.agentId)
-        url.searchParams.set("run_id", params.threadId)
-      } else {
-        url.searchParams.set("user_id", params.userId)
-        url.searchParams.set(
-          "metadata",
-          JSON.stringify({
-            agent_id: config.agentId,
-            thread_id: params.threadId,
-          })
-        )
-      }
+    } else if (legacyPlatformScope === "appRun") {
+      url.searchParams.set("app_id", getPlatformAppId(config, params.userId))
+      url.searchParams.set(
+        "metadata",
+        JSON.stringify({ run_id: params.threadId })
+      )
+    } else if (legacyPlatformScope === "canonicalRun") {
+      url.searchParams.set("user_id", params.userId)
+      url.searchParams.set("agent_id", config.agentId)
+      url.searchParams.set("run_id", params.threadId)
+    } else {
+      url.searchParams.set("user_id", params.userId)
+      url.searchParams.set(
+        "metadata",
+        JSON.stringify({
+          agent_id: config.agentId,
+          thread_id: params.threadId,
+        })
+      )
+    }
 
-      const startedAt = Date.now()
-      const response = await (params.fetchFn ?? fetch)(url, {
-        headers: createMem0Headers(config, mode),
-        method: "DELETE",
-        signal: createMemoryRequestSignal({
-          signal: params.signal,
-          timeoutMs: MEMORY_DELETE_TIMEOUT_MS,
-        }),
-      })
+    const response = await (params.fetchFn ?? fetch)(url, {
+      headers: createMem0Headers(config, mode),
+      method: "DELETE",
+      signal: createMemoryRequestSignal({
+        signal: params.signal,
+        timeoutMs: MEMORY_DELETE_TIMEOUT_MS,
+      }),
+    })
 
-      if (!response.ok) {
-        throw createMem0HttpError("Mem0 memory delete failed.", response)
-      }
+    if (!response.ok) {
+      throw createMem0HttpError("Mem0 memory delete failed.", response)
+    }
 
-      logMemoryOperationSuccess({
-        durationMs: Date.now() - startedAt,
-        legacyPlatformScope: Boolean(legacyPlatformScope),
+    logMemoryOperationSuccess({
+      durationMs: Date.now() - scopeStartedAt,
+      legacyPlatformScope,
+      mode,
+      operation: "delete",
+      requestId: params.requestId,
+      status: response.status,
+    })
+  }
+
+  const scopes: LegacyPlatformDeleteScope[] =
+    mode === "platform"
+      ? [false, "canonicalRun", "appThread", "appRun"]
+      : [false]
+  let successCount = 0
+  let lastError: unknown
+
+  for (const scope of scopes) {
+    try {
+      await deleteScopedMemories(scope)
+      successCount += 1
+    } catch (error) {
+      lastError = error
+      logMemoryOperationFailure({
+        durationMs: Date.now() - operationStartedAt,
+        error,
+        errorCode: "LONG_TERM_MEMORY_DELETE_SCOPE_FAILED",
+        legacyPlatformScope: scope,
+        message: "Long-term memory deletion failed for one scope; continuing.",
         mode,
         operation: "delete",
         requestId: params.requestId,
-        status: response.status,
       })
     }
-
-    await deleteScopedMemories()
-    if (mode === "platform") {
-      await deleteScopedMemories("canonicalRun")
-      await deleteScopedMemories("appThread")
-      await deleteScopedMemories("appRun")
-    }
-    return true
-  } catch (error) {
-    logMemoryOperationFailure({
-      durationMs: 0,
-      error,
-      errorCode: "LONG_TERM_MEMORY_DELETE_FAILED",
-      message: "Long-term memory deletion failed; continuing without it.",
-      mode: getMem0ApiMode(config),
-      operation: "delete",
-      requestId: params.requestId,
-    })
-    return false
   }
+
+  if (successCount > 0) {
+    return true
+  }
+
+  logMemoryOperationFailure({
+    durationMs: Date.now() - operationStartedAt,
+    error: lastError,
+    errorCode: "LONG_TERM_MEMORY_DELETE_FAILED",
+    message: "Long-term memory deletion failed; continuing without it.",
+    mode,
+    operation: "delete",
+    requestId: params.requestId,
+  })
+  return false
 }
