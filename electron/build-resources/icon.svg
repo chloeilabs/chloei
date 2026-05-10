@@ -1,0 +1,26 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1024" height="1024" rx="224" fill="#050505"/>
+  <g fill="#ffffff">
+    <rect x="112" y="512" width="64" height="64"/>
+    <rect x="224" y="512" width="64" height="64"/>
+    <rect x="336" y="512" width="64" height="64"/>
+    <rect x="512" y="112" width="64" height="64"/>
+    <rect x="512" y="224" width="64" height="64"/>
+    <rect x="512" y="336" width="64" height="64"/>
+    <rect x="512" y="512" width="64" height="64"/>
+    <rect x="512" y="624" width="64" height="64"/>
+    <rect x="512" y="736" width="64" height="64"/>
+    <rect x="512" y="848" width="64" height="64"/>
+    <rect x="624" y="512" width="64" height="64"/>
+    <rect x="736" y="512" width="64" height="64"/>
+    <rect x="848" y="512" width="64" height="64"/>
+    <rect x="224" y="224" width="64" height="64"/>
+    <rect x="736" y="224" width="64" height="64"/>
+    <rect x="224" y="736" width="64" height="64"/>
+    <rect x="736" y="736" width="64" height="64"/>
+    <rect x="336" y="336" width="64" height="64"/>
+    <rect x="624" y="336" width="64" height="64"/>
+    <rect x="336" y="624" width="64" height="64"/>
+    <rect x="624" y="624" width="64" height="64"/>
+  </g>
+</svg>

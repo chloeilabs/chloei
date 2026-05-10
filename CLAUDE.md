@@ -8,7 +8,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Development
 pnpm dev                  # Start dev server on port 3000
 pnpm build                # Production build
-pnpm start                # Run production server
+pnpm start                # Run .next/standalone/server.js
+pnpm desktop:dev          # Start Electron with a local Next.js dev server
+pnpm desktop:build        # Build Next.js and prepare desktop bundle
+pnpm desktop:pack         # Create unpacked local Electron app
+pnpm desktop:smoke        # Verify Electron shell preload/isolation with mock auth
+pnpm desktop:dist:mac     # Build macOS desktop artifacts
+pnpm desktop:dist:win     # Build Windows desktop artifacts
 
 # Database (must run before first request)
 pnpm migrate              # Run both auth + app migrations
@@ -27,6 +33,7 @@ pnpm bundle:budget        # Check built static JS chunk budgets
 # Tests
 pnpm test                                        # All tests
 pnpm test:smoke:mock                            # Credential-free Playwright smoke
+pnpm desktop:smoke                              # Electron shell smoke
 pnpm test:smoke:memory                          # Authenticated Mem0 memory smoke
 pnpm mem0:smoke                                 # Direct Mem0 add/search/delete smoke
 pnpm mem0:cleanup-smoke                         # Remove authenticated memory smoke artifacts

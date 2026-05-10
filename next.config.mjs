@@ -44,13 +44,21 @@ const securityHeaders = [
       ]
     : []),
 ]
+const generatedOutputFileTracingExcludes = [
+  "./desktop-build/**/*",
+  "./dist/**/*",
+  "./test-results/**/*",
+]
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  output: "standalone",
   serverExternalPackages: ["@napi-rs/canvas"],
   outputFileTracingExcludes: {
+    "**": generatedOutputFileTracingExcludes,
     "/api/agent": [
+      ...generatedOutputFileTracingExcludes,
       "./CLAUDE.md",
       "./README.md",
       "./app-migrate.mjs",

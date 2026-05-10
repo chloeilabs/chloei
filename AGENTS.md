@@ -27,12 +27,13 @@ Standard commands are documented in `CLAUDE.md` and `README.md`. Key ones:
 - **Lint**: `pnpm lint` (zero warnings enforced)
 - **Typecheck**: `pnpm typecheck`
 - **Unit tests**: `pnpm test` (127 tests, no external services needed)
-- **Smoke tests**: `pnpm test:smoke:mock` (requires a production build via `pnpm build` first)
+- **Smoke tests**: `pnpm test:smoke:mock` (requires a standalone production build via `pnpm build` first)
+- **Desktop smoke**: `pnpm desktop:smoke` (launches Electron in mock-auth mode)
 - **Dev server**: `pnpm dev`
 
 ### Gotchas
 
-- The mock Playwright smoke test (`pnpm test:smoke:mock`) uses `next start`, so a production build (`pnpm build`) must exist before running it.
+- The mock Playwright smoke test (`pnpm test:smoke:mock`) uses `.next/standalone/server.js`, so a production build (`pnpm build`) must exist before running it.
 - Unit tests use stubs and run without a database. No external services are needed for `pnpm test`.
 - The `pnpm.onlyBuiltDependencies` field in `package.json` already handles build script approval for `sharp`; do not run `pnpm approve-builds`.
 - Node.js 24.x is required (pinned in `engines`). The VM needs `/usr/local/node/bin` on `PATH`.
