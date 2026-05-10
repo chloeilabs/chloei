@@ -134,12 +134,7 @@ function createPlatformEntityFilters(params: {
 }) {
   if (params.legacyPlatformScope) {
     return {
-      AND: [
-        { user_id: params.userId },
-        {
-          app_id: getPlatformAppId({ agentId: params.agentId }, params.userId),
-        },
-      ],
+      app_id: getPlatformAppId({ agentId: params.agentId }, params.userId),
     }
   }
 
@@ -263,11 +258,8 @@ function createMemoryCommitMessages(params: {
 }
 
 function createMemoryCommitBody(params: {
-  assistantContent: string
   config: MemoryRuntimeConfig
-  latestUserMessage: string
-  latestUserMessageIndex: number
-  messages: CommitLongTermMemoryParams["messages"]
+  memoryMessages: MemoryCommitMessage[]
   mode: Mem0ApiMode
   requestId?: string
   threadId: string
@@ -282,12 +274,7 @@ function createMemoryCommitBody(params: {
   }
   const shared = {
     infer: true,
-    messages: createMemoryCommitMessages({
-      assistantContent: params.assistantContent,
-      latestUserMessage: params.latestUserMessage,
-      latestUserMessageIndex: params.latestUserMessageIndex,
-      messages: params.messages,
-    }),
+    messages: params.memoryMessages,
     metadata,
   }
 
@@ -726,11 +713,8 @@ export async function commitLongTermMemory(
       {
         body: JSON.stringify(
           createMemoryCommitBody({
-            assistantContent,
             config,
-            latestUserMessage,
-            latestUserMessageIndex,
-            messages: params.messages,
+            memoryMessages,
             mode,
             requestId: params.requestId,
             threadId: params.threadId,

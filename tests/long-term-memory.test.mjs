@@ -257,7 +257,7 @@ test("searchLongTermMemories falls back to legacy Mem0 Platform app scope", asyn
     AND: [{ user_id: "user-1" }, { metadata: { agent_id: "chloei" } }],
   })
   assert.deepEqual(calls[1].body.filters, {
-    AND: [{ user_id: "user-1" }, { app_id: "chloei:user-1" }],
+    app_id: "chloei:user-1",
   })
   assert.deepEqual(results, [
     {
