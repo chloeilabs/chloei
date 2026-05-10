@@ -362,8 +362,6 @@ All other variables are optional — the code has safe defaults. See `.env.examp
 | `MEMORY_THRESHOLD`                         | Minimum memory similarity threshold (default: 0.3)                                                      |
 | `MEMORY_CONTEXT_MAX_CHARS`                 | Max retrieved memory prompt chars (default: 3,000)                                                      |
 | `MEMORY_COMMIT_MAX_CHARS`                  | Max assistant chars eligible for memory commit (default: 12,000)                                        |
-| `OPENAI_API_KEY`                           | Enables OpenAI judge for prompt evals                                                                   |
-| `OPENAI_EVAL_JUDGE_MODEL`                  | Judge model override (default: `gpt-5.4-mini`)                                                          |
 | `PYTHON3_PATH`                             | Override `python3` binary for code execution                                                            |
 | `AGENT_MAX_MESSAGES`                       | Max messages per request (default: 50)                                                                  |
 | `AGENT_MAX_MESSAGE_CHARS`                  | Max chars per message (default: 12,000)                                                                 |

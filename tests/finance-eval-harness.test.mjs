@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { readFile } from "node:fs/promises"
 import path from "node:path"
 import test from "node:test"
 import { fileURLToPath, pathToFileURL } from "node:url"
@@ -40,4 +41,16 @@ test("finance fixture eval suite establishes a passing internal baseline", async
   assert.equal(result.summary.tasks, 3)
   assert.equal(result.summary.failed, 0)
   assert.equal(result.summary.passRate, 1)
+})
+
+test("GDPval judge uses AI Gateway with Kimi by default", async () => {
+  const source = await readFile(
+    path.join(cwd, "evals/finance/judge-gdpval-gateway.mjs"),
+    "utf8"
+  )
+
+  assert.match(source, /process\.env\.AI_GATEWAY_API_KEY/)
+  assert.match(source, /AvailableModels\.MOONSHOTAI_KIMI_K2_6/)
+  assert.doesNotMatch(source, /process\.env\.OPENAI_API_KEY/)
+  assert.doesNotMatch(source, /OPENAI_EVAL_JUDGE_MODEL/)
 })
