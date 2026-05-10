@@ -43,7 +43,6 @@ To enable auth locally, provision PostgreSQL and add:
 - `pnpm desktop:pack`: create an unpacked local Electron app for inspection
 - `pnpm desktop:smoke`: launch Electron in mock-auth mode and verify the desktop shell contract
 - `pnpm desktop:dist:mac`: build macOS desktop artifacts
-- `pnpm desktop:dist:win`: build Windows desktop artifacts
 - `pnpm test`: run regression tests
 - `pnpm test:smoke`: run opt-in Playwright browser smoke tests against `SMOKE_BASE_URL`
 - `pnpm test:smoke:memory`: run opt-in authenticated memory smoke tests against `SMOKE_BASE_URL`
@@ -74,7 +73,7 @@ Managed integration rollout, rollback, and smoke-test steps live in [docs/manage
 
 ## Desktop app
 
-Chloei ships a macOS/Windows desktop shell through Electron. The shell starts a local Next.js server on `127.0.0.1` using a random available port, then opens that local origin in a locked-down Electron window. Production desktop builds use Next.js `output: "standalone"` and package the traced server files plus `.next/static`.
+Chloei ships a macOS desktop shell through Electron. The shell starts a local Next.js server on `127.0.0.1` using a random available port, then opens that local origin in a locked-down Electron window. Production desktop builds use Next.js `output: "standalone"` and package the traced server files plus `.next/static`. Windows users should use the hosted web app.
 
 Desktop development:
 
@@ -89,17 +88,15 @@ Desktop packaging:
 pnpm desktop:build
 pnpm desktop:pack
 pnpm desktop:dist:mac
-pnpm desktop:dist:win
 ```
 
 The desktop app does not bundle server secrets. For local packaged testing, provide runtime server environment variables through the OS environment or a `desktop.env` file in Electron's app data directory:
 
 - macOS: `~/Library/Application Support/Chloei/desktop.env`
-- Windows: `%APPDATA%\Chloei\desktop.env`
 
 Use the same key/value format as `.env.local`. The Electron shell always overrides `BETTER_AUTH_URL`, `BETTER_AUTH_TRUSTED_ORIGINS`, `HOSTNAME`, and `PORT` for the local desktop server, and clears `BETTER_AUTH_COOKIE_DOMAIN` so localhost sessions work correctly.
 
-Desktop release builds are configured in `.github/workflows/desktop-release.yml`. CI builds separate macOS Apple Silicon, macOS Intel, and Windows x64 artifacts, each with its own auto-update channel so split macOS builds do not overwrite each other's update metadata. Local macOS desktop builds skip signing by default because this repo often lives in a cloud-synced workspace; set `CHLOEI_DESKTOP_SIGN=1` to opt into local certificate signing from a normal local checkout. CI macOS signing/notarization uses `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_API_KEY_P8`, `APPLE_API_KEY_ID`, and `APPLE_API_ISSUER`. Windows signing uses `WIN_CERT_FILE` and `WIN_CERT_PASSWORD`. Draft GitHub release publishing is available through the workflow's `publish` input.
+Desktop release builds are configured in `.github/workflows/desktop-release.yml`. CI builds separate macOS Apple Silicon and macOS Intel artifacts, each with its own auto-update channel so split macOS builds do not overwrite each other's update metadata. Local macOS desktop builds skip signing by default because this repo often lives in a cloud-synced workspace; set `CHLOEI_DESKTOP_SIGN=1` to opt into local certificate signing from a normal local checkout. CI macOS signing/notarization uses `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_API_KEY_P8`, `APPLE_API_KEY_ID`, and `APPLE_API_ISSUER`. Draft GitHub release publishing is available through the workflow's `publish` input.
 
 ## Environment
 

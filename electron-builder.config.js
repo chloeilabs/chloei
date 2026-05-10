@@ -91,15 +91,6 @@ module.exports = {
     target: ["dmg", "zip"],
   },
   npmRebuild: false,
-  nsis: {
-    allowElevation: true,
-    allowToChangeInstallationDirectory: true,
-    createDesktopShortcut: true,
-    createStartMenuShortcut: true,
-    deleteAppDataOnUninstall: false,
-    oneClick: false,
-    perMachine: false,
-  },
   productName: "Chloei",
   protocols: [
     {
@@ -116,11 +107,4 @@ module.exports = {
       repo: "chloei",
     },
   ],
-  win: {
-    cscKeyPassword: process.env.WIN_CERT_PASSWORD || undefined,
-    cscLink: process.env.WIN_CERT_FILE || undefined,
-    icon: "electron/build-resources/icon.ico",
-    legalTrademarks: "Chloei",
-    target: ["nsis"],
-  },
 }
