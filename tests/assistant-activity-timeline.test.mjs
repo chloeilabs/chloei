@@ -282,6 +282,7 @@ test("normalizeAssistantActivityTimeline hides tool errors superseded by a later
           callId: "call-1",
           toolName: "sec_filings",
           label: "Extracting SEC filing tables",
+          query: "0001065280-25-000044 | issuer purchases",
           operation: "table_extract",
           status: "error",
           errorCode: "INVALID_INPUT",
@@ -294,6 +295,7 @@ test("normalizeAssistantActivityTimeline hides tool errors superseded by a later
           callId: "call-2",
           toolName: "sec_filings",
           label: "Extracting SEC filing tables",
+          query: "0001065280-25-000044 | issuer purchases",
           operation: "table_extract",
           status: "success",
         },
@@ -381,6 +383,50 @@ test("normalizeAssistantActivityTimeline keeps SEC errors for different filing q
           label: "Extracting SEC filing tables",
           query: "0001065280-26-000034 | issuer purchases",
           operation: "table_extract",
+          status: "success",
+        },
+      ],
+    },
+  })
+
+  assert.deepEqual(
+    timeline.map((entry) => entry.id),
+    ["tool-error", "tool-success"]
+  )
+})
+
+test("normalizeAssistantActivityTimeline keeps finance errors for different input queries visible", () => {
+  const timeline = normalizeAssistantActivityTimeline({
+    id: "assistant-distinct-finance-tools",
+    role: "assistant",
+    content: "",
+    llmModel: "moonshotai/kimi-k2.6",
+    createdAt: "2026-04-20T12:00:00.000Z",
+    metadata: {
+      activityTimeline: [
+        {
+          id: "tool-error",
+          kind: "tool",
+          order: 0,
+          createdAt: "2026-04-20T12:00:00.000Z",
+          callId: "call-1",
+          toolName: "finance_data",
+          label: "Finance: Quote",
+          query: "AAPL",
+          operation: "quote",
+          status: "error",
+          errorCode: "HTTP_404",
+        },
+        {
+          id: "tool-success",
+          kind: "tool",
+          order: 1,
+          createdAt: "2026-04-20T12:00:01.000Z",
+          callId: "call-2",
+          toolName: "finance_data",
+          label: "Finance: Quote",
+          query: "MSFT",
+          operation: "quote",
           status: "success",
         },
       ],

@@ -15,12 +15,15 @@ const SEC_FILINGS_LABEL = "Searching SEC filings"
 const SEC_COMPANY_SUBMISSIONS_BASE_URL = "https://data.sec.gov/submissions"
 const SEC_COMPANY_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 const SEC_ARCHIVE_HOSTNAMES = new Set(["sec.gov", "www.sec.gov"])
+const SEC_SUBMISSIONS_CONTINUATION_FILE_PATTERN =
+  /^CIK\d{10}-submissions-\d+\.json$/i
 const DEFAULT_MAX_CHARS = 25_000
 const MAX_TEXT_CHARS = 80_000
 const DEFAULT_LIMIT = 10
 const MAX_LIMIT = 50
 const DEFAULT_SNIPPET_LIMIT = 6
 const MAX_SNIPPET_LIMIT = 12
+const MAX_SUBMISSION_CONTINUATION_FILES = 25
 
 type SecFilingsToolName = Extract<ToolName, typeof SEC_FILINGS_TOOL_NAME>
 type SecFilingsOperation =
@@ -70,6 +73,13 @@ interface ResolvedFilingDocument {
 interface ParsedSecArchiveUrl {
   accessionNumber: string
   cik: string
+}
+
+interface FetchedSubmissionData {
+  attempts: number
+  continuationUrls: URL[]
+  data: unknown
+  url: URL
 }
 
 interface FetchedFilingDocument extends ResolvedFilingDocument {
@@ -247,6 +257,10 @@ function buildSecSubmissionsUrl(cik: string): URL {
   return new URL(
     `${SEC_COMPANY_SUBMISSIONS_BASE_URL}/CIK${normalizeCik(cik)}.json`
   )
+}
+
+function buildSecSubmissionsContinuationUrl(fileName: string): URL {
+  return new URL(`${SEC_COMPANY_SUBMISSIONS_BASE_URL}/${fileName}`)
 }
 
 function buildSecFilingUrl(params: {
@@ -513,6 +527,72 @@ function getRecentArray(
   return Array.isArray(values) ? (values as unknown[]) : []
 }
 
+function getSubmissionContinuationFileNames(data: unknown): string[] {
+  const files = asRecord(asRecord(data)?.filings)?.files
+  if (!Array.isArray(files)) {
+    return []
+  }
+
+  return Array.from(
+    new Set(
+      files.flatMap((file) => {
+        const name = toOptionalString(asRecord(file)?.name)
+        return name && SEC_SUBMISSIONS_CONTINUATION_FILE_PATTERN.test(name)
+          ? [name]
+          : []
+      })
+    )
+  ).slice(0, MAX_SUBMISSION_CONTINUATION_FILES)
+}
+
+function getSubmissionFilingArrays(
+  data: unknown
+): Record<string, unknown> | null {
+  const record = asRecord(data)
+  const recent = asRecord(asRecord(record?.filings)?.recent)
+  return recent ?? record
+}
+
+function mergeSubmissionContinuationData(
+  data: unknown,
+  continuationData: readonly unknown[]
+): unknown {
+  const record = asRecord(data)
+  const filings = asRecord(record?.filings)
+  const recent = asRecord(filings?.recent)
+  if (!record || !filings || !recent || continuationData.length === 0) {
+    return data
+  }
+
+  const mergedRecent: Record<string, unknown> = { ...recent }
+  for (const continuation of continuationData) {
+    const continuationArrays = getSubmissionFilingArrays(continuation)
+    if (!continuationArrays) {
+      continue
+    }
+
+    for (const [key, values] of Object.entries(continuationArrays)) {
+      if (!Array.isArray(values)) {
+        continue
+      }
+
+      const existing = Array.isArray(mergedRecent[key])
+        ? (mergedRecent[key] as unknown[])
+        : []
+      const nextValues = values as unknown[]
+      mergedRecent[key] = [...existing, ...nextValues]
+    }
+  }
+
+  return {
+    ...record,
+    filings: {
+      ...filings,
+      recent: mergedRecent,
+    },
+  }
+}
+
 function passesDateRange(
   filingDate: string,
   from: string | undefined,
@@ -650,11 +730,80 @@ function findFilingByAccession(params: {
   return null
 }
 
+async function fetchSubmissionContinuationData(config: {
+  data: unknown
+  fetchImpl: typeof fetch
+  secUserAgent?: string
+}) {
+  const continuationData: unknown[] = []
+  const continuationUrls: URL[] = []
+  let attempts = 0
+
+  for (const fileName of getSubmissionContinuationFileNames(config.data)) {
+    const url = buildSecSubmissionsContinuationUrl(fileName)
+    const response = await fetchJsonWithRetry({
+      url,
+      provider: "sec",
+      headers: {
+        Accept: "application/json",
+        "User-Agent": getConfiguredSecUserAgent(config.secUserAgent),
+      },
+      fetchImpl: config.fetchImpl,
+    })
+    attempts += response.attempts
+
+    if (!response.ok) {
+      throw Object.assign(new Error(response.message), {
+        code: response.code,
+        retryable: response.retryable,
+        attempts,
+      })
+    }
+
+    continuationData.push(response.data)
+    continuationUrls.push(url)
+  }
+
+  return {
+    attempts,
+    data: continuationData,
+    urls: continuationUrls,
+  }
+}
+
+async function expandSubmissionsWithContinuationFiles(
+  submissions: FetchedSubmissionData,
+  config: {
+    fetchImpl: typeof fetch
+    secUserAgent?: string
+  }
+): Promise<FetchedSubmissionData> {
+  if (getSubmissionContinuationFileNames(submissions.data).length === 0) {
+    return submissions
+  }
+
+  const continuations = await fetchSubmissionContinuationData({
+    data: submissions.data,
+    ...config,
+  })
+
+  if (continuations.data.length === 0) {
+    return submissions
+  }
+
+  return {
+    ...submissions,
+    attempts: submissions.attempts + continuations.attempts,
+    continuationUrls: [...submissions.continuationUrls, ...continuations.urls],
+    data: mergeSubmissionContinuationData(submissions.data, continuations.data),
+  }
+}
+
 async function fetchSubmissions(config: {
   cik: string
   fetchImpl: typeof fetch
   secUserAgent?: string
-}) {
+}): Promise<FetchedSubmissionData> {
   const url = buildSecSubmissionsUrl(config.cik)
   const response = await fetchJsonWithRetry({
     url,
@@ -677,6 +826,7 @@ async function fetchSubmissions(config: {
   return {
     data: response.data,
     url,
+    continuationUrls: [],
     attempts: response.attempts,
   }
 }
@@ -728,18 +878,30 @@ async function resolveFilingDocument(config: {
     }
   }
 
-  const submissions = await fetchSubmissions({
+  let submissions = await fetchSubmissions({
     cik: company.cik,
     fetchImpl: config.fetchImpl,
     secUserAgent: config.secUserAgent,
   })
 
   if (config.input.accessionNumber) {
-    const filing = findFilingByAccession({
+    let filing = findFilingByAccession({
       data: submissions.data,
       cik: company.cik,
       accessionNumber: config.input.accessionNumber,
     })
+    if (!filing) {
+      submissions = await expandSubmissionsWithContinuationFiles(submissions, {
+        fetchImpl: config.fetchImpl,
+        secUserAgent: config.secUserAgent,
+      })
+      filing = findFilingByAccession({
+        data: submissions.data,
+        cik: company.cik,
+        accessionNumber: config.input.accessionNumber,
+      })
+    }
+
     if (!filing) {
       throw Object.assign(
         new Error(
@@ -767,6 +929,13 @@ async function resolveFilingDocument(config: {
         createSecSource(["filing"], filing.url, `SEC ${filing.form} filing`),
       ],
     }
+  }
+
+  if (config.input.from || config.input.to) {
+    submissions = await expandSubmissionsWithContinuationFiles(submissions, {
+      fetchImpl: config.fetchImpl,
+      secUserAgent: config.secUserAgent,
+    })
   }
 
   const filings = summarizeFilings({
@@ -1236,10 +1405,17 @@ async function runFilingSearch(
   startedAt: number
 ): Promise<SecFilingsToolResultPayload> {
   const company = await resolveSecCompany({ input, ...config })
-  const submissions = await fetchSubmissions({
+  let submissions = await fetchSubmissions({
     cik: company.cik,
     ...config,
   })
+  if (input.from || input.to) {
+    submissions = await expandSubmissionsWithContinuationFiles(submissions, {
+      fetchImpl: config.fetchImpl,
+      secUserAgent: config.secUserAgent,
+    })
+  }
+
   const filings = summarizeFilings({
     data: submissions.data,
     cik: company.cik,
@@ -1345,7 +1521,10 @@ async function runSectionExtract(
     ? retrieveSnippets({
         text: section.text,
         query: input.query,
-        limit: input.limit ?? DEFAULT_SNIPPET_LIMIT,
+        limit: Math.min(
+          MAX_SNIPPET_LIMIT,
+          input.limit ?? DEFAULT_SNIPPET_LIMIT
+        ),
       })
     : []
   if (input.query && snippets.length === 0) {

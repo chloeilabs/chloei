@@ -54,8 +54,30 @@ const submissions = {
         "10-K annual report",
       ],
     },
+    files: [
+      {
+        name: "CIK0001065280-submissions-001.json",
+        filingFrom: "2022-01-01",
+        filingTo: "2023-12-31",
+      },
+    ],
   },
 }
+
+const continuationSubmissions = {
+  form: ["10-K"],
+  filingDate: ["2023-01-26"],
+  reportDate: ["2022-12-31"],
+  accessionNumber: ["0001065280-23-000015"],
+  primaryDocument: ["nflx-20221231.htm"],
+  primaryDocDescription: ["10-K annual report"],
+}
+
+const sectionSnippetParagraphs = Array.from(
+  { length: 16 },
+  (_, index) =>
+    `<p>Streaming subscriber metric ${String(index + 1)} improved with revenue scale and operating leverage.</p>`
+).join("\n")
 
 const filingHtml = `
 <html>
@@ -64,6 +86,7 @@ const filingHtml = `
     <p>Netflix leases corporate offices and production facilities.</p>
     <h1>Item 7. Management's Discussion and Analysis</h1>
     <p>Total revenue increased 15% year over year.</p>
+    ${sectionSnippetParagraphs}
     <h2>Earnings per Share</h2>
     <table>
       <tr><th>Year Ended December 31</th></tr>
@@ -79,6 +102,15 @@ const filingHtml = `
     </table>
     <h1>Item 7A. Quantitative and Qualitative Disclosures</h1>
     <p>Market risk disclosure.</p>
+  </body>
+</html>
+`
+
+const olderFilingHtml = `
+<html>
+  <body>
+    <h1>Item 7. Management's Discussion and Analysis</h1>
+    <p>Older annual filing revenue increased 6% year over year.</p>
   </body>
 </html>
 `
@@ -103,8 +135,22 @@ function createSecFetch() {
       })
     }
 
+    if (requestUrl.includes("submissions/CIK0001065280-submissions-001.json")) {
+      return new Response(JSON.stringify(continuationSubmissions), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    }
+
     if (requestUrl.includes("nflx-20241231.htm")) {
       return new Response(filingHtml, {
+        status: 200,
+        headers: { "Content-Type": "text/html" },
+      })
+    }
+
+    if (requestUrl.includes("nflx-20221231.htm")) {
+      return new Response(olderFilingHtml, {
         status: 200,
         headers: { "Content-Type": "text/html" },
       })
@@ -172,6 +218,56 @@ test("sec filings searches companies and filings with SEC sources", async () => 
   )
 })
 
+test("sec filings loads continuation pages for older filing searches", async () => {
+  const { calls, fetchImpl } = createSecFetch()
+  const filingSearch = await runSecFilingsOperation(
+    {
+      operation: "filing_search",
+      symbol: "NFLX",
+      forms: ["10-K"],
+      from: "2023-01-01",
+      to: "2023-12-31",
+      limit: 2,
+    },
+    { fetchImpl, secUserAgent: "Chloei tests contact@example.com" }
+  )
+
+  assert.equal(filingSearch.error, undefined)
+  assert.equal(filingSearch.output?.data.filings.length, 1)
+  assert.equal(
+    filingSearch.output?.data.filings[0]?.accessionNumber,
+    "0001065280-23-000015"
+  )
+  assert.equal(
+    calls.some((call) =>
+      call.url.includes("CIK0001065280-submissions-001.json")
+    ),
+    true
+  )
+})
+
+test("sec filings resolves older accessions from continuation pages", async () => {
+  const { calls, fetchImpl } = createSecFetch()
+  const document = await runSecFilingsOperation(
+    {
+      operation: "document_fetch",
+      accessionNumber: "0001065280-23-000015",
+      maxChars: 2_000,
+    },
+    { fetchImpl, secUserAgent: "Chloei tests contact@example.com" }
+  )
+
+  assert.equal(document.error, undefined)
+  assert.equal(document.output?.data.url.includes("nflx-20221231.htm"), true)
+  assert.match(document.output?.data.text, /Older annual filing revenue/)
+  assert.equal(
+    calls.some((call) =>
+      call.url.includes("CIK0001065280-submissions-001.json")
+    ),
+    true
+  )
+})
+
 test("sec filings extracts sections, tables, and retrieval snippets", async () => {
   const { fetchImpl } = createSecFetch()
   const section = await runSecFilingsOperation(
@@ -205,6 +301,22 @@ test("sec filings extracts sections, tables, and retrieval snippets", async () =
     namedSection.output?.data.text,
     /Total Number of Shares Purchased/
   )
+
+  const queriedSection = await runSecFilingsOperation(
+    {
+      operation: "section_extract",
+      symbol: "NFLX",
+      forms: ["10-K"],
+      item: "Item 7",
+      query: "streaming subscriber metric revenue leverage",
+      limit: 50,
+      maxChars: 10_000,
+    },
+    { fetchImpl }
+  )
+
+  assert.equal(queriedSection.error, undefined)
+  assert.equal(queriedSection.output?.data.snippets.length, 12)
 
   const fallbackSection = await runSecFilingsOperation(
     {

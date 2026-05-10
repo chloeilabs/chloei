@@ -948,12 +948,14 @@ test("finance data metadata includes operation and provider", () => {
       input: {
         operation: "financial_statements",
         provider: "fmp",
+        symbol: "MSFT",
       },
     }),
     {
       callId: "call-1",
       toolName: "finance_data",
       label: "Finance: Financial Statements",
+      query: "MSFT",
       operation: "financial_statements",
       provider: "fmp",
       attempt: 1,

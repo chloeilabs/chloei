@@ -111,6 +111,7 @@ interface AiSdkFinanceDataToolCallMetadata {
   callId: string
   toolName: FinanceDataToolName
   label: string
+  query?: string
   operation?: string
   provider?: string
   attempt?: number
@@ -1735,11 +1736,24 @@ export function getAiSdkFinanceDataToolCallMetadata(
   const inputRecord = asRecord(part.input)
   const operation = toOptionalString(inputRecord?.operation)
   const provider = toOptionalString(inputRecord?.provider)
+  const query = [
+    toOptionalString(inputRecord?.query),
+    toOptionalString(inputRecord?.symbol),
+    toOptionalString(inputRecord?.cik),
+    toOptionalString(inputRecord?.seriesId),
+    toOptionalString(inputRecord?.statementType),
+    toOptionalString(inputRecord?.period),
+    toOptionalString(inputRecord?.from),
+    toOptionalString(inputRecord?.to),
+  ]
+    .filter((value): value is string => Boolean(value))
+    .join(" | ")
 
   return {
     callId: part.toolCallId,
     toolName: FINANCE_DATA_TOOL_NAME,
     label: getToolLabel(part.input),
+    ...(query ? { query } : {}),
     ...(operation ? { operation } : {}),
     ...(provider ? { provider } : {}),
     attempt: 1,
