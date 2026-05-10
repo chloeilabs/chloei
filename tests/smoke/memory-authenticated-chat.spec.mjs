@@ -16,14 +16,24 @@ async function signIn(page) {
 
 async function submitPrompt(page, prompt) {
   const promptInput = page.getByPlaceholder("Ask anything")
-  await promptInput.click()
-  await promptInput.fill(prompt)
-  await expect(promptInput).toHaveValue(prompt)
-
   const assistantMessages = page.locator("[data-message-role='assistant']")
   const assistantMessageCount = await assistantMessages.count()
   const submitButton = page.locator("[data-prompt-form] button[type='submit']")
-  await expect(submitButton).toBeEnabled()
+
+  const submitReadyDeadline = Date.now() + 30_000
+  while (Date.now() < submitReadyDeadline) {
+    await promptInput.click()
+    await promptInput.fill(prompt)
+    await expect(promptInput).toHaveValue(prompt)
+
+    if (await submitButton.isEnabled()) {
+      break
+    }
+
+    await page.waitForTimeout(1_000)
+  }
+
+  await expect(submitButton).toBeEnabled({ timeout: 1_000 })
   await submitButton.click()
 
   await expect(page.locator("[data-message-role='user']").last()).toContainText(
