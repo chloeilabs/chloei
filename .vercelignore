@@ -4,3 +4,22 @@
 .env.test.local
 .env.production.local
 .env.example
+
+# Dependencies
+node_modules
+.pnpm-store
+.pnp
+.pnp.js
+
+# Local build outputs
+.next
+dist
+desktop-build
+out
+build
+
+# Test and tooling outputs
+coverage
+test-results
+.artifacts
+.turbo
