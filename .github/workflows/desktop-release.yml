@@ -1,0 +1,76 @@
+name: Desktop Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish draft release artifacts to GitHub Releases"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  desktop:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos
+            runner: macos-latest
+            build-target: --mac
+          - platform: windows
+            runner: windows-latest
+            build-target: --win
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: 10.32.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Next.js desktop bundle
+        run: pnpm desktop:build
+        env:
+          E2E_MOCK_AUTH: "1"
+          E2E_MOCK_AUTH_ALLOW_NEXT_START: "1"
+
+      - name: Package desktop app
+        shell: bash
+        run: pnpm exec electron-builder --config electron-builder.config.js ${{ matrix.build-target }} --publish "$DESKTOP_PUBLISH"
+        env:
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          DESKTOP_PUBLISH: ${{ inputs.publish && 'always' || 'never' }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WIN_CERT_FILE: ${{ secrets.WIN_CERT_FILE }}
+          WIN_CERT_PASSWORD: ${{ secrets.WIN_CERT_PASSWORD }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: chloei-desktop-${{ matrix.platform }}
+          path: dist/desktop/**

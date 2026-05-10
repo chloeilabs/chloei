@@ -35,9 +35,15 @@ To enable auth locally, provision PostgreSQL and add:
 - `pnpm auth:migrate`: apply Better Auth schema changes to PostgreSQL
 - `pnpm app:migrate`: apply app storage schema changes to PostgreSQL
 - `pnpm build`: build the production app
+- `pnpm start`: run the standalone production server from `.next/standalone/server.js`
 - `pnpm bundle:budget`: check built static JavaScript chunks against bundle budgets
 - `pnpm bundle:report`: report built static JavaScript chunk headroom and largest first-load routes
-- `pnpm start`: run the production server
+- `pnpm desktop:dev`: start the Electron app against a local Next.js dev server
+- `pnpm desktop:build`: build Next.js and prepare the packaged desktop server bundle
+- `pnpm desktop:pack`: create an unpacked local Electron app for inspection
+- `pnpm desktop:smoke`: launch Electron in mock-auth mode and verify the desktop shell contract
+- `pnpm desktop:dist:mac`: build macOS desktop artifacts
+- `pnpm desktop:dist:win`: build Windows desktop artifacts
 - `pnpm test`: run regression tests
 - `pnpm test:smoke`: run opt-in Playwright browser smoke tests against `SMOKE_BASE_URL`
 - `pnpm test:smoke:memory`: run opt-in authenticated memory smoke tests against `SMOKE_BASE_URL`
@@ -65,6 +71,35 @@ To enable auth locally, provision PostgreSQL and add:
 6. Run one authenticated production smoke test: sign in, load models, send a prompt, verify an existing thread still reopens cleanly, and run the memory smoke against `https://chloei.ai`.
 
 Managed integration rollout, rollback, and smoke-test steps live in [docs/managed-integrations-rollout.md](docs/managed-integrations-rollout.md). Public-markets finance answer quality checks live in [docs/finance-research-quality.md](docs/finance-research-quality.md).
+
+## Desktop app
+
+Chloei ships a macOS/Windows desktop shell through Electron. The shell starts a local Next.js server on `127.0.0.1` using a random available port, then opens that local origin in a locked-down Electron window. Production desktop builds use Next.js `output: "standalone"` and package the traced server files plus `.next/static`.
+
+Desktop development:
+
+```bash
+pnpm desktop:dev
+pnpm desktop:smoke
+```
+
+Desktop packaging:
+
+```bash
+pnpm desktop:build
+pnpm desktop:pack
+pnpm desktop:dist:mac
+pnpm desktop:dist:win
+```
+
+The desktop app does not bundle server secrets. For local packaged testing, provide runtime server environment variables through the OS environment or a `desktop.env` file in Electron's app data directory:
+
+- macOS: `~/Library/Application Support/Chloei/desktop.env`
+- Windows: `%APPDATA%\Chloei\desktop.env`
+
+Use the same key/value format as `.env.local`. The Electron shell always overrides `BETTER_AUTH_URL`, `BETTER_AUTH_TRUSTED_ORIGINS`, `HOSTNAME`, and `PORT` for the local desktop server, and clears `BETTER_AUTH_COOKIE_DOMAIN` so localhost sessions work correctly.
+
+Desktop release builds are configured in `.github/workflows/desktop-release.yml`. Local macOS desktop builds skip signing by default because this repo often lives in a cloud-synced workspace; set `CHLOEI_DESKTOP_SIGN=1` to opt into local certificate signing from a normal local checkout. CI macOS signing/notarization uses `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_API_KEY`, `APPLE_API_KEY_ID`, and `APPLE_API_ISSUER`. Windows signing uses `WIN_CERT_FILE` and `WIN_CERT_PASSWORD`. Draft GitHub release publishing is available through the workflow's `publish` input.
 
 ## Environment
 
@@ -135,6 +170,6 @@ By default, Chloei enforces safe built-in agent limits even if you leave all opt
 
 `pnpm test:smoke` runs Playwright against `SMOKE_BASE_URL` or starts the local dev server at `http://localhost:3000`. Set `SMOKE_EMAIL` and `SMOKE_PASSWORD` for an existing test account before running the live authenticated smoke test. Optional `SMOKE_PROMPT` and `SMOKE_EXPECTED_TEXT` let you tune the live prompt assertion.
 
-`pnpm test:smoke:mock` runs a CI-safe authenticated chat flow with `E2E_MOCK_AUTH=1`, in-memory thread storage, and a deterministic mock agent response. It does not require Better Auth credentials, PostgreSQL, or AI provider API keys.
+`pnpm test:smoke:mock` runs a CI-safe authenticated chat flow with `E2E_MOCK_AUTH=1`, in-memory thread storage, and a deterministic mock agent response against the standalone production server. It does not require Better Auth credentials, PostgreSQL, or AI provider API keys.
 
 `pnpm mem0:smoke` requires `MEMORY_PROVIDER=mem0`, `MEM0_API_URL`, and `MEM0_API_KEY`; it writes a disposable marker, retries search for up to 45 seconds to allow Mem0 extraction/indexing to settle, and deletes the marker. `pnpm test:smoke:memory` requires `SMOKE_EMAIL` and `SMOKE_PASSWORD`; use `SMOKE_BASE_URL=<preview-or-production-url>` for preview and production verification. `pnpm mem0:cleanup-smoke` removes authenticated memory smoke threads and Mem0 memories for the configured smoke user while keeping the account available for recurring checks.

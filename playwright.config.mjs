@@ -19,10 +19,16 @@ export default defineConfig({
   webServer: shouldStartLocalServer
     ? {
         command: isMockSmoke
-          ? `next start --port ${localPort}`
+          ? "node scripts/start-standalone-server.mjs"
           : `next dev --port ${localPort}`,
         env: {
           ...process.env,
+          ...(isMockSmoke
+            ? {
+                HOSTNAME: "127.0.0.1",
+                PORT: localPort,
+              }
+            : {}),
         },
         reuseExistingServer: shouldReuseExistingServer,
         timeout: 120_000,
