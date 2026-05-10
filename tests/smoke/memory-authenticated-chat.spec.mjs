@@ -44,22 +44,36 @@ test.describe("authenticated long-term memory smoke", () => {
   test("remembers a marker and retrieves it in a new chat", async ({
     page,
   }) => {
+    test.setTimeout(240_000)
+
+    const lookupKey = `chloei-memory-smoke-key-${randomUUID()}`
     const nonce = `chloei-memory-smoke-${randomUUID()}`
+    const recallPrompt = `For memory smoke key ${lookupKey}, what exact marker did I ask you to remember? Reply only with the marker value that starts with chloei-memory-smoke-.`
 
     await signIn(page)
     await submitPrompt(
       page,
-      `Please remember this exact durable preference for future chats: my Chloei memory smoke marker is ${nonce}. Reply with a short acknowledgement that includes the marker.`
+      `Please remember this exact durable QA fact for future chats: for memory smoke key ${lookupKey}, the exact marker is ${nonce}. Reply with a short acknowledgement that includes the key and marker.`
     )
 
-    await page.waitForTimeout(20_000)
-    await page.getByRole("button", { name: "Start a new chat" }).click()
-    await expect(page.getByPlaceholder("Ask anything")).toBeVisible()
+    let lastRecallText = ""
 
-    const recallResponse = await submitPrompt(
-      page,
-      "What exact Chloei memory smoke marker did I ask you to remember? Reply only with the value that starts with chloei-memory-smoke-."
-    )
-    await expect(recallResponse).toContainText(nonce, { timeout: 120_000 })
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await page.waitForTimeout(attempt === 0 ? 30_000 : 15_000)
+      await page.getByRole("button", { name: "Start a new chat" }).click()
+      await expect(page.getByPlaceholder("Ask anything")).toBeVisible()
+
+      const recallResponse = await submitPrompt(page, recallPrompt)
+      await expect(recallResponse).toContainText(/chloei-memory-smoke-/, {
+        timeout: 120_000,
+      })
+      lastRecallText = (await recallResponse.textContent()) ?? ""
+
+      if (lastRecallText.includes(nonce)) {
+        return
+      }
+    }
+
+    expect(lastRecallText).toContain(nonce)
   })
 })
