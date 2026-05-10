@@ -88,24 +88,35 @@ jobs:
           WIN_CERT_FILE: ${{ secrets.WIN_CERT_FILE }}
           WIN_CERT_PASSWORD: ${{ secrets.WIN_CERT_PASSWORD }}
 
-      - name: Write Apple API key for notarization
-        if: inputs.publish && matrix.platform == 'macos'
+      - name: Prepare Apple API key for notarization
+        if: matrix.platform == 'macos'
         shell: bash
         run: |
+          if [[ -z "$APPLE_API_KEY_P8" || -z "$APPLE_API_KEY_ID" || -z "$APPLE_API_ISSUER" || -z "$CSC_LINK" || -z "$CSC_KEY_PASSWORD" ]]; then
+            echo "Apple API key or macOS signing secrets are incomplete; macOS notarization will be skipped."
+            exit 0
+          fi
+
           key_path="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
           printf '%s' "$APPLE_API_KEY_P8" > "$key_path"
           chmod 600 "$key_path"
-          echo "APPLE_API_KEY=$key_path" >> "$GITHUB_ENV"
+
+          {
+            echo "APPLE_API_KEY=$key_path"
+            echo "APPLE_API_KEY_ID=$APPLE_API_KEY_ID"
+            echo "APPLE_API_ISSUER=$APPLE_API_ISSUER"
+          } >> "$GITHUB_ENV"
         env:
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
 
       - name: Package desktop app
         shell: bash
         run: pnpm exec electron-builder --config electron-builder.config.js ${{ matrix.build-target }} --publish "$DESKTOP_PUBLISH"
         env:
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
           DESKTOP_PUBLISH: ${{ inputs.publish && 'always' || 'never' }}
