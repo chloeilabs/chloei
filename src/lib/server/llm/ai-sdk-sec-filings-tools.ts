@@ -263,9 +263,7 @@ function parseSecArchiveUrl(value: string): ParsedSecArchiveUrl | null {
     return null
   }
 
-  const match = /\/Archives\/edgar\/data\/(\d+)\/(\d{18})\//i.exec(
-    url.pathname
-  )
+  const match = /\/Archives\/edgar\/data\/(\d+)\/(\d{18})\//i.exec(url.pathname)
   const accession = match?.[2]
   if (!match?.[1] || !accession) {
     return null
@@ -955,7 +953,10 @@ function buildDocumentSnippetFallback(params: {
   const snippets = retrieveSnippets({
     text: params.text,
     query: params.query,
-    limit: Math.min(MAX_SNIPPET_LIMIT, params.input.limit ?? DEFAULT_SNIPPET_LIMIT),
+    limit: Math.min(
+      MAX_SNIPPET_LIMIT,
+      params.input.limit ?? DEFAULT_SNIPPET_LIMIT
+    ),
   })
 
   return {
@@ -1035,15 +1036,15 @@ function extractItemSection(params: {
         matchedHeading: match[2]?.trim(),
         score:
           Math.min(sectionText.length, 5_000) -
-          (/\btable of contents\b/i.test(sectionText.slice(0, 500)) ? 1_000 : 0),
+          (/\btable of contents\b/i.test(sectionText.slice(0, 500))
+            ? 1_000
+            : 0),
       })
     }
     match = headingPattern.exec(params.text)
   }
 
-  return (
-    candidates.sort((left, right) => right.score - left.score)[0] ?? null
-  )
+  return candidates.sort((left, right) => right.score - left.score)[0] ?? null
 }
 
 function extractNamedHeadingSection(params: {
@@ -1090,7 +1091,11 @@ function extractSection(params: {
   }
 
   return (
-    extractItemSection({ text: params.text, item, maxChars: params.maxChars }) ??
+    extractItemSection({
+      text: params.text,
+      item,
+      maxChars: params.maxChars,
+    }) ??
     extractNamedHeadingSection({
       text: params.text,
       heading: params.item,
