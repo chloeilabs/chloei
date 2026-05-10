@@ -4,16 +4,6 @@ const { spawnSync } = require("node:child_process")
 const fs = require("node:fs")
 const path = require("node:path")
 
-const macNotarize =
-  process.env.APPLE_API_KEY &&
-  process.env.APPLE_API_KEY_ID &&
-  process.env.APPLE_API_ISSUER
-    ? {
-        appleApiIssuer: process.env.APPLE_API_ISSUER,
-        appleApiKey: process.env.APPLE_API_KEY,
-        appleApiKeyId: process.env.APPLE_API_KEY_ID,
-      }
-    : undefined
 const shouldSignMac =
   process.env.CHLOEI_DESKTOP_SIGN === "1" ||
   Boolean(process.env.CSC_LINK || process.env.CSC_NAME)
@@ -90,7 +80,6 @@ module.exports = {
   files: ["electron/**/*", "package.json"],
   generateUpdatesFilesForAllChannels: true,
   mac: {
-    ...(macNotarize && shouldSignMac ? { notarize: macNotarize } : {}),
     category: "public.app-category.productivity",
     entitlements: "electron/build-resources/entitlements.mac.plist",
     entitlementsInherit: "electron/build-resources/entitlements.mac.plist",
