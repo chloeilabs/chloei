@@ -27,6 +27,9 @@ pnpm bundle:budget        # Check built static JS chunk budgets
 # Tests
 pnpm test                                        # All tests
 pnpm test:smoke:mock                            # Credential-free Playwright smoke
+pnpm test:smoke:memory                          # Authenticated Mem0 memory smoke
+pnpm mem0:smoke                                 # Direct Mem0 add/search/delete smoke
+pnpm mem0:cleanup-smoke                         # Remove authenticated memory smoke artifacts
 pnpm eval:finance                               # Fixture finance eval baseline
 pnpm eval:finance:live                          # Live public-markets finance acceptance suite
 node --test tests/agent-route-contract.test.mjs  # Single test file

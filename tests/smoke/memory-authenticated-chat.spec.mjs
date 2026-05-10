@@ -71,9 +71,6 @@ test.describe("authenticated long-term memory smoke", () => {
       await expect(recallPage.getByPlaceholder("Ask anything")).toBeVisible()
 
       const recallResponse = await submitPrompt(recallPage, recallPrompt)
-      await expect(recallResponse).toContainText(/chloei-memory-smoke-/, {
-        timeout: 120_000,
-      })
       lastRecallText = (await recallResponse.textContent()) ?? ""
 
       if (lastRecallText.includes(nonce)) {
