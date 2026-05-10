@@ -15,7 +15,6 @@ const macNotarize =
       }
     : undefined
 const shouldSignMac =
-  process.env.CI === "true" ||
   process.env.CHLOEI_DESKTOP_SIGN === "1" ||
   Boolean(process.env.CSC_LINK || process.env.CSC_NAME)
 
