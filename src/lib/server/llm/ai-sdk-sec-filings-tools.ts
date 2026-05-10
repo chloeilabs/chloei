@@ -14,6 +14,7 @@ const SEC_FILINGS_TOOL_NAME = "sec_filings" as const
 const SEC_FILINGS_LABEL = "Searching SEC filings"
 const SEC_COMPANY_SUBMISSIONS_BASE_URL = "https://data.sec.gov/submissions"
 const SEC_COMPANY_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
+const SEC_ARCHIVE_HOSTNAMES = new Set(["sec.gov", "www.sec.gov"])
 const DEFAULT_MAX_CHARS = 25_000
 const MAX_TEXT_CHARS = 80_000
 const DEFAULT_LIMIT = 10
@@ -160,7 +161,12 @@ const secFilingsInputSchema = z.object({
       "Optional SEC primary document filename, such as nflx-20241231.htm. The tool can resolve this from accessionNumber when omitted."
     )
     .optional(),
-  url: z.url().optional(),
+  url: z
+    .url()
+    .describe(
+      "Optional direct SEC EDGAR archive document URL. Must be an https://www.sec.gov/Archives/edgar/data/... filing document URL."
+    )
+    .optional(),
   item: z
     .string()
     .trim()
@@ -263,9 +269,27 @@ function parseSecArchiveUrl(value: string): ParsedSecArchiveUrl | null {
     return null
   }
 
-  const match = /\/Archives\/edgar\/data\/(\d+)\/(\d{18})\//i.exec(url.pathname)
+  if (
+    url.protocol !== "https:" ||
+    url.username ||
+    url.password ||
+    !SEC_ARCHIVE_HOSTNAMES.has(url.hostname.toLowerCase())
+  ) {
+    return null
+  }
+
+  const match = /^\/Archives\/edgar\/data\/(\d+)\/(\d{18})\/([^/]+)$/i.exec(
+    url.pathname
+  )
   const accession = match?.[2]
-  if (!match?.[1] || !accession) {
+  const documentName = match?.[3]
+  if (
+    !match?.[1] ||
+    !accession ||
+    !documentName ||
+    documentName.includes("..") ||
+    /%2f|%5c/i.test(documentName)
+  ) {
     return null
   }
 
@@ -663,6 +687,18 @@ async function resolveFilingDocument(config: {
   secUserAgent?: string
 }): Promise<ResolvedFilingDocument> {
   if (config.input.url) {
+    if (!parseSecArchiveUrl(config.input.url)) {
+      throw Object.assign(
+        new Error(
+          "document_fetch requires an SEC EDGAR archive document URL under https://www.sec.gov/Archives/edgar/data/."
+        ),
+        {
+          code: "INVALID_INPUT",
+          retryable: false,
+        }
+      )
+    }
+
     return {
       url: config.input.url,
       attempts: 0,

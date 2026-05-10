@@ -297,6 +297,23 @@ test("sec filings recovers bad SEC archive urls through accession lookup", async
   assert.match(document.output?.data.text, /Total revenue increased 15%/)
 })
 
+test("sec filings rejects non-SEC archive urls before fetching", async () => {
+  const { calls, fetchImpl } = createSecFetch()
+  const document = await runSecFilingsOperation(
+    {
+      operation: "document_fetch",
+      url: "http://169.254.169.254/Archives/edgar/data/1065280/000106528025000044/nflx-20241231.htm",
+      maxChars: 2_000,
+    },
+    { fetchImpl }
+  )
+
+  assert.equal(document.output, undefined)
+  assert.equal(document.error?.code, "INVALID_INPUT")
+  assert.equal(document.error?.retryable, false)
+  assert.equal(calls.length, 0)
+})
+
 test("sec filings recovers bad primary documents through accession lookup", async () => {
   const { fetchImpl } = createSecFetch()
   const document = await runSecFilingsOperation(
@@ -379,6 +396,24 @@ test("sec filings internals build EDGAR URLs and parse simple tables", () => {
       cik: "0001065280",
       accessionNumber: "0001065280-25-000044",
     }
+  )
+  assert.equal(
+    __secFilingsTestInternals.parseSecArchiveUrl(
+      "https://example.com/Archives/edgar/data/1065280/000106528025000044/wrong.htm"
+    ),
+    null
+  )
+  assert.equal(
+    __secFilingsTestInternals.parseSecArchiveUrl(
+      "http://www.sec.gov/Archives/edgar/data/1065280/000106528025000044/wrong.htm"
+    ),
+    null
+  )
+  assert.equal(
+    __secFilingsTestInternals.parseSecArchiveUrl(
+      "https://www.sec.gov/Archives/edgar/data/1065280/000106528025000044/nested/wrong.htm"
+    ),
+    null
   )
 
   assert.deepEqual(
