@@ -454,6 +454,50 @@ test("agent route injects financial services workflow and uses finance runtime",
   assert.equal(recorded.streamCalls[0]?.runtimeProfile, "finance_analysis")
 })
 
+test("agent route routes research-mode finance prompts through finance runtime", async () => {
+  process.env.AGENT_FINANCE_WORKFLOWS_ENABLED = "true"
+
+  setTestMocks({
+    agentRoute: {
+      ...getTestMocks().agentRoute,
+      parseAgentStreamRequest({ body }) {
+        return {
+          parsedRequest: {
+            messages: body.messages,
+            runMode: "research",
+          },
+          selectedModel: "openai/gpt-5.5",
+        }
+      },
+    },
+  })
+
+  const response = await POST(
+    createRequest({
+      json: async () => ({
+        messages: [
+          {
+            role: "user",
+            content: "Find the latest 10-K and extract the repurchase table.",
+          },
+        ],
+      }),
+    })
+  )
+
+  assert.equal(response.status, 200)
+  assert.equal(
+    recorded.buildInstructionCalls[0]?.context.taskMode,
+    "finance_analysis"
+  )
+  assert.equal(
+    recorded.buildInstructionCalls[0]?.context.financialServicesWorkflow
+      ?.workflow,
+    "filing_research"
+  )
+  assert.equal(recorded.streamCalls[0]?.runtimeProfile, "finance_analysis")
+})
+
 test("agent route skips long-term memory work when memory is disabled", async () => {
   setTestMocks({
     agentRoute: {

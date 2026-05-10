@@ -2,7 +2,7 @@
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { runFixtureEval, writeEvalResult } from "./harness.mjs"
+import { runFixtureEval, runLiveEval, writeEvalResult } from "./harness.mjs"
 
 const evalDir = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(evalDir, "../..")
@@ -25,6 +25,7 @@ const inputPath = path.resolve(
   repoRoot,
   getArg("--input", "evals/finance/tasks/internal.jsonl")
 )
+const mode = getArg("--mode", "fixture")
 const resultsDir = path.resolve(
   repoRoot,
   process.env.AGENT_EVAL_RESULTS_DIR ||
@@ -35,7 +36,17 @@ const outputPath = path.join(
   `finance-eval-${new Date().toISOString().replace(/[:.]/g, "-")}.json`
 )
 
-const result = await runFixtureEval({ inputPath })
+const result =
+  mode === "live"
+    ? await runLiveEval({
+        inputPath,
+        model: getArg("--model", undefined),
+        userTimeZone: getArg("--timezone", "America/New_York"),
+        offset: Number(getArg("--offset", "0")),
+        limit: Number(getArg("--limit", String(Number.MAX_SAFE_INTEGER))),
+        taskTimeoutMs: Number(getArg("--task-timeout-ms", "180000")),
+      })
+    : await runFixtureEval({ inputPath })
 await writeEvalResult(result, outputPath)
 
 console.log(

@@ -145,6 +145,53 @@ function appendMissingSourcesToTimeline(
   ]
 }
 
+function isToolLikeEntry(
+  entry: ActivityTimelineEntry
+): entry is Extract<ActivityTimelineEntry, { kind: "tool" | "search" }> {
+  return entry.kind === "tool" || entry.kind === "search"
+}
+
+function getToolRecoveryKey(
+  entry: Extract<ActivityTimelineEntry, { kind: "tool" | "search" }>
+): string {
+  const label = entry.kind === "search" ? entry.query : entry.label
+  return [
+    entry.kind,
+    entry.toolName,
+    entry.operation ?? "",
+    label.trim().toLowerCase(),
+  ].join("\u0000")
+}
+
+function omitSupersededToolErrors(
+  timeline: ActivityTimelineEntry[]
+): ActivityTimelineEntry[] {
+  const successfulToolKeys = new Set<string>()
+  const nextTimeline: ActivityTimelineEntry[] = []
+
+  for (let index = timeline.length - 1; index >= 0; index -= 1) {
+    const entry = timeline[index]
+    if (!entry) {
+      continue
+    }
+
+    if (isToolLikeEntry(entry)) {
+      const key = getToolRecoveryKey(entry)
+      if (entry.status === "error" && successfulToolKeys.has(key)) {
+        continue
+      }
+
+      if (entry.status === "success") {
+        successfulToolKeys.add(key)
+      }
+    }
+
+    nextTimeline.push(entry)
+  }
+
+  return nextTimeline.reverse()
+}
+
 export function normalizeAssistantActivityTimeline(
   message: Message
 ): ActivityTimelineEntry[] {
@@ -212,7 +259,7 @@ export function normalizeAssistantActivityTimeline(
       }, [])
 
     return appendMissingSourcesToTimeline(
-      normalizedTimeline,
+      omitSupersededToolErrors(normalizedTimeline),
       dedupedSources,
       message.createdAt
     )
@@ -275,7 +322,7 @@ export function normalizeAssistantActivityTimeline(
   }
 
   return appendMissingSourcesToTimeline(
-    fallback,
+    omitSupersededToolErrors(fallback),
     dedupedSources,
     message.createdAt
   )

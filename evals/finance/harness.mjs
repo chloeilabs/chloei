@@ -38,8 +38,38 @@ function countMarkdownLinks(text) {
   return [...text.matchAll(/\[[^\]]+\]\(<?(https?:\/\/[^)>"]+)/g)].length
 }
 
+const TERM_ALIASES = new Map([
+  ["january", ["jan", "jan."]],
+  ["february", ["feb", "feb."]],
+  ["march", ["mar", "mar."]],
+  ["april", ["apr", "apr."]],
+  ["august", ["aug", "aug."]],
+  ["september", ["sep", "sept", "sep.", "sept."]],
+  ["october", ["oct", "oct."]],
+  ["november", ["nov", "nov."]],
+  ["december", ["dec", "dec."]],
+])
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+function includesAlias(text, alias) {
+  return new RegExp(`(^|[^a-z])${escapeRegExp(alias)}([^a-z]|$)`, "i").test(
+    text
+  )
+}
+
 function includesTerm(text, term) {
-  return text.toLowerCase().includes(String(term).toLowerCase())
+  const normalizedTerm = String(term).toLowerCase()
+  const normalizedText = text.toLowerCase()
+  if (normalizedText.includes(normalizedTerm)) {
+    return true
+  }
+
+  return (TERM_ALIASES.get(normalizedTerm) ?? []).some((alias) =>
+    includesAlias(text, alias)
+  )
 }
 
 function hasRequiredTool(toolCalls, toolName) {
@@ -79,6 +109,140 @@ function getNumericValue(output, key) {
 
   const value = values[key]
   return typeof value === "number" && Number.isFinite(value) ? value : null
+}
+
+function parseNumberToken(value) {
+  const normalized = String(value ?? "")
+    .replace(/[$,]/g, "")
+    .trim()
+  if (!normalized) {
+    return null
+  }
+
+  const isPercent = normalized.endsWith("%")
+  const parsed = Number.parseFloat(normalized.replace(/%$/, ""))
+  if (!Number.isFinite(parsed)) {
+    return null
+  }
+
+  return isPercent ? parsed / 100 : parsed
+}
+
+function getKeyTerms(key) {
+  return String(key)
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .split(/[^A-Za-z0-9]+/g)
+    .map((part) => part.trim().toLowerCase())
+    .filter((part) => part.length >= 3)
+}
+
+export function extractExpectedNumericValues(task, text) {
+  const values = {}
+  const normalizedText = normalizeText(text)
+  for (const expectation of task.expectedNumbers ?? []) {
+    const key = expectation.key
+    const terms = getKeyTerms(key)
+    if (terms.length === 0) {
+      continue
+    }
+
+    const numberPattern = /[-+]?\$?[\d,]+(?:\.\d+)?%?/g
+    let bestCandidate = null
+    for (const match of normalizedText.matchAll(numberPattern)) {
+      const index = match.index ?? 0
+      const before = normalizedText
+        .slice(Math.max(0, index - 120), index)
+        .toLowerCase()
+      const after = normalizedText
+        .slice(index + match[0].length, index + match[0].length + 40)
+        .toLowerCase()
+      const context = `${before} ${after}`
+      if (!terms.every((term) => context.includes(term))) {
+        continue
+      }
+
+      const parsedValue = parseNumberToken(match[0])
+      if (parsedValue === null) {
+        continue
+      }
+
+      const beforeHasAllTerms = terms.every((term) => before.includes(term))
+      const afterHasAllTerms = terms.every((term) => after.includes(term))
+      const furthestBeforeDistance = Math.max(
+        ...terms.map((term) => {
+          const termIndex = before.lastIndexOf(term)
+          return termIndex >= 0 ? before.length - termIndex : 120
+        })
+      )
+      const nearestAfterDistance = Math.min(
+        ...terms.map((term) => {
+          const termIndex = after.indexOf(term)
+          return termIndex >= 0 ? termIndex : 40
+        })
+      )
+      const score =
+        (beforeHasAllTerms ? 1_000 : 0) +
+        (afterHasAllTerms ? 500 : 0) -
+        (beforeHasAllTerms ? furthestBeforeDistance : nearestAfterDistance)
+
+      if (!bestCandidate || score > bestCandidate.score) {
+        bestCandidate = {
+          value: parsedValue,
+          score,
+        }
+      }
+    }
+
+    if (bestCandidate) {
+      values[key] = bestCandidate.value
+    }
+  }
+
+  return values
+}
+
+function mergeArtifactManifests(toolCalls) {
+  const artifactsByPath = new Map()
+  for (const call of toolCalls) {
+    for (const artifact of call.artifactManifest ?? []) {
+      const artifactPath = String(artifact?.path ?? "")
+      if (!artifactPath) {
+        continue
+      }
+
+      const current = artifactsByPath.get(artifactPath)
+      if (!current || (artifact.sizeBytes ?? 0) > (current.sizeBytes ?? 0)) {
+        artifactsByPath.set(artifactPath, artifact)
+      }
+    }
+  }
+
+  return [...artifactsByPath.values()]
+}
+
+export function buildLiveFinanceEvalOutput({
+  task,
+  text,
+  toolCalls,
+  sources,
+  startedAt,
+  model,
+}) {
+  const artifacts = mergeArtifactManifests(toolCalls)
+  const latencyMs = Date.now() - startedAt
+
+  return {
+    text: normalizeText(text),
+    toolCalls,
+    sources,
+    values: extractExpectedNumericValues(task, text),
+    artifacts,
+    latencyMs,
+    cost: {
+      model,
+      estimatedUsd: null,
+    },
+  }
 }
 
 export function gradeFinanceOutput(task, outputCandidate) {
@@ -171,6 +335,171 @@ export async function runFixtureEval(params) {
     inputPath: params.inputPath,
     generatedAt: new Date().toISOString(),
     summary,
+    results,
+  }
+}
+
+export async function runLiveEval(params) {
+  const tasks = await loadJsonl(params.inputPath)
+  const apiKey = process.env.AI_GATEWAY_API_KEY?.trim()
+  if (!apiKey) {
+    throw new Error("Missing AI_GATEWAY_API_KEY for live finance eval mode.")
+  }
+
+  await import("./register-ts-hooks.mjs")
+  const { startAgentRuntimeStream } =
+    await import("../../src/lib/server/llm/agent-runtime.ts")
+  const { buildAgentSystemInstruction } =
+    await import("../../src/lib/server/agent-context.ts")
+  const { resolvePromptProvider } =
+    await import("../../src/lib/server/agent-prompt-steering.ts")
+  const { resolveFinancialServicesWorkflow } =
+    await import("../../src/lib/server/financial-services-workflows.ts")
+  const { withAiSdkInlineCitationInstruction } =
+    await import("../../src/lib/server/llm/system-instruction-augmentations.ts")
+
+  const model = params.model ?? "moonshotai/kimi-k2.6"
+  const limit = Math.max(
+    1,
+    Math.min(tasks.length, params.limit ?? tasks.length)
+  )
+  const selectedTasks = tasks.slice(
+    params.offset ?? 0,
+    (params.offset ?? 0) + limit
+  )
+  const results = []
+
+  for (const task of selectedTasks) {
+    const startedAt = Date.now()
+    const messages = [{ role: "user", content: task.prompt }]
+    const provider = resolvePromptProvider(model)
+    const financialServicesWorkflow = resolveFinancialServicesWorkflow({
+      messages,
+      taskMode: "finance_analysis",
+      tools: {
+        fmpEnabled: Boolean(process.env.FMP_API_KEY?.trim()),
+        tavilyEnabled: Boolean(process.env.TAVILY_API_KEY?.trim()),
+        fredEnabled: Boolean(process.env.FRED_API_KEY?.trim()),
+        secUserAgentConfigured: Boolean(process.env.SEC_API_USER_AGENT?.trim()),
+      },
+    })
+    const systemInstruction = withAiSdkInlineCitationInstruction(
+      buildAgentSystemInstruction(
+        {
+          id: "finance-eval-runner",
+          name: "Chloei Finance Eval Runner",
+          email: "eval@example.com",
+        },
+        {
+          now: new Date(),
+          userTimeZone: params.userTimeZone,
+          provider,
+          taskMode: "finance_analysis",
+          ...(financialServicesWorkflow ? { financialServicesWorkflow } : {}),
+        }
+      ),
+      {
+        fmpEnabled: Boolean(process.env.FMP_API_KEY?.trim()),
+      }
+    )
+    const toolCalls = []
+    const toolCallsById = new Map()
+    const sources = []
+    let text = ""
+    let status = "completed"
+    let error
+
+    try {
+      const signal = AbortSignal.timeout(params.taskTimeoutMs ?? 180_000)
+      for await (const event of startAgentRuntimeStream({
+        model,
+        aiGatewayApiKey: apiKey,
+        tavilyApiKey: process.env.TAVILY_API_KEY,
+        fmpApiKey: process.env.FMP_API_KEY,
+        fredApiKey: process.env.FRED_API_KEY,
+        secUserAgent: process.env.SEC_API_USER_AGENT,
+        userTimeZone: params.userTimeZone,
+        runtimeProfile: "finance_analysis",
+        messages,
+        systemInstruction,
+        signal,
+      })) {
+        if (event.type === "text_delta") {
+          text += event.delta
+          continue
+        }
+
+        if (event.type === "source") {
+          sources.push(event.source)
+          continue
+        }
+
+        if (event.type === "tool_call") {
+          const call = {
+            callId: event.callId,
+            toolName: event.toolName,
+            label: event.label,
+            ...(event.query ? { query: event.query } : {}),
+            ...(event.operation ? { operation: event.operation } : {}),
+            ...(event.provider ? { provider: event.provider } : {}),
+            status: "running",
+          }
+          toolCalls.push(call)
+          toolCallsById.set(event.callId, call)
+          continue
+        }
+
+        if (event.type === "tool_result") {
+          const call = toolCallsById.get(event.callId)
+          if (!call) {
+            continue
+          }
+          call.status = event.status
+          if (event.durationMs !== undefined) {
+            call.durationMs = event.durationMs
+          }
+          if (event.errorCode) {
+            call.errorCode = event.errorCode
+          }
+          if (event.retryable !== undefined) {
+            call.retryable = event.retryable
+          }
+          if (event.artifactManifest) {
+            call.artifactManifest = event.artifactManifest
+          }
+        }
+      }
+    } catch (caught) {
+      status = "failed"
+      error = caught instanceof Error ? caught.message : String(caught)
+    }
+
+    const output = buildLiveFinanceEvalOutput({
+      task,
+      text,
+      toolCalls,
+      sources,
+      startedAt,
+      model,
+    })
+
+    results.push({
+      taskId: task.id,
+      category: task.category,
+      status,
+      ...(error ? { error } : {}),
+      output,
+      grade: gradeFinanceOutput(task, output),
+    })
+  }
+
+  return {
+    mode: "live",
+    inputPath: params.inputPath,
+    generatedAt: new Date().toISOString(),
+    model,
+    runtimeProfile: "finance_analysis",
+    summary: summarizeResults(results),
     results,
   }
 }

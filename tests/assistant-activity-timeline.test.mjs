@@ -264,3 +264,87 @@ test("normalizeAssistantActivityTimeline appends missing sources after legacy fa
     },
   ])
 })
+
+test("normalizeAssistantActivityTimeline hides tool errors superseded by a later success", () => {
+  const timeline = normalizeAssistantActivityTimeline({
+    id: "assistant-recovered-tool",
+    role: "assistant",
+    content: "",
+    llmModel: "moonshotai/kimi-k2.6",
+    createdAt: "2026-04-20T12:00:00.000Z",
+    metadata: {
+      activityTimeline: [
+        {
+          id: "tool-error",
+          kind: "tool",
+          order: 0,
+          createdAt: "2026-04-20T12:00:00.000Z",
+          callId: "call-1",
+          toolName: "sec_filings",
+          label: "Extracting SEC filing tables",
+          operation: "table_extract",
+          status: "error",
+          errorCode: "INVALID_INPUT",
+        },
+        {
+          id: "tool-success",
+          kind: "tool",
+          order: 1,
+          createdAt: "2026-04-20T12:00:01.000Z",
+          callId: "call-2",
+          toolName: "sec_filings",
+          label: "Extracting SEC filing tables",
+          operation: "table_extract",
+          status: "success",
+        },
+      ],
+    },
+  })
+
+  assert.deepEqual(
+    timeline.map((entry) => entry.id),
+    ["tool-success"]
+  )
+})
+
+test("normalizeAssistantActivityTimeline keeps unresolved tool errors visible", () => {
+  const timeline = normalizeAssistantActivityTimeline({
+    id: "assistant-unresolved-tool",
+    role: "assistant",
+    content: "",
+    llmModel: "moonshotai/kimi-k2.6",
+    createdAt: "2026-04-20T12:00:00.000Z",
+    metadata: {
+      activityTimeline: [
+        {
+          id: "tool-error",
+          kind: "tool",
+          order: 0,
+          createdAt: "2026-04-20T12:00:00.000Z",
+          callId: "call-1",
+          toolName: "sec_filings",
+          label: "Extracting SEC filing section",
+          operation: "section_extract",
+          status: "error",
+          errorCode: "SEC_SECTION_NOT_FOUND",
+        },
+        {
+          id: "other-tool-success",
+          kind: "tool",
+          order: 1,
+          createdAt: "2026-04-20T12:00:01.000Z",
+          callId: "call-2",
+          toolName: "sec_filings",
+          label: "Retrieving SEC filing evidence",
+          operation: "retrieve_information",
+          status: "success",
+        },
+      ],
+    },
+  })
+
+  assert.deepEqual(
+    timeline.map((entry) => entry.id),
+    ["tool-error", "other-tool-success"]
+  )
+})

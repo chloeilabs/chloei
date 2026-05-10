@@ -39,6 +39,11 @@ export function ResearchModeToggle({
     }
   }, [disabled, isResearch, onRunModeChange])
 
+  const baseClass =
+    "px-2 font-normal text-muted-foreground hover:bg-accent focus-visible:border-transparent focus-visible:ring-0"
+  const activeClass =
+    "bg-accent text-foreground hover:bg-accent aria-pressed:bg-accent aria-pressed:text-foreground"
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -48,11 +53,7 @@ export function ResearchModeToggle({
           variant="ghost"
           disabled={disabled}
           aria-pressed={isResearch}
-          className={cn(
-            "px-2 font-normal text-muted-foreground hover:bg-accent focus-visible:border-transparent focus-visible:ring-0",
-            isResearch &&
-              "bg-accent text-foreground hover:bg-accent aria-pressed:bg-accent aria-pressed:text-foreground"
-          )}
+          className={cn(baseClass, isResearch && activeClass)}
           onClick={() => {
             onRunModeChange(isResearch ? "chat" : "research")
           }}

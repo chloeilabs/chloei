@@ -98,6 +98,48 @@ test("financial services workflow detection selects market research", () => {
   assert.match(context?.promptBlock ?? "", /Tavily API key: configured/)
 })
 
+test("financial services workflow detection selects filing research for Vals-style retrieval", () => {
+  const context = resolveFinancialServicesWorkflow({
+    messages: [
+      {
+        role: "user",
+        content:
+          "Calculate the % change in total common stock shares repurchased from the latest Netflix 10-K filing table versus the prior year.",
+      },
+    ],
+    taskMode: "finance_analysis",
+    tools: {
+      secUserAgentConfigured: true,
+    },
+  })
+
+  assert.equal(context?.workflow, "filing_research")
+  assert.deepEqual(context?.skillIds, [
+    "filing-researcher",
+    "sec-table-extractor",
+    "evidence-auditor",
+  ])
+  assert.match(context?.promptBlock ?? "", /Skill: filing-researcher/)
+  assert.match(context?.promptBlock ?? "", /use sec_filings/i)
+})
+
+test("financial services workflow detection selects earnings review", () => {
+  const context = resolveFinancialServicesWorkflow({
+    messages: [
+      {
+        role: "user",
+        content:
+          "How did Lam Research revenue compare to management guidance at the midpoint for each 2024 earnings quarter?",
+      },
+    ],
+    taskMode: "finance_analysis",
+  })
+
+  assert.equal(context?.workflow, "earnings_review")
+  assert.match(context?.promptBlock ?? "", /Skill: earnings-reviewer/)
+  assert.match(context?.promptBlock ?? "", /Skill: evidence-auditor/)
+})
+
 test("financial services workflow detection selects pitch materials first", () => {
   const context = resolveFinancialServicesWorkflow({
     messages: [

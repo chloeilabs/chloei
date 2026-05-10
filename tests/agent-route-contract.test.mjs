@@ -142,6 +142,11 @@ test("agent runtime gives supported chat models the same runtime toolset", async
   )
   assert.match(
     runtimeSource,
+    /runtimeProfile\.secFilingsEnabled[\s\S]*createAiSdkSecFilingsTools/,
+    "Expected SEC filing tools to follow the finance runtime profile gate."
+  )
+  assert.match(
+    runtimeSource,
     /createAiSdkCodeExecutionTools\(\{[\s\S]*backend: runtimeProfile\.codeExecutionBackend/,
     "Expected code execution tools to be created for all chat models."
   )

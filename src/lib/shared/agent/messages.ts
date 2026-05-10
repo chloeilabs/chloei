@@ -16,6 +16,7 @@ export const TOOL_NAMES = [
   "knowledge_search",
   "browser_research",
   "finance_data",
+  "sec_filings",
   "fmp_mcp",
 ] as const
 export type ToolName = (typeof TOOL_NAMES)[number]

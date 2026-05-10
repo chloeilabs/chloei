@@ -1,6 +1,6 @@
 # Chloei
 
-Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently exposes a curated model selector with Kimi K2.6 and DeepSeek V4 Pro, uses GPT-5.5 only for deep research runs, and offers private Blob-backed file attachments, local code execution, optional Tavily retrieval, optional governed Upstash Search knowledge retrieval, optional Browserbase dynamic browsing, optional Inngest jobs, optional Financial Modeling Prep MCP tools, optional self-hosted Mem0 long-term memory, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
+Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently exposes a curated model selector with Kimi K2.6 and DeepSeek V4 Pro, uses GPT-5.5 only for deep research runs, and offers private Blob-backed file attachments, local code execution, optional Tavily retrieval, optional governed Upstash Search knowledge retrieval, optional Browserbase dynamic browsing, optional Inngest jobs, normalized finance data, SEC/EDGAR filing retrieval, optional Financial Modeling Prep MCP tools, optional self-hosted Mem0 long-term memory, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
 
 ## Requirements
 
@@ -41,7 +41,9 @@ To enable auth locally, provision PostgreSQL and add:
 - `pnpm test`: run regression tests
 - `pnpm test:smoke`: run opt-in Playwright browser smoke tests against `SMOKE_BASE_URL`
 - `pnpm test:smoke:mock`: run the credential-free mocked Playwright smoke test used by CI
-- `pnpm eval:finance`: run the finance benchmark harness
+- `pnpm eval:finance`: run the finance benchmark harness in fixture mode
+- `pnpm eval:finance -- --mode live`: run the live finance-agent harness against AI Gateway
+- `pnpm eval:finance:live`: run the live public-markets finance acceptance suite
 - `pnpm eval:finance:grade`: grade finance benchmark outputs
 - `pnpm eval:finance:braintrust`: publish finance grade signals to Braintrust
 - `pnpm lint`: run blocking ESLint checks
@@ -59,7 +61,7 @@ To enable auth locally, provision PostgreSQL and add:
 5. Merge to `main` after the preview passes, then confirm production is aliased to [chloei.ai](https://chloei.ai).
 6. Run one authenticated production smoke test: sign in, load models, send a prompt, and verify an existing thread still reopens cleanly.
 
-Managed integration rollout, rollback, and smoke-test steps live in [docs/managed-integrations-rollout.md](docs/managed-integrations-rollout.md).
+Managed integration rollout, rollback, and smoke-test steps live in [docs/managed-integrations-rollout.md](docs/managed-integrations-rollout.md). Public-markets finance answer quality checks live in [docs/finance-research-quality.md](docs/finance-research-quality.md).
 
 ## Environment
 
@@ -87,6 +89,7 @@ Optional variables let you override the built-in safe defaults for message limit
 - `FMP_API_KEY`: enables curated Financial Modeling Prep MCP tools for structured finance data
 - `FRED_API_KEY`: enables macro/rates series through the normalized `finance_data` tool
 - `SEC_API_USER_AGENT`: identifies Chloei for SEC public company-facts requests
+- `AGENT_FINANCE_TOOL_MAX_STEPS`: max tool steps for finance-analysis runs, defaulting to 20
 - `MEMORY_PROVIDER=mem0`: enables long-term memory through a separate self-hosted Mem0 OSS REST server. The default is `disabled`.
 - `MEM0_API_URL`: Mem0 REST API origin, defaulting to `http://localhost:8888`. Use `https://api.mem0.ai` for Mem0 Platform keys.
 - `MEM0_API_KEY`: Mem0 key value. Self-hosted OSS uses `X-API-Key`; Mem0 Platform uses `Authorization: Token ...`.
@@ -117,9 +120,10 @@ By default, Chloei enforces safe built-in agent limits even if you leave all opt
 - PostHog is used for coarse product analytics and rollout analysis only when `analytics.posthog.enabled` or `POSTHOG_ANALYTICS_ENABLED` is on, and server-side capture remains internal-user gated by default. Do not capture prompt text, model output, uploaded filenames, blob paths, document hashes, emails, account data, or credentials in PostHog events.
 - `POST /api/jobs/report` accepts an optional client-generated `reportId` UUID for retry idempotency. Idempotency keys must use report/thread identifiers, not prompt text or document contents.
 - `finance_data` normalizes finance operations across FMP, SEC public company facts, and optional FRED macro/rates data. FMP MCP remains available as a migration compatibility path for chat-default runs.
+- `sec_filings` is available when a normal chat or Research request is inferred as finance-analysis work, covering SEC/EDGAR company lookup, filing search, full filing fetches, section extraction, table extraction, and targeted retrieval over filing text.
 - Long-term memory is opt-in and best effort. When `MEMORY_PROVIDER=mem0`, Chloei retrieves user-scoped memories before each agent run and writes the latest user/assistant turn after meaningful completed or incomplete responses. Memory failures never block chat. Self-hosted OSS and Mem0 Platform are both supported through `MEM0_API_URL`; Platform mode uses a private per-user `app_id` scope for reliable retrieval.
 - Run Mem0 separately with its REST API and dashboard. For a low-friction shared provider setup, configure Mem0's OpenAI-compatible LLM/embedder through Vercel AI Gateway with `OPENAI_BASE_URL=https://ai-gateway.vercel.sh/v1`, `OPENAI_API_KEY=$AI_GATEWAY_API_KEY`, `openai/text-embedding-3-small` for embeddings, and a low-cost GPT model for memory extraction. Prefer private networking and HTTPS outside local development.
-- Finance eval fixtures and GDPval-style harness scripts live in `evals/finance`.
+- Finance eval fixtures, the live public-markets acceptance suite, live-agent eval mode, and GDPval-style harness scripts live in `evals/finance`.
 - To share logins with another Chloei app, point both apps at the same Better Auth database and secret, set `BETTER_AUTH_COOKIE_DOMAIN` to the shared parent domain, and include every live subdomain in `BETTER_AUTH_TRUSTED_ORIGINS`.
 - Rate limiting and concurrency protection are PostgreSQL-backed when `DATABASE_URL` is configured. Local/no-database runs fall back to in-memory limits unless `AGENT_RATE_LIMIT_STORE=postgres` is set.
 - App storage does not self-initialize on live requests. Vercel deployments in this repo run `pnpm migrate` before `next build`.
