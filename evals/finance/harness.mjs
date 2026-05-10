@@ -43,6 +43,9 @@ const TERM_ALIASES = new Map([
   ["february", ["feb", "feb."]],
   ["march", ["mar", "mar."]],
   ["april", ["apr", "apr."]],
+  ["may", ["may."]],
+  ["june", ["jun", "jun."]],
+  ["july", ["jul", "jul."]],
   ["august", ["aug", "aug."]],
   ["september", ["sep", "sept", "sep.", "sept."]],
   ["october", ["oct", "oct."]],
@@ -311,6 +314,24 @@ export function gradeFinanceOutput(task, outputCandidate) {
   }
 }
 
+function gradeIncompleteFinanceRun(task, outputCandidate) {
+  const grade = gradeFinanceOutput(task, outputCandidate)
+  return {
+    ...grade,
+    score: 0,
+    maxScore: grade.maxScore + 1,
+    pass: false,
+    checks: [
+      ...grade.checks.map((check) => ({ ...check, passed: false })),
+      {
+        id: "run_status",
+        passed: false,
+        score: 1,
+      },
+    ],
+  }
+}
+
 export async function runFixtureEval(params) {
   const tasks = await loadJsonl(params.inputPath)
   const results = tasks.map((task) => {
@@ -400,6 +421,7 @@ export async function runLiveEval(params) {
       ),
       {
         fmpEnabled: Boolean(process.env.FMP_API_KEY?.trim()),
+        secFilingsEnabled: true,
       }
     )
     const toolCalls = []
@@ -483,13 +505,18 @@ export async function runLiveEval(params) {
       model,
     })
 
+    const grade =
+      status === "completed"
+        ? gradeFinanceOutput(task, output)
+        : gradeIncompleteFinanceRun(task, output)
+
     results.push({
       taskId: task.id,
       category: task.category,
       status,
       ...(error ? { error } : {}),
       output,
-      grade: gradeFinanceOutput(task, output),
+      grade,
     })
   }
 

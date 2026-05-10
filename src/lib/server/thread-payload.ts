@@ -87,6 +87,7 @@ const toolActivityTimelineEntrySchema = z
     callId: z.string().trim().min(1).max(200).nullable(),
     toolName: TOOL_NAME_SCHEMA,
     label: z.string().trim().min(1).max(500),
+    query: z.string().trim().min(1).max(10_000).optional(),
     status: TOOL_INVOCATION_STATUS_SCHEMA,
     ...toolRunMetadataSchema,
   })

@@ -455,9 +455,7 @@ export function PromptForm({
         (event.metaKey || event.ctrlKey)
       ) {
         event.preventDefault()
-        setRunMode((currentRunMode) =>
-          currentRunMode === "research" ? "chat" : "research"
-        )
+        handleSetRunMode("research")
       }
     }
 
@@ -465,7 +463,7 @@ export function PromptForm({
     return () => {
       window.removeEventListener("keydown", handleResearchShortcut)
     }
-  }, [isFormPending])
+  }, [handleSetRunMode, isFormPending])
 
   const isSubmitButtonDisabled =
     isFormPending ||
@@ -683,7 +681,7 @@ export function PromptForm({
                   aria-pressed="true"
                   className="bg-accent px-2 font-normal text-foreground hover:bg-accent focus-visible:border-transparent focus-visible:ring-0"
                   onClick={() => {
-                    setRunMode("chat")
+                    handleSetRunMode("research")
                   }}
                 >
                   <Telescope className="size-3.5" />

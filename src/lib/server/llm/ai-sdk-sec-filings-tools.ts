@@ -1608,10 +1608,23 @@ export function getAiSdkSecFilingsToolCallMetadata(
 
   const inputRecord = asRecord(part.input)
   const operation = toOptionalString(inputRecord?.operation)
-  const query =
-    toOptionalString(inputRecord?.query) ??
-    toOptionalString(inputRecord?.symbol) ??
-    toOptionalString(inputRecord?.cik)
+  const directUrl = toOptionalString(inputRecord?.url)
+  const parsedUrl = directUrl ? parseSecArchiveUrl(directUrl) : null
+  const forms = Array.isArray(inputRecord?.forms)
+    ? inputRecord.forms.map(toOptionalString).filter(Boolean).join(",")
+    : undefined
+  const query = [
+    toOptionalString(inputRecord?.query),
+    toOptionalString(inputRecord?.item),
+    toOptionalString(inputRecord?.accessionNumber) ??
+      parsedUrl?.accessionNumber,
+    toOptionalString(inputRecord?.primaryDocument),
+    toOptionalString(inputRecord?.symbol),
+    toOptionalString(inputRecord?.cik),
+    forms,
+  ]
+    .filter((value): value is string => Boolean(value))
+    .join(" | ")
 
   return {
     callId: part.toolCallId,

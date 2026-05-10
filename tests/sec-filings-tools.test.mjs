@@ -346,7 +346,7 @@ test("sec filings metadata maps tool call and result events", () => {
     callId: "call-1",
     toolName: "sec_filings",
     label: "Extracting SEC filing tables",
-    query: "repurchases",
+    query: "repurchases | NFLX",
     operation: "table_extract",
     provider: "sec",
   })

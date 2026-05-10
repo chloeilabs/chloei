@@ -155,11 +155,16 @@ function getToolRecoveryKey(
   entry: Extract<ActivityTimelineEntry, { kind: "tool" | "search" }>
 ): string {
   const label = entry.kind === "search" ? entry.query : entry.label
+  const discriminator =
+    entry.kind === "tool" && entry.toolName === "sec_filings"
+      ? (entry.query ?? "").trim().toLowerCase()
+      : ""
   return [
     entry.kind,
     entry.toolName,
     entry.operation ?? "",
     label.trim().toLowerCase(),
+    discriminator,
   ].join("\u0000")
 }
 

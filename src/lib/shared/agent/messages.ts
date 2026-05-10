@@ -90,6 +90,7 @@ export interface ToolActivityTimelineEntry extends ActivityTimelineBaseEntry {
   callId: string | null
   toolName: ToolName
   label: string
+  query?: string
   status: ToolInvocationStatus
   operation?: string
   provider?: string

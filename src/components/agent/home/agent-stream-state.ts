@@ -394,6 +394,7 @@ function upsertToolTimelineFromCall(
     return updated
   }
 
+  const toolQuery = event.query?.trim()
   const existingIndex =
     event.callId !== null
       ? current.findIndex(
@@ -419,6 +420,7 @@ function upsertToolTimelineFromCall(
       callId: event.callId,
       toolName: event.toolName,
       label: event.label,
+      ...(toolQuery ? { query: toolQuery } : {}),
       ...getToolRunMetadata(event),
       status: "running",
     }
@@ -441,6 +443,9 @@ function upsertToolTimelineFromCall(
     callId: event.callId,
     toolName: event.toolName,
     label: event.label,
+    ...((toolQuery ?? existing.query)
+      ? { query: toolQuery ?? existing.query }
+      : {}),
     ...getToolRunMetadata(event),
     status: nextStatus,
   }

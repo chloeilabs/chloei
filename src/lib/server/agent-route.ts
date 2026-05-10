@@ -242,6 +242,15 @@ function shouldIncludeFinanceToolingInstruction(
   return true
 }
 
+function shouldIncludeSecFilingsToolingInstruction(
+  runtimeProfile: AgentRuntimeProfileId | undefined
+): boolean {
+  return (
+    runtimeProfile === "finance_analysis" ||
+    runtimeProfile === "gdpval_workspace"
+  )
+}
+
 function isProviderAuthenticationError(error: unknown): boolean {
   const record = asRecord(error)
   const status =
@@ -856,6 +865,9 @@ export function createAgentStreamResponse(
                 params.runtimeProfile
               ),
               fmpEnabled: Boolean(params.fmpApiKey?.trim()),
+              secFilingsEnabled: shouldIncludeSecFilingsToolingInstruction(
+                params.runtimeProfile
+              ),
             }
           ),
           signal: streamSignal,

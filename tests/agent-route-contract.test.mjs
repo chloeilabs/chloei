@@ -55,7 +55,7 @@ test("agent route streams through the extracted AI Gateway helper path", async (
 
   assert.match(
     helperSource,
-    /withAiSdkInlineCitationInstruction\(\s*params\.systemInstruction,\s*\{[\s\S]*financeEnabled: shouldIncludeFinanceToolingInstruction\([\s\S]*fmpEnabled: Boolean\(params\.fmpApiKey\?\.trim\(\)\),[\s\S]*\}\s*\)/,
+    /withAiSdkInlineCitationInstruction\(\s*params\.systemInstruction,\s*\{[\s\S]*financeEnabled: shouldIncludeFinanceToolingInstruction\([\s\S]*fmpEnabled: Boolean\(params\.fmpApiKey\?\.trim\(\)\),[\s\S]*secFilingsEnabled: shouldIncludeSecFilingsToolingInstruction\([\s\S]*\}\s*\)/,
     "Expected the helper to pass finance tooling augmentation options."
   )
 

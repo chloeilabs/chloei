@@ -42,10 +42,10 @@ test("finance eval grader accepts standard month abbreviations", () => {
   const grade = gradeFinanceOutput(
     {
       id: "month-abbreviation-task",
-      expectedTerms: ["October", "November", "December"],
+      expectedTerms: ["June", "July", "October", "November", "December"],
     },
     {
-      text: "The table covers Oct 1-31, Nov 1-30, and Dec 1-31.",
+      text: "The table covers Jun. 1-30, Jul 1-31, Oct 1-31, Nov 1-30, and Dec 1-31.",
     }
   )
 

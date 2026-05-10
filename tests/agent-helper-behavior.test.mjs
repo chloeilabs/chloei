@@ -800,6 +800,7 @@ test("agent helper streams fallback output when the model yields no content", as
     options: {
       financeEnabled: true,
       fmpEnabled: true,
+      secFilingsEnabled: false,
     },
   })
 })
