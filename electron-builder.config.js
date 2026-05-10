@@ -75,6 +75,9 @@ module.exports = {
     output: "dist/desktop",
   },
   disableDefaultIgnoredFiles: true,
+  dmg: {
+    sign: shouldSignMac,
+  },
   extraMetadata: {
     main: "electron/main.cjs",
   },
