@@ -123,6 +123,28 @@ test("financial services workflow detection selects filing research for Vals-sty
   assert.match(context?.promptBlock ?? "", /use sec_filings/i)
 })
 
+test("financial services workflow detection falls back when SEC filing retrieval is unavailable", () => {
+  const context = resolveFinancialServicesWorkflow({
+    messages: [
+      {
+        role: "user",
+        content:
+          "Find the latest 10-K and extract the issuer purchases filing table.",
+      },
+    ],
+    taskMode: "finance_analysis",
+    tools: {
+      secUserAgentConfigured: false,
+      tavilyEnabled: true,
+    },
+  })
+
+  assert.equal(context?.workflow, "market_research")
+  assert.deepEqual(context?.skillIds, ["market-researcher"])
+  assert.doesNotMatch(context?.promptBlock ?? "", /use sec_filings/i)
+  assert.match(context?.promptBlock ?? "", /filing-retrieval limitations/i)
+})
+
 test("financial services workflow detection selects earnings review", () => {
   const context = resolveFinancialServicesWorkflow({
     messages: [
@@ -138,6 +160,28 @@ test("financial services workflow detection selects earnings review", () => {
   assert.equal(context?.workflow, "earnings_review")
   assert.match(context?.promptBlock ?? "", /Skill: earnings-reviewer/)
   assert.match(context?.promptBlock ?? "", /Skill: evidence-auditor/)
+})
+
+test("financial services workflow detection strips SEC-only earnings skills when SEC is unavailable", () => {
+  const context = resolveFinancialServicesWorkflow({
+    messages: [
+      {
+        role: "user",
+        content:
+          "How did revenue compare to management guidance at the midpoint this quarter?",
+      },
+    ],
+    taskMode: "finance_analysis",
+    tools: {
+      secUserAgentConfigured: false,
+    },
+  })
+
+  assert.equal(context?.workflow, "earnings_review")
+  assert.deepEqual(context?.skillIds, ["earnings-reviewer", "evidence-auditor"])
+  assert.doesNotMatch(context?.promptBlock ?? "", /Skill: filing-researcher/)
+  assert.doesNotMatch(context?.promptBlock ?? "", /Skill: sec-table-extractor/)
+  assert.doesNotMatch(context?.promptBlock ?? "", /use sec_filings/i)
 })
 
 test("financial services workflow detection does not route generic guidance to earnings review", () => {

@@ -48,6 +48,7 @@ const { POST } = await import(routeUrl)
 const originalAiGatewayApiKey = process.env.AI_GATEWAY_API_KEY
 const originalTavilyApiKey = process.env.TAVILY_API_KEY
 const originalFmpApiKey = process.env.FMP_API_KEY
+const originalSecApiUserAgent = process.env.SEC_API_USER_AGENT
 const originalFinanceWorkflowsEnabled =
   process.env.AGENT_FINANCE_WORKFLOWS_ENABLED
 
@@ -109,6 +110,7 @@ beforeEach(() => {
   process.env.AI_GATEWAY_API_KEY = "ai-gateway-key"
   process.env.TAVILY_API_KEY = "tavily-key"
   process.env.FMP_API_KEY = "fmp-key"
+  delete process.env.SEC_API_USER_AGENT
   delete process.env.AGENT_FINANCE_WORKFLOWS_ENABLED
 
   resetTestMocks()
@@ -233,6 +235,11 @@ after(() => {
   process.env.AI_GATEWAY_API_KEY = originalAiGatewayApiKey
   process.env.TAVILY_API_KEY = originalTavilyApiKey
   process.env.FMP_API_KEY = originalFmpApiKey
+  if (originalSecApiUserAgent === undefined) {
+    delete process.env.SEC_API_USER_AGENT
+  } else {
+    process.env.SEC_API_USER_AGENT = originalSecApiUserAgent
+  }
   if (originalFinanceWorkflowsEnabled === undefined) {
     delete process.env.AGENT_FINANCE_WORKFLOWS_ENABLED
   } else {
@@ -456,6 +463,7 @@ test("agent route injects financial services workflow and uses finance runtime",
 
 test("agent route routes research-mode finance prompts through finance runtime", async () => {
   process.env.AGENT_FINANCE_WORKFLOWS_ENABLED = "true"
+  process.env.SEC_API_USER_AGENT = "Chloei tests contact@example.com"
 
   setTestMocks({
     agentRoute: {

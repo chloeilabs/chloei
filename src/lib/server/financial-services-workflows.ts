@@ -237,14 +237,39 @@ function formatAvailability(value: boolean | undefined): string {
   return value ? "configured" : "not configured"
 }
 
+function isSecFilingRetrievalAvailable(
+  tools: FinancialServicesToolAvailability | undefined
+): boolean {
+  return tools?.secUserAgentConfigured === true
+}
+
+function getWorkflowSkillIds(
+  workflow: FinancialServicesWorkflowId,
+  tools: FinancialServicesToolAvailability | undefined
+): readonly FinancialServicesSkillId[] {
+  if (isSecFilingRetrievalAvailable(tools)) {
+    return WORKFLOW_SKILLS[workflow]
+  }
+
+  if (workflow === "earnings_review") {
+    return ["earnings-reviewer", "evidence-auditor"]
+  }
+
+  return WORKFLOW_SKILLS[workflow]
+}
+
 function formatToolAvailability(
   tools: FinancialServicesToolAvailability | undefined
 ): string {
+  const filingRetrievalGuidance = isSecFilingRetrievalAvailable(tools)
+    ? "- Filing retrieval: use sec_filings for EDGAR filing search, full-document fetches, sections, tables, and targeted retrieval."
+    : "- Filing retrieval: dedicated EDGAR retrieval is unavailable without a configured SEC user agent; use finance_data SEC facts or web search where available, and state filing-retrieval limitations clearly."
+
   return [
     "## Chloei Tool Mapping",
     "- Market/company data: use finance_data first.",
     "- Filings/facts: use SEC-backed finance_data when available; cite returned filing/source URLs.",
-    "- Filing retrieval: use sec_filings for EDGAR filing search, full-document fetches, sections, tables, and targeted retrieval.",
+    filingRetrievalGuidance,
     "- Macro/rates: use FRED-backed finance_data when available.",
     "- News/source research: use Tavily or native search when structured tools do not cover the claim.",
     "- Modeling/math/artifacts: use code_execution with the finance backend.",
@@ -295,7 +320,7 @@ export function resolveFinancialServicesWorkflow(
     return null
   }
 
-  const workflow = inferFinancialServicesWorkflow(
+  let workflow = inferFinancialServicesWorkflow(
     `${lastUserMessage}\n\n${normalizeUserText(params.messages)}`,
     params.taskMode
   )
@@ -303,7 +328,14 @@ export function resolveFinancialServicesWorkflow(
     return null
   }
 
-  const skillIds = WORKFLOW_SKILLS[workflow]
+  if (
+    workflow === "filing_research" &&
+    !isSecFilingRetrievalAvailable(params.tools)
+  ) {
+    workflow = "market_research"
+  }
+
+  const skillIds = getWorkflowSkillIds(workflow, params.tools)
   return {
     workflow,
     skillIds: [...skillIds],
