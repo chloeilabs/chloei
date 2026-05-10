@@ -223,6 +223,7 @@ async function runJudge(
     candidateContextMaxChars,
     candidateOutput,
     includeFiles,
+    mode,
     normalizedContextText,
   }
 ) {
@@ -326,7 +327,7 @@ if (normalizedContextDir) {
   }
 }
 
-function pushCompletedResult(task, startedAt, run, fallbackReason) {
+function pushCompletedResult(task, startedAt, run) {
   results.push({
     taskId: task.task_id,
     sector: task.sector,
@@ -338,7 +339,6 @@ function pushCompletedResult(task, startedAt, run, fallbackReason) {
     model: run.response.model,
     rawText: run.text,
     parsed: run.parsed,
-    fallbackReason,
     usage: run.response.usage ?? null,
   })
 }
@@ -398,6 +398,7 @@ for (let index = 0; index < tasks.length; index += 1) {
       candidateContextMaxChars,
       candidateOutput: candidateOutputs.get(task.task_id),
       includeFiles,
+      mode,
       normalizedContextText,
     })
     pushCompletedResult(task, startedAt, run)

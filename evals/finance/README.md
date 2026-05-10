@@ -8,7 +8,7 @@ This directory contains Chloei's finance-agent benchmark harness.
 pnpm eval:finance
 node evals/finance/grade-finance-evals.mjs --outputs evals/finance/results/example.json
 pnpm eval:finance:braintrust -- --grade evals/finance/results/finance-grade.json
-node evals/finance/build-gdpval-manifest.mjs --input gdpval.jsonl
+node evals/finance/build-gdpval-manifest.mjs --input gdpval.jsonl --output evals/finance/results/gdpval-finance-manifest.json
 node evals/finance/judge-gdpval-gateway.mjs --manifest evals/finance/results/gdpval-finance-manifest.json
 ```
 
