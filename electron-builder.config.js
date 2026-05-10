@@ -101,7 +101,7 @@ module.exports = {
   publish: [
     {
       ...(desktopUpdateChannel ? { channel: desktopUpdateChannel } : {}),
-      owner: "chloeilabs",
+      owner: "chloei-labs",
       provider: "github",
       releaseType: "draft",
       repo: "chloei",
