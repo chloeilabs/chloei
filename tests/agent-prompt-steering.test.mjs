@@ -21,10 +21,6 @@ const {
 } = await import(steeringUrl)
 
 test("prompt steering resolves supported model providers", () => {
-  assert.equal(
-    resolvePromptProvider(AvailableModels.ANTHROPIC_CLAUDE_SONNET_4_6),
-    "anthropic"
-  )
   assert.equal(resolvePromptProvider(AvailableModels.OPENAI_GPT_5_5), "openai")
   assert.equal(
     resolvePromptProvider(AvailableModels.MOONSHOTAI_KIMI_K2_6),
@@ -34,55 +30,30 @@ test("prompt steering resolves supported model providers", () => {
     resolvePromptProvider(AvailableModels.DEEPSEEK_V4_PRO),
     "deepseek"
   )
-  assert.equal(resolvePromptProvider(AvailableModels.XAI_GROK_4_3), "xai")
 })
 
-test("prompt steering tells Grok to complete tool-backed news answers", () => {
+test("prompt steering includes provider overlays for supported models", () => {
   const blocks = createPromptSteeringBlocks({
-    provider: "xai",
+    provider: "openai",
     taskMode: "research",
   })
   const overlayText = blocks.map((block) => block.body).join("\n\n")
 
   assert.match(
     overlayText,
-    /complete final response in one pass/,
-    "Expected Grok news and research requests to avoid early final-answer stops."
+    /Use OpenAI reasoning mode efficiently/,
+    "Expected OpenAI prompts to receive the OpenAI provider overlay."
   )
   assert.match(
     overlayText,
-    /Do not stop after the first section/,
-    "Expected Grok to avoid one-section partial news answers."
+    /This request needs deep research/,
+    "Expected research prompts to receive the research task overlay."
   )
 })
 
-test("prompt steering adapts Grok verbosity to detailed requests", () => {
+test("prompt steering keeps finance guidance provider-agnostic", () => {
   const blocks = createPromptSteeringBlocks({
-    provider: "xai",
-    taskMode: "general",
-  })
-  const overlayText = blocks.map((block) => block.body).join("\n\n")
-
-  assert.match(
-    overlayText,
-    /Match the user's requested level of detail/,
-    "Expected Grok to follow long-form detail requests instead of defaulting short."
-  )
-  assert.match(
-    overlayText,
-    /prioritize visible final-answer tokens/,
-    "Expected Grok to preserve visible answer budget on thorough prompts."
-  )
-  assert.doesNotMatch(
-    overlayText,
-    /Keep the final answer concise/,
-    "Expected Grok not to receive an unconditional concise-answer directive."
-  )
-})
-
-test("prompt steering tells Grok finance to use shared tool calling", () => {
-  const blocks = createPromptSteeringBlocks({
-    provider: "xai",
+    provider: "deepseek",
     taskMode: "finance_analysis",
   })
   const overlayText = blocks.map((block) => block.body).join("\n\n")
@@ -90,27 +61,17 @@ test("prompt steering tells Grok finance to use shared tool calling", () => {
   assert.match(
     overlayText,
     /For ordinary public-company quote\/profile requests/,
-    "Expected Grok finance prompts to preserve shared provider-routing rules."
+    "Expected finance prompts to preserve shared provider-routing rules."
   )
   assert.match(
     overlayText,
     /For 10-K\/10-Q prompts/,
-    "Expected Grok finance prompts to preserve shared filing-routing rules."
+    "Expected finance prompts to preserve shared filing-routing rules."
   )
-  assert.match(
-    overlayText,
-    /Additional Grok finance guidance/,
-    "Expected Grok finance prompts to append provider-specific guidance."
-  )
-  assert.match(
+  assert.doesNotMatch(
     overlayText,
     /Return only the user-facing answer/,
-    "Expected Grok finance prompts to suppress visible planning text."
-  )
-  assert.match(
-    overlayText,
-    /synthesize tool results into the final answer/,
-    "Expected Grok finance prompts to synthesize model-driven tool results."
+    "Expected removed provider-specific finance guidance to stay out of supported prompts."
   )
 })
 

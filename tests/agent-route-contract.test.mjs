@@ -121,14 +121,14 @@ test("agent runtime extends the AI Gateway client timeout", async () => {
   )
 })
 
-test("agent runtime gives Grok the same chat toolset as other selected models", async () => {
+test("agent runtime gives supported chat models the same runtime toolset", async () => {
   const runtimeSource = await readFile(runtimePath, "utf8")
   const helperSource = await readFile(helperPath, "utf8")
 
   assert.doesNotMatch(
     runtimeSource,
     /shouldEnableAmbientFinanceTools|shouldEnableCodeExecutionTools|shouldEnableModelToolCalling|shouldPrefetchWebEvidence|shouldPrefetchFinanceEvidence/,
-    "Expected Grok to avoid xAI-specific tool suppression or prefetch branches."
+    "Expected supported chat models to avoid model-specific tool suppression or prefetch branches."
   )
   assert.match(
     runtimeSource,
@@ -157,28 +157,18 @@ test("agent runtime gives Grok the same chat toolset as other selected models", 
   )
   assert.doesNotMatch(
     runtimeSource,
-    /XAI_CHAT_MAX_OUTPUT_TOKENS|resolveMaxOutputTokens|maxOutputTokens/,
-    "Expected Grok chat requests to share the uncapped output budget used by other chat models."
+    /resolveMaxOutputTokens|maxOutputTokens/,
+    "Expected chat requests to share the uncapped output budget used by supported models."
   )
 })
 
-test("agent runtime strips replayed reasoning from Grok tool steps", async () => {
+test("agent runtime does not include removed model step compatibility hooks", async () => {
   const runtimeSource = await readFile(runtimePath, "utf8")
 
-  assert.match(
+  assert.doesNotMatch(
     runtimeSource,
-    /getCompatibleStepMessages\(\s*params\.model,\s*stepMessages\s*\)/,
-    "Expected Grok follow-up steps to receive model-compatible prompt messages."
-  )
-  assert.match(
-    runtimeSource,
-    /from "\.\/agent-runtime-step-messages"/,
-    "Expected replayed reasoning cleanup to live in the runtime step-message helper."
-  )
-  assert.match(
-    runtimeSource,
-    /prepareStep:\s*\(\{[\s\S]*messages: stepMessages,[\s\S]*stepNumber[\s\S]*\}\)[\s\S]*messages: compatibleMessages/,
-    "Expected prepared Grok steps to override only the sanitized messages."
+    /getCompatibleStepMessages|compatibleMessages/,
+    "Expected the runtime to avoid removed model step compatibility code."
   )
 })
 

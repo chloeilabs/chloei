@@ -118,7 +118,7 @@ CREATE TABLE thread (
 
 1. `OPERATING INSTRUCTIONS` — from `DEFAULT_OPERATING_INSTRUCTION` in `src/lib/shared/llm/system-instructions.ts`
 2. `RUNTIME DATE CONTEXT` — current UTC timestamp + user timezone (from `X-User-Timezone` header)
-3. Provider overlay (`PROVIDER OVERLAY: ANTHROPIC`) — Claude-specific reasoning guidance
+3. Provider overlay (`PROVIDER OVERLAY: <PROVIDER>`) — provider-specific reasoning guidance for OpenAI, Kimi, or DeepSeek
 4. Task mode overlay (`TASK MODE OVERLAY: <MODE>`) — mode-specific guidance (see below)
 5. `LONG-TERM MEMORY CAPABILITY` — optional block shown only when Mem0 is fully configured, instructing the model that memory writes are available
 6. `LONG-TERM MEMORY CONTEXT` — optional Mem0-retrieved user memory, treated as context rather than instructions
@@ -187,15 +187,13 @@ Both live in `src/lib/server/rate-limit.ts`. All limits are overridable via `AGE
 
 All available models are defined in `src/lib/shared/llm/models.ts` (`AvailableModels`, `ALL_MODELS`). Current models:
 
-| Key                           | Model ID                      | Display Name      |
-| ----------------------------- | ----------------------------- | ----------------- |
-| `ANTHROPIC_CLAUDE_SONNET_4_6` | `anthropic/claude-sonnet-4.6` | Claude Sonnet 4.6 |
-| `OPENAI_GPT_5_5`              | `openai/gpt-5.5`              | GPT-5.5           |
-| `MOONSHOTAI_KIMI_K2_6`        | `moonshotai/kimi-k2.6`        | Kimi K2.6         |
-| `DEEPSEEK_V4_PRO`             | `deepseek/deepseek-v4-pro`    | DeepSeek V4 Pro   |
-| `XAI_GROK_4_3`                | `xai/grok-4.3`                | Grok 4.3          |
+| Key                    | Model ID                   | Display Name    |
+| ---------------------- | -------------------------- | --------------- |
+| `OPENAI_GPT_5_5`       | `openai/gpt-5.5`           | GPT-5.5         |
+| `MOONSHOTAI_KIMI_K2_6` | `moonshotai/kimi-k2.6`     | Kimi K2.6       |
+| `DEEPSEEK_V4_PRO`      | `deepseek/deepseek-v4-pro` | DeepSeek V4 Pro |
 
-`MODEL_SELECTOR_MODELS` defines the subset shown in the model selector UI (currently Kimi K2.6, DeepSeek V4 Pro, Grok 4.3). Adding a model requires updating `AvailableModels`, `ModelInfos`, `SUPPORTED_MODELS`, and optionally `MODEL_SELECTOR_MODELS` in that file. The `/api/models` route reads from this registry (filtered by configured API keys via `getModels()` in `src/lib/actions/api-keys.ts`); the agent validates the requested model against it.
+`MODEL_SELECTOR_MODELS` defines the subset shown in the model selector UI (currently Kimi K2.6, DeepSeek V4 Pro, and GPT-5.5). Adding a model requires updating `AvailableModels`, `ModelInfos`, `SUPPORTED_MODELS`, and optionally `MODEL_SELECTOR_MODELS` in that file. The `/api/models` route reads from this registry (filtered by configured API keys via `getModels()` in `src/lib/actions/api-keys.ts`); the agent validates the requested model against it.
 
 ### Authentication
 
@@ -265,7 +263,7 @@ src/
         agent-runtime-messages.ts # Agent message preparation and formatting
         ai-sdk-finance-data-tools.ts  # Normalized finance_data tool (FMP, SEC, FRED)
         ai-sdk-fmp-mcp-tools.ts   # FMP MCP client + curated tool wrappers
-        ai-sdk-gateway-search-tools.ts # Native AI Gateway + Anthropic search tools
+        ai-sdk-gateway-provider-options.ts # AI Gateway provider options
         ai-sdk-tavily-tools.ts    # Tavily search/extract tools
         code-execution-tools.ts   # Sandboxed JS/Python execution
         finance-data/             # Finance data provider internals

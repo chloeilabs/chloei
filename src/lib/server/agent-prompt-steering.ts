@@ -7,12 +7,7 @@ import {
   type PromptTextMessage,
 } from "./prompt-message-utils"
 
-export type PromptProvider =
-  | "anthropic"
-  | "deepseek"
-  | "moonshotai"
-  | "openai"
-  | "xai"
+export type PromptProvider = "deepseek" | "moonshotai" | "openai"
 
 export type PromptTaskMode =
   | "general"
@@ -51,15 +46,6 @@ const STRICT_OUTPUT_PATTERN =
   /\b(return only|exactly|exact format|valid json|minified json|last line|single word|one word|single line|one line|two sentences|one sentence|one paragraph|no more than|under \d+ words|no surrounding prose|only one ```|schema|yaml|xml|csv)\b/i
 
 const PROVIDER_OVERLAYS: Record<PromptProvider, string> = {
-  anthropic: `
-Use Claude reasoning mode efficiently.
-- Keep the final answer tighter than the hidden reasoning.
-- Prefer adaptive thinking over unnecessary verbosity.
-- On format-sensitive tasks, do a literal final-format check before finishing.
-- Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
-- Use native web search or other tools only when they materially improve accuracy or freshness.
-- After tool use, synthesize and stop. Do not replay raw tool output.
-`.trim(),
   deepseek: `
 Use DeepSeek reasoning mode efficiently.
 - Keep the final answer concise and grounded in the actual task.
@@ -82,17 +68,6 @@ Use OpenAI reasoning mode efficiently.
 - Prefer direct execution and verification over speculative narration.
 - On format-sensitive tasks, do a literal final-format check before finishing.
 - Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
-- After tool use, synthesize the result and stop. Do not replay raw tool traces.
-`.trim(),
-  xai: `
-Use Grok reasoning mode efficiently.
-- Match the user's requested level of detail. For thorough, detailed, long-form, guide, report, architecture, analysis, or comparison requests, prioritize visible final-answer tokens and write a complete answer with the requested sections and examples instead of compressing to a summary.
-- Prefer direct execution and verification over speculative narration.
-- On format-sensitive tasks, do a literal final-format check before finishing.
-- Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
-- For tool-backed current-events, news, or research answers, write the complete final response in one pass. Do not stop after the first section, source, or example.
-- Keep hidden search planning and tool-use narration out of the final answer.
-- Do not include meta commentary such as "the user asked", "the task is", "I think", confidence macros, or notes about instructions.
 - After tool use, synthesize the result and stop. Do not replay raw tool traces.
 `.trim(),
 }
@@ -156,21 +131,7 @@ This request is high-stakes.
 `.trim(),
 }
 
-const XAI_FINANCE_ANALYSIS_OVERLAY = [
-  TASK_MODE_OVERLAYS.finance_analysis,
-  `
-Additional Grok finance guidance:
-- Cite tool-provided evidence sources when the user asks for sources or current market facts.
-- Return only the user-facing answer. Do not include prompt analysis, planning text, confidence macros, or notes about internal instructions.
-- Stay on the finance task and synthesize tool results into the final answer.
-`.trim(),
-].join("\n\n")
-
 export function resolvePromptProvider(model: ModelType): PromptProvider {
-  if (model.startsWith("anthropic/")) {
-    return "anthropic"
-  }
-
   if (model.startsWith("openai/")) {
     return "openai"
   }
@@ -181,10 +142,6 @@ export function resolvePromptProvider(model: ModelType): PromptProvider {
 
   if (model.startsWith("moonshotai/")) {
     return "moonshotai"
-  }
-
-  if (model.startsWith("xai/")) {
-    return "xai"
   }
 
   throw new Error(`Unsupported model provider for model: ${model}`)
@@ -265,10 +222,7 @@ export function createPromptSteeringBlocks(
   ) {
     blocks.push({
       label: `TASK MODE OVERLAY: ${params.taskMode.toUpperCase()}`,
-      body:
-        params.provider === "xai" && params.taskMode === "finance_analysis"
-          ? XAI_FINANCE_ANALYSIS_OVERLAY
-          : TASK_MODE_OVERLAYS[params.taskMode],
+      body: TASK_MODE_OVERLAYS[params.taskMode],
     })
   }
 

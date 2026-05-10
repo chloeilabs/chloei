@@ -168,7 +168,7 @@ test("agent helper validates total size, last-message role, and default model su
 
   const researchModeResult = parseAgentStreamRequest({
     body: {
-      model: "anthropic/claude-sonnet-4.6",
+      model: "moonshotai/kimi-k2.6",
       runMode: "research",
       messages: [
         {
@@ -177,10 +177,7 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [
-      { id: "anthropic/claude-sonnet-4.6" },
-      { id: "openai/gpt-5.5" },
-    ],
+    availableModels: [{ id: "moonshotai/kimi-k2.6" }, { id: "openai/gpt-5.5" }],
     requestId: "request-research-mode",
   })
 
@@ -198,7 +195,7 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "anthropic/claude-sonnet-4.6" }],
+    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
     requestId: "request-research-unavailable",
   })
 
@@ -239,7 +236,7 @@ test("agent helper validates total size, last-message role, and default model su
         content: "hello",
       })),
     },
-    availableModels: [{ id: "anthropic/claude-sonnet-4.6" }],
+    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
     requestId: "request-too-many",
   })
 
@@ -260,7 +257,7 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "anthropic/claude-sonnet-4.6" }],
+    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
     requestId: "request-message-too-large",
   })
 
@@ -279,7 +276,7 @@ test("agent helper validates total size, last-message role, and default model su
         content: `${String(index).padStart(2, "0")}${"x".repeat(10_998)}`,
       })),
     },
-    availableModels: [{ id: "anthropic/claude-sonnet-4.6" }],
+    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
     requestId: "request-1",
   })
 
@@ -300,7 +297,7 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "anthropic/claude-sonnet-4.6" }],
+    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
     requestId: "request-2",
   })
 
@@ -347,7 +344,7 @@ test("agent helper validates file attachments and preserves the selected model",
 
   const attachmentResult = parseAgentStreamRequest({
     body: {
-      model: "anthropic/claude-sonnet-4.6",
+      model: "moonshotai/kimi-k2.6",
       messages: [
         {
           role: "user",
@@ -356,15 +353,12 @@ test("agent helper validates file attachments and preserves the selected model",
         },
       ],
     },
-    availableModels: [
-      { id: "anthropic/claude-sonnet-4.6" },
-      { id: "openai/gpt-5.5" },
-    ],
+    availableModels: [{ id: "moonshotai/kimi-k2.6" }, { id: "openai/gpt-5.5" }],
     requestId: "request-attachment",
   })
 
   assert(!(attachmentResult instanceof Response))
-  assert.equal(attachmentResult.selectedModel, "anthropic/claude-sonnet-4.6")
+  assert.equal(attachmentResult.selectedModel, "moonshotai/kimi-k2.6")
   assert.deepEqual(attachmentResult.parsedRequest.messages[0]?.attachments, [
     imageAttachment,
   ])
@@ -379,14 +373,14 @@ test("agent helper validates file attachments and preserves the selected model",
         },
       ],
     },
-    availableModels: [{ id: "anthropic/claude-sonnet-4.6" }],
+    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
     requestId: "request-attachment-default-model",
   })
 
   assert(!(defaultAttachmentModelResult instanceof Response))
   assert.equal(
     defaultAttachmentModelResult.selectedModel,
-    "anthropic/claude-sonnet-4.6"
+    "moonshotai/kimi-k2.6"
   )
 
   const assistantAttachmentResult = parseAgentStreamRequest({
@@ -754,7 +748,7 @@ test("agent helper streams fallback output when the model yields no content", as
     request: createRequest(),
     requestId: "request-1",
     timeoutMs: 30_000,
-    selectedModel: "anthropic/claude-sonnet-4.6",
+    selectedModel: "moonshotai/kimi-k2.6",
     runMode: "chat",
     aiGatewayApiKey: "ai-gateway-key",
     tavilyApiKey: "tavily-key",
@@ -814,7 +808,7 @@ test("agent helper marks tool-backed partial output incomplete when a tool call 
     request: createRequest(),
     requestId: "request-unresolved-tool",
     timeoutMs: 30_000,
-    selectedModel: "xai/grok-4.3",
+    selectedModel: "deepseek/deepseek-v4-pro",
     runMode: "chat",
     aiGatewayApiKey: "ai-gateway-key",
     tavilyApiKey: "tavily-key",
@@ -870,7 +864,7 @@ test("agent helper does not add an incomplete fallback when a meaningful answer 
     request: createRequest(),
     requestId: "request-tool-error",
     timeoutMs: 30_000,
-    selectedModel: "xai/grok-4.3",
+    selectedModel: "deepseek/deepseek-v4-pro",
     runMode: "chat",
     aiGatewayApiKey: "ai-gateway-key",
     tavilyApiKey: "tavily-key",
@@ -911,7 +905,7 @@ test("agent helper commits meaningful completed assistant text for memory", asyn
     request: createRequest(),
     requestId: "request-memory-completed",
     timeoutMs: 30_000,
-    selectedModel: "anthropic/claude-sonnet-4.6",
+    selectedModel: "moonshotai/kimi-k2.6",
     aiGatewayApiKey: "ai-gateway-key",
     memoryCommitMaxChars: 13,
     messages: [{ role: "user", content: "Remember me" }],
@@ -956,7 +950,7 @@ test("agent helper commits meaningful incomplete assistant text for memory", asy
     request: createRequest(),
     requestId: "request-memory-incomplete",
     timeoutMs: 30_000,
-    selectedModel: "xai/grok-4.3",
+    selectedModel: "deepseek/deepseek-v4-pro",
     aiGatewayApiKey: "ai-gateway-key",
     memoryCommitMaxChars: 100,
     messages: [{ role: "user", content: "Search memory docs" }],
@@ -983,7 +977,7 @@ test("agent helper does not commit empty or failed assistant output for memory",
     request: createRequest(),
     requestId: "request-memory-empty",
     timeoutMs: 30_000,
-    selectedModel: "anthropic/claude-sonnet-4.6",
+    selectedModel: "moonshotai/kimi-k2.6",
     aiGatewayApiKey: "ai-gateway-key",
     memoryCommitMaxChars: 100,
     messages: [{ role: "user", content: "Hello" }],
@@ -1011,7 +1005,7 @@ test("agent helper does not commit empty or failed assistant output for memory",
     request: createRequest(),
     requestId: "request-memory-failed",
     timeoutMs: 30_000,
-    selectedModel: "anthropic/claude-sonnet-4.6",
+    selectedModel: "moonshotai/kimi-k2.6",
     aiGatewayApiKey: "ai-gateway-key",
     memoryCommitMaxChars: 100,
     messages: [{ role: "user", content: "Hello" }],
@@ -1052,7 +1046,7 @@ test("agent helper turns upstream body timeouts into visible timeout output", as
     request: createRequest(),
     requestId: "request-body-timeout",
     timeoutMs: 30_000,
-    selectedModel: "xai/grok-4.3",
+    selectedModel: "deepseek/deepseek-v4-pro",
     runMode: "chat",
     aiGatewayApiKey: "ai-gateway-key",
     messages: [{ role: "user", content: "Latest AI news" }],
@@ -1122,7 +1116,7 @@ test("agent helper returns an auth-key fallback when provider auth fails", async
     request: createRequest(),
     requestId: "request-2",
     timeoutMs: 30_000,
-    selectedModel: "anthropic/claude-sonnet-4.6",
+    selectedModel: "moonshotai/kimi-k2.6",
     runMode: "chat",
     aiGatewayApiKey: "ai-gateway-key",
     messages: [{ role: "user", content: "Hello" }],

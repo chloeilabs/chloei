@@ -41,7 +41,7 @@ export function parseAgentStreamRequest(params) {
       parsedRequest: {
         messages: params.body?.messages ?? [],
       },
-      selectedModel: "anthropic/claude-sonnet-4.6",
+      selectedModel: "moonshotai/kimi-k2.6",
     }
   )
 }

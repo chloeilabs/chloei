@@ -18,12 +18,6 @@ test("shared model registry includes the curated gateway models", async () => {
 
   assert.match(
     source,
-    /ANTHROPIC_CLAUDE_SONNET_4_6:\s*"anthropic\/claude-sonnet-4\.6"/,
-    "Expected AvailableModels to include ANTHROPIC_CLAUDE_SONNET_4_6."
-  )
-
-  assert.match(
-    source,
     /OPENAI_GPT_5_5:\s*"openai\/gpt-5\.5"/,
     "Expected AvailableModels to include OPENAI_GPT_5_5."
   )
@@ -41,27 +35,15 @@ test("shared model registry includes the curated gateway models", async () => {
   )
 
   assert.match(
-    source,
-    /XAI_GROK_4_3:\s*"xai\/grok-4\.3"/,
-    "Expected AvailableModels to include XAI_GROK_4_3."
+    source.replace(/\s+/g, " "),
+    /SUPPORTED_MODELS = \[ AvailableModels\.OPENAI_GPT_5_5, AvailableModels\.MOONSHOTAI_KIMI_K2_6, AvailableModels\.DEEPSEEK_V4_PRO, \] as const/,
+    "Expected SUPPORTED_MODELS to list only GPT-5.5, Kimi K2.6, and DeepSeek V4 Pro."
   )
 
   assert.match(
     source.replace(/\s+/g, " "),
-    /SUPPORTED_MODELS = \[ AvailableModels\.OPENAI_GPT_5_5, AvailableModels\.ANTHROPIC_CLAUDE_SONNET_4_6, AvailableModels\.MOONSHOTAI_KIMI_K2_6, AvailableModels\.DEEPSEEK_V4_PRO, AvailableModels\.XAI_GROK_4_3, \] as const/,
-    "Expected SUPPORTED_MODELS to list OPENAI_GPT_5_5 first (default), followed by the curated gateway models."
-  )
-
-  assert.match(
-    source.replace(/\s+/g, " "),
-    /MODEL_SELECTOR_MODELS = \[ AvailableModels\.MOONSHOTAI_KIMI_K2_6, AvailableModels\.DEEPSEEK_V4_PRO, AvailableModels\.XAI_GROK_4_3, \] as const/,
-    "Expected the chat model selector to expose Kimi K2.6, DeepSeek V4 Pro, and Grok 4.3."
-  )
-
-  assert.match(
-    source,
-    /\[AvailableModels\.ANTHROPIC_CLAUDE_SONNET_4_6\]:\s*\{[\s\S]*name:\s*"Claude Sonnet 4\.6"/,
-    "Expected ModelInfos to define display metadata for ANTHROPIC_CLAUDE_SONNET_4_6."
+    /MODEL_SELECTOR_MODELS = \[ AvailableModels\.MOONSHOTAI_KIMI_K2_6, AvailableModels\.DEEPSEEK_V4_PRO, AvailableModels\.OPENAI_GPT_5_5, \] as const/,
+    "Expected the chat model selector to expose Kimi K2.6, DeepSeek V4 Pro, and GPT-5.5."
   )
 
   assert.match(
@@ -82,18 +64,7 @@ test("shared model registry includes the curated gateway models", async () => {
     "Expected ModelInfos to define display metadata for DEEPSEEK_V4_PRO."
   )
 
-  assert.match(
-    source,
-    /\[AvailableModels\.XAI_GROK_4_3\]:\s*\{[\s\S]*name:\s*"Grok 4\.3"/,
-    "Expected ModelInfos to define display metadata for XAI_GROK_4_3."
-  )
-
-  for (const modelKey of [
-    "ANTHROPIC_CLAUDE_SONNET_4_6",
-    "MOONSHOTAI_KIMI_K2_6",
-    "OPENAI_GPT_5_5",
-    "XAI_GROK_4_3",
-  ]) {
+  for (const modelKey of ["MOONSHOTAI_KIMI_K2_6", "OPENAI_GPT_5_5"]) {
     assert.match(
       source,
       new RegExp(
