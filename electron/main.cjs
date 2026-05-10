@@ -483,15 +483,15 @@ function getAutoUpdateChannel() {
     return process.arch === "arm64" ? "latest-mac-arm64" : "latest-mac-x64"
   }
 
-  if (process.platform === "win32") {
-    return "latest-win-x64"
-  }
-
   return "latest"
 }
 
 function configureAutoUpdates() {
-  if (!app.isPackaged || process.env.CHLOEI_DESKTOP_AUTO_UPDATE === "0") {
+  if (
+    !app.isPackaged ||
+    process.platform !== "darwin" ||
+    process.env.CHLOEI_DESKTOP_AUTO_UPDATE === "0"
+  ) {
     return
   }
 

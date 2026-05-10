@@ -14,7 +14,6 @@ pnpm desktop:build        # Build Next.js and prepare desktop bundle
 pnpm desktop:pack         # Create unpacked local Electron app
 pnpm desktop:smoke        # Verify Electron shell preload/isolation with mock auth
 pnpm desktop:dist:mac     # Build macOS desktop artifacts
-pnpm desktop:dist:win     # Build Windows desktop artifacts
 
 # Database (must run before first request)
 pnpm migrate              # Run both auth + app migrations
