@@ -8,15 +8,16 @@ This directory contains Chloei's finance-agent benchmark harness.
 pnpm eval:finance
 node evals/finance/grade-finance-evals.mjs --outputs evals/finance/results/example.json
 pnpm eval:finance:braintrust -- --grade evals/finance/results/finance-grade.json
-node evals/finance/build-gdpval-manifest.mjs --input gdpval.jsonl
+node evals/finance/build-gdpval-manifest.mjs --input gdpval.jsonl --output evals/finance/results/gdpval-finance-manifest.json
+node evals/finance/judge-gdpval-gateway.mjs --manifest evals/finance/results/gdpval-finance-manifest.json
 ```
 
 ## Model Defaults
 
 - GDPval candidate generation defaults to `openai/gpt-5.4-mini` through AI Gateway.
-- OpenAI judge grading defaults to `gpt-5.4-mini` through the OpenAI API.
-- Override either default with `--model`; override the judge with `OPENAI_EVAL_JUDGE_MODEL`.
-- Use GPT-5.5 only for final calibration runs where maximum judge quality is worth the additional cost.
+- GDPval judge grading defaults to `moonshotai/kimi-k2.6` through AI Gateway.
+- Both live candidate generation and judge grading use `AI_GATEWAY_API_KEY`; no separate OpenAI API key is required for evals.
+- Override either live default with `--model` when running a script directly.
 
 ## Current Scope
 

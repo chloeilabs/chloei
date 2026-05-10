@@ -3,15 +3,29 @@ import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
+import { createGateway } from "@ai-sdk/gateway"
+import { generateText } from "ai"
+
 import { writeEvalResult } from "./harness.mjs"
 
 await import("./register-ts-hooks.mjs")
 
 const { createLogger } = await import("@/lib/logger")
+const { aiGatewayFetch } = await import("@/lib/server/llm/gateway-client")
+const { AvailableModels } = await import("@/lib/shared/llm/models")
 
 const evalDir = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(evalDir, "../..")
-const logger = createLogger("evals/finance/judge-gdpval-openai")
+const logger = createLogger("evals/finance/judge-gdpval-gateway")
+const DEFAULT_JUDGE_MODEL = AvailableModels.MOONSHOTAI_KIMI_K2_6
+const JUDGE_SYSTEM_PROMPT = [
+  "You are an exacting GDPval-style evaluator.",
+  "Assess deliverables against the provided rubric.",
+  "Do not invent file contents.",
+  "The judge runs through AI Gateway without a browsing tool or direct file upload.",
+  "Use only the prompt text, normalized file context, candidate output, and file URL metadata provided.",
+  "Return JSON only.",
+].join(" ")
 
 function getArg(name, fallback) {
   const index = process.argv.indexOf(name)
@@ -24,24 +38,6 @@ function getArg(name, fallback) {
 
 function getFlag(name) {
   return process.argv.includes(name)
-}
-
-function getOutputText(response) {
-  const parts = []
-
-  for (const item of response.output ?? []) {
-    if (item.type !== "message") {
-      continue
-    }
-
-    for (const content of item.content ?? []) {
-      if (content.type === "output_text") {
-        parts.push(content.text)
-      }
-    }
-  }
-
-  return parts.join("\n").trim()
 }
 
 function parseJudgeJson(text) {
@@ -67,32 +63,8 @@ function parseJudgeJson(text) {
   }
 }
 
-async function createResponse(payload) {
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  })
-  const text = await response.text()
-
-  if (!response.ok) {
-    throw new Error(`OpenAI API ${response.status}: ${text}`)
-  }
-
-  return JSON.parse(text)
-}
-
 function getErrorMessage(error) {
   return error instanceof Error ? error.message : String(error)
-}
-
-function isUnsupportedFileError(errorMessage) {
-  return /unsupported_file|file type you uploaded is not supported/i.test(
-    errorMessage
-  )
 }
 
 function isInsufficientQuotaError(errorMessage) {
@@ -149,10 +121,37 @@ function formatCandidateOutput(candidateResult, maxChars) {
   return trimToBudget(sections.join("\n"), maxChars)
 }
 
-function buildJudgeInput(
+function formatUrls(title, urls) {
+  const normalizedUrls = urls.filter(Boolean)
+  if (normalizedUrls.length === 0) {
+    return `${title}: none`
+  }
+
+  return [title, ...normalizedUrls.map((url) => `- ${url}`)].join("\n")
+}
+
+function buildFileUrlSection(task, includeFiles, mode) {
+  if (!includeFiles) {
+    return "File URL metadata omitted by --no-files."
+  }
+
+  const sections = [
+    "File URL metadata only. These URLs are not fetched by the judge unless their contents are also present in normalized file context.",
+    formatUrls("Reference file URLs", task.reference_file_urls ?? []),
+  ]
+
+  if (mode === "gold_sanity") {
+    sections.push(
+      formatUrls("Gold deliverable file URLs", task.deliverable_file_urls ?? [])
+    )
+  }
+
+  return sections.join("\n\n")
+}
+
+function buildJudgePrompt(
   task,
   {
-    attachmentNote,
     candidateContextMaxChars,
     candidateOutput,
     includeFiles,
@@ -160,176 +159,109 @@ function buildJudgeInput(
     normalizedContextText,
   }
 ) {
-  const content = [
-    {
-      type: "input_text",
-      text: [
-        "Run a GDPval-style rubric judge pass.",
-        "",
-        `Mode: ${mode}`,
-        `Task ID: ${task.task_id}`,
-        `Sector: ${task.sector}`,
-        `Occupation: ${task.occupation}`,
-        "",
-        "Task prompt:",
-        task.prompt,
-        "",
-        "Rubric:",
-        task.rubric_pretty,
-        "",
-        "Candidate deliverable:",
-        mode === "gold_sanity"
-          ? "The candidate is the public GDPval gold deliverable attached or linked below. This validates the judge path, not Chloei model performance."
-          : "Use the candidate output attached or described below.",
-        attachmentNote ? `\nAttachment note: ${attachmentNote}` : "",
-        normalizedContextText
-          ? "\nNormalized file context is included below. Treat it as extracted evidence from the GDPval reference and deliverable files; reflect any extraction truncation or limitation in file_access/confidence."
-          : "",
-        "",
-        "Return only strict JSON with this shape:",
-        JSON.stringify({
-          task_id: task.task_id,
-          mode,
-          score_estimate_0_to_100: 0,
-          pass: false,
-          confidence_0_to_1: 0,
-          file_access: "available | partial | unavailable",
-          rationale: "brief rationale",
-          rubric_findings: [
-            {
-              criterion: "rubric item summary",
-              met: true,
-              evidence: "brief evidence or missing evidence",
-            },
-          ],
-        }),
-      ].join("\n"),
-    },
+  const sections = [
+    "Run a GDPval-style rubric judge pass.",
+    "",
+    `Mode: ${mode}`,
+    `Task ID: ${task.task_id}`,
+    `Sector: ${task.sector}`,
+    `Occupation: ${task.occupation}`,
+    "",
+    "Task prompt:",
+    task.prompt,
+    "",
+    "Rubric:",
+    task.rubric_pretty,
+    "",
+    "Candidate deliverable:",
+    mode === "gold_sanity"
+      ? "The candidate is the public GDPval gold deliverable represented by the normalized context and metadata below. This validates the judge path, not Chloei model performance."
+      : "Use the Chloei candidate output described below.",
+    "",
+    buildFileUrlSection(task, includeFiles, mode),
+    "",
+    normalizedContextText
+      ? "Normalized file context is included below. Treat it as extracted evidence from GDPval reference and deliverable files. Reflect extraction truncation or missing content in file_access and confidence."
+      : "No normalized file context was provided. Treat file contents as unavailable unless visible elsewhere in this prompt.",
+    "",
+    "Return only strict JSON with this shape:",
+    JSON.stringify({
+      task_id: task.task_id,
+      mode,
+      score_estimate_0_to_100: 0,
+      pass: false,
+      confidence_0_to_1: 0,
+      file_access: "available | partial | unavailable",
+      rationale: "brief rationale",
+      rubric_findings: [
+        {
+          criterion: "rubric item summary",
+          met: true,
+          evidence: "brief evidence or missing evidence",
+        },
+      ],
+    }),
   ]
 
   if (normalizedContextText) {
-    content.push({
-      type: "input_text",
-      text: normalizedContextText,
-    })
+    sections.push("", "# Normalized File Context", normalizedContextText)
   }
 
   if (mode !== "gold_sanity") {
-    content.push({
-      type: "input_text",
-      text: formatCandidateOutput(candidateOutput, candidateContextMaxChars),
-    })
+    sections.push(
+      "",
+      formatCandidateOutput(candidateOutput, candidateContextMaxChars)
+    )
   }
 
-  if (!includeFiles) {
-    content.push({
-      type: "input_text",
-      text: [
-        "Reference file URLs:",
-        ...(task.reference_file_urls ?? []),
-        "",
-        "Gold/candidate deliverable file URLs:",
-        ...(task.deliverable_file_urls ?? []),
-      ].join("\n"),
-    })
-    return content
-  }
-
-  for (const url of task.reference_file_urls ?? []) {
-    content.push({
-      type: "input_file",
-      file_url: url,
-    })
-  }
-
-  if (task.gold_sanity) {
-    for (const url of task.deliverable_file_urls ?? []) {
-      content.push({
-        type: "input_file",
-        file_url: url,
-      })
-    }
-  }
-
-  return content
-}
-
-function buildInput(
-  task,
-  {
-    attachmentNote,
-    candidateContextMaxChars,
-    candidateOutput,
-    includeFiles,
-    mode,
-    normalizedContextText,
-  }
-) {
-  return [
-    {
-      role: "developer",
-      content: [
-        {
-          type: "input_text",
-          text: [
-            "You are an exacting GDPval-style evaluator.",
-            "Assess deliverables against the provided rubric.",
-            "Do not invent file contents. If attached files cannot be inspected, set file_access accordingly and lower confidence.",
-            "Return JSON only.",
-          ].join(" "),
-        },
-      ],
-    },
-    {
-      role: "user",
-      content: buildJudgeInput(task, {
-        attachmentNote,
-        candidateContextMaxChars,
-        candidateOutput,
-        includeFiles,
-        mode,
-        normalizedContextText,
-      }),
-    },
-  ]
+  return sections.join("\n")
 }
 
 async function runJudge(
   task,
   {
-    attachmentNote,
     candidateContextMaxChars,
     candidateOutput,
     includeFiles,
+    mode,
     normalizedContextText,
   }
 ) {
-  const response = await createResponse({
-    model,
-    reasoning: { effort },
-    max_output_tokens: maxOutputTokens,
-    input: buildInput(task, {
-      attachmentNote,
+  const result = await generateText({
+    model: gatewayProvider(model),
+    system: JUDGE_SYSTEM_PROMPT,
+    prompt: buildJudgePrompt(task, {
       candidateContextMaxChars,
       candidateOutput,
       includeFiles,
-      mode,
       normalizedContextText,
+      mode,
     }),
+    maxOutputTokens,
   })
-  const text = getOutputText(response)
+  const text = result.text.trim()
 
   return {
-    response,
+    response: {
+      id: result.response.id,
+      model: result.response.modelId,
+      finishReason: result.finishReason,
+      usage: result.totalUsage ?? result.usage ?? null,
+      warnings: result.warnings ?? null,
+    },
     text,
     parsed: parseJudgeJson(text),
   }
 }
 
-const apiKey = process.env.OPENAI_API_KEY
+const apiKey = process.env.AI_GATEWAY_API_KEY
 if (!apiKey) {
-  throw new Error("Missing OPENAI_API_KEY.")
+  throw new Error("Missing AI_GATEWAY_API_KEY.")
 }
+const gatewayProvider = createGateway({
+  apiKey,
+  fetch: aiGatewayFetch,
+})
 
 const manifestPath = path.resolve(
   repoRoot,
@@ -339,16 +271,12 @@ const outputPath = path.resolve(
   repoRoot,
   getArg(
     "--output",
-    `evals/finance/results/gdpval-openai-judge-${new Date()
+    `evals/finance/results/gdpval-gateway-judge-${new Date()
       .toISOString()
       .replace(/[:.]/g, "-")}.json`
   )
 )
-const model = getArg(
-  "--model",
-  process.env.OPENAI_EVAL_JUDGE_MODEL ?? "gpt-5.4-mini"
-)
-const effort = getArg("--reasoning-effort", "xhigh")
+const model = getArg("--model", DEFAULT_JUDGE_MODEL)
 const maxOutputTokens = Number(getArg("--max-output-tokens", "8000"))
 const limit = Number(getArg("--limit", "3"))
 const offset = Number(getArg("--offset", "0"))
@@ -399,7 +327,7 @@ if (normalizedContextDir) {
   }
 }
 
-function pushCompletedResult(task, startedAt, run, fallbackReason) {
+function pushCompletedResult(task, startedAt, run) {
   results.push({
     taskId: task.task_id,
     sector: task.sector,
@@ -411,7 +339,6 @@ function pushCompletedResult(task, startedAt, run, fallbackReason) {
     model: run.response.model,
     rawText: run.text,
     parsed: run.parsed,
-    fallbackReason,
     usage: run.response.usage ?? null,
   })
 }
@@ -426,7 +353,6 @@ function buildOutput() {
     manifestPath,
     source: manifest.source,
     model,
-    effort,
     maxOutputTokens,
     includeFiles,
     normalizedContextDir,
@@ -472,41 +398,13 @@ for (let index = 0; index < tasks.length; index += 1) {
       candidateContextMaxChars,
       candidateOutput: candidateOutputs.get(task.task_id),
       includeFiles,
+      mode,
       normalizedContextText,
     })
     pushCompletedResult(task, startedAt, run)
     await writeCheckpoint()
   } catch (error) {
     const errorMessage = getErrorMessage(error)
-    if (includeFiles && isUnsupportedFileError(errorMessage)) {
-      try {
-        const run = await runJudge(task, {
-          attachmentNote:
-            "Direct file attachment was rejected by the OpenAI API as unsupported, so this fallback pass only includes file URLs. Treat file contents as unavailable unless visible in the URLs or prompt metadata.",
-          candidateContextMaxChars,
-          candidateOutput: candidateOutputs.get(task.task_id),
-          includeFiles: false,
-          normalizedContextText,
-        })
-        pushCompletedResult(task, startedAt, run, "unsupported_file_url_only")
-        await writeCheckpoint()
-        continue
-      } catch (fallbackError) {
-        results.push({
-          taskId: task.task_id,
-          sector: task.sector,
-          occupation: task.occupation,
-          mode,
-          status: "failed",
-          durationMs: Date.now() - startedAt,
-          error: getErrorMessage(fallbackError),
-          primaryError: errorMessage,
-        })
-        await writeCheckpoint()
-        continue
-      }
-    }
-
     results.push({
       taskId: task.task_id,
       sector: task.sector,
@@ -527,7 +425,7 @@ for (let index = 0; index < tasks.length; index += 1) {
           status: "skipped",
           durationMs: 0,
           error:
-            "Skipped because the OpenAI API reported insufficient_quota earlier in this batch.",
+            "Skipped because AI Gateway reported insufficient_quota earlier in this batch.",
         })
       }
       await writeCheckpoint()
