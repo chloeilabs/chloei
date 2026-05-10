@@ -455,7 +455,9 @@ export function PromptForm({
         (event.metaKey || event.ctrlKey)
       ) {
         event.preventDefault()
-        handleSetRunMode("research")
+        setRunMode((currentRunMode) =>
+          currentRunMode === "research" ? "chat" : "research"
+        )
       }
     }
 
@@ -463,7 +465,7 @@ export function PromptForm({
     return () => {
       window.removeEventListener("keydown", handleResearchShortcut)
     }
-  }, [handleSetRunMode, isFormPending])
+  }, [isFormPending])
 
   const isSubmitButtonDisabled =
     isFormPending ||

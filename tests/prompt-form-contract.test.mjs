@@ -49,3 +49,25 @@ test("prompt form always handles browser drag/drop defaults", async () => {
     "Expected drop to reset drag state before pending checks."
   )
 })
+
+test("prompt form research shortcut does not close the tools popover", async () => {
+  const source = await readFile(promptFormPath, "utf8")
+  const shortcutSource = source.match(
+    /const handleResearchShortcut = \(event: KeyboardEvent\) => \{[\s\S]*?window\.addEventListener\("keydown", handleResearchShortcut\)/
+  )?.[0]
+
+  assert.ok(
+    shortcutSource,
+    "Expected PromptForm to define a research shortcut."
+  )
+  assert.match(
+    shortcutSource,
+    /setRunMode\(\(currentRunMode\) =>\s+currentRunMode === "research" \? "chat" : "research"\s+\)/,
+    "Expected shortcut to toggle run mode directly."
+  )
+  assert.doesNotMatch(
+    shortcutSource,
+    /handleSetRunMode|setIsToolsOpen|shouldPreventToolsCloseAutoFocusRef/,
+    "Expected shortcut not to reuse popover-closing menu behavior."
+  )
+})

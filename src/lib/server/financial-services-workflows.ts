@@ -51,7 +51,7 @@ const FILING_RESEARCH_PATTERN =
   /\b(sec|edgar|10-k|10-q|8-k|annual report|quarterly report|proxy statement|def 14a|filings?|mda|md&a|management discussion|risk factors?|issuer purchases?|shares? repurchased|common stock repurchased|adjusted ebitda|non-gaap|capital raise|geographic region|segment revenue|revenue by (?:segment|region)|table extract|filing table)\b/i
 
 const EARNINGS_REVIEW_PATTERN =
-  /\b(earnings review|earnings call|earnings release|quarterly results|reported earnings|guidance|beat or miss|beat\/miss|management projections?|consensus|model update|earnings transcript|q[1-4]\s+\d{4}\s+earnings)\b/i
+  /\b(earnings review|earnings call|earnings release|quarterly results|reported earnings|beat or miss|beat\/miss|management projections?|consensus|model update|earnings transcript|q[1-4]\s+\d{4}\s+earnings|(?:management|company|revenue|margin|eps|earnings|quarterly|annual|full-year|fy\s?\d{2,4}|q[1-4])\s+guidance|guidance\s+(?:range|midpoint|versus|vs\.?|beat|miss|raise|lower|update|revision|actuals?|compare|compared))\b/i
 
 const WORKFLOW_SKILLS: Record<
   FinancialServicesWorkflowId,

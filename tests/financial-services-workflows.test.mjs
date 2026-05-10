@@ -140,6 +140,35 @@ test("financial services workflow detection selects earnings review", () => {
   assert.match(context?.promptBlock ?? "", /Skill: evidence-auditor/)
 })
 
+test("financial services workflow detection does not route generic guidance to earnings review", () => {
+  const modelingContext = resolveFinancialServicesWorkflow({
+    messages: [
+      {
+        role: "user",
+        content: "I need guidance on structuring this DCF model for MSFT.",
+      },
+    ],
+    taskMode: "finance_analysis",
+  })
+
+  assert.equal(modelingContext?.workflow, "financial_modeling")
+
+  const filingContext = resolveFinancialServicesWorkflow({
+    messages: [
+      {
+        role: "user",
+        content: "Find the 10-K section on SEC guidance for Microsoft.",
+      },
+    ],
+    taskMode: "finance_analysis",
+    tools: {
+      secUserAgentConfigured: true,
+    },
+  })
+
+  assert.equal(filingContext?.workflow, "filing_research")
+})
+
 test("financial services workflow detection selects pitch materials first", () => {
   const context = resolveFinancialServicesWorkflow({
     messages: [
