@@ -122,12 +122,22 @@ jobs:
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
 
-      - name: Package desktop app
+      - name: Package desktop app (macOS)
+        if: matrix.os == 'macos'
         shell: bash
         run: pnpm exec electron-builder --config electron-builder.config.js ${{ matrix.build-target }} --publish "$DESKTOP_PUBLISH"
         env:
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
+          DESKTOP_PUBLISH: ${{ inputs.publish && 'always' || 'never' }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHLOEI_DESKTOP_UPDATE_CHANNEL: ${{ matrix.update-channel }}
+
+      - name: Package desktop app (Windows)
+        if: matrix.os == 'windows'
+        shell: bash
+        run: pnpm exec electron-builder --config electron-builder.config.js ${{ matrix.build-target }} --publish "$DESKTOP_PUBLISH"
+        env:
           DESKTOP_PUBLISH: ${{ inputs.publish && 'always' || 'never' }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CHLOEI_DESKTOP_UPDATE_CHANNEL: ${{ matrix.update-channel }}
