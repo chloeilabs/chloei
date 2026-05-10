@@ -129,7 +129,7 @@ CREATE TABLE thread (
 
 After assembly, `withAiSdkInlineCitationInstruction` appends inline citation rules and optionally FMP tool rules when `FMP_API_KEY` is set.
 
-Long-term memory is opt-in through `src/lib/server/long-term-memory.ts`. Chloei calls a self-hosted Mem0 OSS REST server before agent runs and commits only the latest text-only user/assistant turn after meaningful completed or incomplete streams.
+Long-term memory is opt-in through `src/lib/server/long-term-memory.ts`. Chloei calls Mem0 REST before agent runs and commits only the latest text-only user/assistant turn after meaningful completed or incomplete streams. OSS uses `/memories` and `/search`; Platform stores durable memories under `user_id`, keeps Chloei's agent/thread scope in metadata for reliable cross-thread retrieval and cleanup, and has a temporary legacy `app_id` fallback for old memories.
 
 **Task modes** (auto-inferred by `inferPromptTaskMode` from message content patterns):
 
@@ -367,9 +367,9 @@ All other variables are optional — the code has safe defaults. See `.env.examp
 | `MEMORY_PROVIDER`                          | `disabled` or `mem0` (default: `disabled`)                                                              |
 | `MEM0_API_URL`                             | Mem0 REST API origin (default: `http://localhost:8888`; use `https://api.mem0.ai` for Mem0 Platform)    |
 | `MEM0_API_KEY`                             | Mem0 key; self-hosted OSS uses `X-API-Key`, Mem0 Platform uses `Authorization: Token ...`               |
-| `MEMORY_AGENT_ID`                          | Mem0 agent scope (default: `chloei`)                                                                    |
+| `MEMORY_AGENT_ID`                          | Mem0 agent scope (default: `chloei`; use distinct values per environment)                               |
 | `MEMORY_TOP_K`                             | Number of Mem0 memories to retrieve (default: 6)                                                        |
-| `MEMORY_THRESHOLD`                         | Minimum memory similarity threshold (default: 0.3)                                                      |
+| `MEMORY_THRESHOLD`                         | Minimum memory similarity threshold (default: 0.1)                                                      |
 | `MEMORY_CONTEXT_MAX_CHARS`                 | Max retrieved memory prompt chars (default: 3,000)                                                      |
 | `MEMORY_COMMIT_MAX_CHARS`                  | Max assistant chars eligible for memory commit (default: 12,000)                                        |
 | `PYTHON3_PATH`                             | Override `python3` binary for code execution                                                            |

@@ -1,6 +1,6 @@
 # Chloei
 
-Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently exposes a curated model selector with Kimi K2.6 and DeepSeek V4 Pro, uses GPT-5.5 only for deep research runs, and offers private Blob-backed file attachments, local code execution, optional Tavily retrieval, optional governed Upstash Search knowledge retrieval, optional Browserbase dynamic browsing, optional Inngest jobs, normalized finance data, SEC/EDGAR filing retrieval, optional Financial Modeling Prep MCP tools, optional self-hosted Mem0 long-term memory, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
+Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently exposes a curated model selector with Kimi K2.6 and DeepSeek V4 Pro, uses GPT-5.5 only for deep research runs, and offers private Blob-backed file attachments, local code execution, optional Tavily retrieval, optional governed Upstash Search knowledge retrieval, optional Browserbase dynamic browsing, optional Inngest jobs, normalized finance data, SEC/EDGAR filing retrieval, optional Financial Modeling Prep MCP tools, optional Mem0 long-term memory, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
 
 ## Requirements
 
@@ -40,12 +40,14 @@ To enable auth locally, provision PostgreSQL and add:
 - `pnpm start`: run the production server
 - `pnpm test`: run regression tests
 - `pnpm test:smoke`: run opt-in Playwright browser smoke tests against `SMOKE_BASE_URL`
+- `pnpm test:smoke:memory`: run opt-in authenticated memory smoke tests against `SMOKE_BASE_URL`
 - `pnpm test:smoke:mock`: run the credential-free mocked Playwright smoke test used by CI
 - `pnpm eval:finance`: run the finance benchmark harness in fixture mode
 - `pnpm eval:finance -- --mode live`: run the live finance-agent harness against AI Gateway
 - `pnpm eval:finance:live`: run the live public-markets finance acceptance suite
 - `pnpm eval:finance:grade`: grade finance benchmark outputs
 - `pnpm eval:finance:braintrust`: publish finance grade signals to Braintrust
+- `pnpm mem0:smoke`: run a direct add/search/delete Mem0 REST smoke test
 - `pnpm lint`: run blocking ESLint checks
 - `pnpm lint:fix`: apply autofixable ESLint changes
 - `pnpm format`: write Prettier formatting changes
@@ -57,9 +59,9 @@ To enable auth locally, provision PostgreSQL and add:
 1. Sync local secrets when needed with `vercel env pull .env.local`, then remove any stale keys the app no longer uses.
 2. Run `pnpm test`, `pnpm lint`, `pnpm typecheck`, and `pnpm build`.
 3. Open a pull request to `main` and wait for the required `checks` and `Vercel` statuses.
-4. Smoke test the preview deployment: sign in, confirm models load, send one prompt, and verify thread persistence.
+4. Smoke test the preview deployment: sign in, confirm models load, send one prompt, verify thread persistence, and run `SMOKE_BASE_URL=<preview-url> pnpm test:smoke:memory` when Mem0 is enabled.
 5. Merge to `main` after the preview passes, then confirm production is aliased to [chloei.ai](https://chloei.ai).
-6. Run one authenticated production smoke test: sign in, load models, send a prompt, and verify an existing thread still reopens cleanly.
+6. Run one authenticated production smoke test: sign in, load models, send a prompt, verify an existing thread still reopens cleanly, and run the memory smoke against `https://chloei.ai`.
 
 Managed integration rollout, rollback, and smoke-test steps live in [docs/managed-integrations-rollout.md](docs/managed-integrations-rollout.md). Public-markets finance answer quality checks live in [docs/finance-research-quality.md](docs/finance-research-quality.md).
 
@@ -90,10 +92,10 @@ Optional variables let you override the built-in safe defaults for message limit
 - `FRED_API_KEY`: enables macro/rates series through the normalized `finance_data` tool
 - `SEC_API_USER_AGENT`: identifies Chloei for SEC public company-facts requests
 - `AGENT_FINANCE_TOOL_MAX_STEPS`: max tool steps for finance-analysis runs, defaulting to 20
-- `MEMORY_PROVIDER=mem0`: enables long-term memory through a separate self-hosted Mem0 OSS REST server. The default is `disabled`.
+- `MEMORY_PROVIDER=mem0`: enables long-term memory through a separate Mem0 REST service. The default is `disabled`.
 - `MEM0_API_URL`: Mem0 REST API origin, defaulting to `http://localhost:8888`. Use `https://api.mem0.ai` for Mem0 Platform keys.
 - `MEM0_API_KEY`: Mem0 key value. Self-hosted OSS uses `X-API-Key`; Mem0 Platform uses `Authorization: Token ...`.
-- `MEMORY_AGENT_ID`, `MEMORY_TOP_K`, `MEMORY_THRESHOLD`, `MEMORY_CONTEXT_MAX_CHARS`, and `MEMORY_COMMIT_MAX_CHARS`: optional memory scoping, retrieval, and prompt/commit bounds. Mem0 Platform scores can be lower for generic queries; `MEMORY_THRESHOLD=0.1` is a practical local setting.
+- `MEMORY_AGENT_ID`, `MEMORY_TOP_K`, `MEMORY_THRESHOLD`, `MEMORY_CONTEXT_MAX_CHARS`, and `MEMORY_COMMIT_MAX_CHARS`: optional memory scoping, retrieval, and prompt/commit bounds. Use distinct agent ids per environment, such as `chloei-local`, `chloei-development`, `chloei-preview`, and `chloei-production`. The default retrieval threshold is `0.1`.
 
 By default, Chloei enforces safe built-in agent limits even if you leave all optional `AGENT_*` env vars unset.
 `AGENT_RATE_LIMIT_STORE` defaults to `auto`, which uses PostgreSQL when `DATABASE_URL` is configured and falls back to process memory for local/no-database runs. Allowed values: `auto`, `postgres`, `memory`.
@@ -121,7 +123,7 @@ By default, Chloei enforces safe built-in agent limits even if you leave all opt
 - `POST /api/jobs/report` accepts an optional client-generated `reportId` UUID for retry idempotency. Idempotency keys must use report/thread identifiers, not prompt text or document contents.
 - `finance_data` normalizes finance operations across FMP, SEC public company facts, and optional FRED macro/rates data. FMP MCP remains available as a migration compatibility path for chat-default runs.
 - `sec_filings` is available when a normal chat or Research request is inferred as finance-analysis work, covering SEC/EDGAR company lookup, filing search, full filing fetches, section extraction, table extraction, and targeted retrieval over filing text.
-- Long-term memory is opt-in and best effort. When `MEMORY_PROVIDER=mem0`, Chloei retrieves user-scoped memories before each agent run and writes the latest user/assistant turn after meaningful completed or incomplete responses. Memory failures never block chat. Self-hosted OSS and Mem0 Platform are both supported through `MEM0_API_URL`; Platform mode uses a private per-user `app_id` scope for reliable retrieval.
+- Long-term memory is opt-in and best effort. When `MEMORY_PROVIDER=mem0`, Chloei retrieves user-scoped memories before each agent run and writes the latest user/assistant turn after meaningful completed or incomplete responses. Memory failures never block chat. Self-hosted OSS and Mem0 Platform are both supported through `MEM0_API_URL`; Platform mode stores durable memories under `user_id`, keeps Chloei's agent/thread scope in metadata for reliable cross-thread retrieval and cleanup, and temporarily falls back to the legacy per-user `app_id` scope for old memories.
 - Run Mem0 separately with its REST API and dashboard. For a low-friction shared provider setup, configure Mem0's OpenAI-compatible LLM/embedder through Vercel AI Gateway with `OPENAI_BASE_URL=https://ai-gateway.vercel.sh/v1`, `OPENAI_API_KEY=$AI_GATEWAY_API_KEY`, `openai/text-embedding-3-small` for embeddings, and a low-cost GPT model for memory extraction. Prefer private networking and HTTPS outside local development.
 - Finance eval fixtures, the live public-markets acceptance suite, live-agent eval mode, and GDPval-style harness scripts live in `evals/finance`.
 - To share logins with another Chloei app, point both apps at the same Better Auth database and secret, set `BETTER_AUTH_COOKIE_DOMAIN` to the shared parent domain, and include every live subdomain in `BETTER_AUTH_TRUSTED_ORIGINS`.
@@ -133,3 +135,5 @@ By default, Chloei enforces safe built-in agent limits even if you leave all opt
 `pnpm test:smoke` runs Playwright against `SMOKE_BASE_URL` or starts the local dev server at `http://localhost:3000`. Set `SMOKE_EMAIL` and `SMOKE_PASSWORD` for an existing test account before running the live authenticated smoke test. Optional `SMOKE_PROMPT` and `SMOKE_EXPECTED_TEXT` let you tune the live prompt assertion.
 
 `pnpm test:smoke:mock` runs a CI-safe authenticated chat flow with `E2E_MOCK_AUTH=1`, in-memory thread storage, and a deterministic mock agent response. It does not require Better Auth credentials, PostgreSQL, or AI provider API keys.
+
+`pnpm mem0:smoke` requires `MEMORY_PROVIDER=mem0`, `MEM0_API_URL`, and `MEM0_API_KEY`; it writes a disposable marker, retries search for up to 45 seconds to allow Mem0 extraction/indexing to settle, and deletes the marker. `pnpm test:smoke:memory` requires `SMOKE_EMAIL` and `SMOKE_PASSWORD`; use `SMOKE_BASE_URL=<preview-or-production-url>` for preview and production verification.

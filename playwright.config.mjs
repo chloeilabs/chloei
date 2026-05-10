@@ -6,6 +6,8 @@ const baseURL =
 const isMockSmoke = process.env.E2E_MOCK_AUTH === "1"
 const shouldStartLocalServer = !process.env.SMOKE_BASE_URL
 const shouldReuseExistingServer = !process.env.CI && !isMockSmoke
+const vercelProtectionBypassSecret =
+  process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim()
 
 export default defineConfig({
   testDir: "./tests/smoke",
@@ -29,6 +31,14 @@ export default defineConfig({
     : undefined,
   use: {
     baseURL,
+    ...(vercelProtectionBypassSecret
+      ? {
+          extraHTTPHeaders: {
+            "x-vercel-protection-bypass": vercelProtectionBypassSecret,
+            "x-vercel-set-bypass-cookie": "true",
+          },
+        }
+      : {}),
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
