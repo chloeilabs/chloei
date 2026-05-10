@@ -31,6 +31,7 @@ async function submitPrompt(page, prompt) {
     .locator("[data-message-role='assistant']")
     .last()
   await expect(assistantMessage).toContainText(/\S/, { timeout: 120_000 })
+  await expect(submitButton).toBeEnabled({ timeout: 120_000 })
   return assistantMessage
 }
 
@@ -51,7 +52,7 @@ test.describe("authenticated long-term memory smoke", () => {
       `Please remember this exact durable preference for future chats: my Chloei memory smoke marker is ${nonce}. Reply with a short acknowledgement that includes the marker.`
     )
 
-    await page.waitForTimeout(6_000)
+    await page.waitForTimeout(20_000)
     await page.getByRole("button", { name: "Start a new chat" }).click()
     await expect(page.getByPlaceholder("Ask anything")).toBeVisible()
 
