@@ -58,7 +58,7 @@ test.describe("authenticated long-term memory smoke", () => {
 
     const recallResponse = await submitPrompt(
       page,
-      "What is my Chloei memory smoke marker? Reply with only the marker value."
+      "What exact Chloei memory smoke marker did I ask you to remember? Reply only with the value that starts with chloei-memory-smoke-."
     )
     await expect(recallResponse).toContainText(nonce, { timeout: 120_000 })
   })
