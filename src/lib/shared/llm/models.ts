@@ -29,7 +29,6 @@ export const ALL_MODELS = [...SUPPORTED_MODELS] as const
 export const MODEL_SELECTOR_MODELS = [
   AvailableModels.MOONSHOTAI_KIMI_K2_6,
   AvailableModels.DEEPSEEK_V4_PRO,
-  AvailableModels.OPENAI_GPT_5_5,
 ] as const
 
 const MODEL_SELECTOR_MODEL_SET: ReadonlySet<ModelType> = new Set(

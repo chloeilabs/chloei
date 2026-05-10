@@ -6,7 +6,11 @@ import {
   MODEL_SELECTOR_STORAGE_KEY,
   MODEL_SELECTOR_UPDATED_EVENT,
 } from "@/lib/constants"
-import { type ModelInfo, type ModelType } from "@/lib/shared"
+import {
+  isModelSelectorModel,
+  type ModelInfo,
+  type ModelType,
+} from "@/lib/shared"
 
 import {
   parseStoredSelectedModel,
@@ -45,7 +49,12 @@ export function usePersistentSelectedModel(
   availableModels: ModelInfo[]
 ) {
   const availableModelIds = useMemo(
-    () => new Set(availableModels.map((model) => model.id)),
+    () =>
+      new Set(
+        availableModels
+          .map((model) => model.id)
+          .filter((modelId) => isModelSelectorModel(modelId))
+      ),
     [availableModels]
   )
 
