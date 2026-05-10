@@ -158,13 +158,13 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "openai/gpt-5.5" }],
+    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
     requestId: "request-default-mode",
   })
 
   assert(!(defaultModeResult instanceof Response))
   assert.equal(defaultModeResult.parsedRequest.runMode, "chat")
-  assert.equal(defaultModeResult.selectedModel, "openai/gpt-5.5")
+  assert.equal(defaultModeResult.selectedModel, "moonshotai/kimi-k2.6")
 
   const researchModeResult = parseAgentStreamRequest({
     body: {
@@ -207,6 +207,28 @@ test("agent helper validates total size, last-message role, and default model su
     requestId: "request-research-unavailable",
   })
 
+  const standaloneGptResult = parseAgentStreamRequest({
+    body: {
+      model: "openai/gpt-5.5",
+      messages: [
+        {
+          role: "user",
+          content: "Use GPT as a normal chat model.",
+        },
+      ],
+    },
+    availableModels: [{ id: "moonshotai/kimi-k2.6" }, { id: "openai/gpt-5.5" }],
+    requestId: "request-standalone-gpt",
+  })
+
+  assert(standaloneGptResult instanceof Response)
+  assert.equal(standaloneGptResult.status, 400)
+  assert.deepEqual(await standaloneGptResult.json(), {
+    error: "Unsupported model selected.",
+    errorCode: "AGENT_UNSUPPORTED_MODEL",
+    requestId: "request-standalone-gpt",
+  })
+
   const invalidRunModeResult = parseAgentStreamRequest({
     body: {
       runMode: "deep",
@@ -217,7 +239,7 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "openai/gpt-5.5" }],
+    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
     requestId: "request-invalid-mode",
   })
 
@@ -393,7 +415,7 @@ test("agent helper validates file attachments and preserves the selected model",
         },
       ],
     },
-    availableModels: [{ id: "openai/gpt-5.5" }],
+    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
     requestId: "request-attachment-role",
   })
 
@@ -420,7 +442,7 @@ test("agent helper validates file attachments and preserves the selected model",
         },
       ],
     },
-    availableModels: [{ id: "openai/gpt-5.5" }],
+    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
     requestId: "request-attachment-bad-data-url",
   })
 
@@ -447,7 +469,7 @@ test("agent helper validates file attachments and preserves the selected model",
         },
       ],
     },
-    availableModels: [{ id: "openai/gpt-5.5" }],
+    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
     requestId: "request-attachment-bad-preview",
   })
 
@@ -479,7 +501,7 @@ test("agent helper validates file attachments and preserves the selected model",
         },
       ],
     },
-    availableModels: [{ id: "openai/gpt-5.5" }],
+    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
     requestId: "request-attachment-pdf-preview",
   })
 
@@ -507,7 +529,7 @@ test("agent helper validates file attachments and preserves the selected model",
         },
       ],
     },
-    availableModels: [{ id: "openai/gpt-5.5" }],
+    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
     requestId: "request-attachment-empty-base64",
   })
 
@@ -534,12 +556,12 @@ test("agent helper validates file attachments and preserves the selected model",
         },
       ],
     },
-    availableModels: [{ id: "openai/gpt-5.5" }],
+    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
     requestId: "request-attachment-normalized-base64",
   })
 
   assert(!(normalizedBase64Result instanceof Response))
-  assert.equal(normalizedBase64Result.selectedModel, "openai/gpt-5.5")
+  assert.equal(normalizedBase64Result.selectedModel, "moonshotai/kimi-k2.6")
 
   const tooManyAttachments = Array.from(
     { length: AGENT_ATTACHMENT_MAX_FILES + 1 },
@@ -559,7 +581,7 @@ test("agent helper validates file attachments and preserves the selected model",
         },
       ],
     },
-    availableModels: [{ id: "openai/gpt-5.5" }],
+    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
     requestId: "request-attachments-too-many-per-turn",
   })
 
@@ -590,14 +612,14 @@ test("agent helper validates file attachments and preserves the selected model",
         },
       ],
     },
-    availableModels: [{ id: "openai/gpt-5.5" }],
+    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
     requestId: "request-attachments-cross-convo",
   })
 
   assert(!(crossConversationAttachmentsResult instanceof Response))
   assert.equal(
     crossConversationAttachmentsResult.selectedModel,
-    "openai/gpt-5.5"
+    "moonshotai/kimi-k2.6"
   )
 
   const largePdfDataUrl = `data:application/pdf;base64,${Buffer.alloc(3 * 1024 * 1024).toString("base64")}`
@@ -656,14 +678,14 @@ test("agent helper validates file attachments and preserves the selected model",
         },
       ],
     },
-    availableModels: [{ id: "openai/gpt-5.5" }],
+    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
     requestId: "request-attachments-cross-message-large",
   })
 
   assert(!(crossMessageLargeAttachmentsResult instanceof Response))
   assert.equal(
     crossMessageLargeAttachmentsResult.selectedModel,
-    "openai/gpt-5.5"
+    "moonshotai/kimi-k2.6"
   )
 
   const priorAttachmentPayloadsResult = parseAgentStreamRequest({
@@ -692,7 +714,7 @@ test("agent helper validates file attachments and preserves the selected model",
         },
       ],
     },
-    availableModels: [{ id: "openai/gpt-5.5" }],
+    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
     requestId: "request-attachments-prior-prompt",
   })
 
@@ -721,7 +743,7 @@ test("agent helper validates file attachments and preserves the selected model",
         },
       ],
     },
-    availableModels: [{ id: "openai/gpt-5.5" }],
+    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
     requestId: "request-attachments-too-large",
   })
 

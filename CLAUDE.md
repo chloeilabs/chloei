@@ -193,7 +193,7 @@ All available models are defined in `src/lib/shared/llm/models.ts` (`AvailableMo
 | `MOONSHOTAI_KIMI_K2_6` | `moonshotai/kimi-k2.6`     | Kimi K2.6       |
 | `DEEPSEEK_V4_PRO`      | `deepseek/deepseek-v4-pro` | DeepSeek V4 Pro |
 
-`MODEL_SELECTOR_MODELS` defines the subset shown in the model selector UI (currently Kimi K2.6, DeepSeek V4 Pro, and GPT-5.5). Adding a model requires updating `AvailableModels`, `ModelInfos`, `SUPPORTED_MODELS`, and optionally `MODEL_SELECTOR_MODELS` in that file. The `/api/models` route reads from this registry (filtered by configured API keys via `getModels()` in `src/lib/actions/api-keys.ts`); the agent validates the requested model against it.
+`MODEL_SELECTOR_MODELS` defines the subset shown in the model selector UI (currently Kimi K2.6 and DeepSeek V4 Pro). GPT-5.5 remains in `SUPPORTED_MODELS` for research mode only and is not a standalone chat selector option. Adding a model requires updating `AvailableModels`, `ModelInfos`, `SUPPORTED_MODELS`, and optionally `MODEL_SELECTOR_MODELS` in that file. The `/api/models` route reads from this registry (filtered by configured API keys via `getModels()` in `src/lib/actions/api-keys.ts`); the agent validates the requested model against it.
 
 ### Authentication
 

@@ -1,4 +1,9 @@
-import { isModelType, type ModelInfo, type ModelType } from "@/lib/shared"
+import {
+  isModelSelectorModel,
+  isModelType,
+  type ModelInfo,
+  type ModelType,
+} from "@/lib/shared"
 
 const STORED_SELECTED_MODEL_VERSION = 1
 
@@ -23,7 +28,7 @@ export function parseStoredSelectedModel(value: unknown): ModelType | null {
     return null
   }
 
-  if (isModelType(value)) {
+  if (isModelType(value) && isModelSelectorModel(value)) {
     return value
   }
 
@@ -38,7 +43,8 @@ export function parseStoredSelectedModel(value: unknown): ModelType | null {
       "version" in parsed &&
       parsed.source === "user" &&
       parsed.version === STORED_SELECTED_MODEL_VERSION &&
-      isModelType(parsed.model)
+      isModelType(parsed.model) &&
+      isModelSelectorModel(parsed.model)
     ) {
       return parsed.model
     }
@@ -56,13 +62,16 @@ export function resolvePersistedSelectedModel(params: {
   availableModels: ModelInfo[]
 }): ModelType | null {
   const availableModelIds = new Set(
-    params.availableModels.map((model) => model.id)
+    params.availableModels
+      .map((model) => model.id)
+      .filter((modelId) => isModelSelectorModel(modelId))
   )
   const fallbackModel =
     params.initialSelectedModel &&
     availableModelIds.has(params.initialSelectedModel)
       ? params.initialSelectedModel
-      : (params.availableModels[0]?.id ?? null)
+      : (params.availableModels.find((model) => availableModelIds.has(model.id))
+          ?.id ?? null)
 
   if (params.storedModel && availableModelIds.has(params.storedModel)) {
     return params.storedModel

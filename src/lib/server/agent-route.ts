@@ -23,9 +23,10 @@ import {
   AvailableModels,
   getAgentAttachmentKind,
   getDataUrlMediaType,
+  isModelSelectorModel,
   type ModelInfo,
   type ModelType,
-  resolveDefaultModel,
+  resolveDefaultModelSelectorModel,
 } from "@/lib/shared"
 
 import {
@@ -654,12 +655,28 @@ export function parseAgentStreamRequest(
     })
   }
 
+  const chatModels = params.availableModels.filter((model) =>
+    isModelSelectorModel(model.id)
+  )
   const selectedModelCandidate =
     runMode === "research"
       ? AvailableModels.OPENAI_GPT_5_5
-      : (parsed.data.model ?? resolveDefaultModel(params.availableModels))
+      : (parsed.data.model ?? resolveDefaultModelSelectorModel(chatModels))
 
   if (!isSupportedModel(selectedModelCandidate)) {
+    return createJsonErrorResponse({
+      requestId: params.requestId,
+      error: "Unsupported model selected.",
+      errorCode: "AGENT_UNSUPPORTED_MODEL",
+      status: 400,
+      rateLimitDecision: params.rateLimitDecision,
+    })
+  }
+
+  if (
+    runMode !== "research" &&
+    !isAvailableModel(chatModels, selectedModelCandidate)
+  ) {
     return createJsonErrorResponse({
       requestId: params.requestId,
       error: "Unsupported model selected.",
