@@ -213,6 +213,24 @@ test("financial services workflow detection does not route generic guidance to e
   assert.equal(filingContext?.workflow, "filing_research")
 })
 
+test("financial services workflow detection does not route standalone sec to filing research", () => {
+  const context = resolveFinancialServicesWorkflow({
+    messages: [
+      {
+        role: "user",
+        content:
+          "Create a company snapshot for Adyen; wait a sec before drafting.",
+      },
+    ],
+    taskMode: "finance_analysis",
+    tools: {
+      secUserAgentConfigured: true,
+    },
+  })
+
+  assert.equal(context?.workflow, "market_research")
+})
+
 test("financial services workflow detection selects pitch materials first", () => {
   const context = resolveFinancialServicesWorkflow({
     messages: [

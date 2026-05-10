@@ -23,6 +23,7 @@ function toOutputRecord(output) {
       toolCalls: [],
       sources: [],
       artifacts: [],
+      values: {},
     }
   }
 
@@ -31,6 +32,8 @@ function toOutputRecord(output) {
     toolCalls: Array.isArray(output?.toolCalls) ? output.toolCalls : [],
     sources: Array.isArray(output?.sources) ? output.sources : [],
     artifacts: Array.isArray(output?.artifacts) ? output.artifacts : [],
+    values:
+      output?.values && typeof output.values === "object" ? output.values : {},
   }
 }
 
@@ -288,7 +291,7 @@ export function gradeFinanceOutput(task, outputCandidate) {
   }
 
   for (const numericExpectation of task.expectedNumbers ?? []) {
-    const value = getNumericValue(outputCandidate, numericExpectation.key)
+    const value = getNumericValue(output, numericExpectation.key)
     const tolerance = numericExpectation.tolerance ?? 0
     checks.push({
       id: `number:${numericExpectation.key}`,

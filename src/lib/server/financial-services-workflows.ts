@@ -36,7 +36,7 @@ const FINANCIAL_MODELING_PATTERN =
   /\b(dcf|discounted cash flow|lbo|leveraged buyout|three[- ]statement|3[- ]statement|trading comps?|comps analysis|precedent transactions?|valuation model|financial model|model builder|excel valuation|football field|wacc|terminal value|sensitivity table)\b/i
 
 const FINANCIAL_MODELING_CONTEXT_PATTERN =
-  /\b(finance|financial|valuation|dcf|discounted cash flow|lbo|comps?|precedent transactions?|stock|stocks|ticker|market cap|capital markets|enterprise value|ev\/ebitda|ebitda|revenue|cash flow|fcf|wacc|terminal value|sensitivity|investment banking|10-k|10-q|filing|sec)\b/i
+  /\b(finance|financial|valuation|dcf|discounted cash flow|lbo|comps?|precedent transactions?|stock|stocks|ticker|market cap|capital markets|enterprise value|ev\/ebitda|ebitda|revenue|cash flow|fcf|wacc|terminal value|sensitivity|investment banking|10-k|10-q|filings?|sec (?:filings?|reports?|disclosures?|data|facts?))\b/i
 
 const GENERIC_MODELING_ARTIFACT_PATTERN =
   /\b(?:build|create|draft|generate|make)\s+(?:a |an )?(?:model|workbook|spreadsheet)\b|\b(?:model|workbook|spreadsheet|xlsx) artifact\b|\.xlsx\b/i
@@ -48,7 +48,7 @@ const PITCH_MATERIALS_PATTERN =
   /\b(pitch book|pitchbook|pitch deck|pitch materials?|investment banking pitch|client presentation|teaser|slide outline|valuation summary slide|strategic alternatives|situation overview)\b/i
 
 const FILING_RESEARCH_PATTERN =
-  /\b(sec|edgar|10-k|10-q|8-k|annual report|quarterly report|proxy statement|def 14a|filings?|mda|md&a|management discussion|risk factors?|issuer purchases?|shares? repurchased|common stock repurchased|adjusted ebitda|non-gaap|capital raise|geographic region|segment revenue|revenue by (?:segment|region)|table extract|filing table)\b/i
+  /\b(sec (?:filings?|reports?|disclosures?|data|facts?|10-k|10-q|8-k)|edgar|10-k|10-q|8-k|annual report|quarterly report|proxy statement|def 14a|filings?|mda|md&a|management discussion|risk factors?|issuer purchases?|shares? repurchased|common stock repurchased|adjusted ebitda|non-gaap|capital raise|geographic region|segment revenue|revenue by (?:segment|region)|table extract|filing table)\b/i
 
 const EARNINGS_REVIEW_PATTERN =
   /\b(earnings review|earnings call|earnings release|quarterly results|reported earnings|beat or miss|beat\/miss|management projections?|consensus|model update|earnings transcript|q[1-4]\s+\d{4}\s+earnings|(?:management|company|revenue|margin|eps|earnings|quarterly|annual|full-year|fy\s?\d{2,4}|q[1-4])\s+guidance|guidance\s+(?:range|midpoint|versus|vs\.?|beat|miss|raise|lower|update|revision|actuals?|compare|compared))\b/i
