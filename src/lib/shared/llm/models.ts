@@ -1,9 +1,7 @@
 export const AvailableModels = {
-  ANTHROPIC_CLAUDE_SONNET_4_6: "anthropic/claude-sonnet-4.6",
   DEEPSEEK_V4_PRO: "deepseek/deepseek-v4-pro",
   MOONSHOTAI_KIMI_K2_6: "moonshotai/kimi-k2.6",
   OPENAI_GPT_5_5: "openai/gpt-5.5",
-  XAI_GROK_4_3: "xai/grok-4.3",
 } as const
 
 export type ModelType = (typeof AvailableModels)[keyof typeof AvailableModels]
@@ -22,10 +20,8 @@ export interface ModelInfo {
 
 export const SUPPORTED_MODELS = [
   AvailableModels.OPENAI_GPT_5_5,
-  AvailableModels.ANTHROPIC_CLAUDE_SONNET_4_6,
   AvailableModels.MOONSHOTAI_KIMI_K2_6,
   AvailableModels.DEEPSEEK_V4_PRO,
-  AvailableModels.XAI_GROK_4_3,
 ] as const
 
 export const ALL_MODELS = [...SUPPORTED_MODELS] as const
@@ -33,7 +29,7 @@ export const ALL_MODELS = [...SUPPORTED_MODELS] as const
 export const MODEL_SELECTOR_MODELS = [
   AvailableModels.MOONSHOTAI_KIMI_K2_6,
   AvailableModels.DEEPSEEK_V4_PRO,
-  AvailableModels.XAI_GROK_4_3,
+  AvailableModels.OPENAI_GPT_5_5,
 ] as const
 
 const MODEL_SELECTOR_MODEL_SET: ReadonlySet<ModelType> = new Set(
@@ -50,7 +46,11 @@ export function isModelSelectorModel(value: unknown): value is ModelType {
 export function getModelSelectorModels(
   models: readonly ModelInfo[]
 ): ModelInfo[] {
-  return models.filter((model) => isModelSelectorModel(model.id))
+  const modelById = new Map(models.map((model) => [model.id, model]))
+  return MODEL_SELECTOR_MODELS.flatMap((modelId) => {
+    const model = modelById.get(modelId)
+    return model ? [model] : []
+  })
 }
 
 export function resolveDefaultModelSelectorModel(
@@ -66,10 +66,6 @@ export function resolveDefaultModel(
 }
 
 export const ModelInfos: Record<ModelType, ModelInfo> = {
-  [AvailableModels.ANTHROPIC_CLAUDE_SONNET_4_6]: {
-    id: AvailableModels.ANTHROPIC_CLAUDE_SONNET_4_6,
-    name: "Claude Sonnet 4.6",
-  },
   [AvailableModels.DEEPSEEK_V4_PRO]: {
     id: AvailableModels.DEEPSEEK_V4_PRO,
     name: "DeepSeek V4 Pro",
@@ -82,17 +78,11 @@ export const ModelInfos: Record<ModelType, ModelInfo> = {
     id: AvailableModels.OPENAI_GPT_5_5,
     name: "GPT-5.5",
   },
-  [AvailableModels.XAI_GROK_4_3]: {
-    id: AvailableModels.XAI_GROK_4_3,
-    name: "Grok 4.3",
-  },
 }
 
 const VISION_CAPABLE_MODEL_SET: ReadonlySet<ModelType> = new Set([
-  AvailableModels.ANTHROPIC_CLAUDE_SONNET_4_6,
   AvailableModels.MOONSHOTAI_KIMI_K2_6,
   AvailableModels.OPENAI_GPT_5_5,
-  AvailableModels.XAI_GROK_4_3,
 ])
 
 export function modelSupportsImageInput(model: ModelType): boolean {
@@ -100,4 +90,4 @@ export function modelSupportsImageInput(model: ModelType): boolean {
 }
 
 export const VISION_PREPROCESSOR_MODEL: ModelType =
-  AvailableModels.ANTHROPIC_CLAUDE_SONNET_4_6
+  AvailableModels.OPENAI_GPT_5_5

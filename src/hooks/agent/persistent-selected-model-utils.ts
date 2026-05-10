@@ -1,9 +1,4 @@
-import {
-  AvailableModels,
-  isModelType,
-  type ModelInfo,
-  type ModelType,
-} from "@/lib/shared"
+import { isModelType, type ModelInfo, type ModelType } from "@/lib/shared"
 
 const STORED_SELECTED_MODEL_VERSION = 1
 
@@ -29,7 +24,7 @@ export function parseStoredSelectedModel(value: unknown): ModelType | null {
   }
 
   if (isModelType(value)) {
-    return value === AvailableModels.ANTHROPIC_CLAUDE_SONNET_4_6 ? null : value
+    return value
   }
 
   try {

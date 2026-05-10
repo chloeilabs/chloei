@@ -140,7 +140,7 @@ beforeEach(() => {
           parsedRequest: {
             messages: body.messages,
           },
-          selectedModel: "anthropic/claude-sonnet-4.6",
+          selectedModel: "moonshotai/kimi-k2.6",
         }
       },
       createAgentStreamResponse(params) {
@@ -373,7 +373,7 @@ test("agent route passes the resolved prompt context into stream creation", asyn
     context: {
       now: recorded.buildInstructionCalls[0].context.now,
       userTimeZone: "America/Chicago",
-      provider: "provider:anthropic/claude-sonnet-4.6",
+      provider: "provider:moonshotai/kimi-k2.6",
       taskMode: "multi-turn",
     },
   })
@@ -414,7 +414,7 @@ test("agent route injects financial services workflow and uses finance runtime",
             messages: body.messages,
             runMode: "chat",
           },
-          selectedModel: "anthropic/claude-sonnet-4.6",
+          selectedModel: "moonshotai/kimi-k2.6",
         }
       },
     },
@@ -464,7 +464,7 @@ test("agent route skips long-term memory work when memory is disabled", async ()
             messages: body.messages,
             threadId: body.threadId,
           },
-          selectedModel: "anthropic/claude-sonnet-4.6",
+          selectedModel: "moonshotai/kimi-k2.6",
         }
       },
     },
@@ -504,7 +504,7 @@ test("agent route injects long-term memory context and wires memory commit callb
             runMode: "chat",
             threadId: body.threadId,
           },
-          selectedModel: "anthropic/claude-sonnet-4.6",
+          selectedModel: "moonshotai/kimi-k2.6",
         }
       },
     },

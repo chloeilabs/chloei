@@ -60,10 +60,10 @@ test("thread payload preserves valid run modes and drops invalid run modes", () 
         id: "message-1",
         role: "user",
         content: "Research this.",
-        llmModel: "anthropic/claude-sonnet-4.6",
+        llmModel: "moonshotai/kimi-k2.6",
         createdAt: "2026-04-26T00:00:00.000Z",
         metadata: {
-          selectedModel: "anthropic/claude-sonnet-4.6",
+          selectedModel: "moonshotai/kimi-k2.6",
           runMode: "research",
         },
       },

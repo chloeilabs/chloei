@@ -76,14 +76,11 @@ test("appended user messages preserve the requested run mode", () => {
   const messages = appendUserMessage(
     [],
     "Research Apple supply chain risk.",
-    "anthropic/claude-sonnet-4.6",
+    "moonshotai/kimi-k2.6",
     "research"
   )
 
-  assert.equal(
-    messages[0]?.metadata?.selectedModel,
-    "anthropic/claude-sonnet-4.6"
-  )
+  assert.equal(messages[0]?.metadata?.selectedModel, "moonshotai/kimi-k2.6")
   assert.equal(messages[0]?.metadata?.runMode, "research")
 })
 
@@ -101,7 +98,7 @@ test("attached user messages persist metadata but request transient data separat
   const messages = appendUserMessage(
     [],
     "Analyze this chart.",
-    "anthropic/claude-sonnet-4.6",
+    "moonshotai/kimi-k2.6",
     "chat",
     [attachment]
   )
@@ -142,7 +139,7 @@ test("agent request messages resend raw attachments for every user turn that upl
     ...appendUserMessage(
       [],
       "Analyze this chart.",
-      "anthropic/claude-sonnet-4.6",
+      "moonshotai/kimi-k2.6",
       "chat",
       [attachment]
     ),
@@ -152,11 +149,7 @@ test("agent request messages resend raw attachments for every user turn that upl
       content: "The chart is clear.",
       createdAt: "2026-04-26T00:00:01.000Z",
     },
-    ...appendUserMessage(
-      [],
-      "Summarize the answer.",
-      "anthropic/claude-sonnet-4.6"
-    ),
+    ...appendUserMessage([], "Summarize the answer.", "moonshotai/kimi-k2.6"),
   ]
   const firstUserMessage = messages[0]
   const attachmentsByMessageId = new Map([[firstUserMessage.id, [attachment]]])

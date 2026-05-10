@@ -7,8 +7,8 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import "./register-ts-path-hooks.mjs"
 
 const cwd = fileURLToPath(new URL("..", import.meta.url))
-const gatewaySearchToolsUrl = pathToFileURL(
-  path.join(cwd, "src/lib/server/llm/ai-sdk-gateway-search-tools.ts")
+const gatewayProviderOptionsUrl = pathToFileURL(
+  path.join(cwd, "src/lib/server/llm/ai-sdk-gateway-provider-options.ts")
 ).href
 const tavilyToolsPath = path.join(
   cwd,
@@ -21,49 +21,12 @@ const persistentSelectedModelUrl = pathToFileURL(
 const {
   getAiSdkGatewayProviderOptions,
   getAiSdkGatewayProviderOptionsForMode,
-  getAiSdkGatewaySearchToolCallMetadata,
-} = await import(gatewaySearchToolsUrl)
+} = await import(gatewayProviderOptionsUrl)
 const {
   parseStoredSelectedModel,
   resolvePersistedSelectedModel,
   serializeStoredSelectedModel,
 } = await import(persistentSelectedModelUrl)
-
-test("gateway search tools normalize queries from native and gateway search inputs", () => {
-  assert.deepEqual(
-    getAiSdkGatewaySearchToolCallMetadata({
-      toolCallId: "call-web",
-      toolName: "web_search",
-      input: { query: "latest vercel ai gateway updates" },
-    }),
-    {
-      callId: "call-web",
-      toolName: "web_search",
-      label: "Searching Web",
-      query: "latest vercel ai gateway updates",
-      operation: "web_search",
-      provider: "ai_gateway",
-    }
-  )
-
-  assert.equal(
-    getAiSdkGatewaySearchToolCallMetadata({
-      toolCallId: "call-pplx",
-      toolName: "perplexity_search",
-      input: { query: ["vercel ai gateway", "claude sonnet 4.6"] },
-    }),
-    null
-  )
-
-  assert.equal(
-    getAiSdkGatewaySearchToolCallMetadata({
-      toolCallId: "call-parallel",
-      toolName: "parallel_search",
-      input: { objective: "Find recent AI Gateway launch coverage." },
-    }),
-    null
-  )
-})
 
 test("tavily search tool results derive source links", async () => {
   const source = await readFile(tavilyToolsPath, "utf8")
@@ -81,16 +44,7 @@ test("tavily search tool results derive source links", async () => {
 })
 
 test("gateway provider options request the strongest supported reasoning levels", () => {
-  assert.deepEqual(getAiSdkGatewayProviderOptions(), {
-    anthropic: {
-      sendReasoning: true,
-      thinking: {
-        type: "adaptive",
-        display: "summarized",
-      },
-      effort: "high",
-    },
-  })
+  assert.deepEqual(getAiSdkGatewayProviderOptions(), {})
 
   assert.deepEqual(
     getAiSdkGatewayProviderOptionsForMode({ deepResearch: true }).openai,
@@ -117,16 +71,13 @@ test("inline citation instructions avoid separate sources sections", async () =>
   )
 })
 
-test("stale and legacy default model ids fall back to GPT-5.5", () => {
+test("stale and unavailable default model ids fall back to GPT-5.5", () => {
   assert.equal(parseStoredSelectedModel("qwen/qwen3.6-plus"), null)
-  assert.equal(parseStoredSelectedModel("anthropic/claude-sonnet-4.6"), null)
   assert.equal(
     parseStoredSelectedModel(
-      JSON.stringify(
-        serializeStoredSelectedModel("anthropic/claude-sonnet-4.6")
-      )
+      JSON.stringify(serializeStoredSelectedModel("openai/gpt-5.5"))
     ),
-    "anthropic/claude-sonnet-4.6"
+    "openai/gpt-5.5"
   )
 
   assert.equal(
@@ -140,8 +91,8 @@ test("stale and legacy default model ids fall back to GPT-5.5", () => {
           name: "GPT-5.5",
         },
         {
-          id: "anthropic/claude-sonnet-4.6",
-          name: "Claude Sonnet 4.6",
+          id: "moonshotai/kimi-k2.6",
+          name: "Kimi K2.6",
         },
       ],
     }),
