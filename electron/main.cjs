@@ -474,6 +474,22 @@ function stopNextServer() {
   }, 5_000).unref()
 }
 
+function getAutoUpdateChannel() {
+  if (process.env.CHLOEI_DESKTOP_UPDATE_CHANNEL?.trim()) {
+    return process.env.CHLOEI_DESKTOP_UPDATE_CHANNEL.trim()
+  }
+
+  if (process.platform === "darwin") {
+    return process.arch === "arm64" ? "latest-mac-arm64" : "latest-mac-x64"
+  }
+
+  if (process.platform === "win32") {
+    return "latest-win-x64"
+  }
+
+  return "latest"
+}
+
 function configureAutoUpdates() {
   if (!app.isPackaged || process.env.CHLOEI_DESKTOP_AUTO_UPDATE === "0") {
     return
@@ -482,6 +498,7 @@ function configureAutoUpdates() {
   try {
     const { autoUpdater } = require("electron-updater")
 
+    autoUpdater.channel = getAutoUpdateChannel()
     autoUpdater.on("error", (error) => {
       log("Auto-update check failed.", error)
     })

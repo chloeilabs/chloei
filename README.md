@@ -99,7 +99,7 @@ The desktop app does not bundle server secrets. For local packaged testing, prov
 
 Use the same key/value format as `.env.local`. The Electron shell always overrides `BETTER_AUTH_URL`, `BETTER_AUTH_TRUSTED_ORIGINS`, `HOSTNAME`, and `PORT` for the local desktop server, and clears `BETTER_AUTH_COOKIE_DOMAIN` so localhost sessions work correctly.
 
-Desktop release builds are configured in `.github/workflows/desktop-release.yml`. Local macOS desktop builds skip signing by default because this repo often lives in a cloud-synced workspace; set `CHLOEI_DESKTOP_SIGN=1` to opt into local certificate signing from a normal local checkout. CI macOS signing/notarization uses `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_API_KEY_P8`, `APPLE_API_KEY_ID`, and `APPLE_API_ISSUER`. Windows signing uses `WIN_CERT_FILE` and `WIN_CERT_PASSWORD`. Draft GitHub release publishing is available through the workflow's `publish` input.
+Desktop release builds are configured in `.github/workflows/desktop-release.yml`. CI builds separate macOS Apple Silicon, macOS Intel, and Windows x64 artifacts, each with its own auto-update channel so split macOS builds do not overwrite each other's update metadata. Local macOS desktop builds skip signing by default because this repo often lives in a cloud-synced workspace; set `CHLOEI_DESKTOP_SIGN=1` to opt into local certificate signing from a normal local checkout. CI macOS signing/notarization uses `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_API_KEY_P8`, `APPLE_API_KEY_ID`, and `APPLE_API_ISSUER`. Windows signing uses `WIN_CERT_FILE` and `WIN_CERT_PASSWORD`. Draft GitHub release publishing is available through the workflow's `publish` input.
 
 ## Environment
 

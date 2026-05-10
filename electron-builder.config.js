@@ -7,6 +7,7 @@ const path = require("node:path")
 const shouldSignMac =
   process.env.CHLOEI_DESKTOP_SIGN === "1" ||
   Boolean(process.env.CSC_LINK || process.env.CSC_NAME)
+const desktopUpdateChannel = process.env.CHLOEI_DESKTOP_UPDATE_CHANNEL?.trim()
 
 function getAppBundlePath(context) {
   return path.join(
@@ -108,6 +109,7 @@ module.exports = {
   ],
   publish: [
     {
+      ...(desktopUpdateChannel ? { channel: desktopUpdateChannel } : {}),
       owner: "chloeilabs",
       provider: "github",
       releaseType: "draft",

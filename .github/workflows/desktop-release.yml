@@ -24,12 +24,21 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: macos
+          - platform: macos-arm64
+            os: macos
             runner: macos-latest
-            build-target: --mac
-          - platform: windows
+            build-target: --mac --arm64
+            update-channel: latest-mac-arm64
+          - platform: macos-x64
+            os: macos
+            runner: macos-15-intel
+            build-target: --mac --x64
+            update-channel: latest-mac-x64
+          - platform: windows-x64
+            os: windows
             runner: windows-latest
-            build-target: --win
+            build-target: --win --x64
+            update-channel: latest-win-x64
 
     steps:
       - name: Check out repository
@@ -69,7 +78,7 @@ jobs:
             fi
           }
 
-          if [[ "${{ matrix.platform }}" == "macos" ]]; then
+          if [[ "${{ matrix.os }}" == "macos" ]]; then
             require_secret "CSC_LINK" "$CSC_LINK"
             require_secret "CSC_KEY_PASSWORD" "$CSC_KEY_PASSWORD"
             require_secret "APPLE_API_ISSUER" "$APPLE_API_ISSUER"
@@ -89,7 +98,7 @@ jobs:
           WIN_CERT_PASSWORD: ${{ secrets.WIN_CERT_PASSWORD }}
 
       - name: Prepare Apple API key for notarization
-        if: matrix.platform == 'macos'
+        if: matrix.os == 'macos'
         shell: bash
         run: |
           if [[ -z "$APPLE_API_KEY_P8" || -z "$APPLE_API_KEY_ID" || -z "$APPLE_API_ISSUER" || -z "$CSC_LINK" || -z "$CSC_KEY_PASSWORD" ]]; then
@@ -121,6 +130,7 @@ jobs:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           DESKTOP_PUBLISH: ${{ inputs.publish && 'always' || 'never' }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHLOEI_DESKTOP_UPDATE_CHANNEL: ${{ matrix.update-channel }}
           WIN_CERT_FILE: ${{ secrets.WIN_CERT_FILE }}
           WIN_CERT_PASSWORD: ${{ secrets.WIN_CERT_PASSWORD }}
 
