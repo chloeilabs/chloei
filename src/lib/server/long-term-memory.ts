@@ -10,7 +10,19 @@ const logger = createLogger("long-term-memory")
 const MEMORY_SEARCH_TIMEOUT_MS = 5_000
 const MEMORY_COMMIT_TIMEOUT_MS = 30_000
 const MEMORY_DELETE_TIMEOUT_MS = 10_000
+const MEMORY_COMMIT_CONTEXT_MAX_CHARS = 2_000
+const MEMORY_RECENT_CONTEXT_MESSAGE_LIMIT = 4
 const MAX_MEMORY_ITEM_CHARS = 700
+const MEMORY_EXTRACTION_INSTRUCTIONS = [
+  "Extract only durable user preferences, stable personal facts, and long-lived instructions that can help personalize future Chloei conversations.",
+  "Do not store transient market data, one-off task details, raw prompt text, raw attachments, hidden prompts, auth metadata, API keys, passwords, tokens, secrets, or other credentials.",
+  "If the latest user message says to remember this/that/the above, use recent conversation context only to resolve the referenced durable fact or preference.",
+  "If there is no durable non-sensitive memory to store, create no memory.",
+].join(" ")
+const EXPLICIT_MEMORY_CONTEXT_REFERENCE_PATTERNS = [
+  /\b(?:remember|save|retain|store|keep(?:\s+in\s+mind)?)\b[\s\S]{0,120}\b(?:this|that|these|those|it|the\s+above|what\s+i\s+(?:just\s+)?(?:said|told\s+you)|my\s+(?:last|previous)\s+message)\b/i,
+  /\b(?:please|can\s+you|could\s+you)\s+(?:remember|save|retain|store)\s+(?:this|that|these|those|it|the\s+above)\b/i,
+]
 const SECRET_PATTERNS = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/i,
   /\b(?:api[_-]?key|password|passwd|pwd)\b\s*(?::|=|\bis\b|\bare\b)/i,
@@ -66,6 +78,11 @@ interface DeleteLongTermMemoriesForThreadParams extends MemoryRequestOptions {
 
 type Mem0ApiMode = "oss" | "platform"
 
+interface MemoryCommitMessage {
+  role: "user" | "assistant"
+  content: string
+}
+
 function getMemoryRuntimeConfig(
   config: MemoryRuntimeConfig | undefined
 ): MemoryRuntimeConfig {
@@ -100,44 +117,180 @@ function getMem0ApiMode(config: MemoryRuntimeConfig): Mem0ApiMode {
   }
 }
 
-function getPlatformAppId(config: MemoryRuntimeConfig, userId: string): string {
+function getPlatformAppId(config: { agentId: string }, userId: string): string {
   return `${config.agentId}:${userId}`
+}
+
+function createPlatformEntityFilters(params: {
+  agentId: string
+  legacyPlatformScope?: boolean
+  userId: string
+}) {
+  if (params.legacyPlatformScope) {
+    return {
+      AND: [
+        { user_id: params.userId },
+        {
+          app_id: getPlatformAppId({ agentId: params.agentId }, params.userId),
+        },
+      ],
+    }
+  }
+
+  return {
+    AND: [
+      { user_id: params.userId },
+      { metadata: { agent_id: params.agentId } },
+    ],
+  }
+}
+
+function createMemorySearchBody(params: {
+  config: MemoryRuntimeConfig
+  legacyPlatformScope?: boolean
+  mode: Mem0ApiMode
+  query: string
+  userId: string
+}) {
+  if (params.mode === "platform") {
+    return {
+      filters: createPlatformEntityFilters({
+        agentId: params.config.agentId,
+        legacyPlatformScope: params.legacyPlatformScope,
+        userId: params.userId,
+      }),
+      query: params.query,
+      rerank: false,
+      threshold: params.config.threshold,
+      top_k: params.config.topK,
+    }
+  }
+
+  return {
+    agent_id: params.config.agentId,
+    query: params.query,
+    threshold: params.config.threshold,
+    top_k: params.config.topK,
+    user_id: params.userId,
+  }
+}
+
+function shouldIncludeRecentMemoryContext(latestUserMessage: string): boolean {
+  return EXPLICIT_MEMORY_CONTEXT_REFERENCE_PATTERNS.some((pattern) =>
+    pattern.test(latestUserMessage)
+  )
+}
+
+function getLatestUserMessageIndex(
+  messages: CommitLongTermMemoryParams["messages"]
+): number {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.role === "user") {
+      return index
+    }
+  }
+
+  return -1
+}
+
+function normalizeMemoryCommitContent(value: string): string {
+  return value.replace(/\s+/g, " ").trim()
+}
+
+function getBoundedRecentContextMessages(params: {
+  latestUserMessageIndex: number
+  messages: CommitLongTermMemoryParams["messages"]
+}): MemoryCommitMessage[] {
+  const contextMessages: MemoryCommitMessage[] = []
+  let remainingChars = MEMORY_COMMIT_CONTEXT_MAX_CHARS
+
+  for (
+    let index = params.latestUserMessageIndex - 1;
+    index >= 0 &&
+    contextMessages.length < MEMORY_RECENT_CONTEXT_MESSAGE_LIMIT &&
+    remainingChars > 20;
+    index -= 1
+  ) {
+    const message = params.messages[index]
+    if (!message) {
+      continue
+    }
+
+    const content = normalizeMemoryCommitContent(message.content)
+    if (!content) {
+      continue
+    }
+
+    const boundedContent = truncateText(content, remainingChars)
+    contextMessages.unshift({
+      role: message.role,
+      content: boundedContent,
+    })
+    remainingChars -= boundedContent.length
+  }
+
+  return contextMessages
+}
+
+function createMemoryCommitMessages(params: {
+  assistantContent: string
+  latestUserMessage: string
+  latestUserMessageIndex: number
+  messages: CommitLongTermMemoryParams["messages"]
+}): MemoryCommitMessage[] {
+  const latestUserMessage = normalizeMemoryCommitContent(
+    params.latestUserMessage
+  )
+  const memoryMessages = shouldIncludeRecentMemoryContext(latestUserMessage)
+    ? getBoundedRecentContextMessages({
+        latestUserMessageIndex: params.latestUserMessageIndex,
+        messages: params.messages,
+      })
+    : []
+
+  memoryMessages.push(
+    { role: "user", content: latestUserMessage },
+    { role: "assistant", content: params.assistantContent }
+  )
+
+  return memoryMessages
 }
 
 function createMemoryCommitBody(params: {
   assistantContent: string
   config: MemoryRuntimeConfig
   latestUserMessage: string
+  latestUserMessageIndex: number
+  messages: CommitLongTermMemoryParams["messages"]
   mode: Mem0ApiMode
   requestId?: string
   threadId: string
   userId: string
 }) {
   const metadata = {
+    agent_id: params.config.agentId,
     request_id: params.requestId,
+    run_id: params.threadId,
     source: "chloei_chat",
     thread_id: params.threadId,
-    ...(params.mode === "platform"
-      ? {
-          agent_id: params.config.agentId,
-          run_id: params.threadId,
-          user_id: params.userId,
-        }
-      : {}),
   }
   const shared = {
     infer: true,
-    messages: [
-      { role: "user", content: params.latestUserMessage },
-      { role: "assistant", content: params.assistantContent },
-    ],
+    messages: createMemoryCommitMessages({
+      assistantContent: params.assistantContent,
+      latestUserMessage: params.latestUserMessage,
+      latestUserMessageIndex: params.latestUserMessageIndex,
+      messages: params.messages,
+    }),
     metadata,
   }
 
   if (params.mode === "platform") {
     return {
       ...shared,
-      app_id: getPlatformAppId(params.config, params.userId),
+      agent_id: params.config.agentId,
+      custom_instructions: MEMORY_EXTRACTION_INSTRUCTIONS,
+      user_id: params.userId,
     }
   }
 
@@ -281,12 +434,11 @@ function truncateText(value: string, maxChars: number): string {
 function getLatestUserMessage(
   messages: CommitLongTermMemoryParams["messages"]
 ): string | null {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index]
-    if (message?.role === "user") {
-      const content = message.content.trim()
-      return content.length > 0 ? content : null
-    }
+  const index = getLatestUserMessageIndex(messages)
+  const message = index >= 0 ? messages[index] : undefined
+  if (message?.role === "user") {
+    const content = message.content.trim()
+    return content.length > 0 ? content : null
   }
 
   return null
@@ -309,6 +461,67 @@ function logIncompleteConfig(
     errorCode: "LONG_TERM_MEMORY_CONFIG_INCOMPLETE",
     operation,
     requestId,
+  })
+}
+
+function getErrorStatus(error: unknown): number | undefined {
+  const record = asRecord(error)
+  const status =
+    typeof record?.status === "number"
+      ? record.status
+      : typeof record?.statusCode === "number"
+        ? record.statusCode
+        : undefined
+  return status && Number.isFinite(status) ? status : undefined
+}
+
+function createMem0HttpError(message: string, response: Response): Error {
+  return Object.assign(new Error(message), {
+    status: response.status,
+  })
+}
+
+function logMemoryOperationSuccess(params: {
+  durationMs: number
+  legacyPlatformScope?: boolean
+  mode: Mem0ApiMode
+  operation: "search" | "commit" | "delete"
+  requestId?: string
+  resultCount?: number
+  status: number
+}) {
+  logger.info(`Long-term memory ${params.operation} completed.`, {
+    durationMs: params.durationMs,
+    legacyPlatformScope: params.legacyPlatformScope ?? false,
+    mode: params.mode,
+    operation: params.operation,
+    requestId: params.requestId,
+    ...(params.resultCount !== undefined
+      ? { resultCount: params.resultCount }
+      : {}),
+    status: params.status,
+  })
+}
+
+function logMemoryOperationFailure(params: {
+  durationMs: number
+  error: unknown
+  errorCode: string
+  legacyPlatformScope?: boolean
+  message: string
+  mode: Mem0ApiMode
+  operation: "search" | "commit" | "delete"
+  requestId?: string
+}) {
+  logger.warn(params.message, {
+    durationMs: params.durationMs,
+    error: params.error,
+    errorCode: params.errorCode,
+    legacyPlatformScope: params.legacyPlatformScope ?? false,
+    mode: params.mode,
+    operation: params.operation,
+    requestId: params.requestId,
+    status: getErrorStatus(params.error),
   })
 }
 
@@ -367,8 +580,9 @@ export async function searchLongTermMemories(
     return []
   }
 
-  try {
-    const mode = getMem0ApiMode(config)
+  const mode = getMem0ApiMode(config)
+  const fetchMemories = async (legacyPlatformScope = false) => {
+    const startedAt = Date.now()
     const response = await (params.fetchFn ?? fetch)(
       getMem0Url(
         config,
@@ -376,20 +590,13 @@ export async function searchLongTermMemories(
       ),
       {
         body: JSON.stringify(
-          mode === "platform"
-            ? {
-                filters: { app_id: getPlatformAppId(config, params.userId) },
-                query,
-                threshold: config.threshold,
-                top_k: config.topK,
-              }
-            : {
-                query,
-                user_id: params.userId,
-                agent_id: config.agentId,
-                top_k: config.topK,
-                threshold: config.threshold,
-              }
+          createMemorySearchBody({
+            config,
+            legacyPlatformScope,
+            mode,
+            query,
+            userId: params.userId,
+          })
         ),
         headers: createMem0Headers(config, mode),
         method: "POST",
@@ -401,16 +608,52 @@ export async function searchLongTermMemories(
     )
 
     if (!response.ok) {
-      throw Object.assign(new Error("Mem0 search request failed."), {
-        status: response.status,
-      })
+      throw createMem0HttpError("Mem0 search request failed.", response)
     }
 
-    return normalizeMemoryResults(await readJson(response))
+    const memories = normalizeMemoryResults(await readJson(response))
+    logMemoryOperationSuccess({
+      durationMs: Date.now() - startedAt,
+      legacyPlatformScope,
+      mode,
+      operation: "search",
+      requestId: params.requestId,
+      resultCount: memories.length,
+      status: response.status,
+    })
+    return memories
+  }
+
+  try {
+    const memories = await fetchMemories()
+    if (mode !== "platform" || memories.length > 0) {
+      return memories
+    }
+
+    try {
+      return await fetchMemories(true)
+    } catch (error) {
+      logMemoryOperationFailure({
+        durationMs: 0,
+        error,
+        errorCode: "LONG_TERM_MEMORY_LEGACY_SEARCH_FAILED",
+        legacyPlatformScope: true,
+        message:
+          "Legacy long-term memory search failed; continuing without legacy memories.",
+        mode,
+        operation: "search",
+        requestId: params.requestId,
+      })
+      return memories
+    }
   } catch (error) {
-    logger.warn("Long-term memory search failed; continuing without it.", {
+    logMemoryOperationFailure({
+      durationMs: 0,
       error,
       errorCode: "LONG_TERM_MEMORY_SEARCH_FAILED",
+      message: "Long-term memory search failed; continuing without it.",
+      mode,
+      operation: "search",
       requestId: params.requestId,
     })
     return []
@@ -439,8 +682,9 @@ export async function commitLongTermMemory(
   }
 
   const latestUserMessage = getLatestUserMessage(params.messages)
+  const latestUserMessageIndex = getLatestUserMessageIndex(params.messages)
   const assistantContent = truncateText(
-    params.assistantContent.trim(),
+    normalizeMemoryCommitContent(params.assistantContent),
     config.commitMaxChars
   )
 
@@ -448,9 +692,15 @@ export async function commitLongTermMemory(
     return false
   }
 
+  const memoryMessages = createMemoryCommitMessages({
+    assistantContent,
+    latestUserMessage,
+    latestUserMessageIndex,
+    messages: params.messages,
+  })
+
   if (
-    containsSensitiveContent(latestUserMessage) ||
-    containsSensitiveContent(assistantContent)
+    memoryMessages.some((message) => containsSensitiveContent(message.content))
   ) {
     logger.warn("Skipped long-term memory commit for sensitive content.", {
       errorCode: "LONG_TERM_MEMORY_SENSITIVE_CONTENT_SKIPPED",
@@ -461,6 +711,7 @@ export async function commitLongTermMemory(
 
   try {
     const mode = getMem0ApiMode(config)
+    const startedAt = Date.now()
     const response = await (params.fetchFn ?? fetch)(
       getMem0Url(config, mode === "platform" ? "v3/memories/add/" : "memories"),
       {
@@ -469,6 +720,8 @@ export async function commitLongTermMemory(
             assistantContent,
             config,
             latestUserMessage,
+            latestUserMessageIndex,
+            messages: params.messages,
             mode,
             requestId: params.requestId,
             threadId: params.threadId,
@@ -486,16 +739,25 @@ export async function commitLongTermMemory(
     )
 
     if (!response.ok) {
-      throw Object.assign(new Error("Mem0 memory commit failed."), {
-        status: response.status,
-      })
+      throw createMem0HttpError("Mem0 memory commit failed.", response)
     }
 
+    logMemoryOperationSuccess({
+      durationMs: Date.now() - startedAt,
+      mode,
+      operation: "commit",
+      requestId: params.requestId,
+      status: response.status,
+    })
     return true
   } catch (error) {
-    logger.warn("Long-term memory commit failed; continuing without it.", {
+    logMemoryOperationFailure({
+      durationMs: 0,
       error,
       errorCode: "LONG_TERM_MEMORY_COMMIT_FAILED",
+      message: "Long-term memory commit failed; continuing without it.",
+      mode: getMem0ApiMode(config),
+      operation: "commit",
       requestId: params.requestId,
     })
     return false
@@ -513,42 +775,87 @@ export async function deleteLongTermMemoriesForThread(
 
   try {
     const mode = getMem0ApiMode(config)
-    const url = getMem0Url(
-      config,
-      mode === "platform" ? "v1/memories" : "memories"
-    )
-    if (mode === "oss") {
-      url.searchParams.set("user_id", params.userId)
-      url.searchParams.set("agent_id", config.agentId)
-      url.searchParams.set("run_id", params.threadId)
-    } else {
-      url.searchParams.set("app_id", getPlatformAppId(config, params.userId))
-      url.searchParams.set(
-        "metadata",
-        JSON.stringify({ run_id: params.threadId })
+    const deleteScopedMemories = async (
+      legacyPlatformScope:
+        | "appThread"
+        | "appRun"
+        | "canonicalRun"
+        | false = false
+    ) => {
+      const url = getMem0Url(
+        config,
+        mode === "platform" ? "v1/memories/" : "memories"
       )
-    }
+      if (mode === "oss") {
+        url.searchParams.set("user_id", params.userId)
+        url.searchParams.set("agent_id", config.agentId)
+        url.searchParams.set("run_id", params.threadId)
+      } else if (legacyPlatformScope === "appThread") {
+        url.searchParams.set("app_id", getPlatformAppId(config, params.userId))
+        url.searchParams.set(
+          "metadata",
+          JSON.stringify({ thread_id: params.threadId })
+        )
+      } else if (legacyPlatformScope === "appRun") {
+        url.searchParams.set("app_id", getPlatformAppId(config, params.userId))
+        url.searchParams.set(
+          "metadata",
+          JSON.stringify({ run_id: params.threadId })
+        )
+      } else if (legacyPlatformScope === "canonicalRun") {
+        url.searchParams.set("user_id", params.userId)
+        url.searchParams.set("agent_id", config.agentId)
+        url.searchParams.set("run_id", params.threadId)
+      } else {
+        url.searchParams.set("user_id", params.userId)
+        url.searchParams.set(
+          "metadata",
+          JSON.stringify({
+            agent_id: config.agentId,
+            thread_id: params.threadId,
+          })
+        )
+      }
 
-    const response = await (params.fetchFn ?? fetch)(url, {
-      headers: createMem0Headers(config, mode),
-      method: "DELETE",
-      signal: createMemoryRequestSignal({
-        signal: params.signal,
-        timeoutMs: MEMORY_DELETE_TIMEOUT_MS,
-      }),
-    })
+      const startedAt = Date.now()
+      const response = await (params.fetchFn ?? fetch)(url, {
+        headers: createMem0Headers(config, mode),
+        method: "DELETE",
+        signal: createMemoryRequestSignal({
+          signal: params.signal,
+          timeoutMs: MEMORY_DELETE_TIMEOUT_MS,
+        }),
+      })
 
-    if (!response.ok) {
-      throw Object.assign(new Error("Mem0 memory delete failed."), {
+      if (!response.ok) {
+        throw createMem0HttpError("Mem0 memory delete failed.", response)
+      }
+
+      logMemoryOperationSuccess({
+        durationMs: Date.now() - startedAt,
+        legacyPlatformScope: Boolean(legacyPlatformScope),
+        mode,
+        operation: "delete",
+        requestId: params.requestId,
         status: response.status,
       })
     }
 
+    await deleteScopedMemories()
+    if (mode === "platform") {
+      await deleteScopedMemories("canonicalRun")
+      await deleteScopedMemories("appThread")
+      await deleteScopedMemories("appRun")
+    }
     return true
   } catch (error) {
-    logger.warn("Long-term memory deletion failed; continuing without it.", {
+    logMemoryOperationFailure({
+      durationMs: 0,
       error,
       errorCode: "LONG_TERM_MEMORY_DELETE_FAILED",
+      message: "Long-term memory deletion failed; continuing without it.",
+      mode: getMem0ApiMode(config),
+      operation: "delete",
       requestId: params.requestId,
     })
     return false

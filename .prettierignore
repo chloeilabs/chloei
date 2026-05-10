@@ -6,6 +6,7 @@ coverage/
 test-results/
 pnpm-lock.yaml
 .pnpm-store/
+.agents/
 __pycache__/
 evals/finance/cache/
 evals/finance/results/

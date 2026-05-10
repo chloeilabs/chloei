@@ -37,7 +37,7 @@ function createConfig(overrides = {}) {
     mem0ApiKey: "mem0-key",
     mem0ApiUrl: "http://mem0.local",
     provider: "mem0",
-    threshold: 0.3,
+    threshold: 0.1,
     topK: 6,
     ...overrides,
   }
@@ -67,7 +67,7 @@ test("memory runtime config parses defaults and overrides", () => {
     mem0ApiKey: undefined,
     mem0ApiUrl: "http://localhost:8888",
     provider: "disabled",
-    threshold: 0.3,
+    threshold: 0.1,
     topK: 6,
   })
 
@@ -160,7 +160,7 @@ test("searchLongTermMemories calls Mem0 search and normalizes results", async ()
   assert.deepEqual(calls[0].body, {
     agent_id: "chloei",
     query: "What should I remember?",
-    threshold: 0.3,
+    threshold: 0.1,
     top_k: 6,
     user_id: "user-1",
   })
@@ -209,9 +209,12 @@ test("searchLongTermMemories supports Mem0 Platform API request shape", async ()
   assert.equal(calls[0].headers.get("Authorization"), "Token m0-platform-key")
   assert.equal(calls[0].headers.get("X-API-Key"), null)
   assert.deepEqual(calls[0].body, {
-    filters: { app_id: "chloei:user-1" },
+    filters: {
+      AND: [{ user_id: "user-1" }, { metadata: { agent_id: "chloei" } }],
+    },
     query: "What should I remember?",
-    threshold: 0.3,
+    rerank: false,
+    threshold: 0.1,
     top_k: 6,
   })
   assert.deepEqual(results, [
@@ -220,6 +223,47 @@ test("searchLongTermMemories supports Mem0 Platform API request shape", async ()
       id: "memory-1",
       memory: "User prefers concise answers.",
       score: 0.91,
+    },
+  ])
+})
+
+test("searchLongTermMemories falls back to legacy Mem0 Platform app scope", async () => {
+  const { calls, fetchFn } = createFetchRecorder(() =>
+    calls.length === 1
+      ? Response.json({ results: [] })
+      : Response.json({
+          results: [
+            {
+              id: "legacy-memory-1",
+              memory: "User prefers concise answers.",
+              score: 0.41,
+            },
+          ],
+        })
+  )
+
+  const results = await searchLongTermMemories({
+    config: createConfig({
+      mem0ApiKey: "m0-platform-key",
+      mem0ApiUrl: "https://api.mem0.ai",
+    }),
+    fetchFn,
+    query: "What should I remember?",
+    userId: "user-1",
+  })
+
+  assert.equal(calls.length, 2)
+  assert.deepEqual(calls[0].body.filters, {
+    AND: [{ user_id: "user-1" }, { metadata: { agent_id: "chloei" } }],
+  })
+  assert.deepEqual(calls[1].body.filters, {
+    AND: [{ user_id: "user-1" }, { app_id: "chloei:user-1" }],
+  })
+  assert.deepEqual(results, [
+    {
+      id: "legacy-memory-1",
+      memory: "User prefers concise answers.",
+      score: 0.41,
     },
   ])
 })
@@ -309,13 +353,43 @@ test("commitLongTermMemory writes the latest user turn and assistant text", asyn
       { role: "assistant", content: "Assistant answer..." },
     ],
     metadata: {
+      agent_id: "chloei",
       request_id: "request-1",
+      run_id: "thread-1",
       source: "chloei_chat",
       thread_id: "thread-1",
     },
     run_id: "thread-1",
     user_id: "user-1",
   })
+})
+
+test("commitLongTermMemory includes bounded recent context for ambiguous remember requests", async () => {
+  const { calls, fetchFn } = createFetchRecorder(() =>
+    Response.json({ results: [{ id: "memory-1" }] })
+  )
+
+  const committed = await commitLongTermMemory({
+    assistantContent: "I'll remember that.",
+    config: createConfig(),
+    fetchFn,
+    messages: [
+      { role: "user", content: "I prefer cash-flow focused answers." },
+      { role: "assistant", content: "Understood." },
+      { role: "user", content: "Please remember this." },
+    ],
+    requestId: "request-1",
+    threadId: "thread-1",
+    userId: "user-1",
+  })
+
+  assert.equal(committed, true)
+  assert.deepEqual(calls[0].body.messages, [
+    { role: "user", content: "I prefer cash-flow focused answers." },
+    { role: "assistant", content: "Understood." },
+    { role: "user", content: "Please remember this." },
+    { role: "assistant", content: "I'll remember that." },
+  ])
 })
 
 test("commitLongTermMemory supports Mem0 Platform API request shape", async () => {
@@ -341,8 +415,12 @@ test("commitLongTermMemory supports Mem0 Platform API request shape", async () =
   assert.equal(calls[0].url, "https://api.mem0.ai/v3/memories/add/")
   assert.equal(calls[0].method, "POST")
   assert.equal(calls[0].headers.get("Authorization"), "Token m0-platform-key")
-  assert.deepEqual(calls[0].body, {
-    app_id: "chloei:user-1",
+  const { custom_instructions: customInstructions, ...body } = calls[0].body
+  assert.equal("app_id" in calls[0].body, false)
+  assert.equal("run_id" in calls[0].body, false)
+  assert.match(customInstructions, /durable user preferences/)
+  assert.deepEqual(body, {
+    agent_id: "chloei",
     infer: true,
     messages: [
       { role: "user", content: "Latest user preference" },
@@ -357,8 +435,8 @@ test("commitLongTermMemory supports Mem0 Platform API request shape", async () =
       run_id: "thread-1",
       source: "chloei_chat",
       thread_id: "thread-1",
-      user_id: "user-1",
     },
+    user_id: "user-1",
   })
 })
 
@@ -522,14 +600,46 @@ test("deleteLongTermMemoriesForThread supports Mem0 Platform API request shape",
   const url = new URL(calls[0].url)
 
   assert.equal(deleted, true)
+  assert.equal(calls.length, 4)
   assert.equal(calls[0].method, "DELETE")
   assert.equal(calls[0].headers.get("Authorization"), "Token m0-platform-key")
-  assert.equal(url.origin + url.pathname, "https://api.mem0.ai/v1/memories")
-  assert.equal(url.searchParams.get("app_id"), "chloei:user-1")
-  assert.equal(url.searchParams.get("user_id"), null)
+  assert.equal(url.origin + url.pathname, "https://api.mem0.ai/v1/memories/")
+  assert.equal(url.searchParams.get("user_id"), "user-1")
   assert.equal(url.searchParams.get("agent_id"), null)
   assert.equal(url.searchParams.get("run_id"), null)
   assert.deepEqual(JSON.parse(url.searchParams.get("metadata")), {
+    agent_id: "chloei",
+    thread_id: "thread-1",
+  })
+
+  const canonicalRunUrl = new URL(calls[1].url)
+  assert.equal(calls[1].method, "DELETE")
+  assert.equal(
+    canonicalRunUrl.origin + canonicalRunUrl.pathname,
+    "https://api.mem0.ai/v1/memories/"
+  )
+  assert.equal(canonicalRunUrl.searchParams.get("user_id"), "user-1")
+  assert.equal(canonicalRunUrl.searchParams.get("agent_id"), "chloei")
+  assert.equal(canonicalRunUrl.searchParams.get("run_id"), "thread-1")
+
+  const legacyUrl = new URL(calls[2].url)
+  assert.equal(calls[2].method, "DELETE")
+  assert.equal(
+    legacyUrl.origin + legacyUrl.pathname,
+    "https://api.mem0.ai/v1/memories/"
+  )
+  assert.equal(legacyUrl.searchParams.get("app_id"), "chloei:user-1")
+  assert.equal(legacyUrl.searchParams.get("user_id"), null)
+  assert.equal(legacyUrl.searchParams.get("agent_id"), null)
+  assert.equal(legacyUrl.searchParams.get("run_id"), null)
+  assert.deepEqual(JSON.parse(legacyUrl.searchParams.get("metadata")), {
+    thread_id: "thread-1",
+  })
+
+  const legacyRunUrl = new URL(calls[3].url)
+  assert.equal(calls[3].method, "DELETE")
+  assert.equal(legacyRunUrl.searchParams.get("app_id"), "chloei:user-1")
+  assert.deepEqual(JSON.parse(legacyRunUrl.searchParams.get("metadata")), {
     run_id: "thread-1",
   })
 })
