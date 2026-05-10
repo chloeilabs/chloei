@@ -8,7 +8,7 @@ import {
 
 const logger = createLogger("long-term-memory")
 const MEMORY_SEARCH_TIMEOUT_MS = 5_000
-const MEMORY_COMMIT_TIMEOUT_MS = 30_000
+const MEMORY_COMMIT_TIMEOUT_MS = 60_000
 const MEMORY_DELETE_TIMEOUT_MS = 10_000
 const MEMORY_COMMIT_CONTEXT_MAX_CHARS = 2_000
 const MEMORY_RECENT_CONTEXT_MESSAGE_LIMIT = 4
@@ -717,9 +717,10 @@ export async function commitLongTermMemory(
     return false
   }
 
+  const mode = getMem0ApiMode(config)
+  const startedAt = Date.now()
+
   try {
-    const mode = getMem0ApiMode(config)
-    const startedAt = Date.now()
     const response = await (params.fetchFn ?? fetch)(
       getMem0Url(config, mode === "platform" ? "v3/memories/add/" : "memories"),
       {
@@ -760,11 +761,11 @@ export async function commitLongTermMemory(
     return true
   } catch (error) {
     logMemoryOperationFailure({
-      durationMs: 0,
+      durationMs: Date.now() - startedAt,
       error,
       errorCode: "LONG_TERM_MEMORY_COMMIT_FAILED",
       message: "Long-term memory commit failed; continuing without it.",
-      mode: getMem0ApiMode(config),
+      mode,
       operation: "commit",
       requestId: params.requestId,
     })
