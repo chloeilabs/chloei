@@ -34,7 +34,9 @@ async function submitPrompt(page, prompt) {
   })
   const assistantMessage = assistantMessages.nth(assistantMessageCount)
   await expect(assistantMessage).toContainText(/\S/, { timeout: 120_000 })
-  await expect(submitButton).toBeEnabled({ timeout: 120_000 })
+  await expect(assistantMessage).toHaveAttribute("data-streaming", "false", {
+    timeout: 120_000,
+  })
   return assistantMessage
 }
 

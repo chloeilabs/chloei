@@ -260,6 +260,7 @@ export function AssistantMessage({ message }: { message: Message }) {
   return (
     <div
       data-message-role="assistant"
+      data-streaming={isAssistantStreaming ? "true" : "false"}
       className="group/assistant-message relative flex flex-col gap-1"
     >
       {showActivitySection && (
