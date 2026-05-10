@@ -58,12 +58,6 @@ export function resolveDefaultModelSelectorModel(
   return models[0]?.id ?? MODEL_SELECTOR_MODELS[0]
 }
 
-export function resolveDefaultModel(
-  models: readonly Pick<ModelInfo, "id">[]
-): ModelType {
-  return models[0]?.id ?? SUPPORTED_MODELS[0]
-}
-
 export const ModelInfos: Record<ModelType, ModelInfo> = {
   [AvailableModels.DEEPSEEK_V4_PRO]: {
     id: AvailableModels.DEEPSEEK_V4_PRO,
