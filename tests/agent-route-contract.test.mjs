@@ -55,7 +55,7 @@ test("agent route streams through the extracted AI Gateway helper path", async (
 
   assert.match(
     helperSource,
-    /withAiSdkInlineCitationInstruction\(\s*params\.systemInstruction,\s*\{[\s\S]*financeEnabled: shouldIncludeFinanceToolingInstruction\([\s\S]*fmpEnabled: Boolean\(params\.fmpApiKey\?\.trim\(\)\),[\s\S]*\}\s*\)/,
+    /withAiSdkInlineCitationInstruction\(\s*params\.systemInstruction,\s*\{[\s\S]*financeEnabled: shouldIncludeFinanceToolingInstruction\([\s\S]*fmpEnabled: Boolean\(params\.fmpApiKey\?\.trim\(\)\),[\s\S]*secFilingsEnabled: shouldIncludeSecFilingsToolingInstruction\([\s\S]*\}\s*\)/,
     "Expected the helper to pass finance tooling augmentation options."
   )
 
@@ -139,6 +139,11 @@ test("agent runtime gives supported chat models the same runtime toolset", async
     runtimeSource,
     /runtimeProfile\.financeDataEnabled[\s\S]*createAiSdkFinanceDataTools/,
     "Expected finance data tools to follow the same runtime profile gate for all models."
+  )
+  assert.match(
+    runtimeSource,
+    /runtimeProfile\.secFilingsEnabled[\s\S]*createAiSdkSecFilingsTools/,
+    "Expected SEC filing tools to follow the finance runtime profile gate."
   )
   assert.match(
     runtimeSource,

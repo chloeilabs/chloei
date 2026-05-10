@@ -189,17 +189,20 @@ export function PromptForm({
     fileInputRef.current?.click()
   }, [isFormPending])
 
-  const handleToggleResearch = useCallback(() => {
-    if (isFormPending) {
-      return
-    }
+  const handleSetRunMode = useCallback(
+    (nextRunMode: AgentRunMode) => {
+      if (isFormPending) {
+        return
+      }
 
-    shouldPreventToolsCloseAutoFocusRef.current = true
-    setRunMode((currentRunMode) =>
-      currentRunMode === "research" ? "chat" : "research"
-    )
-    setIsToolsOpen(false)
-  }, [isFormPending])
+      shouldPreventToolsCloseAutoFocusRef.current = true
+      setRunMode((currentRunMode) =>
+        currentRunMode === nextRunMode ? "chat" : nextRunMode
+      )
+      setIsToolsOpen(false)
+    },
+    [isFormPending]
+  )
 
   const submitPrompt = useCallback(
     (attachmentsOverride?: AgentRequestAttachment[]) => {
@@ -238,7 +241,7 @@ export function PromptForm({
       setMessage("")
       setPendingAttachments([])
       clearFileInput()
-      if (activeRunMode === "research") {
+      if (activeRunMode !== "chat") {
         setRunMode("chat")
       }
 
@@ -659,7 +662,9 @@ export function PromptForm({
                       isResearchMode &&
                         "bg-accent text-foreground hover:bg-accent aria-pressed:bg-accent aria-pressed:text-foreground"
                     )}
-                    onClick={handleToggleResearch}
+                    onClick={() => {
+                      handleSetRunMode("research")
+                    }}
                   >
                     <Telescope className="size-3.5" />
                     <span>Research</span>
@@ -677,7 +682,9 @@ export function PromptForm({
                   disabled={isFormPending}
                   aria-pressed="true"
                   className="bg-accent px-2 font-normal text-foreground hover:bg-accent focus-visible:border-transparent focus-visible:ring-0"
-                  onClick={handleToggleResearch}
+                  onClick={() => {
+                    handleSetRunMode("research")
+                  }}
                 >
                   <Telescope className="size-3.5" />
                   <span>Research</span>

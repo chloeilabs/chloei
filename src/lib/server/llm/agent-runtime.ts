@@ -17,6 +17,7 @@ import {
 import { hydrateBlobBackedAttachments } from "@/lib/server/agent-attachment-blobs"
 import {
   AGENT_EVAL_RESULTS_DIR,
+  AGENT_FINANCE_TOOL_MAX_STEPS,
   AGENT_RESEARCH_TOOL_MAX_STEPS,
   AGENT_TOOL_MAX_STEPS,
 } from "@/lib/server/agent-runtime-config"
@@ -56,6 +57,12 @@ import {
   isAiSdkKnowledgeSearchToolName,
 } from "./ai-sdk-knowledge-search-tools"
 import {
+  createAiSdkSecFilingsTools,
+  getAiSdkSecFilingsToolCallMetadata,
+  getAiSdkSecFilingsToolResultMetadata,
+  isAiSdkSecFilingsToolName,
+} from "./ai-sdk-sec-filings-tools"
+import {
   createAiSdkTavilyTools,
   getAiSdkTavilyToolCallMetadata,
   getAiSdkTavilyToolResultMetadata,
@@ -88,6 +95,7 @@ interface AgentRuntimeProfile {
   codeExecutionWorkspaceMode?: "ephemeral" | "preserve"
   fmpMcpEnabled: boolean
   financeDataEnabled: boolean
+  secFilingsEnabled: boolean
   toolMaxSteps: number
 }
 
@@ -122,12 +130,14 @@ const AGENT_RUNTIME_PROFILES: Record<
     id: "chat_default",
     fmpMcpEnabled: true,
     financeDataEnabled: true,
+    secFilingsEnabled: false,
     toolMaxSteps: AGENT_TOOL_MAX_STEPS,
   },
   deep_research: {
     id: "deep_research",
     fmpMcpEnabled: true,
     financeDataEnabled: true,
+    secFilingsEnabled: false,
     toolMaxSteps: AGENT_RESEARCH_TOOL_MAX_STEPS,
   },
   finance_analysis: {
@@ -135,7 +145,8 @@ const AGENT_RUNTIME_PROFILES: Record<
     codeExecutionBackend: "finance",
     fmpMcpEnabled: false,
     financeDataEnabled: true,
-    toolMaxSteps: AGENT_TOOL_MAX_STEPS,
+    secFilingsEnabled: true,
+    toolMaxSteps: AGENT_FINANCE_TOOL_MAX_STEPS,
   },
   gdpval_workspace: {
     id: "gdpval_workspace",
@@ -143,6 +154,7 @@ const AGENT_RUNTIME_PROFILES: Record<
     codeExecutionWorkspaceMode: "preserve",
     fmpMcpEnabled: false,
     financeDataEnabled: true,
+    secFilingsEnabled: true,
     toolMaxSteps: AGENT_TOOL_MAX_STEPS,
   },
 }
@@ -342,6 +354,11 @@ export async function* startAgentRuntimeStream(
             secUserAgent: params.secUserAgent ?? process.env.SEC_API_USER_AGENT,
           })
         : {}),
+      ...(runtimeProfile.secFilingsEnabled
+        ? createAiSdkSecFilingsTools({
+            secUserAgent: params.secUserAgent ?? process.env.SEC_API_USER_AGENT,
+          })
+        : {}),
       ...(fmpToolsContext?.tools ?? {}),
     } as ToolSet
     const toolNames = Object.keys(tools)
@@ -466,6 +483,7 @@ export async function* startAgentRuntimeStream(
           getAiSdkKnowledgeSearchToolCallMetadata(part) ??
           getAiSdkBrowserResearchToolCallMetadata(part) ??
           getAiSdkFinanceDataToolCallMetadata(part) ??
+          getAiSdkSecFilingsToolCallMetadata(part) ??
           fmpToolsContext?.getToolCallMetadata(part)
         if (!metadata || seenToolCalls.has(metadata.callId)) {
           continue
@@ -504,6 +522,7 @@ export async function* startAgentRuntimeStream(
           getAiSdkKnowledgeSearchToolResultMetadata(part) ??
           getAiSdkBrowserResearchToolResultMetadata(part) ??
           getAiSdkFinanceDataToolResultMetadata(part) ??
+          getAiSdkSecFilingsToolResultMetadata(part) ??
           fmpToolsContext?.getToolResultMetadata(part)
         if (!metadata || finalizedToolCalls.has(metadata.callId)) {
           continue
@@ -560,6 +579,7 @@ export async function* startAgentRuntimeStream(
           isAiSdkKnowledgeSearchToolName(part.toolName) ||
           isAiSdkBrowserResearchToolName(part.toolName) ||
           isAiSdkFinanceDataToolName(part.toolName) ||
+          isAiSdkSecFilingsToolName(part.toolName) ||
           fmpToolsContext?.isToolName(part.toolName)) &&
         !finalizedToolCalls.has(part.toolCallId)
       ) {
@@ -569,7 +589,8 @@ export async function* startAgentRuntimeStream(
           isAiSdkTavilyToolName(part.toolName) ||
           isAiSdkKnowledgeSearchToolName(part.toolName) ||
           isAiSdkBrowserResearchToolName(part.toolName) ||
-          isAiSdkFinanceDataToolName(part.toolName)
+          isAiSdkFinanceDataToolName(part.toolName) ||
+          isAiSdkSecFilingsToolName(part.toolName)
             ? part.toolName
             : "fmp_mcp"
         yield {

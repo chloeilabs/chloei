@@ -231,11 +231,11 @@ test("agent helper validates total size, last-message role, and default model su
 
   const invalidRunModeResult = parseAgentStreamRequest({
     body: {
-      runMode: "deep",
+      runMode: "finance",
       messages: [
         {
           role: "user",
-          content: "Use an invalid mode.",
+          content: "Finance is inferred from this public-markets task.",
         },
       ],
     },
@@ -800,6 +800,7 @@ test("agent helper streams fallback output when the model yields no content", as
     options: {
       financeEnabled: true,
       fmpEnabled: true,
+      secFilingsEnabled: false,
     },
   })
 })

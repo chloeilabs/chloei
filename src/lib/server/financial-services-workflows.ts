@@ -36,7 +36,7 @@ const FINANCIAL_MODELING_PATTERN =
   /\b(dcf|discounted cash flow|lbo|leveraged buyout|three[- ]statement|3[- ]statement|trading comps?|comps analysis|precedent transactions?|valuation model|financial model|model builder|excel valuation|football field|wacc|terminal value|sensitivity table)\b/i
 
 const FINANCIAL_MODELING_CONTEXT_PATTERN =
-  /\b(finance|financial|valuation|dcf|discounted cash flow|lbo|comps?|precedent transactions?|stock|stocks|ticker|market cap|capital markets|enterprise value|ev\/ebitda|ebitda|revenue|cash flow|fcf|wacc|terminal value|sensitivity|investment banking|10-k|10-q|filing|sec)\b/i
+  /\b(finance|financial|valuation|dcf|discounted cash flow|lbo|comps?|precedent transactions?|stock|stocks|ticker|market cap|capital markets|enterprise value|ev\/ebitda|ebitda|revenue|cash flow|fcf|wacc|terminal value|sensitivity|investment banking|10-k|10-q|filings?|sec (?:filings?|reports?|disclosures?|data|facts?))\b/i
 
 const GENERIC_MODELING_ARTIFACT_PATTERN =
   /\b(?:build|create|draft|generate|make)\s+(?:a |an )?(?:model|workbook|spreadsheet)\b|\b(?:model|workbook|spreadsheet|xlsx) artifact\b|\.xlsx\b/i
@@ -46,6 +46,12 @@ const MARKET_RESEARCH_PATTERN =
 
 const PITCH_MATERIALS_PATTERN =
   /\b(pitch book|pitchbook|pitch deck|pitch materials?|investment banking pitch|client presentation|teaser|slide outline|valuation summary slide|strategic alternatives|situation overview)\b/i
+
+const FILING_RESEARCH_PATTERN =
+  /\b(sec (?:filings?|reports?|disclosures?|data|facts?|10-k|10-q|8-k)|edgar|10-k|10-q|8-k|annual report|quarterly report|proxy statement|def 14a|filings?|mda|md&a|management discussion|risk factors?|issuer purchases?|shares? repurchased|common stock repurchased|adjusted ebitda|non-gaap|capital raise|geographic region|segment revenue|revenue by (?:segment|region)|table extract|filing table)\b/i
+
+const EARNINGS_REVIEW_PATTERN =
+  /\b(earnings review|earnings call|earnings release|quarterly results|reported earnings|beat or miss|beat\/miss|management projections?|consensus|model update|earnings transcript|q[1-4]\s+\d{4}\s+earnings|(?:management|company|revenue|margin|eps|earnings|quarterly|annual|full-year|fy\s?\d{2,4}|q[1-4])\s+guidance|guidance\s+(?:range|midpoint|versus|vs\.?|beat|miss|raise|lower|update|revision|actuals?|compare|compared))\b/i
 
 const WORKFLOW_SKILLS: Record<
   FinancialServicesWorkflowId,
@@ -57,6 +63,17 @@ const WORKFLOW_SKILLS: Record<
     "comps-analysis",
     "audit-xls",
     "xlsx-author",
+  ],
+  filing_research: [
+    "filing-researcher",
+    "sec-table-extractor",
+    "evidence-auditor",
+  ],
+  earnings_review: [
+    "earnings-reviewer",
+    "filing-researcher",
+    "sec-table-extractor",
+    "evidence-auditor",
   ],
   market_research: ["market-researcher"],
   pitch_materials: [
@@ -118,6 +135,46 @@ Rules:
 - Return artifact names and sizes from the artifactManifest in the final answer.
 - If an artifactManifest item includes a URL, format the artifact as a markdown link. If it has no URL, list only the artifact name and size.
 `.trim(),
+  "filing-researcher": `
+## Skill: filing-researcher
+Use this for public-company SEC/EDGAR research and Finance Agent benchmark-style filing questions.
+
+Rules:
+- Use sec_filings for company lookup, filing search, document fetch, section extraction, table extraction, and targeted retrieval over filing text.
+- Prefer full filing evidence over search snippets. Cite SEC filing URLs returned by the tool.
+- Identify the exact company, ticker or CIK, form type, filing date, report period, and section/table used.
+- For extracted values, preserve units, signs, dates, and period labels exactly before calculating.
+`.trim(),
+  "earnings-reviewer": `
+## Skill: earnings-reviewer
+Use this for quarterly earnings, guidance versus actuals, beat/miss analysis, earnings updates, and filing-backed model refreshes.
+
+Rules:
+- Pull the relevant 10-Q, 10-K, 8-K, earnings release, and filing sections before answering.
+- Reconcile management guidance, actual reported values, and period dates before calculating beat/miss or trend metrics.
+- Use code_execution for percentage changes, CAGRs, margin bridges, and sequential or year-over-year comparisons.
+- Separate reported figures, computed values, and interpretation.
+`.trim(),
+  "evidence-auditor": `
+## Skill: evidence-auditor
+Use this before finalizing public-markets finance answers.
+
+Checklist:
+- Every material numeric claim ties to a tool result, SEC filing source, or explicit assumption.
+- Calculations that affect the answer were checked with code_execution.
+- The final answer names the filing period and source dates when recency or period matching matters.
+- If evidence is incomplete, stale, or ambiguous, state the limitation directly instead of filling the gap.
+`.trim(),
+  "sec-table-extractor": `
+## Skill: sec-table-extractor
+Use this for SEC filing tables such as repurchases, segment revenue, guidance, reconciliation tables, debt schedules, and non-GAAP bridges.
+
+Rules:
+- Use sec_filings table_extract with the most specific heading or query available.
+- Keep row labels, column labels, units, and fiscal period labels attached to extracted numbers.
+- When a table spans multiple rows or columns, reconstruct the relevant slice before calculating.
+- Do not infer missing table values from surrounding narrative unless the source explicitly states them.
+`.trim(),
   "market-researcher": `
 ## Skill: market-researcher
 Use this for company, sector, theme, and competitive research.
@@ -148,6 +205,10 @@ function inferFinancialServicesWorkflow(
     return "pitch_materials"
   }
 
+  if (EARNINGS_REVIEW_PATTERN.test(text)) {
+    return "earnings_review"
+  }
+
   const hasGenericModelingArtifact =
     GENERIC_MODELING_ARTIFACT_PATTERN.test(text)
   const hasFinancialModelingContext =
@@ -161,6 +222,10 @@ function inferFinancialServicesWorkflow(
     return "financial_modeling"
   }
 
+  if (FILING_RESEARCH_PATTERN.test(text)) {
+    return "filing_research"
+  }
+
   if (MARKET_RESEARCH_PATTERN.test(text)) {
     return "market_research"
   }
@@ -172,13 +237,39 @@ function formatAvailability(value: boolean | undefined): string {
   return value ? "configured" : "not configured"
 }
 
+function isSecFilingRetrievalAvailable(
+  tools: FinancialServicesToolAvailability | undefined
+): boolean {
+  return tools?.secUserAgentConfigured === true
+}
+
+function getWorkflowSkillIds(
+  workflow: FinancialServicesWorkflowId,
+  tools: FinancialServicesToolAvailability | undefined
+): readonly FinancialServicesSkillId[] {
+  if (isSecFilingRetrievalAvailable(tools)) {
+    return WORKFLOW_SKILLS[workflow]
+  }
+
+  if (workflow === "earnings_review") {
+    return ["earnings-reviewer", "evidence-auditor"]
+  }
+
+  return WORKFLOW_SKILLS[workflow]
+}
+
 function formatToolAvailability(
   tools: FinancialServicesToolAvailability | undefined
 ): string {
+  const filingRetrievalGuidance = isSecFilingRetrievalAvailable(tools)
+    ? "- Filing retrieval: use sec_filings for EDGAR filing search, full-document fetches, sections, tables, and targeted retrieval."
+    : "- Filing retrieval: dedicated EDGAR retrieval is unavailable without a configured SEC user agent; use finance_data SEC facts or web search where available, and state filing-retrieval limitations clearly."
+
   return [
     "## Chloei Tool Mapping",
     "- Market/company data: use finance_data first.",
     "- Filings/facts: use SEC-backed finance_data when available; cite returned filing/source URLs.",
+    filingRetrievalGuidance,
     "- Macro/rates: use FRED-backed finance_data when available.",
     "- News/source research: use Tavily or native search when structured tools do not cover the claim.",
     "- Modeling/math/artifacts: use code_execution with the finance backend.",
@@ -229,7 +320,7 @@ export function resolveFinancialServicesWorkflow(
     return null
   }
 
-  const workflow = inferFinancialServicesWorkflow(
+  let workflow = inferFinancialServicesWorkflow(
     `${lastUserMessage}\n\n${normalizeUserText(params.messages)}`,
     params.taskMode
   )
@@ -237,7 +328,14 @@ export function resolveFinancialServicesWorkflow(
     return null
   }
 
-  const skillIds = WORKFLOW_SKILLS[workflow]
+  if (
+    workflow === "filing_research" &&
+    !isSecFilingRetrievalAvailable(params.tools)
+  ) {
+    workflow = "market_research"
+  }
+
+  const skillIds = getWorkflowSkillIds(workflow, params.tools)
   return {
     workflow,
     skillIds: [...skillIds],

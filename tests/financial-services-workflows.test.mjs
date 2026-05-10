@@ -98,6 +98,139 @@ test("financial services workflow detection selects market research", () => {
   assert.match(context?.promptBlock ?? "", /Tavily API key: configured/)
 })
 
+test("financial services workflow detection selects filing research for Vals-style retrieval", () => {
+  const context = resolveFinancialServicesWorkflow({
+    messages: [
+      {
+        role: "user",
+        content:
+          "Calculate the % change in total common stock shares repurchased from the latest Netflix 10-K filing table versus the prior year.",
+      },
+    ],
+    taskMode: "finance_analysis",
+    tools: {
+      secUserAgentConfigured: true,
+    },
+  })
+
+  assert.equal(context?.workflow, "filing_research")
+  assert.deepEqual(context?.skillIds, [
+    "filing-researcher",
+    "sec-table-extractor",
+    "evidence-auditor",
+  ])
+  assert.match(context?.promptBlock ?? "", /Skill: filing-researcher/)
+  assert.match(context?.promptBlock ?? "", /use sec_filings/i)
+})
+
+test("financial services workflow detection falls back when SEC filing retrieval is unavailable", () => {
+  const context = resolveFinancialServicesWorkflow({
+    messages: [
+      {
+        role: "user",
+        content:
+          "Find the latest 10-K and extract the issuer purchases filing table.",
+      },
+    ],
+    taskMode: "finance_analysis",
+    tools: {
+      secUserAgentConfigured: false,
+      tavilyEnabled: true,
+    },
+  })
+
+  assert.equal(context?.workflow, "market_research")
+  assert.deepEqual(context?.skillIds, ["market-researcher"])
+  assert.doesNotMatch(context?.promptBlock ?? "", /use sec_filings/i)
+  assert.match(context?.promptBlock ?? "", /filing-retrieval limitations/i)
+})
+
+test("financial services workflow detection selects earnings review", () => {
+  const context = resolveFinancialServicesWorkflow({
+    messages: [
+      {
+        role: "user",
+        content:
+          "How did Lam Research revenue compare to management guidance at the midpoint for each 2024 earnings quarter?",
+      },
+    ],
+    taskMode: "finance_analysis",
+  })
+
+  assert.equal(context?.workflow, "earnings_review")
+  assert.match(context?.promptBlock ?? "", /Skill: earnings-reviewer/)
+  assert.match(context?.promptBlock ?? "", /Skill: evidence-auditor/)
+})
+
+test("financial services workflow detection strips SEC-only earnings skills when SEC is unavailable", () => {
+  const context = resolveFinancialServicesWorkflow({
+    messages: [
+      {
+        role: "user",
+        content:
+          "How did revenue compare to management guidance at the midpoint this quarter?",
+      },
+    ],
+    taskMode: "finance_analysis",
+    tools: {
+      secUserAgentConfigured: false,
+    },
+  })
+
+  assert.equal(context?.workflow, "earnings_review")
+  assert.deepEqual(context?.skillIds, ["earnings-reviewer", "evidence-auditor"])
+  assert.doesNotMatch(context?.promptBlock ?? "", /Skill: filing-researcher/)
+  assert.doesNotMatch(context?.promptBlock ?? "", /Skill: sec-table-extractor/)
+  assert.doesNotMatch(context?.promptBlock ?? "", /use sec_filings/i)
+})
+
+test("financial services workflow detection does not route generic guidance to earnings review", () => {
+  const modelingContext = resolveFinancialServicesWorkflow({
+    messages: [
+      {
+        role: "user",
+        content: "I need guidance on structuring this DCF model for MSFT.",
+      },
+    ],
+    taskMode: "finance_analysis",
+  })
+
+  assert.equal(modelingContext?.workflow, "financial_modeling")
+
+  const filingContext = resolveFinancialServicesWorkflow({
+    messages: [
+      {
+        role: "user",
+        content: "Find the 10-K section on SEC guidance for Microsoft.",
+      },
+    ],
+    taskMode: "finance_analysis",
+    tools: {
+      secUserAgentConfigured: true,
+    },
+  })
+
+  assert.equal(filingContext?.workflow, "filing_research")
+})
+
+test("financial services workflow detection does not route standalone sec to filing research", () => {
+  const context = resolveFinancialServicesWorkflow({
+    messages: [
+      {
+        role: "user",
+        content:
+          "Create a company snapshot for Adyen; wait a sec before drafting.",
+      },
+    ],
+    taskMode: "finance_analysis",
+    tools: {
+      secUserAgentConfigured: true,
+    },
+  })
+
+  assert.equal(context?.workflow, "market_research")
+})
+
 test("financial services workflow detection selects pitch materials first", () => {
   const context = resolveFinancialServicesWorkflow({
     messages: [

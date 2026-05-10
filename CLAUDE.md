@@ -27,6 +27,8 @@ pnpm bundle:budget        # Check built static JS chunk budgets
 # Tests
 pnpm test                                        # All tests
 pnpm test:smoke:mock                            # Credential-free Playwright smoke
+pnpm eval:finance                               # Fixture finance eval baseline
+pnpm eval:finance:live                          # Live public-markets finance acceptance suite
 node --test tests/agent-route-contract.test.mjs  # Single test file
 ```
 
@@ -149,6 +151,7 @@ Multiple tool categories, each only active when the respective API key is config
 | `tavily_extract` | `TAVILY_API_KEY`       | Extract content from specific URLs (up to 5 URLs)   |
 | `code_execution` | always on              | Run sandboxed JS or Python for arithmetic/logic     |
 | `finance_data`   | optional provider keys | Normalized finance data via FMP, SEC, and FRED      |
+| `sec_filings`    | public SEC endpoints   | SEC/EDGAR filing lookup, fetch, sections, tables    |
 | FMP MCP tools    | `FMP_API_KEY`          | Legacy finance data via Financial Modeling Prep MCP |
 
 **Code execution** (`src/lib/server/llm/code-execution-tools.ts`):
@@ -166,13 +169,19 @@ Multiple tool categories, each only active when the respective API key is config
 - Provider calls return sanitized source URLs and structured error payloads with retryability metadata.
 - Finance-analysis runs prefer `finance_data`; chat-default runs keep FMP MCP enabled for migration compatibility.
 
+**SEC filings** (`src/lib/server/llm/ai-sdk-sec-filings-tools.ts`):
+
+- `sec_filings` exposes EDGAR company search, filing search, document fetch, section extraction, table extraction, and targeted retrieval over filing text.
+- Finance-analysis runs use `sec_filings` for Vals-style public-company filing tasks and keep `finance_data` for normalized facts/statements.
+- Finance answer quality expectations are documented in `docs/finance-research-quality.md`; the live public-markets acceptance tasks are in `evals/finance/tasks/live-public-markets.jsonl`.
+
 **FMP MCP tools** (`src/lib/server/llm/ai-sdk-fmp-mcp-tools.ts`):
 
 - Connects to `https://financialmodelingprep.com/mcp` per request
 - Curated subset: `search`, `quote`, `company`, `chart`, `statements`
 - Tool definitions are cached in-memory after first discovery
 
-**Max tool steps** per agent run: 12 (overridable via `AGENT_TOOL_MAX_STEPS`).
+**Max tool steps** per agent run: 12 (overridable via `AGENT_TOOL_MAX_STEPS`). Finance-analysis runs use `AGENT_FINANCE_TOOL_MAX_STEPS` (default: 20); research runs use `AGENT_RESEARCH_TOOL_MAX_STEPS` (default: 20).
 
 ### Rate Limiting
 
@@ -262,6 +271,7 @@ src/
         agent-runtime.ts          # Core agent runtime orchestration
         agent-runtime-messages.ts # Agent message preparation and formatting
         ai-sdk-finance-data-tools.ts  # Normalized finance_data tool (FMP, SEC, FRED)
+        ai-sdk-sec-filings-tools.ts   # SEC/EDGAR filing retrieval and extraction
         ai-sdk-fmp-mcp-tools.ts   # FMP MCP client + curated tool wrappers
         ai-sdk-gateway-provider-options.ts # AI Gateway provider options
         ai-sdk-tavily-tools.ts    # Tavily search/extract tools
@@ -369,6 +379,7 @@ All other variables are optional — the code has safe defaults. See `.env.examp
 | `AGENT_STREAM_TIMEOUT_MS`                  | Stream timeout (default: 800,000 ms)                                                                    |
 | `AGENT_TOOL_MAX_STEPS`                     | Max tool use steps per run (default: 12)                                                                |
 | `AGENT_RESEARCH_TOOL_MAX_STEPS`            | Max tool steps for research runs (default: 20)                                                          |
+| `AGENT_FINANCE_TOOL_MAX_STEPS`             | Max tool steps for finance-analysis runs (default: 20)                                                  |
 | `AI_GATEWAY_CLIENT_TIMEOUT_MS`             | AI Gateway HTTP client timeout (default: 3,600,000 ms)                                                  |
 | `AGENT_CODE_EXECUTION_BACKEND`             | `restricted` or `finance`                                                                               |
 | `AGENT_CODE_EXECUTION_PYTHON_VENV_PATH`    | Optional venv/python path for curated finance execution                                                 |

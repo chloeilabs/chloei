@@ -145,6 +145,61 @@ function appendMissingSourcesToTimeline(
   ]
 }
 
+function isToolLikeEntry(
+  entry: ActivityTimelineEntry
+): entry is Extract<ActivityTimelineEntry, { kind: "tool" | "search" }> {
+  return entry.kind === "tool" || entry.kind === "search"
+}
+
+function getToolRecoveryKey(
+  entry: Extract<ActivityTimelineEntry, { kind: "tool" | "search" }>
+): string {
+  const label = entry.kind === "search" ? entry.query : entry.label
+  let discriminator = ""
+  if (entry.kind === "tool") {
+    const query = entry.query?.trim().toLowerCase()
+    discriminator =
+      query && query.length > 0 ? query : (entry.callId ?? entry.id)
+  }
+
+  return [
+    entry.kind,
+    entry.toolName,
+    entry.operation ?? "",
+    label.trim().toLowerCase(),
+    discriminator,
+  ].join("\u0000")
+}
+
+function omitSupersededToolErrors(
+  timeline: ActivityTimelineEntry[]
+): ActivityTimelineEntry[] {
+  const successfulToolKeys = new Set<string>()
+  const nextTimeline: ActivityTimelineEntry[] = []
+
+  for (let index = timeline.length - 1; index >= 0; index -= 1) {
+    const entry = timeline[index]
+    if (!entry) {
+      continue
+    }
+
+    if (isToolLikeEntry(entry)) {
+      const key = getToolRecoveryKey(entry)
+      if (entry.status === "error" && successfulToolKeys.has(key)) {
+        continue
+      }
+
+      if (entry.status === "success") {
+        successfulToolKeys.add(key)
+      }
+    }
+
+    nextTimeline.push(entry)
+  }
+
+  return nextTimeline.reverse()
+}
+
 export function normalizeAssistantActivityTimeline(
   message: Message
 ): ActivityTimelineEntry[] {
@@ -212,7 +267,7 @@ export function normalizeAssistantActivityTimeline(
       }, [])
 
     return appendMissingSourcesToTimeline(
-      normalizedTimeline,
+      omitSupersededToolErrors(normalizedTimeline),
       dedupedSources,
       message.createdAt
     )
@@ -238,12 +293,15 @@ export function normalizeAssistantActivityTimeline(
   for (const invocation of toolInvocations) {
     const normalizedInvocationQuery = invocation.query?.trim()
     const normalizedInvocationLabel = invocation.label.trim()
-    const query = isSearchToolName(invocation.toolName)
-      ? normalizedInvocationQuery && normalizedInvocationQuery.length > 0
+    const toolQuery =
+      normalizedInvocationQuery && normalizedInvocationQuery.length > 0
         ? normalizedInvocationQuery
-        : normalizedInvocationLabel.length > 0
+        : undefined
+    const query = isSearchToolName(invocation.toolName)
+      ? (toolQuery ??
+        (normalizedInvocationLabel.length > 0
           ? normalizedInvocationLabel
-          : null
+          : null))
       : null
 
     if (isSearchToolName(invocation.toolName) && query) {
@@ -269,13 +327,14 @@ export function normalizeAssistantActivityTimeline(
       callId: invocation.callId,
       toolName: invocation.toolName,
       label: invocation.label,
+      ...(toolQuery ? { query: toolQuery } : {}),
       status: invocation.status,
     })
     order += 1
   }
 
   return appendMissingSourcesToTimeline(
-    fallback,
+    omitSupersededToolErrors(fallback),
     dedupedSources,
     message.createdAt
   )
