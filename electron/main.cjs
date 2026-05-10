@@ -7,6 +7,7 @@ const https = require("node:https")
 const net = require("node:net")
 const path = require("node:path")
 const { setTimeout: delay } = require("node:timers/promises")
+const { version: packageVersion } = require("../package.json")
 
 const { app, BrowserWindow, dialog, shell, session } = require("electron")
 
@@ -371,6 +372,10 @@ function getWindowIconPath() {
   return undefined
 }
 
+function getDesktopAppVersion() {
+  return packageVersion || app.getVersion()
+}
+
 function createMainWindow(origin) {
   serverOrigin = origin
 
@@ -392,7 +397,9 @@ function createMainWindow(origin) {
     show: false,
     title: APP_NAME,
     webPreferences: {
-      additionalArguments: [`--chloei-desktop-version=${app.getVersion()}`],
+      additionalArguments: [
+        `--chloei-desktop-version=${getDesktopAppVersion()}`,
+      ],
       contextIsolation: true,
       nodeIntegration: false,
       preload: path.join(__dirname, "preload.cjs"),
