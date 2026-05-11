@@ -53,6 +53,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install ImageMagick
+        shell: bash
+        run: |
+          if ! command -v magick >/dev/null 2>&1; then
+            brew install imagemagick
+          fi
+
       - name: Build Next.js desktop bundle
         run: pnpm desktop:build
         env:
