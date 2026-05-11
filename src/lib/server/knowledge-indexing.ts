@@ -147,6 +147,16 @@ export function normalizeExtractedKnowledgeText(value: string): string {
     .slice(0, MAX_EXTRACTED_TEXT_CHARS)
 }
 
+export function normalizeExtractedReadableText(value: string): string {
+  return value
+    .replace(/\r\n?/g, "\n")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ")
+    .replace(/[ \t]+$/gm, "")
+    .replace(/\n{4,}/g, "\n\n\n")
+    .trim()
+    .slice(0, MAX_EXTRACTED_TEXT_CHARS)
+}
+
 export function chunkKnowledgeText(
   text: string,
   options: {
@@ -342,7 +352,7 @@ export function extractSimplePdfText(buffer: Buffer): string {
   return normalizeExtractedKnowledgeText(fragments.join(" "))
 }
 
-export async function extractPdfText(buffer: Buffer): Promise<string> {
+async function extractRawPdfText(buffer: Buffer): Promise<string> {
   await installPdfCanvasPolyfills()
 
   const { PDFParse } = await import("pdf-parse")
@@ -355,7 +365,7 @@ export async function extractPdfText(buffer: Buffer): Promise<string> {
 
   try {
     const result = await parser.getText()
-    return normalizeExtractedKnowledgeText(result.text)
+    return result.text
   } catch (error) {
     const fallbackText = extractSimplePdfText(buffer)
     if (fallbackText) {
@@ -366,6 +376,16 @@ export async function extractPdfText(buffer: Buffer): Promise<string> {
   } finally {
     await parser.destroy()
   }
+}
+
+export async function extractPdfTextForModelInput(
+  buffer: Buffer
+): Promise<string> {
+  return normalizeExtractedReadableText(await extractRawPdfText(buffer))
+}
+
+export async function extractPdfText(buffer: Buffer): Promise<string> {
+  return normalizeExtractedKnowledgeText(await extractRawPdfText(buffer))
 }
 
 export async function indexUploadedDocument(

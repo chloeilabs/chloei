@@ -35,6 +35,21 @@ test("prompt form queues submit while attachment files are still reading", async
   )
 })
 
+test("prompt form keeps text input visually active while attachments upload", async () => {
+  const source = await readFile(promptFormPath, "utf8")
+
+  assert.match(
+    source,
+    /isFormPending && "opacity-50"/,
+    "Expected the prompt shell to dim only for form submission transitions."
+  )
+  assert.doesNotMatch(
+    source,
+    /\(isFormPending \|\| isReadingAttachments\) && "opacity-50"/,
+    "Expected attachment uploads not to dim the whole prompt input."
+  )
+})
+
 test("prompt form always handles browser drag/drop defaults", async () => {
   const source = await readFile(promptFormPath, "utf8")
 

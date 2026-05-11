@@ -82,5 +82,16 @@ export function modelSupportsImageInput(model: ModelType): boolean {
   return VISION_CAPABLE_MODEL_SET.has(model)
 }
 
+const FILE_INPUT_CAPABLE_MODEL_SET: ReadonlySet<ModelType> = new Set([
+  // Kimi currently rejects AI SDK file parts through Gateway despite its metadata.
+  AvailableModels.OPENAI_GPT_5_5,
+])
+
+export function modelSupportsFileInput(model: ModelType): boolean {
+  return FILE_INPUT_CAPABLE_MODEL_SET.has(model)
+}
+
 export const VISION_PREPROCESSOR_MODEL: ModelType =
   AvailableModels.OPENAI_GPT_5_5
+
+export const PDF_PREPROCESSOR_MODEL: ModelType = AvailableModels.OPENAI_GPT_5_5

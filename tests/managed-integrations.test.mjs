@@ -69,6 +69,7 @@ const {
   extractSimplePdfText,
   indexUploadedDocument,
   normalizeExtractedKnowledgeText,
+  normalizeExtractedReadableText,
 } = await import(knowledgeIndexingUrl)
 const {
   resolveAgentFeatureFlags,
@@ -215,6 +216,39 @@ test("knowledge text normalization and chunking cap unsafe document payloads", (
   assert.equal(chunks.length, 3)
   assert(chunks.every((chunk) => chunk.length <= 800))
   assert.match(chunks[0], /^first paragraph/)
+})
+
+test("readable text normalization preserves document layout for model prompts", () => {
+  const readable = normalizeExtractedReadableText(
+    "Title\r\n\r\nRow 1    Value A\tValue B  \n\n\n\nRow 2\u0000Value C"
+  )
+
+  assert.equal(
+    readable,
+    "Title\n\nRow 1    Value A\tValue B\n\n\nRow 2 Value C"
+  )
+})
+
+test("PDF indexing extraction applies knowledge normalization directly", () => {
+  const source = readFileSync(
+    path.join(cwd, "src/lib/server/knowledge-indexing.ts"),
+    "utf8"
+  )
+  const extractPdfTextSource = source.match(
+    /export async function extractPdfText\(buffer: Buffer\): Promise<string> \{[\s\S]*?\n\}/
+  )?.[0]
+
+  assert.ok(extractPdfTextSource)
+  assert.match(
+    extractPdfTextSource,
+    /normalizeExtractedKnowledgeText\(await extractRawPdfText\(buffer\)\)/,
+    "Expected search indexing to collapse whitespace before applying the indexing text cap."
+  )
+  assert.doesNotMatch(
+    extractPdfTextSource,
+    /extractPdfTextForModelInput/,
+    "Expected search indexing not to reuse the readable prompt extractor."
+  )
 })
 
 test("uploaded document indexing accepts PDF parameters and caps parse size", async () => {
