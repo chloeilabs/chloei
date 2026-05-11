@@ -759,7 +759,10 @@ test("code execution artifact collection catches best-effort file-read failures"
     "utf8"
   )
 
-  assert.match(source, /readFile\(fullPath\)\.catch\(\(\) => null\)/)
+  assert.match(
+    source,
+    /readFile\(\s*(?:\/\*turbopackIgnore: true\*\/\s*)?fullPath\s*\)\.catch\(\(\) => null\)/
+  )
 })
 
 test("private blob uploads return authenticated app download URLs", () => {

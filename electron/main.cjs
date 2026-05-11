@@ -354,16 +354,6 @@ function getWindowIconPath() {
     "build-resources",
     "icon.png"
   )
-  const icoIconPath = path.join(
-    getAppRoot(),
-    "electron",
-    "build-resources",
-    "icon.ico"
-  )
-
-  if (process.platform === "win32" && fs.existsSync(icoIconPath)) {
-    return icoIconPath
-  }
 
   if (fs.existsSync(pngIconPath)) {
     return pngIconPath

@@ -74,3 +74,46 @@ jobs:
 
       - name: Mock smoke test
         run: pnpm test:smoke:mock
+
+  vercel-status:
+    name: Vercel status
+    runs-on: ubuntu-latest
+    needs: checks
+    if: always()
+    permissions:
+      contents: read
+      statuses: write
+
+    steps:
+      - name: Report Vercel-compatible build status
+        env:
+          CHECKS_RESULT: ${{ needs.checks.result }}
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          case "$CHECKS_RESULT" in
+            success)
+              state="success"
+              description="Vercel-compatible build passed"
+              ;;
+            failure|timed_out)
+              state="failure"
+              description="CI checks failed"
+              ;;
+            cancelled|skipped)
+              state="error"
+              description="CI run was cancelled or skipped"
+              ;;
+            *)
+              state="error"
+              description="CI result was inconclusive: $CHECKS_RESULT"
+              ;;
+          esac
+
+          gh api "repos/$REPOSITORY/statuses/$COMMIT_SHA" \
+            -f state="$state" \
+            -f context="Vercel" \
+            -f target_url="$RUN_URL" \
+            -f description="$description"

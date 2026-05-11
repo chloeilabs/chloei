@@ -3,6 +3,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 
 const DEFAULT_AGENT_ARTIFACT_ROOT = path.join(
+  /*turbopackIgnore: true*/
   tmpdir(),
   "chloei-agent-artifacts"
 )
@@ -57,6 +58,7 @@ export function getAgentArtifactRunRoot(params: {
   userId: string
 }): string {
   return path.join(
+    /*turbopackIgnore: true*/
     AGENT_ARTIFACT_ROOT,
     getArtifactUserKey(params.userId),
     params.artifactId

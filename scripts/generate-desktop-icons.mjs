@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
@@ -8,7 +8,13 @@ const resourcesDir = path.join(rootDir, "electron", "build-resources")
 const svgPath = path.join(resourcesDir, "icon.svg")
 const pngPath = path.join(resourcesDir, "icon.png")
 const icnsPath = path.join(resourcesDir, "icon.icns")
-const icoPath = path.join(resourcesDir, "icon.ico")
+const logoPixelsPath = path.join(
+  rootDir,
+  "src",
+  "lib",
+  "brand",
+  "chloei-logo-pixels.json"
+)
 
 const iconsetSizes = [
   ["icon_16x16.png", 16],
@@ -21,38 +27,6 @@ const iconsetSizes = [
   ["icon_256x256@2x.png", 512],
   ["icon_512x512.png", 512],
   ["icon_512x512@2x.png", 1024],
-]
-
-const icoSizes = [16, 32, 48, 64, 128, 256]
-const logoPixels = [
-  [0, 5],
-  [1, 1],
-  [1, 5],
-  [1, 9],
-  [2, 2],
-  [2, 5],
-  [2, 8],
-  [3, 3],
-  [3, 5],
-  [3, 7],
-  [5, 0],
-  [5, 1],
-  [5, 2],
-  [5, 3],
-  [5, 7],
-  [5, 8],
-  [5, 9],
-  [5, 10],
-  [7, 3],
-  [7, 5],
-  [7, 7],
-  [8, 2],
-  [8, 5],
-  [8, 8],
-  [9, 1],
-  [9, 5],
-  [9, 9],
-  [10, 5],
 ]
 
 function run(command, args) {
@@ -78,7 +52,25 @@ function run(command, args) {
   }
 }
 
-function createIconSvg() {
+async function readLogoPixels() {
+  const parsed = JSON.parse(await readFile(logoPixelsPath, "utf8"))
+  if (
+    !Array.isArray(parsed) ||
+    parsed.some(
+      (pixel) =>
+        !Array.isArray(pixel) ||
+        pixel.length !== 2 ||
+        !Number.isInteger(pixel[0]) ||
+        !Number.isInteger(pixel[1])
+    )
+  ) {
+    throw new Error(`Invalid Chloei logo pixel data in ${logoPixelsPath}`)
+  }
+
+  return parsed
+}
+
+function createIconSvg(logoPixels) {
   const cellSize = 64
   const offset = (1024 - 11 * cellSize) / 2
   const pixels = logoPixels
@@ -111,8 +103,9 @@ async function renderPng(sourceSvgPath, outputPath, size) {
   ])
 }
 
+const logoPixels = await readLogoPixels()
 await mkdir(resourcesDir, { recursive: true })
-await writeFile(svgPath, createIconSvg())
+await writeFile(svgPath, createIconSvg(logoPixels))
 await renderPng(svgPath, pngPath, 1024)
 
 const tmpDir = await mkdtemp(path.join(tmpdir(), "chloei-desktop-icons-"))
@@ -133,16 +126,6 @@ try {
 
   await rm(icnsPath, { force: true })
   run("iconutil", ["-c", "icns", iconsetDir, "-o", icnsPath])
-
-  const icoInputs = []
-  for (const size of icoSizes) {
-    const outputPath = path.join(tmpDir, `icon-${String(size)}.png`)
-    await renderPng(svgPath, outputPath, size)
-    icoInputs.push(outputPath)
-  }
-
-  await rm(icoPath, { force: true })
-  run("magick", [...icoInputs, icoPath])
 } finally {
   await rm(tmpDir, { force: true, recursive: true })
 }

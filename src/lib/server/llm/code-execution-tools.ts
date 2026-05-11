@@ -413,16 +413,19 @@ async function collectArtifactManifest(
   const normalizedArtifactBaseUrl = artifactBaseUrl?.replace(/\/+$/, "")
 
   async function walk(directory: string) {
-    const entries = await readdir(directory, { withFileTypes: true }).catch(
-      () => []
-    )
+    const entries = await readdir(/*turbopackIgnore: true*/ directory, {
+      withFileTypes: true,
+    }).catch(() => [])
 
     for (const entry of entries) {
       if (artifacts.length >= 50 || entry.name === "__pycache__") {
         continue
       }
 
-      const fullPath = path.join(directory, entry.name)
+      const fullPath = path.join(
+        /*turbopackIgnore: true*/ directory,
+        entry.name
+      )
       if (entry.isDirectory()) {
         await walk(fullPath)
         continue
@@ -432,7 +435,9 @@ async function collectArtifactManifest(
         continue
       }
 
-      const fileStats = await stat(fullPath).catch(() => null)
+      const fileStats = await stat(/*turbopackIgnore: true*/ fullPath).catch(
+        () => null
+      )
       if (!fileStats) {
         continue
       }
@@ -462,7 +467,9 @@ async function collectArtifactManifest(
           relativePath,
         })
         if (blobPathname) {
-          const artifactBody = await readFile(fullPath).catch(() => null)
+          const artifactBody = await readFile(
+            /*turbopackIgnore: true*/ fullPath
+          ).catch(() => null)
           const uploaded = artifactBody
             ? await uploadPrivateBlob({
                 pathname: blobPathname,
@@ -491,7 +498,7 @@ async function collectArtifactManifest(
 
 async function computeFileHash(filePath: string): Promise<string | null> {
   const hash = createHash("sha256")
-  const stream = createReadStream(filePath)
+  const stream = createReadStream(/*turbopackIgnore: true*/ filePath)
 
   try {
     for await (const chunk of stream as AsyncIterable<Buffer>) {
@@ -545,14 +552,24 @@ async function copyInputFiles(
       continue
     }
 
-    const destination = path.join(workspaceDir, relativePath)
-    const destinationStats = await stat(destination).catch(() => null)
+    const destination = path.join(
+      /*turbopackIgnore: true*/ workspaceDir,
+      relativePath
+    )
+    const destinationStats = await stat(
+      /*turbopackIgnore: true*/ destination
+    ).catch(() => null)
     if (destinationStats) {
       continue
     }
 
-    await mkdir(path.dirname(destination), { recursive: true })
-    await copyFile(inputFile.sourcePath, destination)
+    await mkdir(/*turbopackIgnore: true*/ path.dirname(destination), {
+      recursive: true,
+    })
+    await copyFile(
+      /*turbopackIgnore: true*/ inputFile.sourcePath,
+      /*turbopackIgnore: true*/ destination
+    )
     copied.add(relativePath)
   }
 
@@ -586,7 +603,7 @@ async function getMountedInputFileHashes(
 
   for (const relativePath of mounted) {
     const fileHash = await computeFileHash(
-      path.join(workspaceDir, relativePath)
+      path.join(/*turbopackIgnore: true*/ workspaceDir, relativePath)
     )
     if (fileHash) {
       hashes.set(relativePath, fileHash)
@@ -683,13 +700,23 @@ async function runProcess(args: {
     normalizedWorkspaceRoot && normalizedWorkspaceRoot.length > 0
       ? normalizedWorkspaceRoot
       : tmpdir()
-  await mkdir(tempRoot, { recursive: true })
+  await mkdir(/*turbopackIgnore: true*/ tempRoot, { recursive: true })
   const tempDir =
     args.workspaceMode === "preserve"
       ? tempRoot
-      : await mkdtemp(path.join(tempRoot, "chloei-code-exec-"))
-  const workspaceDir = path.join(tempDir, "workspace")
-  await mkdir(workspaceDir, { recursive: true })
+      : await mkdtemp(
+          path.join(
+            /*turbopackIgnore: true*/
+            tempRoot,
+            "chloei-code-exec-"
+          )
+        )
+  const workspaceDir = path.join(
+    /*turbopackIgnore: true*/
+    tempDir,
+    "workspace"
+  )
+  await mkdir(/*turbopackIgnore: true*/ workspaceDir, { recursive: true })
   await copyInputFiles(workspaceDir, args.inputFiles)
   const mountedInputFileHashes = await getMountedInputFileHashes(
     workspaceDir,
@@ -734,7 +761,11 @@ async function runProcess(args: {
           TMP: tempDir,
           TEMP: tempDir,
           MPLBACKEND: "Agg",
-          MPLCONFIGDIR: path.join(tempDir, "matplotlib"),
+          MPLCONFIGDIR: path.join(
+            /*turbopackIgnore: true*/
+            tempDir,
+            "matplotlib"
+          ),
           NODE_NO_WARNINGS: "1",
         },
         stdio: "pipe",
@@ -967,7 +998,11 @@ export function createAiSdkCodeExecutionTools(
   const workspaceRoot =
     options.workspaceRoot ??
     (workspaceMode === "preserve"
-      ? path.join(tmpdir(), `chloei-code-exec-${randomUUID()}`)
+      ? path.join(
+          /*turbopackIgnore: true*/
+          tmpdir(),
+          `chloei-code-exec-${randomUUID()}`
+        )
       : undefined)
 
   return {
