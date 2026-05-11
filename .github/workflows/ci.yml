@@ -63,6 +63,12 @@ jobs:
       - name: Report bundle headroom
         run: pnpm bundle:report
 
+      - name: Build standalone server for smoke tests
+        run: pnpm build:standalone
+        env:
+          E2E_MOCK_AUTH: "1"
+          E2E_MOCK_AUTH_ALLOW_NEXT_START: "1"
+
       - name: Install Playwright browser
         run: pnpm exec playwright install --with-deps chromium
 

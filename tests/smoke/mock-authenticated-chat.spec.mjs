@@ -176,6 +176,7 @@ test.describe("mock authenticated chat smoke", () => {
       mimeType: "application/pdf",
       buffer: Buffer.from("%PDF-1.4\n%EOF\n"),
     })
+    await expect(page.getByText("smoke-report.pdf")).toBeVisible()
     await page.getByPlaceholder("Ask anything").press("Enter")
 
     await expect(page.locator("[data-message-role='user']")).toContainText(
