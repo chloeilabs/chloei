@@ -34,8 +34,8 @@
     "test:smoke": "playwright test",
     "test:smoke:memory": "playwright test tests/smoke/memory-authenticated-chat.spec.mjs",
     "test:smoke:mock": "E2E_MOCK_AUTH=1 E2E_MOCK_AUTH_ALLOW_NEXT_START=1 E2E_MOCK_AGENT_RESPONSE=SMOKE_OK SMOKE_EXPECTED_TEXT=SMOKE_OK SMOKE_PORT=3101 playwright test tests/smoke/mock-authenticated-chat.spec.mjs",
-    "lint": "eslint src tests electron auth.ts app-migrate.mjs electron-builder.config.js eslint.config.mjs next.config.mjs playwright.config.mjs postcss.config.mjs scripts/check-desktop-shell.mjs scripts/generate-desktop-icons.mjs scripts/prepare-desktop-bundle.mjs scripts/start-standalone-server.mjs --max-warnings=0",
-    "lint:fix": "eslint src tests electron auth.ts app-migrate.mjs electron-builder.config.js eslint.config.mjs next.config.mjs playwright.config.mjs postcss.config.mjs scripts/check-desktop-shell.mjs scripts/generate-desktop-icons.mjs scripts/prepare-desktop-bundle.mjs scripts/start-standalone-server.mjs --fix --max-warnings=0",
+    "lint": "eslint src tests electron auth.ts app-migrate.mjs electron-builder.config.js eslint.config.mjs next.config.mjs playwright.config.mjs postcss.config.mjs scripts/check-desktop-shell.mjs scripts/generate-desktop-icons.mjs scripts/prepare-desktop-bundle.mjs scripts/start-standalone-server.mjs scripts/vercel-ignore-build.mjs --max-warnings=0",
+    "lint:fix": "eslint src tests electron auth.ts app-migrate.mjs electron-builder.config.js eslint.config.mjs next.config.mjs playwright.config.mjs postcss.config.mjs scripts/check-desktop-shell.mjs scripts/generate-desktop-icons.mjs scripts/prepare-desktop-bundle.mjs scripts/start-standalone-server.mjs scripts/vercel-ignore-build.mjs --fix --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "next typegen && tsc --noEmit"
