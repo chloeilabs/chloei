@@ -13,7 +13,7 @@
     "build": "next build",
     "bundle:budget": "node scripts/check-bundle-budget.mjs",
     "bundle:report": "node scripts/report-bundle-headroom.mjs",
-    "desktop:build": "pnpm desktop:icons && pnpm build && node scripts/prepare-desktop-bundle.mjs",
+    "desktop:build": "pnpm desktop:icons && CHLOEI_DESKTOP_BUILD=1 pnpm build && node scripts/prepare-desktop-bundle.mjs",
     "desktop:dev": "electron electron/main.cjs",
     "desktop:dist": "pnpm desktop:dist:mac",
     "desktop:icons": "node scripts/generate-desktop-icons.mjs",

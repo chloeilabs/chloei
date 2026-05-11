@@ -3,6 +3,7 @@ import { withSentryConfig } from "@sentry/nextjs"
 const isProduction =
   process.env.VERCEL_ENV === "production" ||
   process.env.NODE_ENV === "production"
+const isDesktopBuild = process.env.CHLOEI_DESKTOP_BUILD === "1"
 
 function parseSizeLimitFromEnv(value, fallback) {
   if (!value) {
@@ -53,23 +54,27 @@ const generatedOutputFileTracingExcludes = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
-  output: "standalone",
+  ...(isDesktopBuild
+    ? {
+        output: "standalone",
+        outputFileTracingExcludes: {
+          "**": generatedOutputFileTracingExcludes,
+          "/api/agent": [
+            ...generatedOutputFileTracingExcludes,
+            "./CLAUDE.md",
+            "./README.md",
+            "./app-migrate.mjs",
+            "./auth.ts",
+            "./components.json",
+            "./eslint.config.mjs",
+            "./evals/**/*",
+            "./next.config.mjs",
+            "./tests/**/*",
+          ],
+        },
+      }
+    : {}),
   serverExternalPackages: ["@napi-rs/canvas"],
-  outputFileTracingExcludes: {
-    "**": generatedOutputFileTracingExcludes,
-    "/api/agent": [
-      ...generatedOutputFileTracingExcludes,
-      "./CLAUDE.md",
-      "./README.md",
-      "./app-migrate.mjs",
-      "./auth.ts",
-      "./components.json",
-      "./eslint.config.mjs",
-      "./evals/**/*",
-      "./next.config.mjs",
-      "./tests/**/*",
-    ],
-  },
   experimental: {
     serverActions: {
       bodySizeLimit: serverActionsBodySizeLimit,
