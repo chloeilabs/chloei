@@ -50,6 +50,10 @@ const generatedOutputFileTracingExcludes = [
   "./dist/**/*",
   "./test-results/**/*",
 ]
+const desktopOutputFileTracingIncludes = [
+  "./node_modules/next/dist/compiled/next-server/*runtime.prod.js",
+  "./node_modules/next/dist/compiled/next-server/*runtime.prod.js.map",
+]
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -57,6 +61,9 @@ const nextConfig = {
   ...(isDesktopBuild
     ? {
         output: "standalone",
+        outputFileTracingIncludes: {
+          "/*": desktopOutputFileTracingIncludes,
+        },
         outputFileTracingExcludes: {
           "**": generatedOutputFileTracingExcludes,
           "/api/agent": [
