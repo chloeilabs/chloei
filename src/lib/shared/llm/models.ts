@@ -27,7 +27,6 @@ export const SUPPORTED_MODELS = [
 export const ALL_MODELS = [...SUPPORTED_MODELS] as const
 
 export const MODEL_SELECTOR_MODELS = [
-  AvailableModels.OPENAI_GPT_5_5,
   AvailableModels.MOONSHOTAI_KIMI_K2_6,
   AvailableModels.DEEPSEEK_V4_PRO,
 ] as const

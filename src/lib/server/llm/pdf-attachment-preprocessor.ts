@@ -50,6 +50,33 @@ function truncatePdfText(text: string): string {
   return `${text.slice(0, MAX_PDF_ATTACHMENT_TEXT_CHARS).trimEnd()}\n\n[PDF text truncated after ${String(MAX_PDF_ATTACHMENT_TEXT_CHARS)} characters.]`
 }
 
+function isUsablePdfText(text: string): boolean {
+  const trimmed = text.trim()
+  if (!trimmed) {
+    return false
+  }
+
+  if (!/[A-Za-z0-9]/.test(trimmed)) {
+    return false
+  }
+
+  const rawPdfMarkers = [
+    "%PDF-",
+    "endobj",
+    "endstream",
+    "/FlateDecode",
+    "/ASCII85Decode",
+    "startxref",
+    "%%EOF",
+  ].filter((marker) => trimmed.includes(marker)).length
+
+  if (rawPdfMarkers >= 2) {
+    return false
+  }
+
+  return true
+}
+
 async function extractPdfTextLocally(params: {
   attachment: AgentRequestAttachment
 }): Promise<string | null> {
@@ -65,7 +92,7 @@ async function extractPdfTextLocally(params: {
 
   try {
     const text = await extractPdfTextForModelInput(buffer)
-    return text ? truncatePdfText(text) : null
+    return isUsablePdfText(text) ? truncatePdfText(text) : null
   } catch (error) {
     logger.warn("Local PDF text extraction failed.", {
       attachmentId: attachment.id,
@@ -139,7 +166,21 @@ async function runPdfTextExtractor(
   step: "local" | "gateway"
 ): Promise<string | null> {
   try {
-    return await extractor(params)
+    const text = await extractor(params)
+    if (!text) {
+      return null
+    }
+
+    if (!isUsablePdfText(text)) {
+      logger.warn("PDF text extraction produced unusable text.", {
+        attachmentId: params.attachment.id,
+        filename: params.attachment.filename,
+        step,
+      })
+      return null
+    }
+
+    return text
   } catch (error) {
     logger.warn("PDF text extraction step failed.", {
       attachmentId: params.attachment.id,

@@ -263,6 +263,40 @@ test("PDF preprocessor falls back to Gateway extraction when local text is empty
   assert.equal(messages[0]?.attachments, undefined)
 })
 
+test("PDF preprocessor falls back to Gateway extraction when local text is raw PDF syntax", async () => {
+  let gatewayFallbackCalls = 0
+  const messages = await preparePdfAttachmentsForModel({
+    aiGatewayApiKey: "test-gateway-key",
+    messages: [
+      {
+        role: "user",
+        content: "Read the PDF.",
+        attachments: [
+          {
+            id: "attachment-pdf",
+            kind: "pdf",
+            filename: "encoded.pdf",
+            mediaType: "application/pdf",
+            sizeBytes: 5,
+            dataUrl: "data:application/pdf;base64,aGVsbG8=",
+          },
+        ],
+      },
+    ],
+    extractPdfText: async () =>
+      "%PDF-1.7\n1 0 obj\n/Filter /FlateDecode\nstream\nbinary encoded bytes\nendstream\nendobj\n%%EOF",
+    extractPdfTextWithModel: async () => {
+      gatewayFallbackCalls += 1
+      return "Gateway-readable PDF text."
+    },
+  })
+
+  assert.equal(gatewayFallbackCalls, 1)
+  assert.match(messages[0]?.content ?? "", /Gateway-readable PDF text\./)
+  assert.doesNotMatch(messages[0]?.content ?? "", /%PDF-1\.7/)
+  assert.equal(messages[0]?.attachments, undefined)
+})
+
 test("PDF preprocessor preserves Gateway-extracted document layout", async () => {
   resetTestMocks()
   setTestMocks({

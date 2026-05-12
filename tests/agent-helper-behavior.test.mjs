@@ -221,25 +221,13 @@ test("agent helper validates total size, last-message role, and default model su
     requestId: "request-standalone-gpt",
   })
 
-  assert(!(standaloneGptResult instanceof Response))
-  assert.equal(standaloneGptResult.parsedRequest.runMode, "chat")
-  assert.equal(standaloneGptResult.selectedModel, "openai/gpt-5.5")
-
-  const unorderedDefaultChatResult = parseAgentStreamRequest({
-    body: {
-      messages: [
-        {
-          role: "user",
-          content: "Use the preferred chat model.",
-        },
-      ],
-    },
-    availableModels: [{ id: "moonshotai/kimi-k2.6" }, { id: "openai/gpt-5.5" }],
-    requestId: "request-unordered-default-chat",
+  assert(standaloneGptResult instanceof Response)
+  assert.equal(standaloneGptResult.status, 400)
+  assert.deepEqual(await standaloneGptResult.json(), {
+    error: "Unsupported model selected.",
+    errorCode: "AGENT_UNSUPPORTED_MODEL",
+    requestId: "request-standalone-gpt",
   })
-
-  assert(!(unorderedDefaultChatResult instanceof Response))
-  assert.equal(unorderedDefaultChatResult.selectedModel, "openai/gpt-5.5")
 
   const invalidRunModeResult = parseAgentStreamRequest({
     body: {
