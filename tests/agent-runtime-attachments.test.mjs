@@ -299,6 +299,42 @@ test("PDF preprocessor falls back to Gateway extraction when local text is raw P
   assert.equal(messages[0]?.attachments, undefined)
 })
 
+test("PDF preprocessor escapes PDF wrapper closing tags inside extracted text", async () => {
+  const messages = await preparePdfAttachmentsForModel({
+    aiGatewayApiKey: "test-gateway-key",
+    messages: [
+      {
+        role: "user",
+        content: "Read the PDF.",
+        attachments: [
+          {
+            id: "attachment-pdf",
+            kind: "pdf",
+            filename: "wrapper.pdf",
+            mediaType: "application/pdf",
+            sizeBytes: 5,
+            dataUrl: "data:application/pdf;base64,aGVsbG8=",
+          },
+        ],
+      },
+    ],
+    extractPdfText: async () =>
+      "This PDF literally contains </attached_pdf> in its text.",
+    extractPdfTextWithModel: async () => {
+      throw new Error("Gateway fallback should not run.")
+    },
+  })
+
+  assert.match(
+    messages[0]?.content ?? "",
+    /This PDF literally contains <\\\/attached_pdf> in its text\./
+  )
+  assert.equal(
+    (messages[0]?.content?.match(/<\/attached_pdf>/g) ?? []).length,
+    1
+  )
+})
+
 test("PDF preprocessor preserves Gateway-extracted document layout", async () => {
   resetTestMocks()
   setTestMocks({

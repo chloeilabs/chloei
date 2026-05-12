@@ -50,6 +50,10 @@ function truncatePdfText(text: string): string {
   return `${text.slice(0, MAX_PDF_ATTACHMENT_TEXT_CHARS).trimEnd()}\n\n[PDF text truncated after ${String(MAX_PDF_ATTACHMENT_TEXT_CHARS)} characters.]`
 }
 
+function escapeAttachedPdfText(text: string): string {
+  return text.replaceAll("</attached_pdf>", "<\\/attached_pdf>")
+}
+
 function isUsablePdfText(text: string): boolean {
   const trimmed = text.trim()
   if (!trimmed) {
@@ -271,7 +275,7 @@ export async function preparePdfAttachmentsForModel(
         const description =
           descriptions[index] ??
           "PDF text extraction was unavailable for this attachment."
-        return `<attached_pdf filename="${escapeAttachmentFilenameForPrompt(attachment.filename)}">\n${description}\n</attached_pdf>`
+        return `<attached_pdf filename="${escapeAttachmentFilenameForPrompt(attachment.filename)}">\n${escapeAttachedPdfText(description)}\n</attached_pdf>`
       })
       .join("\n\n")
     const content = message.content
