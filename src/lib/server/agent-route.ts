@@ -23,7 +23,7 @@ import {
   AvailableModels,
   getAgentAttachmentKind,
   getDataUrlMediaType,
-  isModelSelectorModel,
+  MODEL_SELECTOR_MODELS,
   type ModelInfo,
   type ModelType,
   resolveDefaultModelSelectorModel,
@@ -341,6 +341,12 @@ function getMessageAttachments(messages: AgentStreamRequest["messages"]) {
   return messages.flatMap((message) => message.attachments ?? [])
 }
 
+function hasPdfAttachment(messages: AgentStreamRequest["messages"]): boolean {
+  return getMessageAttachments(messages).some(
+    (attachment) => attachment.kind === "pdf"
+  )
+}
+
 function getTotalAttachmentBytes(
   attachments: readonly { sizeBytes: number }[]
 ): number {
@@ -650,6 +656,10 @@ export function parseAgentStreamRequest(
   }
 
   const runMode = parsed.data.runMode ?? "chat"
+  const shouldUsePdfModel =
+    runMode === "chat" &&
+    hasPdfAttachment(parsed.data.messages) &&
+    isAvailableModel(params.availableModels, AvailableModels.OPENAI_GPT_5_5)
 
   if (
     runMode === "research" &&
@@ -664,11 +674,14 @@ export function parseAgentStreamRequest(
     })
   }
 
-  const chatModels = params.availableModels.filter((model) =>
-    isModelSelectorModel(model.id)
+  const availableModelIds = new Set(
+    params.availableModels.map((model) => model.id)
+  )
+  const chatModels = MODEL_SELECTOR_MODELS.flatMap((modelId) =>
+    availableModelIds.has(modelId) ? [{ id: modelId }] : []
   )
   const selectedModelCandidate =
-    runMode === "research"
+    runMode === "research" || shouldUsePdfModel
       ? AvailableModels.OPENAI_GPT_5_5
       : (parsed.data.model ?? resolveDefaultModelSelectorModel(chatModels))
 
@@ -684,6 +697,7 @@ export function parseAgentStreamRequest(
 
   if (
     runMode !== "research" &&
+    !shouldUsePdfModel &&
     !isAvailableModel(chatModels, selectedModelCandidate)
   ) {
     return createJsonErrorResponse({

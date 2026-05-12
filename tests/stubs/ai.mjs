@@ -1,3 +1,5 @@
+import { getTestMocks } from "./mock-state.mjs"
+
 export function tool(definition) {
   return definition
 }
@@ -8,6 +10,10 @@ export function jsonSchema(schema) {
 
 export function stepCountIs(count) {
   return { type: "step-count", count }
+}
+
+export async function generateText(params) {
+  return getTestMocks().ai?.generateText?.(params) ?? { text: "" }
 }
 
 export function streamText() {

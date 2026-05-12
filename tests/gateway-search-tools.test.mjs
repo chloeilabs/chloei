@@ -71,7 +71,7 @@ test("inline citation instructions avoid separate sources sections", async () =>
   )
 })
 
-test("stale and research-only default model ids fall back to Kimi", () => {
+test("stale and fallback-only model ids fall back to Kimi", () => {
   assert.equal(parseStoredSelectedModel("qwen/qwen3.6-plus"), null)
   assert.equal(
     parseStoredSelectedModel(

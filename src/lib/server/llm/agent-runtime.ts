@@ -28,6 +28,7 @@ import {
 import { hashUserId } from "@/lib/server/privacy"
 import {
   type AgentStreamEvent,
+  modelSupportsFileInput,
   modelSupportsImageInput,
   type ModelType,
 } from "@/lib/shared"
@@ -78,6 +79,7 @@ import {
 import { aiGatewayFetch } from "./gateway-client"
 import { describeImagesForTextOnlyModel } from "./image-vision-preprocessor"
 import { createInitialReasoningChunkSanitizer } from "./initial-reasoning-chunk-sanitizer"
+import { preparePdfAttachmentsForModel } from "./pdf-attachment-preprocessor"
 
 const logger = createLogger("agent-runtime")
 
@@ -242,10 +244,17 @@ export async function* startAgentRuntimeStream(
     userId,
     signal: params.signal,
   })
+
+  const pdfPreparedMessages = await preparePdfAttachmentsForModel({
+    messages: blobHydratedMessages,
+    aiGatewayApiKey: params.aiGatewayApiKey,
+    signal: params.signal,
+    preservePdfAttachments: modelSupportsFileInput(params.model),
+  })
   const inputMessages = modelSupportsImageInput(params.model)
-    ? blobHydratedMessages
+    ? pdfPreparedMessages
     : await describeImagesForTextOnlyModel({
-        messages: blobHydratedMessages,
+        messages: pdfPreparedMessages,
         aiGatewayApiKey: params.aiGatewayApiKey,
         signal: params.signal,
       })

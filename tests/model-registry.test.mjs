@@ -79,4 +79,16 @@ test("shared model registry includes the curated gateway models", async () => {
     /AvailableModels\.DEEPSEEK_V4_PRO/,
     "Expected DeepSeek V4 Pro to use image preprocessing because Gateway does not mark it as a vision model."
   )
+
+  assert.match(
+    source,
+    /FILE_INPUT_CAPABLE_MODEL_SET[\s\S]*AvailableModels\.OPENAI_GPT_5_5/,
+    "Expected GPT-5.5 to receive native PDF file parts."
+  )
+
+  assert.doesNotMatch(
+    source.match(/FILE_INPUT_CAPABLE_MODEL_SET[\s\S]*?\]\)/)?.[0] ?? "",
+    /AvailableModels\.(DEEPSEEK_V4_PRO|MOONSHOTAI_KIMI_K2_6)/,
+    "Expected DeepSeek V4 Pro and Kimi K2.6 to use PDF text preprocessing instead of native file parts."
+  )
 })

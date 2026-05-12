@@ -519,7 +519,7 @@ export function PromptForm({
           agentShellInteractiveClass,
           agentShellHighlightClass,
           isDragActive && "ring-1 ring-ring/70",
-          (isFormPending || isReadingAttachments) && "opacity-50"
+          isFormPending && "opacity-50"
         )}
       >
         <div className={cn(agentSurfaceClass, "flex min-h-24 flex-col")}>
