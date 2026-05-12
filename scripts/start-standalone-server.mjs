@@ -30,7 +30,7 @@ async function copyIfExists(sourcePath, destinationPath) {
 
 if (!(await exists(serverPath))) {
   console.error(
-    "Missing .next/standalone/server.js. Run `pnpm build` before starting the production server."
+    "Missing .next/standalone/server.js. Run `pnpm build:standalone` before starting the production server."
   )
   process.exit(1)
 }

@@ -35,6 +35,7 @@ To enable auth locally, provision PostgreSQL and add:
 - `pnpm auth:migrate`: apply Better Auth schema changes to PostgreSQL
 - `pnpm app:migrate`: apply app storage schema changes to PostgreSQL
 - `pnpm build`: build the production app
+- `pnpm build:standalone`: build the standalone production server used by `pnpm start` and mock smoke tests
 - `pnpm start`: run the standalone production server from `.next/standalone/server.js`
 - `pnpm bundle:budget`: check built static JavaScript chunks against bundle budgets
 - `pnpm bundle:report`: report built static JavaScript chunk headroom and largest first-load routes
@@ -47,6 +48,7 @@ To enable auth locally, provision PostgreSQL and add:
 - `pnpm test:smoke`: run opt-in Playwright browser smoke tests against `SMOKE_BASE_URL`
 - `pnpm test:smoke:memory`: run opt-in authenticated memory smoke tests against `SMOKE_BASE_URL`
 - `pnpm test:smoke:mock`: run the credential-free mocked Playwright smoke test used by CI
+- `pnpm test:smoke:mock:build`: build the standalone server, then run the credential-free mocked smoke test
 - `pnpm eval:finance`: run the finance benchmark harness in fixture mode
 - `pnpm eval:finance -- --mode live`: run the live finance-agent harness against AI Gateway
 - `pnpm eval:finance:live`: run the live public-markets finance acceptance suite
@@ -167,6 +169,6 @@ By default, Chloei enforces safe built-in agent limits even if you leave all opt
 
 `pnpm test:smoke` runs Playwright against `SMOKE_BASE_URL` or starts the local dev server at `http://localhost:3000`. Set `SMOKE_EMAIL` and `SMOKE_PASSWORD` for an existing test account before running the live authenticated smoke test. Optional `SMOKE_PROMPT` and `SMOKE_EXPECTED_TEXT` let you tune the live prompt assertion.
 
-`pnpm test:smoke:mock` runs a CI-safe authenticated chat flow with `E2E_MOCK_AUTH=1`, in-memory thread storage, and a deterministic mock agent response against the standalone production server. It does not require Better Auth credentials, PostgreSQL, or AI provider API keys.
+`pnpm test:smoke:mock` runs a CI-safe authenticated chat flow with `E2E_MOCK_AUTH=1`, in-memory thread storage, and a deterministic mock agent response against the standalone production server. It requires `.next/standalone/server.js`, so run `pnpm build:standalone` first or use `pnpm test:smoke:mock:build`. It does not require Better Auth credentials, PostgreSQL, or AI provider API keys.
 
 `pnpm mem0:smoke` requires `MEMORY_PROVIDER=mem0`, `MEM0_API_URL`, and `MEM0_API_KEY`; it writes a disposable marker, retries search for up to 45 seconds to allow Mem0 extraction/indexing to settle, and deletes the marker. `pnpm test:smoke:memory` requires `SMOKE_EMAIL` and `SMOKE_PASSWORD`; use `SMOKE_BASE_URL=<preview-or-production-url>` for preview and production verification. `pnpm mem0:cleanup-smoke` removes authenticated memory smoke threads and Mem0 memories for the configured smoke user while keeping the account available for recurring checks.

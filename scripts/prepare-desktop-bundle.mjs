@@ -40,7 +40,7 @@ function stripMacExtendedAttributes(directoryPath) {
 
 if (!(await exists(standaloneServerPath))) {
   throw new Error(
-    "Missing .next/standalone/server.js. Run `pnpm build` before preparing the desktop bundle."
+    "Missing .next/standalone/server.js. Run `pnpm build:standalone` before preparing the desktop bundle."
   )
 }
 
