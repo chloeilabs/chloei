@@ -7,6 +7,7 @@ const https = require("node:https")
 const net = require("node:net")
 const path = require("node:path")
 const { setTimeout: delay } = require("node:timers/promises")
+const { getPackagedNodeExecutable } = require("./packaged-node-executable.cjs")
 const { version: packageVersion } = require("../package.json")
 
 const { app, BrowserWindow, dialog, shell, session } = require("electron")
@@ -268,15 +269,19 @@ async function startNextServer() {
       throw new Error(`Missing packaged Next.js server at ${serverPath}.`)
     }
 
-    serverProcess = spawn(process.execPath, [serverPath], {
-      cwd: standaloneDir,
-      env: {
-        ...env,
-        ELECTRON_RUN_AS_NODE: "1",
-      },
-      stdio: ["ignore", "pipe", "pipe"],
-      windowsHide: true,
-    })
+    serverProcess = spawn(
+      getPackagedNodeExecutable({ appName: APP_NAME }),
+      [serverPath],
+      {
+        cwd: standaloneDir,
+        env: {
+          ...env,
+          ELECTRON_RUN_AS_NODE: "1",
+        },
+        stdio: ["ignore", "pipe", "pipe"],
+        windowsHide: true,
+      }
+    )
   } else {
     const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm"
 
