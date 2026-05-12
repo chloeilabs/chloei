@@ -66,6 +66,7 @@ const {
 const {
   buildUploadedDocumentSearchRecords,
   chunkKnowledgeText,
+  extractSimplePdfReadableText,
   extractSimplePdfText,
   indexUploadedDocument,
   normalizeExtractedKnowledgeText,
@@ -329,6 +330,22 @@ endobj
   assert.equal(
     extractSimplePdfText(pdf),
     "Chloei smoke SMOKETEST and governed fallback indexing."
+  )
+})
+
+test("simple PDF fallback preserves readable layout for model input", () => {
+  const pdf = Buffer.from(
+    `not-a-valid-pdf
+BT
+(Title) Tj
+(Row 1    Value A\tValue B) Tj
+ET`,
+    "latin1"
+  )
+
+  assert.equal(
+    extractSimplePdfReadableText(pdf),
+    "Title\nRow 1    Value A\tValue B"
   )
 })
 

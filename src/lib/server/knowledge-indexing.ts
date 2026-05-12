@@ -313,7 +313,7 @@ function decodePdfLiteralString(value: string): string {
   return decoded
 }
 
-export function extractSimplePdfText(buffer: Buffer): string {
+function extractSimplePdfRawText(buffer: Buffer): string {
   const source = buffer.toString(
     "latin1",
     0,
@@ -349,7 +349,15 @@ export function extractSimplePdfText(buffer: Buffer): string {
     }
   }
 
-  return normalizeExtractedKnowledgeText(fragments.join(" "))
+  return fragments.join("\n").trim()
+}
+
+export function extractSimplePdfText(buffer: Buffer): string {
+  return normalizeExtractedKnowledgeText(extractSimplePdfRawText(buffer))
+}
+
+export function extractSimplePdfReadableText(buffer: Buffer): string {
+  return normalizeExtractedReadableText(extractSimplePdfRawText(buffer))
 }
 
 async function extractRawPdfText(buffer: Buffer): Promise<string> {
@@ -367,8 +375,8 @@ async function extractRawPdfText(buffer: Buffer): Promise<string> {
     const result = await parser.getText()
     return result.text
   } catch (error) {
-    const fallbackText = extractSimplePdfText(buffer)
-    if (fallbackText) {
+    const fallbackText = extractSimplePdfRawText(buffer)
+    if (normalizeExtractedKnowledgeText(fallbackText)) {
       return fallbackText
     }
 

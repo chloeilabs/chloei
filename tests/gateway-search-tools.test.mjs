@@ -71,13 +71,13 @@ test("inline citation instructions avoid separate sources sections", async () =>
   )
 })
 
-test("stale and research-only default model ids fall back to Kimi", () => {
+test("stale model ids fall back to GPT-5.5 when available", () => {
   assert.equal(parseStoredSelectedModel("qwen/qwen3.6-plus"), null)
   assert.equal(
     parseStoredSelectedModel(
       JSON.stringify(serializeStoredSelectedModel("openai/gpt-5.5"))
     ),
-    null
+    "openai/gpt-5.5"
   )
 
   assert.equal(
@@ -96,6 +96,6 @@ test("stale and research-only default model ids fall back to Kimi", () => {
         },
       ],
     }),
-    "moonshotai/kimi-k2.6"
+    "openai/gpt-5.5"
   )
 })
