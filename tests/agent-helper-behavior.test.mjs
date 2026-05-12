@@ -229,6 +229,70 @@ test("agent helper validates total size, last-message role, and default model su
     requestId: "request-standalone-gpt",
   })
 
+  const pdfAttachmentModelResult = parseAgentStreamRequest({
+    body: {
+      model: "deepseek/deepseek-v4-pro",
+      messages: [
+        {
+          role: "user",
+          content: "Analyze this PDF.",
+          attachments: [
+            {
+              id: "attachment-pdf",
+              kind: "pdf",
+              filename: "doc.pdf",
+              mediaType: "application/pdf",
+              sizeBytes: 5,
+              dataUrl: "data:application/pdf;base64,aGVsbG8=",
+            },
+          ],
+        },
+      ],
+    },
+    availableModels: [
+      { id: "moonshotai/kimi-k2.6" },
+      { id: "deepseek/deepseek-v4-pro" },
+      { id: "openai/gpt-5.5" },
+    ],
+    requestId: "request-pdf-model-fallback",
+  })
+
+  assert(!(pdfAttachmentModelResult instanceof Response))
+  assert.equal(pdfAttachmentModelResult.selectedModel, "openai/gpt-5.5")
+
+  const pdfAttachmentWithoutGptResult = parseAgentStreamRequest({
+    body: {
+      model: "deepseek/deepseek-v4-pro",
+      messages: [
+        {
+          role: "user",
+          content: "Analyze this PDF.",
+          attachments: [
+            {
+              id: "attachment-pdf",
+              kind: "pdf",
+              filename: "doc.pdf",
+              mediaType: "application/pdf",
+              sizeBytes: 5,
+              dataUrl: "data:application/pdf;base64,aGVsbG8=",
+            },
+          ],
+        },
+      ],
+    },
+    availableModels: [
+      { id: "moonshotai/kimi-k2.6" },
+      { id: "deepseek/deepseek-v4-pro" },
+    ],
+    requestId: "request-pdf-model-no-fallback",
+  })
+
+  assert(!(pdfAttachmentWithoutGptResult instanceof Response))
+  assert.equal(
+    pdfAttachmentWithoutGptResult.selectedModel,
+    "deepseek/deepseek-v4-pro"
+  )
+
   const invalidRunModeResult = parseAgentStreamRequest({
     body: {
       runMode: "finance",

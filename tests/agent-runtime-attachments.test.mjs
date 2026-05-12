@@ -177,7 +177,8 @@ test("PDF preprocessor replaces PDF attachments with text for non-file-input mod
   )
 })
 
-test("PDF preprocessor keeps native PDFs while adding text for file-input models", async () => {
+test("PDF preprocessor keeps native PDFs without text extraction for file-input models", async () => {
+  let extractionCalls = 0
   const messages = await preparePdfAttachmentsForModel({
     aiGatewayApiKey: "test-gateway-key",
     preservePdfAttachments: true,
@@ -197,16 +198,17 @@ test("PDF preprocessor keeps native PDFs while adding text for file-input models
         ],
       },
     ],
-    extractPdfText: async () => "Extracted PDF text visible to the model.",
+    extractPdfText: async () => {
+      extractionCalls += 1
+      throw new Error("File-input models should receive native PDFs directly.")
+    },
     extractPdfTextWithModel: async () => {
       throw new Error("Gateway fallback should not run.")
     },
   })
 
-  assert.match(
-    messages[0]?.content ?? "",
-    /<attached_pdf filename="letter\.pdf">\nExtracted PDF text visible to the model\.\n<\/attached_pdf>/
-  )
+  assert.equal(extractionCalls, 0)
+  assert.equal(messages[0]?.content, "Analyze these files.")
   assert.deepEqual(messages[0]?.attachments, [
     {
       id: "attachment-pdf",
@@ -220,7 +222,7 @@ test("PDF preprocessor keeps native PDFs while adding text for file-input models
   assert.deepEqual(toModelMessages(messages)[0]?.content, [
     {
       type: "text",
-      text: messages[0]?.content,
+      text: "Analyze these files.",
     },
     {
       type: "file",

@@ -247,9 +247,14 @@ export async function preparePdfAttachmentsForModel(
       continue
     }
 
-    const remainingAttachments = params.preservePdfAttachments
-      ? attachments
-      : attachments.filter((attachment) => attachment.kind !== "pdf")
+    if (params.preservePdfAttachments) {
+      result.push(message)
+      continue
+    }
+
+    const remainingAttachments = attachments.filter(
+      (attachment) => attachment.kind !== "pdf"
+    )
     const descriptions = await Promise.all(
       pdfAttachments.map((attachment) =>
         describePdfAttachment({
