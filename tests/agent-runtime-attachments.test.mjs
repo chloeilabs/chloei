@@ -102,6 +102,10 @@ test("vision preprocessor escapes attachment filenames for prompt wrappers", () 
 
 test("registered multimodal chat models use native image input", () => {
   assert.equal(
+    modelSupportsImageInput(AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW),
+    true
+  )
+  assert.equal(
     modelSupportsImageInput(AvailableModels.MOONSHOTAI_KIMI_K2_6),
     true
   )
