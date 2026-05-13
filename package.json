@@ -1,6 +1,6 @@
 {
   "name": "chloei",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Chloei desktop and web chat application.",
   "productName": "Chloei",
   "main": "electron/main.cjs",
