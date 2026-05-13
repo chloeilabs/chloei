@@ -7,7 +7,7 @@ import {
   type PromptTextMessage,
 } from "./prompt-message-utils"
 
-export type PromptProvider = "deepseek" | "moonshotai" | "openai"
+export type PromptProvider = "google" | "moonshotai" | "xiaomi"
 
 export type PromptTaskMode =
   | "general"
@@ -46,8 +46,8 @@ const STRICT_OUTPUT_PATTERN =
   /\b(return only|exactly|exact format|valid json|minified json|last line|single word|one word|single line|one line|two sentences|one sentence|one paragraph|no more than|under \d+ words|no surrounding prose|only one ```|schema|yaml|xml|csv)\b/i
 
 const PROVIDER_OVERLAYS: Record<PromptProvider, string> = {
-  deepseek: `
-Use DeepSeek reasoning mode efficiently.
+  google: `
+Use Gemini reasoning mode efficiently.
 - Keep the final answer concise and grounded in the actual task.
 - Prefer direct execution and verification over speculative narration.
 - On format-sensitive tasks, do a literal final-format check before finishing.
@@ -62,9 +62,9 @@ Use Kimi reasoning mode efficiently.
 - Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
 - After tool use, synthesize the result and stop. Do not replay raw tool traces.
 `.trim(),
-  openai: `
-Use OpenAI reasoning mode efficiently.
-- Keep the final answer tighter than the hidden reasoning.
+  xiaomi: `
+Use MiMo reasoning mode efficiently.
+- Keep the final answer concise and grounded in the actual task.
 - Prefer direct execution and verification over speculative narration.
 - On format-sensitive tasks, do a literal final-format check before finishing.
 - Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
@@ -133,16 +133,16 @@ This request is high-stakes.
 }
 
 export function resolvePromptProvider(model: ModelType): PromptProvider {
-  if (model.startsWith("openai/")) {
-    return "openai"
-  }
-
-  if (model.startsWith("deepseek/")) {
-    return "deepseek"
+  if (model.startsWith("google/")) {
+    return "google"
   }
 
   if (model.startsWith("moonshotai/")) {
     return "moonshotai"
+  }
+
+  if (model.startsWith("xiaomi/")) {
+    return "xiaomi"
   }
 
   throw new Error(`Unsupported model provider for model: ${model}`)

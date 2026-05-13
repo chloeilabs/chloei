@@ -474,7 +474,7 @@ test("agent route routes research-mode finance prompts through finance runtime",
             messages: body.messages,
             runMode: "research",
           },
-          selectedModel: "openai/gpt-5.5",
+          selectedModel: "google/gemini-3.1-pro-preview",
         }
       },
     },

@@ -43,15 +43,21 @@ test("tavily search tool results derive source links", async () => {
   )
 })
 
-test("gateway provider options request the strongest supported reasoning levels", () => {
+test("gateway provider options use Gemini high thinking for research", () => {
   assert.deepEqual(getAiSdkGatewayProviderOptions(), {})
-
   assert.deepEqual(
-    getAiSdkGatewayProviderOptionsForMode({ deepResearch: true }).openai,
+    getAiSdkGatewayProviderOptionsForMode({ deepResearch: false }),
+    {}
+  )
+  assert.deepEqual(
+    getAiSdkGatewayProviderOptionsForMode({ deepResearch: true }),
     {
-      reasoningEffort: "xhigh",
-      reasoningSummary: "detailed",
-      textVerbosity: "high",
+      google: {
+        thinkingConfig: {
+          thinkingLevel: "high",
+          includeThoughts: true,
+        },
+      },
     }
   )
 })
@@ -87,8 +93,8 @@ test("stale and fallback-only model ids fall back to Kimi", () => {
       initialSelectedModel: null,
       availableModels: [
         {
-          id: "openai/gpt-5.5",
-          name: "GPT-5.5",
+          id: "google/gemini-3.1-pro-preview",
+          name: "Gemini 3.1 Pro Preview",
         },
         {
           id: "moonshotai/kimi-k2.6",

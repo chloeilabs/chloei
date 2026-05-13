@@ -1,7 +1,7 @@
 export const AvailableModels = {
-  DEEPSEEK_V4_PRO: "deepseek/deepseek-v4-pro",
+  GOOGLE_GEMINI_3_1_PRO_PREVIEW: "google/gemini-3.1-pro-preview",
   MOONSHOTAI_KIMI_K2_6: "moonshotai/kimi-k2.6",
-  OPENAI_GPT_5_5: "openai/gpt-5.5",
+  XIAOMI_MIMO_V2_5_PRO: "xiaomi/mimo-v2.5-pro",
 } as const
 
 export type ModelType = (typeof AvailableModels)[keyof typeof AvailableModels]
@@ -19,16 +19,18 @@ export interface ModelInfo {
 }
 
 export const SUPPORTED_MODELS = [
-  AvailableModels.OPENAI_GPT_5_5,
+  AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW,
   AvailableModels.MOONSHOTAI_KIMI_K2_6,
-  AvailableModels.DEEPSEEK_V4_PRO,
+  AvailableModels.XIAOMI_MIMO_V2_5_PRO,
 ] as const
 
 export const ALL_MODELS = [...SUPPORTED_MODELS] as const
 
+export const RESEARCH_MODEL = AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW
+
 export const MODEL_SELECTOR_MODELS = [
   AvailableModels.MOONSHOTAI_KIMI_K2_6,
-  AvailableModels.DEEPSEEK_V4_PRO,
+  AvailableModels.XIAOMI_MIMO_V2_5_PRO,
 ] as const
 
 const MODEL_SELECTOR_MODEL_SET: ReadonlySet<ModelType> = new Set(
@@ -59,23 +61,24 @@ export function resolveDefaultModelSelectorModel(
 }
 
 export const ModelInfos: Record<ModelType, ModelInfo> = {
-  [AvailableModels.DEEPSEEK_V4_PRO]: {
-    id: AvailableModels.DEEPSEEK_V4_PRO,
-    name: "DeepSeek V4 Pro",
+  [AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW]: {
+    id: AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW,
+    name: "Gemini 3.1 Pro Preview",
   },
   [AvailableModels.MOONSHOTAI_KIMI_K2_6]: {
     id: AvailableModels.MOONSHOTAI_KIMI_K2_6,
     name: "Kimi K2.6",
   },
-  [AvailableModels.OPENAI_GPT_5_5]: {
-    id: AvailableModels.OPENAI_GPT_5_5,
-    name: "GPT-5.5",
+  [AvailableModels.XIAOMI_MIMO_V2_5_PRO]: {
+    id: AvailableModels.XIAOMI_MIMO_V2_5_PRO,
+    name: "MiMo V2.5 Pro",
   },
 }
 
 const VISION_CAPABLE_MODEL_SET: ReadonlySet<ModelType> = new Set([
+  AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW,
   AvailableModels.MOONSHOTAI_KIMI_K2_6,
-  AvailableModels.OPENAI_GPT_5_5,
+  AvailableModels.XIAOMI_MIMO_V2_5_PRO,
 ])
 
 export function modelSupportsImageInput(model: ModelType): boolean {
@@ -83,8 +86,9 @@ export function modelSupportsImageInput(model: ModelType): boolean {
 }
 
 const FILE_INPUT_CAPABLE_MODEL_SET: ReadonlySet<ModelType> = new Set([
-  // Kimi currently rejects AI SDK file parts through Gateway despite its metadata.
-  AvailableModels.OPENAI_GPT_5_5,
+  AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW,
+  AvailableModels.MOONSHOTAI_KIMI_K2_6,
+  AvailableModels.XIAOMI_MIMO_V2_5_PRO,
 ])
 
 export function modelSupportsFileInput(model: ModelType): boolean {
@@ -92,6 +96,7 @@ export function modelSupportsFileInput(model: ModelType): boolean {
 }
 
 export const VISION_PREPROCESSOR_MODEL: ModelType =
-  AvailableModels.OPENAI_GPT_5_5
+  AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW
 
-export const PDF_PREPROCESSOR_MODEL: ModelType = AvailableModels.OPENAI_GPT_5_5
+export const PDF_PREPROCESSOR_MODEL: ModelType =
+  AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW

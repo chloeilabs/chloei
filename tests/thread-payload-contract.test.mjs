@@ -54,7 +54,7 @@ test("thread store delegates parsing and persistence shaping to the payload help
 test("thread payload preserves valid run modes and drops invalid run modes", () => {
   const parsed = parseThreadPayload({
     id: "thread-1",
-    model: "openai/gpt-5.5",
+    model: "google/gemini-3.1-pro-preview",
     messages: [
       {
         id: "message-1",
@@ -71,7 +71,7 @@ test("thread payload preserves valid run modes and drops invalid run modes", () 
         id: "message-2",
         role: "assistant",
         content: "Done.",
-        llmModel: "openai/gpt-5.5",
+        llmModel: "google/gemini-3.1-pro-preview",
         createdAt: "2026-04-26T00:00:01.000Z",
         metadata: {
           runMode: "invalid",
@@ -89,13 +89,13 @@ test("thread payload preserves valid run modes and drops invalid run modes", () 
 test("thread payload preserves attachment metadata and strips request-only data", () => {
   const parsed = parseThreadPayload({
     id: "thread-attachments",
-    model: "openai/gpt-5.5",
+    model: "google/gemini-3.1-pro-preview",
     messages: [
       {
         id: "message-1",
         role: "user",
         content: "Analyze this file.",
-        llmModel: "openai/gpt-5.5",
+        llmModel: "google/gemini-3.1-pro-preview",
         createdAt: "2026-04-26T00:00:00.000Z",
         metadata: {
           attachments: [
@@ -151,13 +151,13 @@ test("thread payload preserves attachment metadata and strips request-only data"
 test("thread payload caps attachment metadata and preview persistence", () => {
   const baseThread = {
     id: "thread-attachment-limits",
-    model: "openai/gpt-5.5",
+    model: "google/gemini-3.1-pro-preview",
     messages: [
       {
         id: "message-1",
         role: "user",
         content: "Analyze these files.",
-        llmModel: "openai/gpt-5.5",
+        llmModel: "google/gemini-3.1-pro-preview",
         createdAt: "2026-04-26T00:00:00.000Z",
         metadata: {
           attachments: [],

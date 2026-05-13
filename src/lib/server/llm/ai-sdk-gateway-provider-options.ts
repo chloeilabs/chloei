@@ -1,3 +1,12 @@
+const GEMINI_HIGH_THINKING_PROVIDER_OPTIONS = {
+  google: {
+    thinkingConfig: {
+      thinkingLevel: "high",
+      includeThoughts: true,
+    },
+  },
+} as const
+
 export function getAiSdkGatewayProviderOptions() {
   return getAiSdkGatewayProviderOptionsForMode()
 }
@@ -7,15 +16,5 @@ export function getAiSdkGatewayProviderOptionsForMode({
 }: {
   deepResearch?: boolean
 } = {}) {
-  return {
-    ...(deepResearch
-      ? {
-          openai: {
-            reasoningEffort: "xhigh",
-            reasoningSummary: "detailed",
-            textVerbosity: "high",
-          },
-        }
-      : {}),
-  }
+  return deepResearch ? GEMINI_HIGH_THINKING_PROVIDER_OPTIONS : {}
 }

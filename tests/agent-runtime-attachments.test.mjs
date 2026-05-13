@@ -100,21 +100,34 @@ test("vision preprocessor escapes attachment filenames for prompt wrappers", () 
   assert.equal(escapeAttachmentFilenameForPrompt(escaped), escaped)
 })
 
-test("DeepSeek image attachments are routed through preprocessing", () => {
-  assert.equal(modelSupportsImageInput(AvailableModels.DEEPSEEK_V4_PRO), false)
+test("registered multimodal chat models use native image input", () => {
+  assert.equal(
+    modelSupportsImageInput(AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW),
+    true
+  )
   assert.equal(
     modelSupportsImageInput(AvailableModels.MOONSHOTAI_KIMI_K2_6),
+    true
+  )
+  assert.equal(
+    modelSupportsImageInput(AvailableModels.XIAOMI_MIMO_V2_5_PRO),
     true
   )
 })
 
 test("PDF file-input capability matches runtime-compatible Gateway models", () => {
-  assert.equal(modelSupportsFileInput(AvailableModels.OPENAI_GPT_5_5), true)
+  assert.equal(
+    modelSupportsFileInput(AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW),
+    true
+  )
   assert.equal(
     modelSupportsFileInput(AvailableModels.MOONSHOTAI_KIMI_K2_6),
-    false
+    true
   )
-  assert.equal(modelSupportsFileInput(AvailableModels.DEEPSEEK_V4_PRO), false)
+  assert.equal(
+    modelSupportsFileInput(AvailableModels.XIAOMI_MIMO_V2_5_PRO),
+    true
+  )
 })
 
 test("PDF preprocessor replaces PDF attachments with text for non-file-input models", async () => {

@@ -50,14 +50,14 @@ test("agent system prompt composes trusted blocks in priority order", () => {
     {
       now: new Date("2026-05-03T12:34:56.000Z"),
       userTimeZone: "America/Chicago",
-      provider: "openai",
+      provider: "google",
       taskMode: "research",
     }
   )
 
   const operatingIndex = prompt.indexOf("--- BEGIN OPERATING INSTRUCTIONS ---")
   const dateIndex = prompt.indexOf("--- BEGIN RUNTIME DATE CONTEXT ---")
-  const providerIndex = prompt.indexOf("--- BEGIN PROVIDER OVERLAY: OPENAI ---")
+  const providerIndex = prompt.indexOf("--- BEGIN PROVIDER OVERLAY: GOOGLE ---")
   const taskIndex = prompt.indexOf("--- BEGIN TASK MODE OVERLAY: RESEARCH ---")
   const soulIndex = prompt.indexOf("--- BEGIN SHARED CONTEXT FILE: SOUL.md ---")
   const authIndex = prompt.indexOf("--- BEGIN AUTH USER CONTEXT ---")
@@ -86,7 +86,7 @@ test("agent system prompt composes trusted blocks in priority order", () => {
 
   assert.match(prompt, /Current UTC timestamp: 2026-05-03T12:34:56.000Z/)
   assert.match(prompt, /User time zone: America\/Chicago/)
-  assert.match(prompt, /Use OpenAI reasoning mode efficiently/)
+  assert.match(prompt, /Use Gemini reasoning mode efficiently/)
   assert.match(prompt, /This request needs deep research/)
   assert.match(prompt, /Email: user@example.com/)
   assert(prompt.includes(DEFAULT_SOUL_FALLBACK_INSTRUCTION))
@@ -154,7 +154,7 @@ test("agent system prompt injects financial services workflow after task steerin
     },
     {
       now: new Date("2026-05-03T12:34:56.000Z"),
-      provider: "openai",
+      provider: "google",
       taskMode: "finance_analysis",
       financialServicesWorkflow: {
         workflow: "financial_modeling",

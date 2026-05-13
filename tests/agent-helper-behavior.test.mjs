@@ -177,13 +177,19 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "moonshotai/kimi-k2.6" }, { id: "openai/gpt-5.5" }],
+    availableModels: [
+      { id: "moonshotai/kimi-k2.6" },
+      { id: "google/gemini-3.1-pro-preview" },
+    ],
     requestId: "request-research-mode",
   })
 
   assert(!(researchModeResult instanceof Response))
   assert.equal(researchModeResult.parsedRequest.runMode, "research")
-  assert.equal(researchModeResult.selectedModel, "openai/gpt-5.5")
+  assert.equal(
+    researchModeResult.selectedModel,
+    "google/gemini-3.1-pro-preview"
+  )
 
   const unavailableResearchModelResult = parseAgentStreamRequest({
     body: {
@@ -202,36 +208,39 @@ test("agent helper validates total size, last-message role, and default model su
   assert(unavailableResearchModelResult instanceof Response)
   assert.equal(unavailableResearchModelResult.status, 400)
   assert.deepEqual(await unavailableResearchModelResult.json(), {
-    error: "Research mode requires GPT-5.5 model access.",
+    error: "Research mode requires Gemini 3.1 Pro Preview model access.",
     errorCode: "AGENT_RESEARCH_MODEL_UNAVAILABLE",
     requestId: "request-research-unavailable",
   })
 
-  const standaloneGptResult = parseAgentStreamRequest({
+  const standaloneResearchModelResult = parseAgentStreamRequest({
     body: {
-      model: "openai/gpt-5.5",
+      model: "google/gemini-3.1-pro-preview",
       messages: [
         {
           role: "user",
-          content: "Use GPT as a normal chat model.",
+          content: "Use Gemini Research as a normal chat model.",
         },
       ],
     },
-    availableModels: [{ id: "moonshotai/kimi-k2.6" }, { id: "openai/gpt-5.5" }],
-    requestId: "request-standalone-gpt",
+    availableModels: [
+      { id: "moonshotai/kimi-k2.6" },
+      { id: "google/gemini-3.1-pro-preview" },
+    ],
+    requestId: "request-standalone-research-model",
   })
 
-  assert(standaloneGptResult instanceof Response)
-  assert.equal(standaloneGptResult.status, 400)
-  assert.deepEqual(await standaloneGptResult.json(), {
+  assert(standaloneResearchModelResult instanceof Response)
+  assert.equal(standaloneResearchModelResult.status, 400)
+  assert.deepEqual(await standaloneResearchModelResult.json(), {
     error: "Unsupported model selected.",
     errorCode: "AGENT_UNSUPPORTED_MODEL",
-    requestId: "request-standalone-gpt",
+    requestId: "request-standalone-research-model",
   })
 
   const pdfAttachmentModelResult = parseAgentStreamRequest({
     body: {
-      model: "deepseek/deepseek-v4-pro",
+      model: "xiaomi/mimo-v2.5-pro",
       messages: [
         {
           role: "user",
@@ -251,18 +260,18 @@ test("agent helper validates total size, last-message role, and default model su
     },
     availableModels: [
       { id: "moonshotai/kimi-k2.6" },
-      { id: "deepseek/deepseek-v4-pro" },
-      { id: "openai/gpt-5.5" },
+      { id: "xiaomi/mimo-v2.5-pro" },
+      { id: "google/gemini-3.1-pro-preview" },
     ],
-    requestId: "request-pdf-model-fallback",
+    requestId: "request-pdf-model-preserved",
   })
 
   assert(!(pdfAttachmentModelResult instanceof Response))
-  assert.equal(pdfAttachmentModelResult.selectedModel, "openai/gpt-5.5")
+  assert.equal(pdfAttachmentModelResult.selectedModel, "xiaomi/mimo-v2.5-pro")
 
-  const pdfAttachmentWithoutGptResult = parseAgentStreamRequest({
+  const pdfAttachmentWithoutResearchModelResult = parseAgentStreamRequest({
     body: {
-      model: "deepseek/deepseek-v4-pro",
+      model: "xiaomi/mimo-v2.5-pro",
       messages: [
         {
           role: "user",
@@ -282,15 +291,15 @@ test("agent helper validates total size, last-message role, and default model su
     },
     availableModels: [
       { id: "moonshotai/kimi-k2.6" },
-      { id: "deepseek/deepseek-v4-pro" },
+      { id: "xiaomi/mimo-v2.5-pro" },
     ],
-    requestId: "request-pdf-model-no-fallback",
+    requestId: "request-pdf-model-no-research-model",
   })
 
-  assert(!(pdfAttachmentWithoutGptResult instanceof Response))
+  assert(!(pdfAttachmentWithoutResearchModelResult instanceof Response))
   assert.equal(
-    pdfAttachmentWithoutGptResult.selectedModel,
-    "deepseek/deepseek-v4-pro"
+    pdfAttachmentWithoutResearchModelResult.selectedModel,
+    "xiaomi/mimo-v2.5-pro"
   )
 
   const invalidRunModeResult = parseAgentStreamRequest({
@@ -439,7 +448,10 @@ test("agent helper validates file attachments and preserves the selected model",
         },
       ],
     },
-    availableModels: [{ id: "moonshotai/kimi-k2.6" }, { id: "openai/gpt-5.5" }],
+    availableModels: [
+      { id: "moonshotai/kimi-k2.6" },
+      { id: "google/gemini-3.1-pro-preview" },
+    ],
     requestId: "request-attachment",
   })
 
@@ -895,7 +907,7 @@ test("agent helper marks tool-backed partial output incomplete when a tool call 
     request: createRequest(),
     requestId: "request-unresolved-tool",
     timeoutMs: 30_000,
-    selectedModel: "deepseek/deepseek-v4-pro",
+    selectedModel: "moonshotai/kimi-k2.6",
     runMode: "chat",
     aiGatewayApiKey: "ai-gateway-key",
     tavilyApiKey: "tavily-key",
@@ -951,7 +963,7 @@ test("agent helper does not add an incomplete fallback when a meaningful answer 
     request: createRequest(),
     requestId: "request-tool-error",
     timeoutMs: 30_000,
-    selectedModel: "deepseek/deepseek-v4-pro",
+    selectedModel: "moonshotai/kimi-k2.6",
     runMode: "chat",
     aiGatewayApiKey: "ai-gateway-key",
     tavilyApiKey: "tavily-key",
@@ -1037,7 +1049,7 @@ test("agent helper commits meaningful incomplete assistant text for memory", asy
     request: createRequest(),
     requestId: "request-memory-incomplete",
     timeoutMs: 30_000,
-    selectedModel: "deepseek/deepseek-v4-pro",
+    selectedModel: "moonshotai/kimi-k2.6",
     aiGatewayApiKey: "ai-gateway-key",
     memoryCommitMaxChars: 100,
     messages: [{ role: "user", content: "Search memory docs" }],
@@ -1133,7 +1145,7 @@ test("agent helper turns upstream body timeouts into visible timeout output", as
     request: createRequest(),
     requestId: "request-body-timeout",
     timeoutMs: 30_000,
-    selectedModel: "deepseek/deepseek-v4-pro",
+    selectedModel: "moonshotai/kimi-k2.6",
     runMode: "chat",
     aiGatewayApiKey: "ai-gateway-key",
     messages: [{ role: "user", content: "Latest AI news" }],
@@ -1168,7 +1180,7 @@ test("agent helper forwards the deep research runtime profile", async () => {
     request: createRequest(),
     requestId: "request-research",
     timeoutMs: 30_000,
-    selectedModel: "openai/gpt-5.5",
+    selectedModel: "google/gemini-3.1-pro-preview",
     runMode: "research",
     aiGatewayApiKey: "ai-gateway-key",
     runtimeProfile: "deep_research",
@@ -1180,9 +1192,9 @@ test("agent helper forwards the deep research runtime profile", async () => {
 
   assert.equal(
     response.headers.get("X-Agent-Effective-Model"),
-    "openai/gpt-5.5"
+    "google/gemini-3.1-pro-preview"
   )
-  assert.equal(recorded.streamParams[0]?.model, "openai/gpt-5.5")
+  assert.equal(recorded.streamParams[0]?.model, "google/gemini-3.1-pro-preview")
   assert.equal(recorded.streamParams[0]?.runtimeProfile, "deep_research")
 })
 

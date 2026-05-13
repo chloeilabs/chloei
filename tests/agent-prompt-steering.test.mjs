@@ -21,28 +21,31 @@ const {
 } = await import(steeringUrl)
 
 test("prompt steering resolves supported model providers", () => {
-  assert.equal(resolvePromptProvider(AvailableModels.OPENAI_GPT_5_5), "openai")
+  assert.equal(
+    resolvePromptProvider(AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW),
+    "google"
+  )
   assert.equal(
     resolvePromptProvider(AvailableModels.MOONSHOTAI_KIMI_K2_6),
     "moonshotai"
   )
   assert.equal(
-    resolvePromptProvider(AvailableModels.DEEPSEEK_V4_PRO),
-    "deepseek"
+    resolvePromptProvider(AvailableModels.XIAOMI_MIMO_V2_5_PRO),
+    "xiaomi"
   )
 })
 
 test("prompt steering includes provider overlays for supported models", () => {
   const blocks = createPromptSteeringBlocks({
-    provider: "openai",
+    provider: "google",
     taskMode: "research",
   })
   const overlayText = blocks.map((block) => block.body).join("\n\n")
 
   assert.match(
     overlayText,
-    /Use OpenAI reasoning mode efficiently/,
-    "Expected OpenAI prompts to receive the OpenAI provider overlay."
+    /Use Gemini reasoning mode efficiently/,
+    "Expected Google prompts to receive the Gemini provider overlay."
   )
   assert.match(
     overlayText,
@@ -53,7 +56,7 @@ test("prompt steering includes provider overlays for supported models", () => {
 
 test("prompt steering keeps finance guidance provider-agnostic", () => {
   const blocks = createPromptSteeringBlocks({
-    provider: "deepseek",
+    provider: "xiaomi",
     taskMode: "finance_analysis",
   })
   const overlayText = blocks.map((block) => block.body).join("\n\n")

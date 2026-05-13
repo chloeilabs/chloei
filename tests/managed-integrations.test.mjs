@@ -489,14 +489,14 @@ test("Sentry scrubbing removes sensitive fields without dropping safe metadata",
     },
     extra: {
       prompt: "raw prompt",
-      modelId: "openai/gpt-5.5",
+      modelId: "google/gemini-3.1-pro-preview",
     },
   })
 
   assert.equal(scrubbed.user.sessionToken, "[Filtered]")
   assert.equal(scrubbed.user.email, "[Filtered]")
   assert.equal(scrubbed.extra.prompt, "[Filtered]")
-  assert.equal(scrubbed.extra.modelId, "openai/gpt-5.5")
+  assert.equal(scrubbed.extra.modelId, "google/gemini-3.1-pro-preview")
 })
 
 test("Sentry scrubbing handles every array element", () => {
@@ -531,13 +531,13 @@ test("PostHog before-send scrubbing applies the property allowlist", () => {
   const scrubbed = scrubPostHogEvent({
     event: "agent_request_started",
     properties: {
-      model_id: "openai/gpt-5.5",
+      model_id: "google/gemini-3.1-pro-preview",
       customer_segment: "private-bank",
       email: "person@example.com",
     },
   })
 
-  assert.equal(scrubbed.properties.model_id, "openai/gpt-5.5")
+  assert.equal(scrubbed.properties.model_id, "google/gemini-3.1-pro-preview")
   assert.equal("customer_segment" in scrubbed.properties, false)
   assert.equal(scrubbed.properties.email, "[Filtered]")
 })
@@ -581,7 +581,7 @@ test("PostHog product analytics is gated and emits privacy-safe events", async (
       userEmail: "external@example.com",
       userId: "user-1",
       properties: {
-        model_id: "openai/gpt-5.5",
+        model_id: "google/gemini-3.1-pro-preview",
       },
     })
     assert.equal(globalThis[postHogCapturesKey], undefined)
@@ -603,7 +603,7 @@ test("PostHog product analytics is gated and emits privacy-safe events", async (
         financeWorkflowsEnabled: true,
       },
       properties: {
-        model_id: "openai/gpt-5.5",
+        model_id: "google/gemini-3.1-pro-preview",
         prompt: "raw prompt",
       },
     })

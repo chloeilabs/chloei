@@ -12,14 +12,14 @@ test("shared model registry includes the curated gateway models", async () => {
 
   assert.doesNotMatch(
     source,
-    /qwen\/qwen3\.6-plus|z-ai\/glm-5\.1|Qwen3\.6 Plus|GLM 5\.1/,
+    /qwen\/qwen3\.6-plus|z-ai\/glm-5\.1|deepseek\/deepseek-v4-pro|openai\/gpt-5\.5|Qwen3\.6 Plus|GLM 5\.1|DEEPSEEK_V4_PRO|OPENAI_GPT_5_5|DeepSeek V4 Pro|GPT-5\.5/,
     "Expected legacy model ids to be fully removed from the shared model registry."
   )
 
   assert.match(
     source,
-    /OPENAI_GPT_5_5:\s*"openai\/gpt-5\.5"/,
-    "Expected AvailableModels to include OPENAI_GPT_5_5."
+    /GOOGLE_GEMINI_3_1_PRO_PREVIEW:\s*"google\/gemini-3\.1-pro-preview"/,
+    "Expected AvailableModels to include GOOGLE_GEMINI_3_1_PRO_PREVIEW."
   )
 
   assert.match(
@@ -30,26 +30,32 @@ test("shared model registry includes the curated gateway models", async () => {
 
   assert.match(
     source,
-    /DEEPSEEK_V4_PRO:\s*"deepseek\/deepseek-v4-pro"/,
-    "Expected AvailableModels to include DEEPSEEK_V4_PRO."
+    /XIAOMI_MIMO_V2_5_PRO:\s*"xiaomi\/mimo-v2\.5-pro"/,
+    "Expected AvailableModels to include XIAOMI_MIMO_V2_5_PRO."
   )
 
   assert.match(
     source.replace(/\s+/g, " "),
-    /SUPPORTED_MODELS = \[ AvailableModels\.OPENAI_GPT_5_5, AvailableModels\.MOONSHOTAI_KIMI_K2_6, AvailableModels\.DEEPSEEK_V4_PRO, \] as const/,
-    "Expected SUPPORTED_MODELS to list only GPT-5.5, Kimi K2.6, and DeepSeek V4 Pro."
-  )
-
-  assert.match(
-    source.replace(/\s+/g, " "),
-    /MODEL_SELECTOR_MODELS = \[ AvailableModels\.MOONSHOTAI_KIMI_K2_6, AvailableModels\.DEEPSEEK_V4_PRO, \] as const/,
-    "Expected the chat model selector to expose only Kimi K2.6 and DeepSeek V4 Pro."
+    /SUPPORTED_MODELS = \[ AvailableModels\.GOOGLE_GEMINI_3_1_PRO_PREVIEW, AvailableModels\.MOONSHOTAI_KIMI_K2_6, AvailableModels\.XIAOMI_MIMO_V2_5_PRO, \] as const/,
+    "Expected SUPPORTED_MODELS to list Gemini 3.1 Pro Preview, Kimi K2.6, and MiMo V2.5 Pro."
   )
 
   assert.match(
     source,
-    /\[AvailableModels\.OPENAI_GPT_5_5\]:\s*\{[\s\S]*name:\s*"GPT-5\.5"/,
-    "Expected ModelInfos to define display metadata for OPENAI_GPT_5_5."
+    /RESEARCH_MODEL = AvailableModels\.GOOGLE_GEMINI_3_1_PRO_PREVIEW/,
+    "Expected Research mode to use Gemini 3.1 Pro Preview."
+  )
+
+  assert.match(
+    source.replace(/\s+/g, " "),
+    /MODEL_SELECTOR_MODELS = \[ AvailableModels\.MOONSHOTAI_KIMI_K2_6, AvailableModels\.XIAOMI_MIMO_V2_5_PRO, \] as const/,
+    "Expected the chat model selector to expose Kimi K2.6 and MiMo V2.5 Pro."
+  )
+
+  assert.match(
+    source,
+    /\[AvailableModels\.GOOGLE_GEMINI_3_1_PRO_PREVIEW\]:\s*\{[\s\S]*name:\s*"Gemini 3\.1 Pro Preview"/,
+    "Expected ModelInfos to define display metadata for GOOGLE_GEMINI_3_1_PRO_PREVIEW."
   )
 
   assert.match(
@@ -60,11 +66,15 @@ test("shared model registry includes the curated gateway models", async () => {
 
   assert.match(
     source,
-    /\[AvailableModels\.DEEPSEEK_V4_PRO\]:\s*\{[\s\S]*name:\s*"DeepSeek V4 Pro"/,
-    "Expected ModelInfos to define display metadata for DEEPSEEK_V4_PRO."
+    /\[AvailableModels\.XIAOMI_MIMO_V2_5_PRO\]:\s*\{[\s\S]*name:\s*"MiMo V2\.5 Pro"/,
+    "Expected ModelInfos to define display metadata for XIAOMI_MIMO_V2_5_PRO."
   )
 
-  for (const modelKey of ["MOONSHOTAI_KIMI_K2_6", "OPENAI_GPT_5_5"]) {
+  for (const modelKey of [
+    "MOONSHOTAI_KIMI_K2_6",
+    "GOOGLE_GEMINI_3_1_PRO_PREVIEW",
+    "XIAOMI_MIMO_V2_5_PRO",
+  ]) {
     assert.match(
       source,
       new RegExp(
@@ -74,21 +84,17 @@ test("shared model registry includes the curated gateway models", async () => {
     )
   }
 
-  assert.doesNotMatch(
-    source.match(/VISION_CAPABLE_MODEL_SET[\s\S]*?\]\)/)?.[0] ?? "",
-    /AvailableModels\.DEEPSEEK_V4_PRO/,
-    "Expected DeepSeek V4 Pro to use image preprocessing because Gateway does not mark it as a vision model."
-  )
-
-  assert.match(
-    source,
-    /FILE_INPUT_CAPABLE_MODEL_SET[\s\S]*AvailableModels\.OPENAI_GPT_5_5/,
-    "Expected GPT-5.5 to receive native PDF file parts."
-  )
-
-  assert.doesNotMatch(
-    source.match(/FILE_INPUT_CAPABLE_MODEL_SET[\s\S]*?\]\)/)?.[0] ?? "",
-    /AvailableModels\.(DEEPSEEK_V4_PRO|MOONSHOTAI_KIMI_K2_6)/,
-    "Expected DeepSeek V4 Pro and Kimi K2.6 to use PDF text preprocessing instead of native file parts."
-  )
+  for (const modelKey of [
+    "GOOGLE_GEMINI_3_1_PRO_PREVIEW",
+    "MOONSHOTAI_KIMI_K2_6",
+    "XIAOMI_MIMO_V2_5_PRO",
+  ]) {
+    assert.match(
+      source,
+      new RegExp(
+        `FILE_INPUT_CAPABLE_MODEL_SET[\\s\\S]*AvailableModels\\.${modelKey}`
+      ),
+      `Expected ${modelKey} to receive native PDF file parts based on current Gateway tags.`
+    )
+  }
 })
