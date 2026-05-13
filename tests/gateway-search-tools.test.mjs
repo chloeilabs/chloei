@@ -45,15 +45,21 @@ test("tavily search tool results derive source links", async () => {
 
 test("gateway provider options use Gemini high thinking for research", () => {
   assert.deepEqual(getAiSdkGatewayProviderOptions(), {})
-  assert.deepEqual(getAiSdkGatewayProviderOptionsForMode({ deepResearch: false }), {})
-  assert.deepEqual(getAiSdkGatewayProviderOptionsForMode({ deepResearch: true }), {
-    google: {
-      thinkingConfig: {
-        thinkingLevel: "high",
-        includeThoughts: true,
+  assert.deepEqual(
+    getAiSdkGatewayProviderOptionsForMode({ deepResearch: false }),
+    {}
+  )
+  assert.deepEqual(
+    getAiSdkGatewayProviderOptionsForMode({ deepResearch: true }),
+    {
+      google: {
+        thinkingConfig: {
+          thinkingLevel: "high",
+          includeThoughts: true,
+        },
       },
-    },
-  })
+    }
+  )
 })
 
 test("inline citation instructions avoid separate sources sections", async () => {

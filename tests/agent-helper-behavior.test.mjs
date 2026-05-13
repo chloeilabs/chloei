@@ -1194,10 +1194,7 @@ test("agent helper forwards the deep research runtime profile", async () => {
     response.headers.get("X-Agent-Effective-Model"),
     "google/gemini-3.1-pro-preview"
   )
-  assert.equal(
-    recorded.streamParams[0]?.model,
-    "google/gemini-3.1-pro-preview"
-  )
+  assert.equal(recorded.streamParams[0]?.model, "google/gemini-3.1-pro-preview")
   assert.equal(recorded.streamParams[0]?.runtimeProfile, "deep_research")
 })
 

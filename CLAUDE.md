@@ -207,11 +207,11 @@ Both live in `src/lib/server/rate-limit.ts`. All limits are overridable via `AGE
 
 All available models are defined in `src/lib/shared/llm/models.ts` (`AvailableModels`, `ALL_MODELS`). Current models:
 
-| Key                    | Model ID                   | Display Name    |
-| ---------------------- | -------------------------- | --------------- |
+| Key                             | Model ID                        | Display Name           |
+| ------------------------------- | ------------------------------- | ---------------------- |
 | `GOOGLE_GEMINI_3_1_PRO_PREVIEW` | `google/gemini-3.1-pro-preview` | Gemini 3.1 Pro Preview |
-| `MOONSHOTAI_KIMI_K2_6` | `moonshotai/kimi-k2.6`     | Kimi K2.6       |
-| `XIAOMI_MIMO_V2_5_PRO` | `xiaomi/mimo-v2.5-pro`     | MiMo V2.5 Pro   |
+| `MOONSHOTAI_KIMI_K2_6`          | `moonshotai/kimi-k2.6`          | Kimi K2.6              |
+| `XIAOMI_MIMO_V2_5_PRO`          | `xiaomi/mimo-v2.5-pro`          | MiMo V2.5 Pro          |
 
 `MODEL_SELECTOR_MODELS` defines the subset shown in the model selector UI (currently Kimi K2.6 and MiMo V2.5 Pro). Gemini 3.1 Pro Preview remains in `SUPPORTED_MODELS` as `RESEARCH_MODEL` for research mode only, uses high thinking via `src/lib/server/llm/ai-sdk-gateway-provider-options.ts`, and is not a standalone chat selector option. Adding a model requires updating `AvailableModels`, `ModelInfos`, `SUPPORTED_MODELS`, and optionally `MODEL_SELECTOR_MODELS` in that file. The `/api/models` route reads from this registry (filtered by configured API keys via `getModels()` in `src/lib/actions/api-keys.ts`); the agent validates the requested model against it.
 
