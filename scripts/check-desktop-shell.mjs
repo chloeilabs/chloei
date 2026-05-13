@@ -5,6 +5,8 @@ import { _electron as electron } from "playwright-core"
 
 const rootDir = path.resolve(import.meta.dirname, "..")
 const electronMainPath = path.join(rootDir, "electron", "main.cjs")
+const expectedAppBackgroundColor = "rgb(12, 10, 9)"
+const expectedAppThemeColor = "#0c0a09"
 const expectedAgentResponse =
   process.env.E2E_MOCK_AGENT_RESPONSE?.trim() || "DESKTOP_SMOKE_OK"
 
@@ -74,6 +76,53 @@ try {
   })
   assert.equal(desktopApi.updateState.currentVersion, desktopApi.version)
   assert.equal(desktopApi.updateState.status, "unavailable")
+
+  if (desktopApi.platform === "darwin") {
+    const desktopShellStyles = await page.evaluate(() => {
+      const titlebar = document.querySelector(".chloei-desktop-titlebar")
+      const shell = document.querySelector(".chloei-desktop-shell")
+      const themeColor = document
+        .querySelector('meta[name="theme-color"]')
+        ?.getAttribute("content")
+
+      if (
+        !(titlebar instanceof HTMLElement) ||
+        !(shell instanceof HTMLElement)
+      ) {
+        return null
+      }
+
+      const titlebarStyle = window.getComputedStyle(titlebar)
+      const shellStyle = window.getComputedStyle(shell)
+
+      return {
+        bodyBackground: window.getComputedStyle(document.body).backgroundColor,
+        htmlBackground: window.getComputedStyle(document.documentElement)
+          .backgroundColor,
+        shellBackground: shellStyle.backgroundColor,
+        shellPaddingTop: shellStyle.paddingTop,
+        themeColor,
+        titlebarAppRegion: titlebarStyle.getPropertyValue("-webkit-app-region"),
+        titlebarBackground: titlebarStyle.backgroundColor,
+        titlebarDisplay: titlebarStyle.display,
+        titlebarHeight: titlebarStyle.height,
+      }
+    })
+
+    assert.notEqual(desktopShellStyles, null)
+    assert.equal(desktopShellStyles.bodyBackground, expectedAppBackgroundColor)
+    assert.equal(desktopShellStyles.htmlBackground, expectedAppBackgroundColor)
+    assert.equal(desktopShellStyles.shellBackground, expectedAppBackgroundColor)
+    assert.equal(
+      desktopShellStyles.titlebarBackground,
+      expectedAppBackgroundColor
+    )
+    assert.equal(desktopShellStyles.themeColor, expectedAppThemeColor)
+    assert.equal(desktopShellStyles.titlebarAppRegion, "drag")
+    assert.equal(desktopShellStyles.titlebarDisplay, "flex")
+    assert.equal(desktopShellStyles.titlebarHeight, "40px")
+    assert.equal(desktopShellStyles.shellPaddingTop, "40px")
+  }
 
   const rendererGlobals = await page.evaluate(() => ({
     processType: typeof window.process,
