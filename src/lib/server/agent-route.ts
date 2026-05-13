@@ -20,12 +20,12 @@ import {
   type AgentRunMode,
   type AgentStreamEvent,
   ALL_MODELS,
-  AvailableModels,
   getAgentAttachmentKind,
   getDataUrlMediaType,
   MODEL_SELECTOR_MODELS,
   type ModelInfo,
   type ModelType,
+  RESEARCH_MODEL,
   resolveDefaultModelSelectorModel,
 } from "@/lib/shared"
 
@@ -341,12 +341,6 @@ function getMessageAttachments(messages: AgentStreamRequest["messages"]) {
   return messages.flatMap((message) => message.attachments ?? [])
 }
 
-function hasPdfAttachment(messages: AgentStreamRequest["messages"]): boolean {
-  return getMessageAttachments(messages).some(
-    (attachment) => attachment.kind === "pdf"
-  )
-}
-
 function getTotalAttachmentBytes(
   attachments: readonly { sizeBytes: number }[]
 ): number {
@@ -656,18 +650,14 @@ export function parseAgentStreamRequest(
   }
 
   const runMode = parsed.data.runMode ?? "chat"
-  const shouldUsePdfModel =
-    runMode === "chat" &&
-    hasPdfAttachment(parsed.data.messages) &&
-    isAvailableModel(params.availableModels, AvailableModels.OPENAI_GPT_5_5)
 
   if (
     runMode === "research" &&
-    !isAvailableModel(params.availableModels, AvailableModels.OPENAI_GPT_5_5)
+    !isAvailableModel(params.availableModels, RESEARCH_MODEL)
   ) {
     return createJsonErrorResponse({
       requestId: params.requestId,
-      error: "Research mode requires GPT-5.5 model access.",
+      error: "Research mode requires Gemini 3.1 Pro Preview model access.",
       errorCode: "AGENT_RESEARCH_MODEL_UNAVAILABLE",
       status: 400,
       rateLimitDecision: params.rateLimitDecision,
@@ -681,8 +671,8 @@ export function parseAgentStreamRequest(
     availableModelIds.has(modelId) ? [{ id: modelId }] : []
   )
   const selectedModelCandidate =
-    runMode === "research" || shouldUsePdfModel
-      ? AvailableModels.OPENAI_GPT_5_5
+    runMode === "research"
+      ? RESEARCH_MODEL
       : (parsed.data.model ?? resolveDefaultModelSelectorModel(chatModels))
 
   if (!isSupportedModel(selectedModelCandidate)) {
@@ -697,7 +687,6 @@ export function parseAgentStreamRequest(
 
   if (
     runMode !== "research" &&
-    !shouldUsePdfModel &&
     !isAvailableModel(chatModels, selectedModelCandidate)
   ) {
     return createJsonErrorResponse({
