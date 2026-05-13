@@ -474,6 +474,8 @@ export function HomePageContent({
             </Tooltip>
           ) : null}
 
+          <DesktopUpdateButton />
+
           <div ref={threadsTriggerRef}>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -496,8 +498,6 @@ export function HomePageContent({
               </TooltipContent>
             </Tooltip>
           </div>
-
-          <DesktopUpdateButton />
           <AppLauncher className="size-7 text-muted-foreground hover:text-foreground" />
           <UserMenu
             viewer={viewer}

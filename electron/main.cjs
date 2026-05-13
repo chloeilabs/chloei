@@ -20,6 +20,7 @@ const {
 } = require("electron")
 
 const APP_NAME = "Chloei"
+const APP_BACKGROUND_COLOR = "#0c0a09"
 const SERVER_HOST = "127.0.0.1"
 const SERVER_START_TIMEOUT_MS = 120_000
 const SERVER_POLL_INTERVAL_MS = 250
@@ -396,10 +397,18 @@ function createMainWindow(origin) {
   session.defaultSession.setPermissionCheckHandler(() => false)
 
   const windowIconPath = getWindowIconPath()
+  const macOSWindowOptions =
+    process.platform === "darwin"
+      ? {
+          titleBarStyle: "hidden",
+          trafficLightPosition: { x: 13, y: 13 },
+        }
+      : {}
 
   mainWindow = new BrowserWindow({
     ...(windowIconPath ? { icon: windowIconPath } : {}),
-    backgroundColor: "#050505",
+    ...macOSWindowOptions,
+    backgroundColor: APP_BACKGROUND_COLOR,
     height: 900,
     minHeight: 700,
     minWidth: 1024,

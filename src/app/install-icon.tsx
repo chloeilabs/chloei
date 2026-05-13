@@ -1,17 +1,16 @@
 import { ImageResponse } from "next/og"
 
 import logoPixels from "@/lib/brand/chloei-logo-pixels.json"
+import { appBackgroundColor } from "@/lib/brand/colors"
 
-const BRAND_BACKGROUND = "#0c0a09"
-
-export const installIconThemeColor = BRAND_BACKGROUND
+export const installIconThemeColor = appBackgroundColor
 
 export function createInstallIconResponse(size: number) {
   return new ImageResponse(
     <div
       style={{
         alignItems: "center",
-        backgroundColor: BRAND_BACKGROUND,
+        backgroundColor: appBackgroundColor,
         color: "#ffffff",
         display: "flex",
         height: "100%",

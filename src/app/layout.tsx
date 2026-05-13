@@ -9,6 +9,7 @@ import Script from "next/script"
 import { Toaster } from "sonner"
 
 import { QueryClientProvider } from "@/components/layout/query-client-provider"
+import { appBackgroundColor } from "@/lib/brand/colors"
 import { cn } from "@/lib/utils"
 
 const isProduction = process.env.NODE_ENV === "production"
@@ -77,6 +78,22 @@ const localhostDevCacheResetScript = `
 })();
 `.trim()
 
+const desktopShellClassScript = `
+(() => {
+  const desktop = window.chloeiDesktop;
+
+  if (!desktop?.isDesktop) {
+    return;
+  }
+
+  document.documentElement.classList.add("chloei-desktop");
+
+  if (typeof desktop.platform === "string") {
+    document.documentElement.dataset.chloeiDesktopPlatform = desktop.platform;
+  }
+})();
+`.trim()
+
 const geistSans = Geist({
   variable: "--font-sans",
   subsets: ["latin"],
@@ -94,7 +111,7 @@ const departureMono = localFont({
 
 export const viewport: Viewport = {
   colorScheme: "dark",
-  themeColor: "#0c0a09",
+  themeColor: appBackgroundColor,
 }
 
 export const metadata: Metadata = {
@@ -144,6 +161,9 @@ export default function RootLayout({
       <body
         className={cn(departureMono.variable, "overscroll-none antialiased")}
       >
+        <Script id="desktop-shell-class" strategy="beforeInteractive">
+          {desktopShellClassScript}
+        </Script>
         {isProduction ? null : (
           <Script id="localhost-dev-cache-reset" strategy="beforeInteractive">
             {localhostDevCacheResetScript}
