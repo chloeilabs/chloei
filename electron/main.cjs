@@ -625,20 +625,20 @@ function getAutoUpdater() {
 
 async function checkForDesktopUpdate({ notify = false } = {}) {
   if (
-    ["checking", "downloading", "downloaded"].includes(
+    ["available", "checking", "downloading", "downloaded"].includes(
       desktopUpdateState.status
     )
   ) {
     return desktopUpdateState
   }
 
-  const updater = getAutoUpdater()
-
-  if (!updater) {
-    return desktopUpdateState
-  }
-
   try {
+    const updater = getAutoUpdater()
+
+    if (!updater) {
+      return desktopUpdateState
+    }
+
     setDesktopUpdateState({
       message: null,
       percent: null,
@@ -672,23 +672,27 @@ function configureAutoUpdateIpc() {
   ipcMain.handle(UPDATE_GET_STATE_CHANNEL, () => desktopUpdateState)
   ipcMain.handle(UPDATE_CHECK_CHANNEL, () => checkForDesktopUpdate())
   ipcMain.handle(UPDATE_INSTALL_CHANNEL, () => {
-    const updater = getAutoUpdater()
+    try {
+      const updater = getAutoUpdater()
 
-    if (!updater || desktopUpdateState.status !== "downloaded") {
+      if (!updater || desktopUpdateState.status !== "downloaded") {
+        return desktopUpdateState
+      }
+
+      updater.quitAndInstall()
       return desktopUpdateState
+    } catch (error) {
+      log("Unable to install desktop update.", error)
+      return setDesktopUpdateState({
+        message: getErrorMessage(error),
+        status: "error",
+      })
     }
-
-    updater.quitAndInstall()
-    return desktopUpdateState
   })
 }
 
 function configureAutoUpdates() {
-  if (
-    !app.isPackaged ||
-    process.platform !== "darwin" ||
-    process.env.CHLOEI_DESKTOP_AUTO_UPDATE === "0"
-  ) {
+  if (!isAutoUpdateSupported()) {
     setDesktopUpdateState({
       message: "Desktop updates are available only in packaged macOS builds.",
       status: "unavailable",

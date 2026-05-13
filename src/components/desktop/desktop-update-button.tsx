@@ -38,7 +38,7 @@ function getButtonContent(state: ChloeiDesktopUpdateState) {
     case "downloading": {
       const percent =
         typeof state.percent === "number"
-          ? `${String(Math.round(state.percent))}%`
+          ? `${Math.round(state.percent).toString()}%`
           : "Downloading"
 
       return {
@@ -117,11 +117,14 @@ export function DesktopUpdateButton() {
           ? await desktop.updates.install()
           : await desktop.updates.check()
         setState(nextState)
-      } catch {
+      } catch (error) {
+        console.error("Desktop updater request failed.", error)
         setState((currentState) =>
           currentState
             ? {
                 ...currentState,
+                canCheck: true,
+                canInstall: false,
                 message: "Unable to contact the desktop updater.",
                 status: "error",
               }
