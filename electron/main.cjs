@@ -10,7 +10,14 @@ const { setTimeout: delay } = require("node:timers/promises")
 const { getPackagedNodeExecutable } = require("./packaged-node-executable.cjs")
 const { version: packageVersion } = require("../package.json")
 
-const { app, BrowserWindow, dialog, shell, session } = require("electron")
+const {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  shell,
+  session,
+} = require("electron")
 
 const APP_NAME = "Chloei"
 const SERVER_HOST = "127.0.0.1"
@@ -22,6 +29,13 @@ let serverProcess = null
 let serverOrigin = null
 let serverStartupError = null
 let isQuitting = false
+let autoUpdater = null
+let autoUpdateIpcConfigured = false
+
+const UPDATE_STATE_CHANNEL = "chloei:update:state"
+const UPDATE_GET_STATE_CHANNEL = "chloei:update:get-state"
+const UPDATE_CHECK_CHANNEL = "chloei:update:check"
+const UPDATE_INSTALL_CHANNEL = "chloei:update:install"
 
 app.setName(APP_NAME)
 app.setAppUserModelId("ai.chloei.desktop")
@@ -488,31 +502,216 @@ function getAutoUpdateChannel() {
   return "latest"
 }
 
-function configureAutoUpdates() {
+function isAutoUpdateSupported() {
+  return (
+    app.isPackaged &&
+    process.platform === "darwin" &&
+    process.env.CHLOEI_DESKTOP_AUTO_UPDATE !== "0"
+  )
+}
+
+function createDesktopUpdateState(overrides = {}) {
+  const status =
+    overrides.status || (isAutoUpdateSupported() ? "idle" : "unavailable")
+  const canCheck =
+    isAutoUpdateSupported() &&
+    status !== "available" &&
+    status !== "checking" &&
+    status !== "downloading" &&
+    status !== "downloaded"
+
+  return {
+    channel: getAutoUpdateChannel(),
+    currentVersion: getDesktopAppVersion(),
+    message: null,
+    percent: null,
+    status,
+    updateVersion: null,
+    ...overrides,
+    canCheck,
+    canInstall: status === "downloaded",
+  }
+}
+
+let desktopUpdateState = createDesktopUpdateState()
+
+function setDesktopUpdateState(overrides = {}) {
+  desktopUpdateState = createDesktopUpdateState({
+    ...desktopUpdateState,
+    ...overrides,
+  })
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(UPDATE_STATE_CHANNEL, desktopUpdateState)
+  }
+
+  return desktopUpdateState
+}
+
+function getErrorMessage(error) {
+  return error instanceof Error ? error.message : String(error)
+}
+
+function getAutoUpdater() {
+  if (!isAutoUpdateSupported()) {
+    setDesktopUpdateState({
+      message: "Desktop updates are available only in packaged macOS builds.",
+      status: "unavailable",
+    })
+    return null
+  }
+
+  if (autoUpdater) {
+    return autoUpdater
+  }
+
+  const updaterModule = require("electron-updater")
+  autoUpdater = updaterModule.autoUpdater
+  autoUpdater.channel = getAutoUpdateChannel()
+
+  autoUpdater.on("checking-for-update", () => {
+    setDesktopUpdateState({
+      message: null,
+      percent: null,
+      status: "checking",
+    })
+  })
+  autoUpdater.on("update-available", (info) => {
+    setDesktopUpdateState({
+      message: null,
+      percent: null,
+      status: "available",
+      updateVersion: info?.version || null,
+    })
+  })
+  autoUpdater.on("download-progress", (progress) => {
+    setDesktopUpdateState({
+      message: null,
+      percent:
+        typeof progress?.percent === "number"
+          ? Math.max(0, Math.min(100, progress.percent))
+          : null,
+      status: "downloading",
+    })
+  })
+  autoUpdater.on("update-downloaded", (info) => {
+    log("Desktop update downloaded and ready to install.")
+    setDesktopUpdateState({
+      message: null,
+      percent: 100,
+      status: "downloaded",
+      updateVersion: info?.version || desktopUpdateState.updateVersion,
+    })
+  })
+  autoUpdater.on("update-not-available", (info) => {
+    setDesktopUpdateState({
+      message: "Chloei is up to date.",
+      percent: null,
+      status: "up-to-date",
+      updateVersion: info?.version || null,
+    })
+  })
+  autoUpdater.on("error", (error) => {
+    log("Auto-update check failed.", error)
+    setDesktopUpdateState({
+      message: getErrorMessage(error),
+      percent: null,
+      status: "error",
+    })
+  })
+
+  return autoUpdater
+}
+
+async function checkForDesktopUpdate({ notify = false } = {}) {
   if (
-    !app.isPackaged ||
-    process.platform !== "darwin" ||
-    process.env.CHLOEI_DESKTOP_AUTO_UPDATE === "0"
+    ["available", "checking", "downloading", "downloaded"].includes(
+      desktopUpdateState.status
+    )
   ) {
+    return desktopUpdateState
+  }
+
+  try {
+    const updater = getAutoUpdater()
+
+    if (!updater) {
+      return desktopUpdateState
+    }
+
+    setDesktopUpdateState({
+      message: null,
+      percent: null,
+      status: "checking",
+    })
+
+    if (notify) {
+      await updater.checkForUpdatesAndNotify()
+    } else {
+      await updater.checkForUpdates()
+    }
+  } catch (error) {
+    log("Unable to check for desktop updates.", error)
+    setDesktopUpdateState({
+      message: getErrorMessage(error),
+      percent: null,
+      status: "error",
+    })
+  }
+
+  return desktopUpdateState
+}
+
+function configureAutoUpdateIpc() {
+  if (autoUpdateIpcConfigured) {
+    return
+  }
+
+  autoUpdateIpcConfigured = true
+
+  ipcMain.handle(UPDATE_GET_STATE_CHANNEL, () => desktopUpdateState)
+  ipcMain.handle(UPDATE_CHECK_CHANNEL, () => checkForDesktopUpdate())
+  ipcMain.handle(UPDATE_INSTALL_CHANNEL, () => {
+    try {
+      const updater = getAutoUpdater()
+
+      if (!updater || desktopUpdateState.status !== "downloaded") {
+        return desktopUpdateState
+      }
+
+      updater.quitAndInstall()
+      return desktopUpdateState
+    } catch (error) {
+      log("Unable to install desktop update.", error)
+      return setDesktopUpdateState({
+        message: getErrorMessage(error),
+        status: "error",
+      })
+    }
+  })
+}
+
+function configureAutoUpdates() {
+  if (!isAutoUpdateSupported()) {
+    setDesktopUpdateState({
+      message: "Desktop updates are available only in packaged macOS builds.",
+      status: "unavailable",
+    })
     return
   }
 
   try {
-    const { autoUpdater } = require("electron-updater")
-
-    autoUpdater.channel = getAutoUpdateChannel()
-    autoUpdater.on("error", (error) => {
-      log("Auto-update check failed.", error)
-    })
-    autoUpdater.on("update-downloaded", () => {
-      log("Desktop update downloaded and ready to install.")
-    })
+    getAutoUpdater()
 
     setTimeout(() => {
-      void autoUpdater.checkForUpdatesAndNotify()
+      void checkForDesktopUpdate({ notify: true })
     }, 10_000).unref()
   } catch (error) {
     log("Unable to initialize auto-updates.", error)
+    setDesktopUpdateState({
+      message: getErrorMessage(error),
+      status: "error",
+    })
   }
 }
 
@@ -550,6 +749,7 @@ process.on("unhandledRejection", (error) => {
 
 app.whenReady().then(async () => {
   try {
+    configureAutoUpdateIpc()
     const origin = await startNextServer()
     createMainWindow(origin)
     configureAutoUpdates()
