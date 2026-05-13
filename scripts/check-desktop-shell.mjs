@@ -32,16 +32,48 @@ try {
   assert.equal(localAppUrl.hostname, "127.0.0.1")
   assert.match(localAppUrl.port, /^\d+$/u)
 
-  const desktopApi = await page.evaluate(() => window.chloeiDesktop)
-  assert.deepEqual(Object.keys(desktopApi).sort(), [
+  const desktopApi = await page.evaluate(async () => {
+    const updateState = await window.chloeiDesktop.updates.getState()
+
+    return {
+      isDesktop: window.chloeiDesktop.isDesktop,
+      keys: Object.keys(window.chloeiDesktop).sort(),
+      platform: window.chloeiDesktop.platform,
+      updateState,
+      updateTypes: {
+        check: typeof window.chloeiDesktop.updates.check,
+        getState: typeof window.chloeiDesktop.updates.getState,
+        install: typeof window.chloeiDesktop.updates.install,
+        onStateChange: typeof window.chloeiDesktop.updates.onStateChange,
+      },
+      updatesKeys: Object.keys(window.chloeiDesktop.updates).sort(),
+      version: window.chloeiDesktop.version,
+    }
+  })
+  assert.deepEqual(desktopApi.keys, [
     "isDesktop",
     "platform",
+    "updates",
     "version",
   ])
   assert.equal(desktopApi.isDesktop, true)
   assert.equal(typeof desktopApi.platform, "string")
   assert.equal(typeof desktopApi.version, "string")
   assert.notEqual(desktopApi.version.length, 0)
+  assert.deepEqual(desktopApi.updatesKeys, [
+    "check",
+    "getState",
+    "install",
+    "onStateChange",
+  ])
+  assert.deepEqual(desktopApi.updateTypes, {
+    check: "function",
+    getState: "function",
+    install: "function",
+    onStateChange: "function",
+  })
+  assert.equal(desktopApi.updateState.currentVersion, desktopApi.version)
+  assert.equal(desktopApi.updateState.status, "unavailable")
 
   const rendererGlobals = await page.evaluate(() => ({
     processType: typeof window.process,

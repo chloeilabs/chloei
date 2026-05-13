@@ -20,6 +20,7 @@ import { StickToBottom } from "use-stick-to-bottom"
 
 import { AppLauncher } from "@/components/agent/home/app-launcher"
 import { UserMenu } from "@/components/auth/user-menu"
+import { DesktopUpdateButton } from "@/components/desktop/desktop-update-button"
 import { Button } from "@/components/ui/button"
 import {
   Tooltip,
@@ -496,6 +497,7 @@ export function HomePageContent({
             </Tooltip>
           </div>
 
+          <DesktopUpdateButton />
           <AppLauncher className="size-7 text-muted-foreground hover:text-foreground" />
           <UserMenu
             viewer={viewer}
