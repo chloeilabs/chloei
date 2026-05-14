@@ -16,7 +16,7 @@ export function isAiGatewayAuthConfigured(): boolean {
 
   return Boolean(
     trimEnv(process.env.AI_GATEWAY_API_KEY) ??
-      trimEnv(process.env.VERCEL_OIDC_TOKEN)
+    trimEnv(process.env.VERCEL_OIDC_TOKEN)
   )
 }
 
