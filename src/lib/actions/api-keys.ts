@@ -1,11 +1,11 @@
 import { ALL_MODELS, type ModelInfo, ModelInfos } from "@/lib/shared"
 
-import { isE2eMockModeEnabled } from "../server/e2e-test-mode"
+import { isAiGatewayAuthConfigured } from "../server/ai-gateway-auth"
 
 /** Returns models for configured providers. */
 export function getModels(): ModelInfo[] {
   const models: ModelInfo[] = []
-  if (process.env.AI_GATEWAY_API_KEY || isE2eMockModeEnabled()) {
+  if (isAiGatewayAuthConfigured()) {
     for (const modelId of ALL_MODELS) {
       models.push(ModelInfos[modelId])
     }

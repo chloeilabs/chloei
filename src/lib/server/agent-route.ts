@@ -150,7 +150,7 @@ interface CreateAgentStreamResponseParams {
   rateLimitDecision?: AgentRateLimitDecision
   timeoutMs: number
   selectedModel: ModelType
-  aiGatewayApiKey: string
+  aiGatewayApiKey?: string
   tavilyApiKey?: string
   fmpApiKey?: string
   userTimeZone?: string

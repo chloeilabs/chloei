@@ -1,4 +1,3 @@
-import { createGateway } from "@ai-sdk/gateway"
 import { generateText } from "ai"
 
 import { createLogger } from "@/lib/logger"
@@ -8,7 +7,7 @@ import {
 } from "@/lib/shared"
 
 import type { AgentInputMessage } from "./agent-runtime-messages"
-import { aiGatewayFetch } from "./gateway-client"
+import { createConfiguredAiGateway } from "./gateway-client"
 import { escapeAttachmentFilenameForPrompt } from "./image-vision-preprocessor-utils"
 
 const PREPROCESSOR_PROMPT =
@@ -18,7 +17,7 @@ const logger = createLogger("image-vision-preprocessor")
 
 interface DescribeImageParams {
   attachment: AgentRequestAttachment
-  aiGatewayApiKey: string
+  aiGatewayApiKey?: string
   signal?: AbortSignal
 }
 
@@ -29,10 +28,7 @@ export async function describeAttachmentImage(
     throw new Error("Image attachment payload is missing.")
   }
 
-  const gatewayProvider = createGateway({
-    apiKey: params.aiGatewayApiKey,
-    fetch: aiGatewayFetch,
-  })
+  const gatewayProvider = createConfiguredAiGateway(params.aiGatewayApiKey)
 
   const result = await generateText({
     model: gatewayProvider(VISION_PREPROCESSOR_MODEL),
@@ -68,7 +64,7 @@ export async function describeAttachmentImage(
 
 interface PreprocessParams {
   messages: AgentInputMessage[]
-  aiGatewayApiKey: string
+  aiGatewayApiKey?: string
   signal?: AbortSignal
 }
 

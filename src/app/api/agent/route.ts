@@ -24,6 +24,10 @@ import {
   MEMORY_RUNTIME_CONFIG,
 } from "@/lib/server/agent-runtime-config"
 import {
+  isAiGatewayAuthConfigured,
+  resolveAiGatewayApiKeySetting,
+} from "@/lib/server/ai-gateway-auth"
+import {
   createAuthUnavailableResponse,
   isAuthConfigured,
 } from "@/lib/server/auth"
@@ -97,7 +101,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const aiGatewayApiKey = process.env.AI_GATEWAY_API_KEY
+    const aiGatewayApiKey = resolveAiGatewayApiKeySetting()
     const tavilyApiKey = process.env.TAVILY_API_KEY
     const fmpApiKey = process.env.FMP_API_KEY
     const isE2eMockRequest = isE2eMockModeEnabled()
@@ -258,8 +262,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!aiGatewayApiKey) {
-      logger.error("Missing AI_GATEWAY_API_KEY on the server.", {
+    if (!isAiGatewayAuthConfigured()) {
+      logger.error("Missing AI Gateway authentication on the server.", {
         errorCode: "AGENT_AI_GATEWAY_API_KEY_MISSING",
         requestId,
       })
@@ -267,7 +271,8 @@ export async function POST(request: NextRequest) {
         observation,
         createJsonErrorResponse({
           requestId,
-          error: "Missing AI_GATEWAY_API_KEY on the server.",
+          error:
+            "Missing AI Gateway authentication. Set AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN (for example via `vercel env pull`).",
           errorCode: "AGENT_AI_GATEWAY_API_KEY_MISSING",
           status: 500,
           rateLimitDecision: rateLimitDecision ?? undefined,

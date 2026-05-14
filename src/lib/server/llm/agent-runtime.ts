@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto"
 import path from "node:path"
 
-import { createGateway } from "@ai-sdk/gateway"
 import {
   type LanguageModelUsage,
   stepCountIs,
@@ -76,7 +75,7 @@ import {
   getAiSdkCodeExecutionToolResultMetadata,
   isAiSdkCodeExecutionToolName,
 } from "./code-execution-tools"
-import { aiGatewayFetch } from "./gateway-client"
+import { createConfiguredAiGateway } from "./gateway-client"
 import { describeImagesForTextOnlyModel } from "./image-vision-preprocessor"
 import { createInitialReasoningChunkSanitizer } from "./initial-reasoning-chunk-sanitizer"
 import { preparePdfAttachmentsForModel } from "./pdf-attachment-preprocessor"
@@ -104,7 +103,7 @@ interface AgentRuntimeProfile {
 export interface StartAgentRuntimeStreamParams {
   requestId?: string
   model: ModelType
-  aiGatewayApiKey: string
+  aiGatewayApiKey?: string
   tavilyApiKey?: string
   fmpApiKey?: string
   fredApiKey?: string
@@ -234,10 +233,7 @@ export async function* startAgentRuntimeStream(
 ): AsyncGenerator<AgentStreamEvent> {
   const userId = params.userId ?? params.artifactOwnerId
   const featureFlags = params.featureFlags ?? getDefaultAgentFeatureFlags()
-  const gatewayProvider = createGateway({
-    apiKey: params.aiGatewayApiKey,
-    fetch: aiGatewayFetch,
-  })
+  const gatewayProvider = createConfiguredAiGateway(params.aiGatewayApiKey)
 
   const blobHydratedMessages = await hydrateBlobBackedAttachments({
     messages: params.messages,

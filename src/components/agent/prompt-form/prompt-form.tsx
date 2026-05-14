@@ -723,7 +723,8 @@ export function PromptForm({
 
       {!resolvedSelectedModel && (
         <p className="mt-2 text-xs text-muted-foreground">
-          Configure `AI_GATEWAY_API_KEY` on the server to enable model access.
+          Configure AI Gateway on the server (set `AI_GATEWAY_API_KEY`, or use
+          Vercel OIDC via `vercel env pull`) to enable model access.
         </p>
       )}
     </form>

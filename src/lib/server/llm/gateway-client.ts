@@ -1,3 +1,4 @@
+import { createGateway } from "@ai-sdk/gateway"
 import { Agent, type Dispatcher, Dispatcher1Wrapper } from "undici"
 
 import { AI_GATEWAY_CLIENT_TIMEOUT_MS } from "@/lib/server/agent-runtime-config"
@@ -18,3 +19,10 @@ export const aiGatewayFetch: typeof fetch = (input, init) =>
     ...init,
     dispatcher: aiGatewayDispatcher,
   } as UndiciRequestInit)
+
+export function createConfiguredAiGateway(aiGatewayApiKey?: string) {
+  return createGateway({
+    ...(aiGatewayApiKey ? { apiKey: aiGatewayApiKey } : {}),
+    fetch: aiGatewayFetch,
+  })
+}

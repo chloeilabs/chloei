@@ -1,6 +1,5 @@
 import { Buffer } from "node:buffer"
 
-import { createGateway } from "@ai-sdk/gateway"
 import { generateText } from "ai"
 
 import { createLogger } from "@/lib/logger"
@@ -15,7 +14,7 @@ import {
 } from "@/lib/shared"
 
 import type { AgentInputMessage } from "./agent-runtime-messages"
-import { aiGatewayFetch } from "./gateway-client"
+import { createConfiguredAiGateway } from "./gateway-client"
 import { escapeAttachmentFilenameForPrompt } from "./image-vision-preprocessor-utils"
 
 const logger = createLogger("pdf-attachment-preprocessor")
@@ -109,17 +108,14 @@ async function extractPdfTextLocally(params: {
 
 async function extractPdfTextWithModel(params: {
   attachment: AgentRequestAttachment
-  aiGatewayApiKey: string
+  aiGatewayApiKey?: string
   signal?: AbortSignal
 }): Promise<string | null> {
   if (!params.attachment.dataUrl) {
     return null
   }
 
-  const gatewayProvider = createGateway({
-    apiKey: params.aiGatewayApiKey,
-    fetch: aiGatewayFetch,
-  })
+  const gatewayProvider = createConfiguredAiGateway(params.aiGatewayApiKey)
 
   try {
     const result = await generateText({
@@ -160,7 +156,7 @@ async function extractPdfTextWithModel(params: {
 
 type PdfTextExtractor = (params: {
   attachment: AgentRequestAttachment
-  aiGatewayApiKey: string
+  aiGatewayApiKey?: string
   signal?: AbortSignal
 }) => Promise<string | null>
 
@@ -198,7 +194,7 @@ async function runPdfTextExtractor(
 
 async function describePdfAttachment(params: {
   attachment: AgentRequestAttachment
-  aiGatewayApiKey: string
+  aiGatewayApiKey?: string
   signal?: AbortSignal
   extractPdfText?: PdfTextExtractor
   extractPdfTextWithModel?: PdfTextExtractor
@@ -224,7 +220,7 @@ async function describePdfAttachment(params: {
 
 interface PreprocessPdfParams {
   messages: AgentInputMessage[]
-  aiGatewayApiKey: string
+  aiGatewayApiKey?: string
   signal?: AbortSignal
   preservePdfAttachments?: boolean
   extractPdfText?: PdfTextExtractor

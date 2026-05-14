@@ -116,8 +116,13 @@ test("agent runtime extends the AI Gateway client timeout", async () => {
   )
   assert.match(
     runtimeSource,
-    /createGateway\(\{\s*apiKey: params\.aiGatewayApiKey,\s*fetch: aiGatewayFetch,/,
-    "Expected createGateway to receive the custom fetch implementation."
+    /createConfiguredAiGateway\(params\.aiGatewayApiKey\)/,
+    "Expected agent runtime to build the gateway via createConfiguredAiGateway."
+  )
+  assert.match(
+    gatewayClientSource,
+    /return createGateway\(\{[\s\S]*fetch: aiGatewayFetch/,
+    "Expected createConfiguredAiGateway to pass the custom fetch into createGateway."
   )
 })
 
