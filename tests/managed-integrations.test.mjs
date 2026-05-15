@@ -890,6 +890,32 @@ test("managed search metadata marks provider errors retryable", () => {
   )
 })
 
+test("managed search metadata treats explicit errors as failures with empty results", () => {
+  assert.deepEqual(
+    getAiSdkManagedSearchToolResultMetadata({
+      toolCallId: "call-gateway",
+      toolName: "gateway_web_search",
+      output: {
+        error: {
+          code: "quota_exceeded",
+          message: "Gateway search quota exceeded.",
+        },
+        results: [],
+      },
+    }),
+    {
+      callId: "call-gateway",
+      toolName: "gateway_web_search",
+      status: "error",
+      sources: [],
+      operation: "search",
+      provider: "vercel_ai_gateway",
+      errorCode: "quota_exceeded",
+      retryable: true,
+    }
+  )
+})
+
 test("prompt attachment uploads validate API response shape", () => {
   const source = readFileSync(
     path.join(cwd, "src/components/agent/prompt-form/attachments.ts"),

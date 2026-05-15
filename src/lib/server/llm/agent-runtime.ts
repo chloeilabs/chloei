@@ -3,8 +3,10 @@ import path from "node:path"
 
 import { createGateway } from "@ai-sdk/gateway"
 import {
+  type ContentPart,
   type LanguageModelUsage,
   stepCountIs,
+  type StepResult,
   streamText,
   type ToolSet,
 } from "ai"
@@ -203,40 +205,54 @@ function shouldForceFinalSynthesisStep(
   return stepNumber >= Math.max(0, toolMaxSteps - 1)
 }
 
-function hasToolFailure(steps: unknown[], toolName: string): boolean {
-  return steps.some((step) => {
-    const content = (step as { content?: unknown[] }).content
-    if (!Array.isArray(content)) {
-      return false
-    }
+function outputHasError(output: unknown): boolean {
+  if (!output || typeof output !== "object" || !("error" in output)) {
+    return false
+  }
 
-    return content.some((part) => {
-      const record = part as {
-        type?: string
-        toolName?: string
-        output?: unknown
-      }
-      if (record.toolName !== toolName) {
-        return false
-      }
+  return Boolean(output.error)
+}
 
-      if (record.type === "tool-error") {
-        return true
-      }
+function isToolFailureResult(
+  result: {
+    toolName: string
+    output: unknown
+  },
+  toolName: string
+): boolean {
+  return result.toolName === toolName && outputHasError(result.output)
+}
 
-      if (record.type !== "tool-result") {
-        return false
-      }
+function isToolFailureContentPart(
+  part: ContentPart<ToolSet>,
+  toolName: string
+): boolean {
+  if (part.type !== "tool-error" && part.type !== "tool-result") {
+    return false
+  }
 
-      const output = record.output as { error?: unknown } | undefined
-      return Boolean(output && typeof output === "object" && output.error)
-    })
-  })
+  if (part.toolName !== toolName) {
+    return false
+  }
+
+  return part.type === "tool-error" || outputHasError(part.output)
+}
+
+function hasToolFailure(
+  steps: StepResult<ToolSet>[],
+  toolName: string
+): boolean {
+  return steps.some(
+    (step) =>
+      step.toolResults.some((result) =>
+        isToolFailureResult(result, toolName)
+      ) || step.content.some((part) => isToolFailureContentPart(part, toolName))
+  )
 }
 
 function getActiveToolsForSearchFallback(params: {
   toolNames: string[]
-  steps: unknown[]
+  steps: StepResult<ToolSet>[]
   parallelEnabled: boolean
 }): string[] | undefined {
   if (
@@ -248,7 +264,7 @@ function getActiveToolsForSearchFallback(params: {
   }
 
   if (hasToolFailure(params.steps, "parallel_search")) {
-    return undefined
+    return params.toolNames.filter((toolName) => toolName !== "parallel_search")
   }
 
   return params.toolNames.filter(
@@ -434,6 +450,7 @@ export async function* startAgentRuntimeStream(
       ...(fmpToolsContext?.tools ?? {}),
     } as ToolSet
     const toolNames = Object.keys(tools)
+    const parallelEnabled = Boolean(params.parallelApiKey?.trim())
 
     logger.info("Starting agent runtime stream.", {
       requestId: params.requestId,
@@ -477,7 +494,7 @@ export async function* startAgentRuntimeStream(
         const activeTools = getActiveToolsForSearchFallback({
           toolNames,
           steps,
-          parallelEnabled: Boolean(params.parallelApiKey?.trim()),
+          parallelEnabled,
         })
         if (!forceFinalSynthesis) {
           return activeTools ? { activeTools } : undefined

@@ -7,6 +7,8 @@ import type { MessageSource, ToolName } from "@/lib/shared"
 const PARALLEL_SEARCH_TOOL_NAME = "parallel_search" as const
 const GATEWAY_WEB_SEARCH_TOOL_NAME = "gateway_web_search" as const
 const MANAGED_SEARCH_MAX_RESULTS = 8
+const PARALLEL_SEARCH_DESCRIPTION =
+  "Search the live web with Parallel for fresh, LLM-optimized excerpts. Use this after Tavily is unavailable, quota-limited, rate-limited, or returns a provider error."
 
 type ManagedSearchToolName = Extract<
   ToolName,
@@ -100,7 +102,7 @@ function getErrorCode(output: Record<string, unknown>): string | undefined {
 }
 
 function isErrorOutput(output: Record<string, unknown>): boolean {
-  return Boolean(getErrorCode(output) ?? toOptionalString(output.message))
+  return Boolean(getErrorCode(output))
 }
 
 function getErrorMessage(error: unknown): string {
@@ -189,8 +191,6 @@ export function createAiSdkManagedSearchTools(params: {
       excerpts: {
         max_chars_per_result: 2500,
       },
-      description:
-        "Search the live web with Parallel for fresh, LLM-optimized excerpts. Use this after Tavily is unavailable, quota-limited, rate-limited, or returns a provider error.",
     })
     type ParallelSearchExecute = NonNullable<typeof parallelSearchTool.execute>
     type ParallelSearchInput = Parameters<ParallelSearchExecute>[0]
@@ -199,6 +199,7 @@ export function createAiSdkManagedSearchTools(params: {
 
     tools.parallel_search = {
       ...parallelSearchTool,
+      description: PARALLEL_SEARCH_DESCRIPTION,
       execute: async (
         input: ParallelSearchInput,
         options: ParallelSearchOptions
@@ -288,7 +289,7 @@ export function getAiSdkManagedSearchToolResultMetadata(
   }
 
   const errorCode = getErrorCode(output)
-  if (isErrorOutput(output) && !Array.isArray(output.results)) {
+  if (isErrorOutput(output)) {
     return {
       callId: part.toolCallId,
       toolName,

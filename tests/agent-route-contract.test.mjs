@@ -101,6 +101,26 @@ test("agent runtime reserves the final loop step for synthesis", async () => {
   )
 })
 
+test("agent runtime unlocks Gateway search after Parallel failures", async () => {
+  const runtimeSource = await readFile(runtimePath, "utf8")
+
+  assert.match(
+    runtimeSource,
+    /step\.toolResults\.some\(\(result\) =>[\s\S]*isToolFailureResult\(result,\s*toolName\)/,
+    "Expected managed search fallback to inspect AI SDK toolResults."
+  )
+  assert.match(
+    runtimeSource,
+    /if \(hasToolFailure\(params\.steps,\s*"parallel_search"\)\) \{[\s\S]*return params\.toolNames\.filter\([\s\S]*toolName !== "parallel_search"/,
+    "Expected Parallel to be excluded after a Parallel failure so Gateway search remains available."
+  )
+  assert.match(
+    runtimeSource,
+    /const parallelEnabled = Boolean\(params\.parallelApiKey\?\.trim\(\)\)/,
+    "Expected the Parallel availability check to be normalized once outside prepareStep."
+  )
+})
+
 test("agent runtime extends the AI Gateway client timeout", async () => {
   const runtimeSource = await readFile(runtimePath, "utf8")
   const gatewayClientPath = path.join(

@@ -47,6 +47,7 @@ const { POST } = await import(routeUrl)
 
 const originalAiGatewayApiKey = process.env.AI_GATEWAY_API_KEY
 const originalTavilyApiKey = process.env.TAVILY_API_KEY
+const originalParallelApiKey = process.env.PARALLEL_API_KEY
 const originalFmpApiKey = process.env.FMP_API_KEY
 const originalSecApiUserAgent = process.env.SEC_API_USER_AGENT
 const originalFinanceWorkflowsEnabled =
@@ -235,6 +236,11 @@ beforeEach(() => {
 after(() => {
   process.env.AI_GATEWAY_API_KEY = originalAiGatewayApiKey
   process.env.TAVILY_API_KEY = originalTavilyApiKey
+  if (originalParallelApiKey === undefined) {
+    delete process.env.PARALLEL_API_KEY
+  } else {
+    process.env.PARALLEL_API_KEY = originalParallelApiKey
+  }
   process.env.FMP_API_KEY = originalFmpApiKey
   if (originalSecApiUserAgent === undefined) {
     delete process.env.SEC_API_USER_AGENT
