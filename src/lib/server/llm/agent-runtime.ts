@@ -251,7 +251,9 @@ function getActiveToolsForSearchFallback(params: {
     return undefined
   }
 
-  return params.toolNames.filter((toolName) => toolName !== "gateway_web_search")
+  return params.toolNames.filter(
+    (toolName) => toolName !== "gateway_web_search"
+  )
 }
 
 function getSourceEvent(
