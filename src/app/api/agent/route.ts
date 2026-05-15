@@ -99,6 +99,7 @@ export async function POST(request: NextRequest) {
 
     const aiGatewayApiKey = process.env.AI_GATEWAY_API_KEY
     const tavilyApiKey = process.env.TAVILY_API_KEY
+    const parallelApiKey = process.env.PARALLEL_API_KEY
     const fmpApiKey = process.env.FMP_API_KEY
     const isE2eMockRequest = isE2eMockModeEnabled()
     const session = await getRequestSession(request.headers)
@@ -344,6 +345,7 @@ export async function POST(request: NextRequest) {
         selectedModel,
         aiGatewayApiKey,
         tavilyApiKey,
+        parallelApiKey,
         fmpApiKey,
         userTimeZone,
         runtimeProfile: resolveRuntimeProfile(

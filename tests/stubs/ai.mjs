@@ -12,6 +12,18 @@ export function stepCountIs(count) {
   return { type: "step-count", count }
 }
 
+export const gateway = {
+  tools: {
+    parallelSearch(config) {
+      return {
+        type: "provider-defined",
+        id: "gateway.parallel_search",
+        args: config,
+      }
+    },
+  },
+}
+
 export async function generateText(params) {
   return getTestMocks().ai?.generateText?.(params) ?? { text: "" }
 }

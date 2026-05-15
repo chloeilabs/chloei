@@ -331,7 +331,7 @@ export function createAiSdkKnowledgeSearchTools(
   return {
     knowledge_search: tool({
       description:
-        "Search Chloei's governed internal knowledge store for user-authorized policies, research notes, uploaded documents, transcripts, and static reference material. Do not use this for live market prices, filings, macro releases, news, or other current facts; use finance_data, SEC, FRED, FMP, Tavily, or native web search for live/current facts.",
+        "Search Chloei's governed internal knowledge store for user-authorized policies, research notes, uploaded documents, transcripts, and static reference material. Do not use this for live market prices, filings, macro releases, news, or other current facts; use finance_data, SEC, FRED, FMP, Tavily, Parallel, or AI Gateway search for live/current facts.",
       inputSchema: knowledgeSearchInputSchema,
       execute: async (input) => {
         try {

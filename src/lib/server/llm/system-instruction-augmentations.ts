@@ -1,6 +1,6 @@
 const AI_SDK_INLINE_CITATION_INSTRUCTION = `
 <ai_sdk_inline_citation_rules>
-When Tavily tool results are used in the answer, cite them inline with markdown links, not only in a sources list.
+When Tavily, Parallel, or AI Gateway search tool results are used in the answer, cite them inline with markdown links, not only in a sources list.
 - Place the citation immediately after the sentence or clause it supports.
 - Prefer the exact \`citationMarkdown\` value returned in Tavily tool results when available.
 - Use only URLs that came from tool results in this response.
@@ -25,6 +25,7 @@ function buildAiSdkFinanceToolingInstruction(options: {
       : null,
     "- For benchmark-style public-company tasks, gather the filing evidence first, then use `code_execution` for arithmetic that affects the answer.",
     "- Prefer Tavily for fresh web discovery, controlled retrieval, extraction, and clickable inline citations.",
+    "- If Tavily is unavailable, quota-limited, rate-limited, or returns a provider error, use `parallel_search` next for live web discovery. If both Tavily and Parallel are unavailable or fail, use `gateway_web_search`.",
     "- Do not invent inline citations or source cards for FMP data unless the tool result itself clearly provides a canonical URL.",
     "- Use code execution only for calculation or validation.",
     "- Use the minimum mix of tools needed, then synthesize the answer around the evidence.",

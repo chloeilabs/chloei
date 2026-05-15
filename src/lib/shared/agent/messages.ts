@@ -13,6 +13,8 @@ export const TOOL_NAMES = [
   "code_execution",
   "tavily_search",
   "tavily_extract",
+  "parallel_search",
+  "gateway_web_search",
   "knowledge_search",
   "browser_research",
   "finance_data",
@@ -25,6 +27,8 @@ export const SEARCH_TOOL_NAMES = [
   "web_search",
   "x_search",
   "tavily_search",
+  "parallel_search",
+  "gateway_web_search",
   "knowledge_search",
 ] as const satisfies readonly ToolName[]
 export type SearchToolName = (typeof SEARCH_TOOL_NAMES)[number]

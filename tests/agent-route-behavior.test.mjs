@@ -109,6 +109,7 @@ beforeEach(() => {
 
   process.env.AI_GATEWAY_API_KEY = "ai-gateway-key"
   process.env.TAVILY_API_KEY = "tavily-key"
+  process.env.PARALLEL_API_KEY = "parallel-key"
   process.env.FMP_API_KEY = "fmp-key"
   delete process.env.SEC_API_USER_AGENT
   delete process.env.AGENT_FINANCE_WORKFLOWS_ENABLED
@@ -391,6 +392,7 @@ test("agent route passes the resolved prompt context into stream creation", asyn
   ])
   assert.equal(recorded.streamCalls[0]?.aiGatewayApiKey, "ai-gateway-key")
   assert.equal(recorded.streamCalls[0]?.tavilyApiKey, "tavily-key")
+  assert.equal(recorded.streamCalls[0]?.parallelApiKey, "parallel-key")
   assert.equal(recorded.streamCalls[0]?.fmpApiKey, "fmp-key")
   assert.equal(recorded.streamCalls[0]?.systemInstruction, "system-instruction")
   assert.equal(recorded.streamCalls[0]?.memoryCommitMaxChars, undefined)

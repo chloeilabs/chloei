@@ -75,6 +75,11 @@ test("inline citation instructions avoid separate sources sections", async () =>
     /Do not add a separate "Sources", "References", or bibliography section/,
     "Expected source-backed answers to rely on inline citations and Activity instead of a footer."
   )
+  assert.match(
+    source,
+    /quota-limited[\s\S]*`parallel_search`[\s\S]*`gateway_web_search`/,
+    "Expected Tavily provider failures to fall back through Parallel and then AI Gateway search."
+  )
 })
 
 test("stale and fallback-only model ids fall back to Kimi", () => {
