@@ -388,6 +388,9 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
           ),
           errorCode: "CLOUD_AGENT_TESTS_FAILED",
         })
+        if (sandboxId) {
+          await adapter.destroy({ sandboxId }).catch(() => undefined)
+        }
         return
       }
     }
