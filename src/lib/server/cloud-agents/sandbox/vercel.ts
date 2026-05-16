@@ -553,8 +553,8 @@ export const vercelCloudAgentSandboxAdapter: CloudAgentSandboxAdapter = {
       cmd: "sh",
       args: [
         "-lc",
-        'git -c credential.helper= ' +
-          'push ' +
+        "git -c credential.helper= " +
+          "push " +
           '"https://x-access-token:$CHLOEI_GITHUB_TOKEN@github.com/$CHLOEI_REPO_OWNER/$CHLOEI_REPO_NAME.git" ' +
           '"HEAD:refs/heads/$CHLOEI_BRANCH"',
       ],
