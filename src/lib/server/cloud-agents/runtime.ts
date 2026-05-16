@@ -352,14 +352,17 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
       event,
     })
   } catch (error) {
-    await failCloudAgentTask({
-      userId: input.userId,
-      taskId: input.taskId,
-      error,
-      errorCode: "CLOUD_AGENT_RUN_FAILED",
-    })
-    if (sandboxId) {
-      await adapter.destroy({ sandboxId }).catch(() => undefined)
+    try {
+      await failCloudAgentTask({
+        userId: input.userId,
+        taskId: input.taskId,
+        error,
+        errorCode: "CLOUD_AGENT_RUN_FAILED",
+      })
+    } finally {
+      if (sandboxId) {
+        await adapter.destroy({ sandboxId }).catch(() => undefined)
+      }
     }
   }
 }

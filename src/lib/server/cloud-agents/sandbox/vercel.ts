@@ -315,19 +315,28 @@ export const vercelCloudAgentSandboxAdapter: CloudAgentSandboxAdapter = {
     if (commit.exitCode !== 0) {
       throw new Error(`git commit failed: ${await commit.stderr()}`)
     }
-    const remoteUrl = `https://github.com/${session.repoOwner}/${session.repoName}.git`
-    // Pass the token through env + shell expansion so it never appears in
-    // command args, the process list, or any captured stderr output. Using
-    // `cmd: "git"` directly skips shell expansion, so the env var would land
-    // as literal text in the header; route through `sh -lc` instead.
+    // Pass the token, repo identifiers, and branch through env vars rather
+    // than interpolating them into the shell command. Env var VALUES are
+    // not re-parsed by the shell, so double-quoted `"$CHLOEI_REPO_OWNER"`
+    // expands to the literal value even if it contains `$(...)` or other
+    // shell metacharacters. Using `cmd: "git"` directly skips shell
+    // expansion, so the auth header token would land as literal text; we
+    // need `sh -lc` to expand $CHLOEI_GITHUB_TOKEN into the header.
     const push = await session.sandbox.runCommand({
       cmd: "sh",
       args: [
         "-lc",
-        `git -c "http.extraHeader=Authorization: Bearer $CHLOEI_GITHUB_TOKEN" push ${remoteUrl} HEAD:refs/heads/${params.branch}`,
+        'git -c "http.extraHeader=Authorization: Bearer $CHLOEI_GITHUB_TOKEN" ' +
+          'push "https://github.com/$CHLOEI_REPO_OWNER/$CHLOEI_REPO_NAME.git" ' +
+          '"HEAD:refs/heads/$CHLOEI_BRANCH"',
       ],
       cwd: session.repoCwd,
-      env: { CHLOEI_GITHUB_TOKEN: githubToken },
+      env: {
+        CHLOEI_GITHUB_TOKEN: githubToken,
+        CHLOEI_REPO_OWNER: session.repoOwner,
+        CHLOEI_REPO_NAME: session.repoName,
+        CHLOEI_BRANCH: params.branch,
+      },
     })
     if (push.exitCode !== 0) {
       throw new Error(`git push failed: ${await push.stderr()}`)

@@ -20,6 +20,31 @@ const PROMPT_SCHEMA = z.string().trim().min(1).max(20_000)
 const URL_SCHEMA = z.string().trim().min(1).max(2_048)
 const PATH_SCHEMA = z.string().trim().min(1).max(1_000)
 
+// GitHub repo owner/name and git branch names land in shell commands
+// downstream (the Vercel adapter's git push). Even though those commands
+// now pass these through env vars (which the shell does not re-parse),
+// constrain the character set at the API boundary as defense in depth.
+// GitHub allows alphanumerics + hyphen / underscore / dot in
+// owners and names. Branch names additionally allow `/`.
+const REPO_IDENTIFIER_SCHEMA = z
+  .string()
+  .trim()
+  .min(1)
+  .max(200)
+  .regex(
+    /^[A-Za-z0-9._-]+$/,
+    "Must contain only letters, digits, '.', '_', '-'."
+  )
+const GIT_REF_SCHEMA = z
+  .string()
+  .trim()
+  .min(1)
+  .max(200)
+  .regex(
+    /^[A-Za-z0-9._/-]+$/,
+    "Must contain only letters, digits, '.', '_', '-', '/'."
+  )
+
 const NETWORK_POLICY_SCHEMA = z
   .object({
     mode: z.enum(CLOUD_AGENT_NETWORK_POLICY_MODES),
@@ -30,9 +55,9 @@ const NETWORK_POLICY_SCHEMA = z
 const ENVIRONMENT_BASE_FIELDS = {
   name: SHORT_TEXT_SCHEMA,
   repoProvider: z.enum(CLOUD_AGENT_REPO_PROVIDERS).default("github"),
-  repoOwner: SHORT_TEXT_SCHEMA,
-  repoName: SHORT_TEXT_SCHEMA,
-  baseBranch: SHORT_TEXT_SCHEMA.default("main"),
+  repoOwner: REPO_IDENTIFIER_SCHEMA,
+  repoName: REPO_IDENTIFIER_SCHEMA,
+  baseBranch: GIT_REF_SCHEMA.default("main"),
   setupCommand: COMMAND_SCHEMA.optional(),
   testCommand: COMMAND_SCHEMA.optional(),
   devCommand: COMMAND_SCHEMA.optional(),
@@ -48,7 +73,7 @@ export const cloudAgentEnvironmentCreateSchema = z
 export const cloudAgentEnvironmentUpdateSchema = z
   .object({
     name: SHORT_TEXT_SCHEMA.optional(),
-    baseBranch: SHORT_TEXT_SCHEMA.optional(),
+    baseBranch: GIT_REF_SCHEMA.optional(),
     setupCommand: COMMAND_SCHEMA.nullish(),
     testCommand: COMMAND_SCHEMA.nullish(),
     devCommand: COMMAND_SCHEMA.nullish(),
