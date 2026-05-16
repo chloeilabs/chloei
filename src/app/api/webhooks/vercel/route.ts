@@ -176,15 +176,28 @@ export async function POST(request: NextRequest) {
     await updateCloudAgentTask(userId, task.id, {
       previewUrl: parsed.url,
     })
-    await appendCloudAgentTaskEvent({
-      userId,
-      taskId: task.id,
-      payload: {
-        kind: "preview_ready",
-        url: parsed.url,
-        environment: parsed.target,
-      },
-    })
+    // Isolate the event-append so a transient write failure doesn't
+    // make Vercel retry the whole webhook. Vercel retries an HTTP
+    // 5xx, which would re-run updateCloudAgentTask (idempotent) but
+    // also append a *second* preview_ready event with a fresh UUID.
+    // Logging + 202 keeps the timeline single-shot.
+    try {
+      await appendCloudAgentTaskEvent({
+        userId,
+        taskId: task.id,
+        payload: {
+          kind: "preview_ready",
+          url: parsed.url,
+          environment: parsed.target,
+        },
+      })
+    } catch (error) {
+      logger.warn("Failed to append preview_ready event after task update.", {
+        taskId: task.id,
+        userId,
+        error,
+      })
+    }
 
     return observeRouteResponse(
       observation,

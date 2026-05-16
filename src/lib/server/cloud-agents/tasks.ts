@@ -112,6 +112,11 @@ export async function findCloudAgentTaskAnyUserByProjectAndBranch(params: {
   branch: string
 }): Promise<CloudAgentTaskWithOwner | null> {
   if (isCloudAgentMockModeEnabled()) {
+    // Mirror the SQL ORDER BY updatedAt DESC LIMIT 1 by collecting
+    // every per-user match and picking the globally most recent.
+    // Map insertion order would otherwise return whichever user was
+    // created first, diverging from the real-DB lookup.
+    const matches: CloudAgentTaskWithOwner[] = []
     for (const userId of mockListAllUserIds()) {
       const environments = mockListEnvironments(userId)
       const matchingEnvIds = new Set(
@@ -121,14 +126,21 @@ export async function findCloudAgentTaskAnyUserByProjectAndBranch(params: {
       )
       if (matchingEnvIds.size === 0) continue
       const tasks = mockListTasks({ userId })
-      const found = tasks.find(
-        (task) =>
+      for (const task of tasks) {
+        if (
           task.branch === params.branch &&
           matchingEnvIds.has(task.environmentId)
-      )
-      if (found) return { userId, task: found }
+        ) {
+          matches.push({ userId, task })
+        }
+      }
     }
-    return null
+    if (matches.length === 0) return null
+    matches.sort((a, b) => {
+      const order = Date.parse(b.task.updatedAt) - Date.parse(a.task.updatedAt)
+      return order !== 0 ? order : a.task.id.localeCompare(b.task.id)
+    })
+    return matches[0] ?? null
   }
   const database = getDatabase()
   try {
