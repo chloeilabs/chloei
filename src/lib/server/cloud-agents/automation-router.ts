@@ -1,8 +1,10 @@
 import { createLogger } from "@/lib/logger"
 import { CLOUD_AGENT_MAX_CONCURRENT_PER_USER } from "@/lib/server/agent-runtime-config"
+import { resolveAgentFeatureFlags } from "@/lib/server/integration-flags"
 
 import { dispatchCloudAgentTaskRequested } from "./dispatcher"
 import { listCloudAgentEnvironments } from "./environments"
+import { CloudAgentTransitionError } from "./errors"
 import { appendCloudAgentTaskEvent } from "./events"
 import { createCloudAgentTask } from "./tasks"
 
@@ -28,6 +30,15 @@ export async function routeAutomationTriggerToCloudAgent(params: {
     }
   }
 
+  const flags = await resolveAgentFeatureFlags()
+  if (!flags.cloudAgentsAutomationsEnabled) {
+    return {
+      skipped: true,
+      reason:
+        "Cloud agent automations are disabled (AGENT_CLOUD_AGENTS_AUTOMATIONS_ENABLED is not set).",
+    }
+  }
+
   const environments = await listCloudAgentEnvironments(userId)
   const target = environments.find(
     (environment) =>
@@ -50,7 +61,7 @@ export async function routeAutomationTriggerToCloudAgent(params: {
       maxConcurrentPerUser: CLOUD_AGENT_MAX_CONCURRENT_PER_USER,
     })
   } catch (error) {
-    if (error instanceof Error && error.message.includes("concurrency limit")) {
+    if (error instanceof CloudAgentTransitionError) {
       return {
         skipped: true,
         reason: `Cloud agent concurrency limit (${String(CLOUD_AGENT_MAX_CONCURRENT_PER_USER)}) reached for user ${userId}.`,

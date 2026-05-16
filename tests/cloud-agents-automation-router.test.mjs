@@ -35,9 +35,13 @@ const { clearAllStores, seedEnvironment, getStoredTask, getStoredEvents } =
 const { getDispatchedTasks, resetDispatchedTasks } = await import(dispatcherUrl)
 
 let previousAutomationUserId
+let previousAutomationsEnabled
 
 beforeEach(() => {
   previousAutomationUserId = process.env.AGENT_CLOUD_AGENT_AUTOMATION_USER_ID
+  previousAutomationsEnabled =
+    process.env.AGENT_CLOUD_AGENTS_AUTOMATIONS_ENABLED
+  process.env.AGENT_CLOUD_AGENTS_AUTOMATIONS_ENABLED = "1"
   clearAllStores()
   resetDispatchedTasks()
 })
@@ -47,6 +51,12 @@ afterEach(() => {
     delete process.env.AGENT_CLOUD_AGENT_AUTOMATION_USER_ID
   } else {
     process.env.AGENT_CLOUD_AGENT_AUTOMATION_USER_ID = previousAutomationUserId
+  }
+  if (previousAutomationsEnabled === undefined) {
+    delete process.env.AGENT_CLOUD_AGENTS_AUTOMATIONS_ENABLED
+  } else {
+    process.env.AGENT_CLOUD_AGENTS_AUTOMATIONS_ENABLED =
+      previousAutomationsEnabled
   }
 })
 
@@ -59,6 +69,19 @@ test("routeAutomationTriggerToCloudAgent skips when automation user is not confi
   })
   assert.equal(result.skipped, true)
   assert.match(result.reason, /AUTOMATION_USER_ID/)
+})
+
+test("routeAutomationTriggerToCloudAgent skips when automations feature flag is disabled", async () => {
+  process.env.AGENT_CLOUD_AGENT_AUTOMATION_USER_ID = "bot-user"
+  process.env.AGENT_CLOUD_AGENTS_AUTOMATIONS_ENABLED = "0"
+  const result = await routeAutomationTriggerToCloudAgent({
+    repoOwner: "acme",
+    repoName: "widgets",
+    prompt: "fix",
+    source: "test",
+  })
+  assert.equal(result.skipped, true)
+  assert.match(result.reason, /automations are disabled/i)
 })
 
 test("routeAutomationTriggerToCloudAgent skips when no env matches the repo", async () => {
