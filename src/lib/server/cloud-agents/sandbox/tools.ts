@@ -1,6 +1,7 @@
 import { tool } from "ai"
 import { z } from "zod"
 
+import { clampTerminalChunk } from "../runtime-helpers"
 import type {
   CloudAgentSandboxAdapter,
   CloudAgentSandboxCommandResult,
@@ -88,14 +89,6 @@ function summarizeCommandResult(
   if (trimmedStdout) sections.push(`stdout:\n${trimmedStdout}`)
   if (trimmedStderr) sections.push(`stderr:\n${trimmedStderr}`)
   return sections.join("\n\n")
-}
-
-const TERMINAL_CHUNK_MAX_CHARS = 11_800
-function clampTerminalChunk(value: string): string {
-  if (value.length <= TERMINAL_CHUNK_MAX_CHARS) {
-    return value
-  }
-  return `${value.slice(0, TERMINAL_CHUNK_MAX_CHARS)}\n…[truncated ${String(value.length - TERMINAL_CHUNK_MAX_CHARS)} chars]`
 }
 
 export function buildCloudAgentSandboxTools(

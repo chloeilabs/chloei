@@ -3,14 +3,12 @@ import { z } from "zod"
 import {
   CLOUD_AGENT_APPROVAL_ACTIONS,
   CLOUD_AGENT_ARTIFACT_KINDS,
-  CLOUD_AGENT_EVENT_KINDS,
   CLOUD_AGENT_NETWORK_POLICY_MODES,
   CLOUD_AGENT_REPO_PROVIDERS,
   CLOUD_AGENT_SANDBOX_RUNTIMES,
   CLOUD_AGENT_TASK_STATUSES,
   type CloudAgentArtifact,
   type CloudAgentEnvironment,
-  type CloudAgentEvent,
   type CloudAgentTask,
   type CloudAgentTaskEvent,
 } from "@/lib/shared/cloud-agents"
@@ -221,16 +219,6 @@ export type CloudAgentTaskMessageInput = z.infer<
 export type CloudAgentArtifactCreateInput = z.infer<
   typeof cloudAgentArtifactCreateSchema
 >
-
-const KNOWN_EVENT_KINDS = new Set<string>(CLOUD_AGENT_EVENT_KINDS)
-
-export function parseCloudAgentEventPayload(value: unknown): CloudAgentEvent {
-  return cloudAgentEventPayloadSchema.parse(value)
-}
-
-export function isKnownCloudAgentEventKind(value: unknown): value is string {
-  return typeof value === "string" && KNOWN_EVENT_KINDS.has(value)
-}
 
 function toIsoString(value: Date | string): string {
   const parsed = value instanceof Date ? value : new Date(value)

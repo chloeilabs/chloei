@@ -18,6 +18,7 @@ import {
 import {
   approveCloudAgentTask,
   cancelCloudAgentTask,
+  type CloudAgentEventsResponse,
   getCloudAgentTaskDetail,
   getCloudAgentTaskEvents,
   sendCloudAgentTaskMessage,
@@ -338,9 +339,36 @@ export function CloudAgentTaskDetail({
   const task = taskQuery.data.task
   const artifacts = taskQuery.data.artifacts
 
+  const eventsQueryKey = useMemo(
+    () => ["cloud-agent-task-events", taskId] as const,
+    [taskId]
+  )
   const eventsQuery = useQuery({
-    queryKey: ["cloud-agent-task-events", taskId],
-    queryFn: () => getCloudAgentTaskEvents({ taskId }),
+    queryKey: eventsQueryKey,
+    queryFn: async () => {
+      const previous =
+        queryClient.getQueryData<CloudAgentEventsResponse>(eventsQueryKey)
+      const afterSeq = previous?.lastSeq ?? 0
+      const next = await getCloudAgentTaskEvents({
+        taskId,
+        ...(afterSeq > 0 ? { afterSeq } : {}),
+      })
+      if (!previous || afterSeq === 0) {
+        return next
+      }
+      if (next.events.length === 0) {
+        return {
+          task: next.task,
+          events: previous.events,
+          lastSeq: Math.max(previous.lastSeq, next.lastSeq),
+        }
+      }
+      return {
+        task: next.task,
+        events: [...previous.events, ...next.events],
+        lastSeq: next.lastSeq,
+      }
+    },
     refetchInterval: isTerminalCloudAgentTaskStatus(task.status)
       ? false
       : 1_500,

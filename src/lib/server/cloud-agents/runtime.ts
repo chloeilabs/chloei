@@ -2,26 +2,25 @@ import { createLogger } from "@/lib/logger"
 import {
   type CloudAgentApprovalAction,
   type CloudAgentEnvironment,
-  type CloudAgentEvent,
   deriveCloudAgentTaskBranchName,
 } from "@/lib/shared/cloud-agents"
 
 import { requestCloudAgentApproval } from "./approvals"
 import { createCloudAgentArtifact } from "./artifacts"
 import { getCloudAgentEnvironment } from "./environments"
-import { appendCloudAgentTaskEvent } from "./events"
 import { startCloudAgentTaskRunWithLlm } from "./llm-runtime"
+import {
+  applyCloudAgentStatus,
+  emitCloudAgentEvent,
+  failCloudAgentTask,
+} from "./runtime-helpers"
 import { fakeCloudAgentSandboxAdapter } from "./sandbox/fake"
 import type { CloudAgentSandboxAdapter } from "./sandbox/types"
 import {
   isVercelSandboxConfigured,
   vercelCloudAgentSandboxAdapter,
 } from "./sandbox/vercel"
-import {
-  type CloudAgentTaskUpdate,
-  getCloudAgentTask,
-  updateCloudAgentTask,
-} from "./tasks"
+import { getCloudAgentTask, updateCloudAgentTask } from "./tasks"
 
 const logger = createLogger("cloud-agent-runtime")
 
@@ -60,41 +59,6 @@ export function resolveCloudAgentSandboxAdapter(
   return fakeCloudAgentSandboxAdapter
 }
 
-async function emit(params: {
-  userId: string
-  taskId: string
-  event: CloudAgentEvent
-}) {
-  await appendCloudAgentTaskEvent({
-    userId: params.userId,
-    taskId: params.taskId,
-    payload: params.event,
-  })
-}
-
-async function applyStatus(params: {
-  userId: string
-  taskId: string
-  update: CloudAgentTaskUpdate
-  phase?: string
-}) {
-  await updateCloudAgentTask(params.userId, params.taskId, {
-    ...params.update,
-    ...(params.phase !== undefined ? { phase: params.phase } : {}),
-  })
-  if (params.update.status) {
-    await emit({
-      userId: params.userId,
-      taskId: params.taskId,
-      event: {
-        kind: "status",
-        status: params.update.status,
-        ...(params.phase ? { phase: params.phase } : {}),
-      },
-    })
-  }
-}
-
 interface RunInput {
   userId: string
   taskId: string
@@ -110,7 +74,7 @@ async function getEnvironmentOrFail(params: {
     params.environmentId
   )
   if (!environment) {
-    await applyStatus({
+    await applyCloudAgentStatus({
       userId: params.userId,
       taskId: params.taskId,
       update: {
@@ -118,7 +82,7 @@ async function getEnvironmentOrFail(params: {
         error: "Environment not found.",
       },
     })
-    await emit({
+    await emitCloudAgentEvent({
       userId: params.userId,
       taskId: params.taskId,
       event: {
@@ -131,38 +95,6 @@ async function getEnvironmentOrFail(params: {
     return null
   }
   return environment
-}
-
-async function failTask(params: {
-  userId: string
-  taskId: string
-  error: unknown
-  errorCode?: string
-}) {
-  const message =
-    params.error instanceof Error
-      ? params.error.message
-      : "Unknown cloud agent failure."
-  logger.error("Cloud agent task run failed.", {
-    userId: params.userId,
-    taskId: params.taskId,
-    error: params.error,
-  })
-  await applyStatus({
-    userId: params.userId,
-    taskId: params.taskId,
-    update: { status: "failed", error: message },
-  })
-  await emit({
-    userId: params.userId,
-    taskId: params.taskId,
-    event: {
-      kind: "error",
-      message,
-      ...(params.errorCode ? { errorCode: params.errorCode } : {}),
-      retryable: false,
-    },
-  })
 }
 
 export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
@@ -210,7 +142,7 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
 
   let sandboxId: string | null = null
   try {
-    await applyStatus({
+    await applyCloudAgentStatus({
       userId: input.userId,
       taskId: input.taskId,
       update: { status: "provisioning" },
@@ -227,7 +159,7 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
     sandboxId = provisioned.sandboxId
     await updateCloudAgentTask(input.userId, input.taskId, { sandboxId })
 
-    await applyStatus({
+    await applyCloudAgentStatus({
       userId: input.userId,
       taskId: input.taskId,
       update: { status: "setting_up" },
@@ -235,7 +167,7 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
     })
     if (environment.setupCommand) {
       const setupCallId = `setup-${sandboxId}`
-      await emit({
+      await emitCloudAgentEvent({
         userId: input.userId,
         taskId: input.taskId,
         event: {
@@ -249,7 +181,7 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
         sandboxId,
         command: environment.setupCommand,
       })
-      await emit({
+      await emitCloudAgentEvent({
         userId: input.userId,
         taskId: input.taskId,
         event: {
@@ -259,7 +191,7 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
           callId: setupCallId,
         },
       })
-      await emit({
+      await emitCloudAgentEvent({
         userId: input.userId,
         taskId: input.taskId,
         event: {
@@ -270,13 +202,13 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
       })
     }
 
-    await applyStatus({
+    await applyCloudAgentStatus({
       userId: input.userId,
       taskId: input.taskId,
       update: { status: "planning" },
       phase: "Planning changes",
     })
-    await emit({
+    await emitCloudAgentEvent({
       userId: input.userId,
       taskId: input.taskId,
       event: {
@@ -285,7 +217,7 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
       },
     })
 
-    await applyStatus({
+    await applyCloudAgentStatus({
       userId: input.userId,
       taskId: input.taskId,
       update: { status: "editing" },
@@ -294,7 +226,7 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
     const targetPath = "CLOUD_AGENT_NOTE.md"
     const fileBody = `# Cloud agent note\n\nTask: ${task.prompt}\n\nGenerated by Chloei cloud agent (${mode} runtime).\n`
     const editCallId = `edit-${sandboxId}`
-    await emit({
+    await emitCloudAgentEvent({
       userId: input.userId,
       taskId: input.taskId,
       event: {
@@ -305,7 +237,7 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
       },
     })
     await adapter.writeFile({ sandboxId, path: targetPath, content: fileBody })
-    await emit({
+    await emitCloudAgentEvent({
       userId: input.userId,
       taskId: input.taskId,
       event: {
@@ -314,7 +246,7 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
         change: "added",
       },
     })
-    await emit({
+    await emitCloudAgentEvent({
       userId: input.userId,
       taskId: input.taskId,
       event: {
@@ -327,7 +259,7 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
       sandboxId,
       baseBranch: environment.baseBranch,
     })
-    await emit({
+    await emitCloudAgentEvent({
       userId: input.userId,
       taskId: input.taskId,
       event: {
@@ -338,7 +270,7 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
       },
     })
 
-    await applyStatus({
+    await applyCloudAgentStatus({
       userId: input.userId,
       taskId: input.taskId,
       update: { status: "testing" },
@@ -346,7 +278,7 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
     })
     if (environment.testCommand) {
       const testCallId = `test-${sandboxId}`
-      await emit({
+      await emitCloudAgentEvent({
         userId: input.userId,
         taskId: input.taskId,
         event: {
@@ -360,7 +292,7 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
         sandboxId,
         command: environment.testCommand,
       })
-      await emit({
+      await emitCloudAgentEvent({
         userId: input.userId,
         taskId: input.taskId,
         event: {
@@ -370,7 +302,7 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
           callId: testCallId,
         },
       })
-      await emit({
+      await emitCloudAgentEvent({
         userId: input.userId,
         taskId: input.taskId,
         event: {
@@ -380,7 +312,7 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
         },
       })
       if (testResult.exitCode !== 0) {
-        await failTask({
+        await failCloudAgentTask({
           userId: input.userId,
           taskId: input.taskId,
           error: new Error(
@@ -400,7 +332,7 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
       slug: task.prompt,
     })
 
-    await applyStatus({
+    await applyCloudAgentStatus({
       userId: input.userId,
       taskId: input.taskId,
       update: { status: "waiting_for_approval", branch },
@@ -413,9 +345,13 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
       action,
       reason: `Push ${String(diff.totals.filesChanged)} file change(s) to ${branch}.`,
     })
-    await emit({ userId: input.userId, taskId: input.taskId, event })
+    await emitCloudAgentEvent({
+      userId: input.userId,
+      taskId: input.taskId,
+      event,
+    })
   } catch (error) {
-    await failTask({
+    await failCloudAgentTask({
       userId: input.userId,
       taskId: input.taskId,
       error,
@@ -447,7 +383,7 @@ export async function continueCloudAgentTaskAfterApproval(input: {
   }
 
   if (!input.approved) {
-    await applyStatus({
+    await applyCloudAgentStatus({
       userId: input.userId,
       taskId: input.taskId,
       update: {
@@ -480,7 +416,7 @@ export async function continueCloudAgentTaskAfterApproval(input: {
   const adapter = resolveCloudAgentSandboxAdapter(mode)
   const sandboxId = task.sandboxId
   if (!sandboxId) {
-    await failTask({
+    await failCloudAgentTask({
       userId: input.userId,
       taskId: input.taskId,
       error: new Error("Sandbox id missing on task; cannot push."),
@@ -496,7 +432,7 @@ export async function continueCloudAgentTaskAfterApproval(input: {
     })
 
   try {
-    await applyStatus({
+    await applyCloudAgentStatus({
       userId: input.userId,
       taskId: input.taskId,
       update: { status: "pushing" },
@@ -533,7 +469,7 @@ export async function continueCloudAgentTaskAfterApproval(input: {
     // Preview URL is populated asynchronously by the Vercel deployment webhook
     // (POST /api/webhooks/vercel) once the PR deployment finishes.
 
-    await applyStatus({
+    await applyCloudAgentStatus({
       userId: input.userId,
       taskId: input.taskId,
       update: {
@@ -544,14 +480,14 @@ export async function continueCloudAgentTaskAfterApproval(input: {
       phase: "Pull request ready",
     })
 
-    await applyStatus({
+    await applyCloudAgentStatus({
       userId: input.userId,
       taskId: input.taskId,
       update: { status: "completed" },
       phase: "Completed",
     })
   } catch (error) {
-    await failTask({
+    await failCloudAgentTask({
       userId: input.userId,
       taskId: input.taskId,
       error,

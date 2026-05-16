@@ -5,37 +5,29 @@ import { createLogger } from "@/lib/logger"
 import {
   type CloudAgentApprovalAction,
   type CloudAgentEnvironment,
-  type CloudAgentEvent,
   deriveCloudAgentTaskBranchName,
 } from "@/lib/shared/cloud-agents"
 
 import { requestCloudAgentApproval } from "./approvals"
 import { getCloudAgentEnvironment } from "./environments"
-import { appendCloudAgentTaskEvent } from "./events"
+import {
+  applyCloudAgentStatus,
+  clampTerminalChunk,
+  emitCloudAgentEvent,
+  failCloudAgentTask,
+} from "./runtime-helpers"
 import {
   buildCloudAgentSandboxTools,
   type CloudAgentToolEvent,
 } from "./sandbox/tools"
 import type { CloudAgentSandboxAdapter } from "./sandbox/types"
-import {
-  type CloudAgentTaskUpdate,
-  getCloudAgentTask,
-  updateCloudAgentTask,
-} from "./tasks"
+import { getCloudAgentTask, updateCloudAgentTask } from "./tasks"
 
 const logger = createLogger("cloud-agent-llm-runtime")
 
 const DEFAULT_LLM_MODEL_ID = "moonshotai/kimi-k2.6"
 const DEFAULT_MAX_TOOL_STEPS = 80
 const DEFAULT_MAX_OUTPUT_TOKENS = 4_000
-const TERMINAL_CHUNK_MAX_CHARS = 11_800
-
-function clampTerminalChunk(value: string): string {
-  if (value.length <= TERMINAL_CHUNK_MAX_CHARS) {
-    return value
-  }
-  return `${value.slice(0, TERMINAL_CHUNK_MAX_CHARS)}\n…[truncated ${String(value.length - TERMINAL_CHUNK_MAX_CHARS)} chars]`
-}
 
 function resolveLlmModelId(): string {
   const explicit = process.env.CLOUD_AGENT_LLM_MODEL?.trim()
@@ -47,73 +39,6 @@ function resolveMaxToolSteps(): number {
   if (!raw) return DEFAULT_MAX_TOOL_STEPS
   const parsed = Number.parseInt(raw, 10)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_TOOL_STEPS
-}
-
-async function emit(params: {
-  userId: string
-  taskId: string
-  event: CloudAgentEvent
-}): Promise<void> {
-  await appendCloudAgentTaskEvent({
-    userId: params.userId,
-    taskId: params.taskId,
-    payload: params.event,
-  })
-}
-
-async function applyStatus(params: {
-  userId: string
-  taskId: string
-  update: CloudAgentTaskUpdate
-  phase?: string
-}): Promise<void> {
-  await updateCloudAgentTask(params.userId, params.taskId, {
-    ...params.update,
-    ...(params.phase !== undefined ? { phase: params.phase } : {}),
-  })
-  if (params.update.status) {
-    await emit({
-      userId: params.userId,
-      taskId: params.taskId,
-      event: {
-        kind: "status",
-        status: params.update.status,
-        ...(params.phase ? { phase: params.phase } : {}),
-      },
-    })
-  }
-}
-
-async function failTask(params: {
-  userId: string
-  taskId: string
-  error: unknown
-  errorCode?: string
-}): Promise<void> {
-  const message =
-    params.error instanceof Error
-      ? params.error.message
-      : "Unknown cloud agent failure."
-  logger.error("LLM cloud agent task run failed.", {
-    userId: params.userId,
-    taskId: params.taskId,
-    error: params.error,
-  })
-  await applyStatus({
-    userId: params.userId,
-    taskId: params.taskId,
-    update: { status: "failed", error: message },
-  })
-  await emit({
-    userId: params.userId,
-    taskId: params.taskId,
-    event: {
-      kind: "error",
-      message,
-      ...(params.errorCode ? { errorCode: params.errorCode } : {}),
-      retryable: false,
-    },
-  })
 }
 
 function buildSystemPrompt(environment: CloudAgentEnvironment): string {
@@ -169,12 +94,12 @@ export async function startCloudAgentTaskRunWithLlm(
     task.environmentId
   )
   if (!environment) {
-    await applyStatus({
+    await applyCloudAgentStatus({
       userId: input.userId,
       taskId: input.taskId,
       update: { status: "failed", error: "Environment not found." },
     })
-    await emit({
+    await emitCloudAgentEvent({
       userId: input.userId,
       taskId: input.taskId,
       event: {
@@ -191,7 +116,7 @@ export async function startCloudAgentTaskRunWithLlm(
   const summaryRef = { value: null as string | null }
 
   try {
-    await applyStatus({
+    await applyCloudAgentStatus({
       userId: input.userId,
       taskId: input.taskId,
       update: { status: "provisioning" },
@@ -208,7 +133,7 @@ export async function startCloudAgentTaskRunWithLlm(
     sandboxId = provisioned.sandboxId
     await updateCloudAgentTask(input.userId, input.taskId, { sandboxId })
 
-    await applyStatus({
+    await applyCloudAgentStatus({
       userId: input.userId,
       taskId: input.taskId,
       update: { status: "setting_up" },
@@ -219,7 +144,7 @@ export async function startCloudAgentTaskRunWithLlm(
         sandboxId,
         command: environment.setupCommand,
       })
-      await emit({
+      await emitCloudAgentEvent({
         userId: input.userId,
         taskId: input.taskId,
         event: {
@@ -235,7 +160,7 @@ export async function startCloudAgentTaskRunWithLlm(
       }
     }
 
-    await applyStatus({
+    await applyCloudAgentStatus({
       userId: input.userId,
       taskId: input.taskId,
       update: { status: "planning" },
@@ -251,7 +176,7 @@ export async function startCloudAgentTaskRunWithLlm(
         ? { testCommand: environment.testCommand }
         : {}),
       onCall: async (event) => {
-        await emit({
+        await emitCloudAgentEvent({
           userId: input.userId,
           taskId: input.taskId,
           event: {
@@ -264,7 +189,7 @@ export async function startCloudAgentTaskRunWithLlm(
       },
       onResult: async (event: CloudAgentToolEvent) => {
         if (event.terminal) {
-          await emit({
+          await emitCloudAgentEvent({
             userId: input.userId,
             taskId: input.taskId,
             event: {
@@ -276,7 +201,7 @@ export async function startCloudAgentTaskRunWithLlm(
           })
         }
         if (event.fileChange) {
-          await emit({
+          await emitCloudAgentEvent({
             userId: input.userId,
             taskId: input.taskId,
             event: {
@@ -286,7 +211,7 @@ export async function startCloudAgentTaskRunWithLlm(
             },
           })
         }
-        await emit({
+        await emitCloudAgentEvent({
           userId: input.userId,
           taskId: input.taskId,
           event: {
@@ -322,7 +247,7 @@ export async function startCloudAgentTaskRunWithLlm(
     })
 
     if (result.text.trim()) {
-      await emit({
+      await emitCloudAgentEvent({
         userId: input.userId,
         taskId: input.taskId,
         event: { kind: "text_delta", text: result.text.trim() },
@@ -333,7 +258,7 @@ export async function startCloudAgentTaskRunWithLlm(
       sandboxId,
       baseBranch: environment.baseBranch,
     })
-    await emit({
+    await emitCloudAgentEvent({
       userId: input.userId,
       taskId: input.taskId,
       event: {
@@ -345,7 +270,7 @@ export async function startCloudAgentTaskRunWithLlm(
     })
 
     if (environment.testCommand) {
-      await applyStatus({
+      await applyCloudAgentStatus({
         userId: input.userId,
         taskId: input.taskId,
         update: { status: "testing" },
@@ -355,7 +280,7 @@ export async function startCloudAgentTaskRunWithLlm(
         sandboxId,
         command: environment.testCommand,
       })
-      await emit({
+      await emitCloudAgentEvent({
         userId: input.userId,
         taskId: input.taskId,
         event: {
@@ -365,13 +290,14 @@ export async function startCloudAgentTaskRunWithLlm(
         },
       })
       if (testResult.exitCode !== 0) {
-        await failTask({
+        await failCloudAgentTask({
           userId: input.userId,
           taskId: input.taskId,
           error: new Error(
             `Tests failed (exit ${String(testResult.exitCode)}). Cloud agent edits were not pushed.`
           ),
           errorCode: "CLOUD_AGENT_TESTS_FAILED",
+          loggerScope: "cloud-agent-llm-runtime",
         })
         if (sandboxId) {
           await input.adapter.destroy({ sandboxId }).catch(() => undefined)
@@ -391,7 +317,7 @@ export async function startCloudAgentTaskRunWithLlm(
       branch,
       summary,
     })
-    await applyStatus({
+    await applyCloudAgentStatus({
       userId: input.userId,
       taskId: input.taskId,
       update: { status: "waiting_for_approval" },
@@ -405,14 +331,19 @@ export async function startCloudAgentTaskRunWithLlm(
       action,
       reason: `Push ${String(diff.totals.filesChanged)} file change(s) to ${branch}.`,
     })
-    await emit({ userId: input.userId, taskId: input.taskId, event })
+    await emitCloudAgentEvent({
+      userId: input.userId,
+      taskId: input.taskId,
+      event,
+    })
   } catch (error) {
     try {
-      await failTask({
+      await failCloudAgentTask({
         userId: input.userId,
         taskId: input.taskId,
         error,
         errorCode: "CLOUD_AGENT_LLM_RUN_FAILED",
+        loggerScope: "cloud-agent-llm-runtime",
       })
     } finally {
       if (sandboxId) {
