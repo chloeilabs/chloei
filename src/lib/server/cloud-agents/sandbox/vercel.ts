@@ -215,6 +215,7 @@ export const vercelCloudAgentSandboxAdapter: CloudAgentSandboxAdapter = {
       oldLineCount,
       newLineCount: countLines(params.content),
     })
+    return { wasNew }
   },
 
   async readFile(params) {

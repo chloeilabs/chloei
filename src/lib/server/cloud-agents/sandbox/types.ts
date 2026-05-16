@@ -53,7 +53,7 @@ export interface CloudAgentSandboxAdapter {
     sandboxId: string
     path: string
     content: string
-  }): Promise<void>
+  }): Promise<{ wasNew: boolean }>
   readFile(params: {
     sandboxId: string
     path: string

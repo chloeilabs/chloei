@@ -138,6 +138,17 @@ ON cloud_agent_task ("userId", "environmentId", "updatedAt" DESC);
 CREATE INDEX IF NOT EXISTS cloud_agent_task_status_updated_at_idx
 ON cloud_agent_task (status, "updatedAt" DESC);
 
+-- Cross-user lookups for the Vercel deployment webhook. The composite
+-- primary key on ("userId", id) does not support lookups by id alone,
+-- so without these the webhook handler falls back to a sequential scan
+-- on every deployment.succeeded event.
+CREATE INDEX IF NOT EXISTS cloud_agent_task_id_idx
+ON cloud_agent_task (id);
+
+CREATE INDEX IF NOT EXISTS cloud_agent_task_branch_updated_at_idx
+ON cloud_agent_task (branch, "updatedAt" DESC)
+WHERE branch IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS cloud_agent_task_event (
   id text NOT NULL PRIMARY KEY,
   "userId" text NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,

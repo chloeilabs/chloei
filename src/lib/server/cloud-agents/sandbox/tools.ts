@@ -158,14 +158,21 @@ export function buildCloudAgentSandboxTools(
           input: { path: filePath, bytes: content.length },
         })
         try {
-          await adapter.writeFile({ sandboxId, path: filePath, content })
+          const { wasNew } = await adapter.writeFile({
+            sandboxId,
+            path: filePath,
+            content,
+          })
           await params.onResult({
             callId,
             toolName: "write_file",
             label,
             status: "success",
             output: { bytes: content.length },
-            fileChange: { path: filePath, change: "modified" },
+            fileChange: {
+              path: filePath,
+              change: wasNew ? "added" : "modified",
+            },
           })
           return `wrote ${String(content.length)} bytes to ${filePath}`
         } catch (error) {

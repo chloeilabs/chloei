@@ -144,20 +144,21 @@ export const fakeCloudAgentSandboxAdapter: CloudAgentSandboxAdapter = {
     }
   },
 
-  writeFile(params): Promise<void> {
+  writeFile(params): Promise<{ wasNew: boolean }> {
     try {
       const state = require(getStore().get(params.sandboxId), params.sandboxId)
       const path = ensureSafePath(params.path)
       const previous = state.files.get(path)
+      const wasNew = previous === undefined
       const newLines = countLines(params.content)
       const oldLines = previous ? countLines(previous) : 0
       state.files.set(path, params.content)
       state.changes.set(path, {
-        change: previous ? "modified" : "added",
-        additions: previous ? Math.max(newLines - oldLines, 0) : newLines,
-        deletions: previous ? Math.max(oldLines - newLines, 0) : 0,
+        change: wasNew ? "added" : "modified",
+        additions: wasNew ? newLines : Math.max(newLines - oldLines, 0),
+        deletions: wasNew ? 0 : Math.max(oldLines - newLines, 0),
       })
-      return Promise.resolve()
+      return Promise.resolve({ wasNew })
     } catch (error) {
       return Promise.reject(
         error instanceof Error
