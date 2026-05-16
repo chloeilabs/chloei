@@ -165,6 +165,14 @@ test("postgres concurrency slot increments atomically and releases asynchronousl
   assert.equal(slot.inFlight, 2)
   assert.equal(slot.retryAfterSeconds, null)
 
+  const acquireQuery = recorded.queries.find((query) =>
+    query.text.includes('"previousInFlight"')
+  )
+  assert(acquireQuery)
+  assert.match(acquireQuery.text, /normalized_state/)
+  assert.match(acquireQuery.text, /"lastSeenAt" < /)
+  assert.match(acquireQuery.text, /"effectiveInFlight"/)
+
   slot.release()
   await new Promise((resolve) => {
     setImmediate(resolve)

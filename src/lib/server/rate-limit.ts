@@ -2,7 +2,10 @@ import { sql } from "kysely"
 
 import { createLogger } from "@/lib/logger"
 
-import { AGENT_RATE_LIMIT_STORE } from "./agent-runtime-config"
+import {
+  AGENT_RATE_LIMIT_STORE,
+  AGENT_STREAM_TIMEOUT_MS,
+} from "./agent-runtime-config"
 import { getDatabase, isPrimaryDatabaseConfigured } from "./postgres"
 
 const logger = createLogger("rate-limit")
@@ -43,6 +46,7 @@ type RateLimitStore = "memory" | "postgres"
 
 const slidingWindowStates = new Map<string, SlidingWindowRateLimitState>()
 let lastPersistentCleanupAt = 0
+const PERSISTENT_CONCURRENCY_STALE_GRACE_MS = 60_000
 
 function resolveRateLimitStore(): RateLimitStore {
   if (AGENT_RATE_LIMIT_STORE === "memory") {
@@ -67,6 +71,13 @@ function toNumber(value: number | string | bigint | null | undefined): number {
   }
 
   return typeof value === "number" && Number.isFinite(value) ? value : 0
+}
+
+function getPersistentConcurrencyStaleAfterMs(windowMs: number): number {
+  return Math.max(
+    windowMs * 2,
+    AGENT_STREAM_TIMEOUT_MS + PERSISTENT_CONCURRENCY_STALE_GRACE_MS
+  )
 }
 
 function pruneHitsInPlace(hits: number[], now: number, windowMs: number): void {
@@ -170,6 +181,15 @@ async function cleanupPersistentRateLimitStates(
   }
 
   lastPersistentCleanupAt = now
+  await sql`
+    UPDATE agent_rate_limit
+    SET "inFlight" = 0
+    WHERE "inFlight" > 0
+      AND "lastSeenAt" < ${new Date(
+        now - getPersistentConcurrencyStaleAfterMs(windowMs)
+      )}
+  `.execute(getDatabase())
+
   await sql`
     DELETE FROM agent_rate_limit
     WHERE "inFlight" = 0
@@ -355,6 +375,9 @@ async function tryAcquirePersistentConcurrencySlot(params: {
 }): Promise<ConcurrencySlotDecision> {
   const now = Date.now()
   const lastSeenAt = new Date(now)
+  const staleInFlightCutoff = new Date(
+    now - getPersistentConcurrencyStaleAfterMs(params.windowMs)
+  )
 
   await cleanupPersistentRateLimitStates(now, params.windowMs)
 
@@ -375,24 +398,33 @@ async function tryAcquirePersistentConcurrencySlot(params: {
       ON CONFLICT (identifier) DO NOTHING
     ),
     current_state AS (
-      SELECT "inFlight"
+      SELECT "inFlight", "lastSeenAt"
       FROM agent_rate_limit
       WHERE identifier = ${params.identifier}
       FOR UPDATE
+    ),
+    normalized_state AS (
+      SELECT
+        CASE
+          WHEN current_state."lastSeenAt" < ${staleInFlightCutoff}
+            THEN 0
+          ELSE current_state."inFlight"
+        END AS "effectiveInFlight"
+      FROM current_state
     ),
     updated AS (
       UPDATE agent_rate_limit
       SET
         "inFlight" = CASE
-          WHEN current_state."inFlight" < ${params.maxConcurrent}
-            THEN current_state."inFlight" + 1
-          ELSE current_state."inFlight"
+          WHEN normalized_state."effectiveInFlight" < ${params.maxConcurrent}
+            THEN normalized_state."effectiveInFlight" + 1
+          ELSE normalized_state."effectiveInFlight"
         END,
         "lastSeenAt" = ${lastSeenAt}
-      FROM current_state
+      FROM normalized_state
       WHERE identifier = ${params.identifier}
       RETURNING
-        current_state."inFlight" AS "previousInFlight",
+        normalized_state."effectiveInFlight" AS "previousInFlight",
         agent_rate_limit."inFlight" AS "inFlight"
     )
     SELECT
