@@ -129,6 +129,7 @@ export async function startCloudAgentTaskRunWithLlm(
       repoName: environment.repoName,
       baseBranch: environment.baseBranch,
       sandboxRuntime: environment.sandboxRuntime,
+      networkPolicy: environment.networkPolicy,
     })
     sandboxId = provisioned.sandboxId
     await updateCloudAgentTask(input.userId, input.taskId, { sandboxId })

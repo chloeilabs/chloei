@@ -46,10 +46,23 @@ function countLines(content: string): number {
   return content.split("\n").length
 }
 
+// Mirror of ensureSafeRepoPath in sandbox/vercel.ts so the fake and
+// real adapters reject the same set of unsafe paths. Per-segment check
+// avoids false positives on filenames that contain `..` (e.g.
+// `a..b.txt`) and also catches `.` segments, NUL bytes, and
+// backslashes that the previous `includes("..")` check missed.
 function ensureSafePath(path: string): string {
   const trimmed = path.trim()
-  if (!trimmed || trimmed.includes("..") || trimmed.startsWith("/")) {
-    throw new Error("Path must be a repo-relative path without '..' segments.")
+  if (
+    !trimmed ||
+    trimmed.startsWith("/") ||
+    trimmed.includes("\0") ||
+    trimmed.includes("\\") ||
+    trimmed.split("/").some((segment) => segment === ".." || segment === ".")
+  ) {
+    throw new Error(
+      "Repo-relative path required: no leading '/', no '..'/'.' segments, no NUL bytes or backslashes."
+    )
   }
   return trimmed
 }

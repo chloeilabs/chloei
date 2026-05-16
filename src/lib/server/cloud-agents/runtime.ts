@@ -156,6 +156,7 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
       repoName: environment.repoName,
       baseBranch: environment.baseBranch,
       sandboxRuntime: environment.sandboxRuntime,
+      networkPolicy: environment.networkPolicy,
     })
     sandboxId = provisioned.sandboxId
     await updateCloudAgentTask(input.userId, input.taskId, { sandboxId })

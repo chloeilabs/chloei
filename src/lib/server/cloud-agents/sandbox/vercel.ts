@@ -160,6 +160,37 @@ export function isVercelSandboxConfigured(): boolean {
   )
 }
 
+// Map our CloudAgentSandboxRuntime enum to the strings the @vercel/sandbox
+// SDK accepts. Unknown values pass through; the SDK types accept any
+// string so it will surface its own error if the runtime is unsupported.
+function mapToVercelRuntime(value: string): string {
+  switch (value) {
+    case "python311":
+    case "python312":
+      return "python3.13"
+    default:
+      return value
+  }
+}
+
+// Map our networkPolicy onto the Vercel SDK's NetworkPolicy union.
+// `setup_only` is treated as `allow-all` at creation time because the
+// SDK only supports phase-transition via updateNetworkPolicy after
+// setup completes; tightening it post-setup is a follow-up.
+function mapToVercelNetworkPolicy(
+  policy: CloudAgentSandboxProvisionInput["networkPolicy"]
+): "allow-all" | "deny-all" | { allow: string[] } {
+  switch (policy.mode) {
+    case "off":
+      return "deny-all"
+    case "open":
+    case "setup_only":
+      return "allow-all"
+    case "allowlist":
+      return { allow: policy.allowlist ?? [] }
+  }
+}
+
 export const vercelCloudAgentSandboxAdapter: CloudAgentSandboxAdapter = {
   id: "vercel",
   async provision(
@@ -168,6 +199,8 @@ export const vercelCloudAgentSandboxAdapter: CloudAgentSandboxAdapter = {
     const { Sandbox } = await import("@vercel/sandbox")
     const sandbox = await Sandbox.create({
       timeout: SANDBOX_TIMEOUT_MS,
+      runtime: mapToVercelRuntime(input.sandboxRuntime),
+      networkPolicy: mapToVercelNetworkPolicy(input.networkPolicy),
       source: {
         type: "git",
         url: `https://github.com/${input.repoOwner}/${input.repoName}.git`,

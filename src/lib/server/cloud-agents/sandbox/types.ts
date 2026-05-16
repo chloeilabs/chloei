@@ -29,6 +29,10 @@ export interface CloudAgentSandboxProvisionInput {
   repoName: string
   baseBranch: string
   sandboxRuntime: string
+  networkPolicy: {
+    mode: "setup_only" | "open" | "off" | "allowlist"
+    allowlist?: string[]
+  }
 }
 
 export interface CloudAgentSandboxProvisionResult {
