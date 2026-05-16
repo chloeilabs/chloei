@@ -206,11 +206,20 @@ function shouldForceFinalSynthesisStep(
 }
 
 function outputHasError(output: unknown): boolean {
-  if (!output || typeof output !== "object" || !("error" in output)) {
+  if (!output || typeof output !== "object") {
     return false
   }
 
-  return Boolean(output.error)
+  const record = output as Record<string, unknown>
+  if (record.error) {
+    return true
+  }
+
+  const code = typeof record.code === "string" ? record.code.trim() : ""
+  const errorCode =
+    typeof record.errorCode === "string" ? record.errorCode.trim() : ""
+
+  return code.length > 0 || errorCode.length > 0
 }
 
 function isToolFailureResult(

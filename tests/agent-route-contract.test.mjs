@@ -111,6 +111,11 @@ test("agent runtime unlocks Gateway search after Parallel failures", async () =>
   )
   assert.match(
     runtimeSource,
+    /record\.error[\s\S]*record\.code[\s\S]*record\.errorCode/,
+    "Expected fallback failure detection to cover managed search error fields."
+  )
+  assert.match(
+    runtimeSource,
     /if \(hasToolFailure\(params\.steps,\s*"parallel_search"\)\) \{[\s\S]*return params\.toolNames\.filter\([\s\S]*toolName !== "parallel_search"/,
     "Expected Parallel to be excluded after a Parallel failure so Gateway search remains available."
   )
