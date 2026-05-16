@@ -369,10 +369,6 @@ test("agent feature flags default off and respect explicit env overrides", async
       asyncReportsEnabled: false,
       telemetryRecordIo: false,
       financeWorkflowsEnabled: false,
-      cloudAgentsEnabled: false,
-      cloudAgentsGithubEnabled: false,
-      cloudAgentsVercelDeploymentsEnabled: false,
-      cloudAgentsAutomationsEnabled: false,
     })
 
     process.env.AGENT_KNOWLEDGE_SEARCH_ENABLED = "true"
@@ -613,10 +609,6 @@ test("PostHog product analytics is gated and emits privacy-safe events", async (
         asyncReportsEnabled: false,
         telemetryRecordIo: false,
         financeWorkflowsEnabled: true,
-        cloudAgentsEnabled: false,
-        cloudAgentsGithubEnabled: false,
-        cloudAgentsVercelDeploymentsEnabled: false,
-        cloudAgentsAutomationsEnabled: false,
       },
       properties: {
         model_id: "google/gemini-3.1-pro-preview",
