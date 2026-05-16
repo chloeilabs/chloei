@@ -171,6 +171,10 @@ export function mockListTasks(params: {
     .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
 }
 
+export function mockListAllUserIds(): string[] {
+  return [...getState().tasks.keys()]
+}
+
 export function mockGetTask(
   userId: string,
   taskId: string

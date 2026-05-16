@@ -8,10 +8,9 @@ import {
 } from "@/lib/server/api-response"
 import {
   appendCloudAgentTaskEvent,
-  findCloudAgentTaskByBranch,
-  getCloudAgentTask,
+  findCloudAgentTaskAnyUserByBranch,
+  findCloudAgentTaskAnyUserById,
   parseVercelWebhookEvent,
-  resolveCloudAgentAutomationUserId,
   updateCloudAgentTask,
   verifyVercelWebhookSignature,
 } from "@/lib/server/cloud-agents"
@@ -122,31 +121,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const userId = resolveCloudAgentAutomationUserId()
-    if (!userId) {
-      return observeRouteResponse(
-        observation,
-        Response.json(
-          {
-            accepted: false,
-            reason: "AGENT_CLOUD_AGENT_AUTOMATION_USER_ID not configured.",
-          },
-          { status: 200, headers: createApiHeaders({ requestId }) }
-        ),
-        { outcome: "ignored" }
-      )
-    }
-
-    let task = parsed.taskId
-      ? await getCloudAgentTask(userId, parsed.taskId)
-      : null
-    if (!task && parsed.branch) {
-      task = await findCloudAgentTaskByBranch({
-        userId,
-        branch: parsed.branch,
-      })
-    }
-    if (!task) {
+    // The Vercel webhook is HMAC-signed and carries no per-user auth, so
+    // lookup the owning task across all users — both automation- and
+    // dashboard-created tasks need their previewUrl populated.
+    const match =
+      (parsed.taskId
+        ? await findCloudAgentTaskAnyUserById(parsed.taskId)
+        : null) ??
+      (parsed.branch
+        ? await findCloudAgentTaskAnyUserByBranch(parsed.branch)
+        : null)
+    if (!match) {
       return observeRouteResponse(
         observation,
         Response.json(
@@ -160,6 +145,7 @@ export async function POST(request: NextRequest) {
         { outcome: "ignored" }
       )
     }
+    const { userId, task } = match
 
     await updateCloudAgentTask(userId, task.id, {
       previewUrl: parsed.url,

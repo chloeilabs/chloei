@@ -19,6 +19,7 @@ import {
   mockCountActiveTasks,
   mockCreateTask,
   mockGetTask,
+  mockListAllUserIds,
   mockListTasks,
   mockUpdateTask,
 } from "./mock-store"
@@ -95,6 +96,63 @@ export async function findCloudAgentTaskByBranch(params: {
     `.execute(database)
     const row = result.rows[0]
     return row ? parseTaskRow(row) : null
+  } catch (error) {
+    throw wrapCloudAgentStoreError(error)
+  }
+}
+
+export interface CloudAgentTaskWithOwner {
+  userId: string
+  task: CloudAgentTask
+}
+
+export async function findCloudAgentTaskAnyUserById(
+  taskId: string
+): Promise<CloudAgentTaskWithOwner | null> {
+  if (isCloudAgentMockModeEnabled()) {
+    for (const userId of mockListAllUserIds()) {
+      const task = mockGetTask(userId, taskId)
+      if (task) return { userId, task }
+    }
+    return null
+  }
+  const database = getDatabase()
+  try {
+    const result = await sql<CloudAgentTaskRow & { userId: string }>`
+      SELECT "userId", ${SELECT_FIELDS}
+      FROM cloud_agent_task
+      WHERE id = ${taskId}
+      LIMIT 1
+    `.execute(database)
+    const row = result.rows[0]
+    return row ? { userId: row.userId, task: parseTaskRow(row) } : null
+  } catch (error) {
+    throw wrapCloudAgentStoreError(error)
+  }
+}
+
+export async function findCloudAgentTaskAnyUserByBranch(
+  branch: string
+): Promise<CloudAgentTaskWithOwner | null> {
+  if (isCloudAgentMockModeEnabled()) {
+    for (const userId of mockListAllUserIds()) {
+      const tasks = mockListTasks({ userId })
+      const found = tasks.find((task) => task.branch === branch)
+      if (found) return { userId, task: found }
+    }
+    return null
+  }
+  const database = getDatabase()
+  try {
+    const result = await sql<CloudAgentTaskRow & { userId: string }>`
+      SELECT "userId", ${SELECT_FIELDS}
+      FROM cloud_agent_task
+      WHERE branch = ${branch}
+      ORDER BY "updatedAt" DESC, id ASC
+      LIMIT 1
+    `.execute(database)
+    const row = result.rows[0]
+    return row ? { userId: row.userId, task: parseTaskRow(row) } : null
   } catch (error) {
     throw wrapCloudAgentStoreError(error)
   }

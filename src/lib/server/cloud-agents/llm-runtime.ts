@@ -313,14 +313,14 @@ export async function startCloudAgentTaskRunWithLlm(
     const fallbackSummary =
       result.text.split("\n").slice(0, 3).join(" ").trim() || task.prompt
     const summary = summaryRef.value ?? fallbackSummary
-    await updateCloudAgentTask(input.userId, input.taskId, {
-      branch,
-      summary,
-    })
+    // Single update: write branch + summary AND transition to
+    // waiting_for_approval atomically so continueCloudAgentTaskAfterApproval
+    // always sees the persisted branch the user approved against (matches
+    // the scripted runtime's pattern in runtime.ts).
     await applyCloudAgentStatus({
       userId: input.userId,
       taskId: input.taskId,
-      update: { status: "waiting_for_approval" },
+      update: { status: "waiting_for_approval", branch, summary },
       phase: "Waiting for push approval",
     })
 

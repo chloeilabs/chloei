@@ -11,6 +11,7 @@ import { getCloudAgentEnvironment } from "./environments"
 import { startCloudAgentTaskRunWithLlm } from "./llm-runtime"
 import {
   applyCloudAgentStatus,
+  clampTerminalChunk,
   emitCloudAgentEvent,
   failCloudAgentTask,
 } from "./runtime-helpers"
@@ -187,7 +188,7 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
         event: {
           kind: "terminal_output",
           stream: setupResult.exitCode === 0 ? "stdout" : "stderr",
-          chunk: setupResult.stdout || setupResult.stderr,
+          chunk: clampTerminalChunk(setupResult.stdout || setupResult.stderr),
           callId: setupCallId,
         },
       })
@@ -298,7 +299,7 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
         event: {
           kind: "terminal_output",
           stream: testResult.exitCode === 0 ? "stdout" : "stderr",
-          chunk: testResult.stdout || testResult.stderr,
+          chunk: clampTerminalChunk(testResult.stdout || testResult.stderr),
           callId: testCallId,
         },
       })
