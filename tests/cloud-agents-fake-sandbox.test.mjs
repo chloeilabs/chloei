@@ -139,6 +139,39 @@ test("fake adapter creates a stub branch and PR url", async () => {
   assert.ok(pr.number >= 1000 && pr.number <= 9999)
 })
 
+test("fake adapter accepts setNetworkPolicy and stays usable afterward", async () => {
+  const { sandboxId } = await fakeCloudAgentSandboxAdapter.provision({
+    userId: "user-1",
+    taskId: "task-network",
+    repoOwner: "chloeilabs",
+    repoName: "chloei",
+    baseBranch: "main",
+    sandboxRuntime: "node22",
+    networkPolicy: { mode: "setup_only" },
+  })
+  // Tightening should resolve cleanly and not invalidate the
+  // sandbox — the runtime calls this right after setup and then
+  // continues to read/write files and run commands.
+  await fakeCloudAgentSandboxAdapter.setNetworkPolicy({
+    sandboxId,
+    policy: { mode: "off" },
+  })
+  const after = await fakeCloudAgentSandboxAdapter.runCommand({
+    sandboxId,
+    command: "ls",
+  })
+  assert.equal(after.exitCode, 0)
+
+  // Calling against a missing sandbox should reject — mirrors the
+  // real adapter so misuse is loud, not silent.
+  await assert.rejects(
+    fakeCloudAgentSandboxAdapter.setNetworkPolicy({
+      sandboxId: "fake-sb-missing",
+      policy: { mode: "off" },
+    })
+  )
+})
+
 test("fake adapter destroys sandboxes idempotently", async () => {
   const { sandboxId } = await fakeCloudAgentSandboxAdapter.provision({
     userId: "user-1",

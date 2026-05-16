@@ -154,6 +154,30 @@ export async function startCloudAgentTaskRunWithLlm(
       }
     }
 
+    // `setup_only` keeps network access open during the setup phase
+    // so package installers can reach registries, then flips to
+    // `deny-all` for the LLM agent phase. Best-effort — see
+    // runtime.ts for the matching scripted-runtime call and rationale.
+    if (environment.networkPolicy.mode === "setup_only") {
+      const tightenSandboxId = sandboxId
+      await input.adapter
+        .setNetworkPolicy({
+          sandboxId: tightenSandboxId,
+          policy: { mode: "off" },
+        })
+        .catch((error: unknown) => {
+          logger.warn(
+            "Failed to tighten sandbox network policy after setup; continuing with the policy provisioned at create time.",
+            {
+              userId: input.userId,
+              taskId: input.taskId,
+              sandboxId: tightenSandboxId,
+              error,
+            }
+          )
+        })
+    }
+
     await applyCloudAgentStatus({
       userId: input.userId,
       taskId: input.taskId,

@@ -53,6 +53,9 @@ interface VercelSandboxSession {
     writeFiles(
       files: { path: string; content: Buffer | string }[]
     ): Promise<void>
+    updateNetworkPolicy(
+      networkPolicy: "allow-all" | "deny-all" | { allow: string[] }
+    ): Promise<unknown>
     stop?: () => Promise<void>
   }
   repoCwd: string
@@ -253,9 +256,11 @@ function mapToVercelRuntime(value: string): string {
 }
 
 // Map our networkPolicy onto the Vercel SDK's NetworkPolicy union.
-// `setup_only` is treated as `allow-all` at creation time because the
-// SDK only supports phase-transition via updateNetworkPolicy after
-// setup completes; tightening it post-setup is a follow-up.
+// `setup_only` is treated as `allow-all` at creation time so the
+// setup command (e.g. `pnpm install`) can reach package registries;
+// the runtime later calls `setNetworkPolicy({ mode: "off" })` once
+// setup completes to flip the live sandbox to `deny-all` for the
+// agent phase.
 function mapToVercelNetworkPolicy(
   policy: CloudAgentSandboxProvisionInput["networkPolicy"]
 ): "allow-all" | "deny-all" | { allow: string[] } {
@@ -303,6 +308,13 @@ export const vercelCloudAgentSandboxAdapter: CloudAgentSandboxAdapter = {
       repoName: input.repoName,
     })
     return { sandboxId: sandbox.sandboxId }
+  },
+
+  async setNetworkPolicy(params) {
+    const session = require(params.sandboxId)
+    await session.sandbox.updateNetworkPolicy(
+      mapToVercelNetworkPolicy(params.policy)
+    )
   },
 
   async runSetup(params): Promise<CloudAgentSandboxCommandResult> {
