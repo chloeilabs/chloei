@@ -102,6 +102,27 @@ async function rehydrateSession(params: {
 
 const SANDBOX_REPO_CWD = "/vercel/sandbox"
 
+// Defense in depth alongside FILE_PATH_SCHEMA in sandbox/tools.ts.
+// Even if a caller bypasses the AI SDK tool schema (e.g. a future
+// scripted runtime that calls writeFile directly), the adapter must
+// not let the LLM write outside its sandbox checkout via traversal,
+// NUL bytes, or absolute paths.
+function ensureSafeRepoPath(path: string): string {
+  const trimmed = path.trim()
+  if (
+    !trimmed ||
+    trimmed.startsWith("/") ||
+    trimmed.includes("\0") ||
+    trimmed.includes("\\") ||
+    trimmed.split("/").some((segment) => segment === ".." || segment === ".")
+  ) {
+    throw new Error(
+      "Repo-relative path required: no leading '/', no '..'/'.' segments, no NUL bytes or backslashes."
+    )
+  }
+  return trimmed
+}
+
 async function readFileContent(
   session: VercelSandboxSession,
   path: string
@@ -196,21 +217,22 @@ export const vercelCloudAgentSandboxAdapter: CloudAgentSandboxAdapter = {
 
   async writeFile(params) {
     const session = require(params.sandboxId)
-    const existing = session.fileChanges.get(params.path)
+    const safePath = ensureSafeRepoPath(params.path)
+    const existing = session.fileChanges.get(safePath)
     const wasNew =
-      existing?.wasNew ?? (await readFileContent(session, params.path)) === null
+      existing?.wasNew ?? (await readFileContent(session, safePath)) === null
     const oldLineCount =
       existing?.oldLineCount ??
       (wasNew
         ? 0
-        : countLines((await readFileContent(session, params.path)) ?? ""))
+        : countLines((await readFileContent(session, safePath)) ?? ""))
     await session.sandbox.writeFiles([
       {
-        path: `${session.repoCwd}/${params.path}`,
+        path: `${session.repoCwd}/${safePath}`,
         content: Buffer.from(params.content, "utf8"),
       },
     ])
-    session.fileChanges.set(params.path, {
+    session.fileChanges.set(safePath, {
       wasNew,
       oldLineCount,
       newLineCount: countLines(params.content),
@@ -220,14 +242,15 @@ export const vercelCloudAgentSandboxAdapter: CloudAgentSandboxAdapter = {
 
   async readFile(params) {
     const session = require(params.sandboxId)
+    const safePath = ensureSafeRepoPath(params.path)
     const result = await session.sandbox.runCommand({
       cmd: "cat",
-      args: [params.path],
+      args: [safePath],
       cwd: session.repoCwd,
     })
     if (result.exitCode !== 0) {
       const stderr = await result.stderr()
-      throw new Error(`Failed to read ${params.path}: ${stderr}`)
+      throw new Error(`Failed to read ${safePath}: ${stderr}`)
     }
     return { content: await result.stdout() }
   },

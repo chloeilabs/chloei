@@ -198,6 +198,11 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
           status: setupResult.exitCode === 0 ? "success" : "error",
         },
       })
+      if (setupResult.exitCode !== 0) {
+        throw new Error(
+          `Setup failed (exit ${String(setupResult.exitCode)}). Cloud agent did not enter the planning phase.`
+        )
+      }
     }
 
     await applyCloudAgentStatus({

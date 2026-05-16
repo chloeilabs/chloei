@@ -3,15 +3,14 @@ import { type NextRequest } from "next/server"
 import { createLogger } from "@/lib/logger"
 import {
   appendCloudAgentTaskEvent,
+  cancelCloudAgentTaskIfActive,
   cloudAgentJsonResponse,
   createCloudAgentRouteContext,
   handleCloudAgentError,
   requireCloudAgentsEnabled,
   requireCloudAgentSession,
-  requireCloudAgentTaskTransition,
   resolveCloudAgentRuntimeMode,
   resolveCloudAgentSandboxAdapter,
-  updateCloudAgentTask,
 } from "@/lib/server/cloud-agents"
 
 export const runtime = "nodejs"
@@ -34,10 +33,15 @@ export async function POST(request: NextRequest, routeContext: RouteContext) {
     const flagsOrError = await requireCloudAgentsEnabled(context, session)
     if (flagsOrError instanceof Response) return flagsOrError
     const { taskId } = await routeContext.params
-    const priorTask = await requireCloudAgentTaskTransition({
+    // Atomic conditional UPDATE: cancel only if the row is still in
+    // one of the allowed non-terminal statuses. Prevents a TOCTOU
+    // race where the background runtime transitions to `completed`
+    // between a status read and a write — otherwise that update
+    // would clobber the completed task's prUrl/summary.
+    const task = await cancelCloudAgentTaskIfActive({
       userId: session.user.id,
       taskId,
-      from: [
+      allowedFromStatuses: [
         "queued",
         "provisioning",
         "setting_up",
@@ -48,9 +52,6 @@ export async function POST(request: NextRequest, routeContext: RouteContext) {
         "pushing",
         "pr_ready",
       ],
-    })
-    const task = await updateCloudAgentTask(session.user.id, taskId, {
-      status: "cancelled",
       phase: "Cancelled by user",
       summary: "Cancelled by user.",
     })
@@ -63,19 +64,21 @@ export async function POST(request: NextRequest, routeContext: RouteContext) {
         phase: "Cancelled by user",
       },
     })
-    if (priorTask.sandboxId) {
+    // Re-read after cancel so we destroy the sandbox the canceled row
+    // actually owns (the conditional UPDATE returned the full task too,
+    // but `task.sandboxId` is already accurate as of the same write).
+    const sandboxId = task.sandboxId
+    if (sandboxId) {
       const adapter = resolveCloudAgentSandboxAdapter(
         resolveCloudAgentRuntimeMode()
       )
-      await adapter
-        .destroy({ sandboxId: priorTask.sandboxId })
-        .catch((error: unknown) => {
-          logger.warn("Failed to destroy sandbox on cancel.", {
-            taskId,
-            sandboxId: priorTask.sandboxId,
-            error,
-          })
+      await adapter.destroy({ sandboxId }).catch((error: unknown) => {
+        logger.warn("Failed to destroy sandbox on cancel.", {
+          taskId,
+          sandboxId,
+          error,
         })
+      })
     }
     return cloudAgentJsonResponse(context, { task })
   } catch (error) {

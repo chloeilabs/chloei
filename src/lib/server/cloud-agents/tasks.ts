@@ -366,3 +366,64 @@ export async function requireCloudAgentTaskTransition(params: {
   }
   return task
 }
+
+// Atomic cancel: the row is only transitioned to "cancelled" if its
+// current status is still in `allowedFromStatuses`. If the background
+// runtime has already moved the task to a terminal state in the
+// window between the route handler reading status and writing
+// "cancelled", the UPDATE matches 0 rows and the helper throws a
+// CloudAgentTransitionError so the route returns 409 instead of
+// clobbering the completed task's prUrl/summary.
+export async function cancelCloudAgentTaskIfActive(params: {
+  userId: string
+  taskId: string
+  allowedFromStatuses: CloudAgentTaskStatus[]
+  phase: string
+  summary: string
+}): Promise<CloudAgentTask> {
+  if (isCloudAgentMockModeEnabled()) {
+    const existing = mockGetTask(params.userId, params.taskId)
+    if (!existing) {
+      throw new CloudAgentNotFoundError("task", params.taskId)
+    }
+    if (!params.allowedFromStatuses.includes(existing.status)) {
+      throw new CloudAgentTransitionError(
+        `Task ${params.taskId} is in status ${existing.status}; expected one of [${params.allowedFromStatuses.join(", ")}].`
+      )
+    }
+    return mockUpdateTask(params.userId, params.taskId, {
+      status: "cancelled",
+      phase: params.phase,
+      summary: params.summary,
+    })
+  }
+  const database = getDatabase()
+  try {
+    const result = await sql<CloudAgentTaskRow>`
+      UPDATE cloud_agent_task
+      SET
+        status = 'cancelled',
+        phase = ${params.phase},
+        summary = ${params.summary},
+        "updatedAt" = CURRENT_TIMESTAMP,
+        "completedAt" = COALESCE("completedAt", CURRENT_TIMESTAMP)
+      WHERE "userId" = ${params.userId}
+        AND id = ${params.taskId}
+        AND status = ANY(${params.allowedFromStatuses}::text[])
+      RETURNING ${SELECT_FIELDS}
+    `.execute(database)
+    const row = result.rows[0]
+    if (!row) {
+      const current = await getCloudAgentTask(params.userId, params.taskId)
+      if (!current) {
+        throw new CloudAgentNotFoundError("task", params.taskId)
+      }
+      throw new CloudAgentTransitionError(
+        `Task ${params.taskId} is in status ${current.status}; expected one of [${params.allowedFromStatuses.join(", ")}].`
+      )
+    }
+    return parseTaskRow(row)
+  } catch (error) {
+    throw wrapCloudAgentStoreError(error)
+  }
+}

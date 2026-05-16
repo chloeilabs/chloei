@@ -1,10 +1,12 @@
 import { type NextRequest } from "next/server"
 
 import {
+  cloudAgentErrorResponse,
   cloudAgentJsonResponse,
   cloudAgentTaskApproveSchema,
   createCloudAgentRouteContext,
   dispatchCloudAgentApprovalReceived,
+  getLatestApprovalRequiredId,
   handleCloudAgentError,
   requireCloudAgentsEnabled,
   requireCloudAgentSession,
@@ -36,6 +38,21 @@ export async function POST(request: NextRequest, routeContext: RouteContext) {
       taskId,
       from: ["waiting_for_approval"],
     })
+    // Validate the supplied approvalId matches the latest pending
+    // `approval_required` event for this task. Without this check,
+    // any authenticated owner could approve with an arbitrary
+    // approvalId and the audit trail would be meaningless.
+    const expectedApprovalId = await getLatestApprovalRequiredId({
+      userId: session.user.id,
+      taskId,
+    })
+    if (!expectedApprovalId || expectedApprovalId !== input.approvalId) {
+      return cloudAgentErrorResponse(context, {
+        error: "Approval id does not match the pending approval for this task.",
+        errorCode: "CLOUD_AGENT_TASK_APPROVE_STALE",
+        status: 409,
+      })
+    }
     const dispatch = await dispatchCloudAgentApprovalReceived({
       userId: session.user.id,
       taskId,

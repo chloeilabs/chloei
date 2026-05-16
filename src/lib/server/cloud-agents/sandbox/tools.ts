@@ -7,11 +7,24 @@ import type {
   CloudAgentSandboxDiff,
 } from "./types"
 
+// Repo-relative path. Reject absolute paths, any `..` segment, NUL
+// bytes, and backslashes. The LLM is the caller, so a repo containing
+// adversarial instructions could otherwise prompt-inject the tool
+// into reading or writing outside the checkout (e.g. into the host
+// container's filesystem). The Vercel adapter also re-validates.
 const FILE_PATH_SCHEMA = z
   .string()
   .trim()
   .min(1)
   .max(1_000)
+  .refine(
+    (value) =>
+      !value.startsWith("/") &&
+      !value.includes("\0") &&
+      !value.includes("\\") &&
+      !value.split("/").some((segment) => segment === ".." || segment === "."),
+    "Path must be a repo-relative path without '..' or '.' segments, leading '/', NUL bytes, or backslashes."
+  )
   .describe("Repo-relative file path (no leading slash, no '..' segments).")
 const FILE_CONTENT_SCHEMA = z
   .string()
