@@ -89,7 +89,8 @@ test("run_command attaches terminal output and propagates exit codes", async () 
   assert.match(result, /exit_code=0/)
   const last = onResultEvents.at(-1)
   assert.equal(last.status, "success")
-  assert.equal(last.terminal?.stream, "stdout")
+  assert.ok(typeof last.terminal?.stdout === "string")
+  assert.ok(typeof last.terminal?.stderr === "string")
 })
 
 test("get_diff summarizes file counts and additions", async () => {

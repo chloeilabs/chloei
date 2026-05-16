@@ -77,31 +77,6 @@ export async function listCloudAgentTasks(params: {
   }
 }
 
-export async function findCloudAgentTaskByBranch(params: {
-  userId: string
-  branch: string
-}): Promise<CloudAgentTask | null> {
-  if (isCloudAgentMockModeEnabled()) {
-    const tasks = mockListTasks({ userId: params.userId })
-    return tasks.find((task) => task.branch === params.branch) ?? null
-  }
-  const database = getDatabase()
-  try {
-    const result = await sql<CloudAgentTaskRow>`
-      SELECT ${SELECT_FIELDS}
-      FROM cloud_agent_task
-      WHERE "userId" = ${params.userId}
-        AND branch = ${params.branch}
-      ORDER BY "updatedAt" DESC, id ASC
-      LIMIT 1
-    `.execute(database)
-    const row = result.rows[0]
-    return row ? parseTaskRow(row) : null
-  } catch (error) {
-    throw wrapCloudAgentStoreError(error)
-  }
-}
-
 export interface CloudAgentTaskWithOwner {
   userId: string
   task: CloudAgentTask

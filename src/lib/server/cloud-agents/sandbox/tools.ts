@@ -1,7 +1,6 @@
 import { tool } from "ai"
 import { z } from "zod"
 
-import { clampTerminalChunk } from "../runtime-helpers"
 import type {
   CloudAgentSandboxAdapter,
   CloudAgentSandboxCommandResult,
@@ -32,9 +31,14 @@ export interface CloudAgentToolEvent {
   input?: unknown
   output?: unknown
   errorMessage?: string
+  // Raw stdout / stderr captured from a sandbox command. The consumer
+  // emits one `terminal_output` event per non-empty stream so a command
+  // that writes to both is not silently truncated to one stream and a
+  // successful command emitting only stderr warnings is not mislabeled
+  // as stdout.
   terminal?: {
-    stream: "stdout" | "stderr"
-    chunk: string
+    stdout: string
+    stderr: string
   }
   fileChange?: {
     path: string
@@ -217,10 +221,7 @@ export function buildCloudAgentSandboxTools(
               stdoutBytes: result.stdout.length,
               stderrBytes: result.stderr.length,
             },
-            terminal: {
-              stream: result.exitCode === 0 ? "stdout" : "stderr",
-              chunk: clampTerminalChunk(result.stdout || result.stderr),
-            },
+            terminal: { stdout: result.stdout, stderr: result.stderr },
           })
           return summarizeCommandResult(result)
         } catch (error) {
@@ -274,10 +275,7 @@ export function buildCloudAgentSandboxTools(
             label,
             status: result.exitCode === 0 ? "success" : "error",
             output: { exitCode: result.exitCode },
-            terminal: {
-              stream: result.exitCode === 0 ? "stdout" : "stderr",
-              chunk: clampTerminalChunk(result.stdout || result.stderr),
-            },
+            terminal: { stdout: result.stdout, stderr: result.stderr },
           })
           return summarizeCommandResult(result)
         } catch (error) {

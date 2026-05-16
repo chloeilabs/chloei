@@ -186,15 +186,12 @@ export async function startCloudAgentTaskRunWithLlm(
       },
       onResult: async (event: CloudAgentToolEvent) => {
         if (event.terminal) {
-          await emitCloudAgentEvent({
+          await emitTerminalOutput({
             userId: input.userId,
             taskId: input.taskId,
-            event: {
-              kind: "terminal_output",
-              stream: event.terminal.stream,
-              chunk: event.terminal.chunk,
-              callId: event.callId,
-            },
+            stdout: event.terminal.stdout,
+            stderr: event.terminal.stderr,
+            callId: event.callId,
           })
         }
         if (event.fileChange) {
