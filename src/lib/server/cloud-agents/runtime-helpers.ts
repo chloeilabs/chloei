@@ -164,6 +164,22 @@ export async function getCloudAgentEnvironmentOrFail(params: {
   return null
 }
 
+// Non-terminal statuses — the runtime fail path is only allowed to
+// flip the row when it's still in one of these. Prevents a runtime
+// error after a user `cancel` (or another path's `completed`) from
+// silently rewriting the terminal state to `failed`.
+const NON_TERMINAL_TASK_STATUSES: CloudAgentTaskStatus[] = [
+  "queued",
+  "provisioning",
+  "setting_up",
+  "planning",
+  "editing",
+  "testing",
+  "waiting_for_approval",
+  "pushing",
+  "pr_ready",
+]
+
 export async function failCloudAgentTask(params: {
   userId: string
   taskId: string
@@ -181,11 +197,23 @@ export async function failCloudAgentTask(params: {
     taskId: params.taskId,
     error: params.error,
   })
-  await applyCloudAgentStatus({
+  const updated = await applyCloudAgentStatusIfFrom({
     userId: params.userId,
     taskId: params.taskId,
+    allowedFromStatuses: NON_TERMINAL_TASK_STATUSES,
     update: { status: "failed", error: message },
   })
+  // Only emit the error event when the status transition actually
+  // landed. Otherwise the row is already in a terminal state set by
+  // someone else (user cancel, push completion, etc.) and a stray
+  // error event would pollute the timeline of a closed task.
+  if (!updated) {
+    logger.info(
+      "Skipping fail: task already in terminal state, leaving as-is.",
+      { userId: params.userId, taskId: params.taskId }
+    )
+    return
+  }
   await emitCloudAgentEvent({
     userId: params.userId,
     taskId: params.taskId,

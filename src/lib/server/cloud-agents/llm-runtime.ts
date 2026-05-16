@@ -11,6 +11,7 @@ import {
 import { requestCloudAgentApproval } from "./approvals"
 import {
   applyCloudAgentStatus,
+  applyCloudAgentStatusIfFrom,
   emitCloudAgentEvent,
   emitTerminalOutput,
   failCloudAgentTask,
@@ -100,12 +101,23 @@ export async function startCloudAgentTaskRunWithLlm(
   const summaryRef = { value: null as string | null }
 
   try {
-    await applyCloudAgentStatus({
+    // Atomically claim the task (queued → provisioning) so a
+    // duplicate runner can't double-provision. See
+    // startCloudAgentTaskRun for the same guard rationale.
+    const claimed = await applyCloudAgentStatusIfFrom({
       userId: input.userId,
       taskId: input.taskId,
+      allowedFromStatuses: ["queued"],
       update: { status: "provisioning" },
       phase: "Provisioning sandbox",
     })
+    if (!claimed) {
+      logger.info(
+        "Skipping LLM run: task was claimed by another runner or moved out of queued.",
+        { userId: input.userId, taskId: input.taskId }
+      )
+      return
+    }
     const provisioned = await input.adapter.provision({
       userId: input.userId,
       taskId: input.taskId,

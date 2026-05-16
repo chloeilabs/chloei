@@ -126,10 +126,15 @@ export async function updateCloudAgentTask(userId, taskId, update) {
   if (update.summary !== undefined) next.summary = update.summary ?? undefined
   if (update.error !== undefined) next.error = update.error ?? undefined
   next.updatedAt = nowIso()
+  // Mirror the production SQL CASE: only stamp completedAt on the
+  // first terminal transition. Subsequent terminal-status writes
+  // (e.g. the same row touched again via a retry) leave the
+  // original timestamp in place. Source: tasks.ts updateCloudAgentTask.
   if (
-    update.status === "completed" ||
-    update.status === "failed" ||
-    update.status === "cancelled"
+    (update.status === "completed" ||
+      update.status === "failed" ||
+      update.status === "cancelled") &&
+    !next.completedAt
   ) {
     next.completedAt = nowIso()
   }

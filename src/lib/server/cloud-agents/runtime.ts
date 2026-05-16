@@ -110,12 +110,26 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
 
   let sandboxId: string | null = null
   try {
-    await applyCloudAgentStatus({
+    // Atomically claim the task. Two runners can race past the
+    // `task.status !== "queued"` read above (e.g. a duplicate
+    // Inngest delivery, or the dev-mode inline fallback firing
+    // alongside a real worker). The conditional UPDATE ensures only
+    // one runner transitions queued → provisioning; the loser sees
+    // null and exits before provisioning a second sandbox.
+    const claimed = await applyCloudAgentStatusIfFrom({
       userId: input.userId,
       taskId: input.taskId,
+      allowedFromStatuses: ["queued"],
       update: { status: "provisioning" },
       phase: "Provisioning sandbox",
     })
+    if (!claimed) {
+      logger.info(
+        "Skipping run: task was claimed by another runner or moved out of queued.",
+        input
+      )
+      return
+    }
     const provisioned = await adapter.provision({
       userId: input.userId,
       taskId: input.taskId,
@@ -354,15 +368,28 @@ export async function continueCloudAgentTaskAfterApproval(input: {
   }
 
   if (!input.approved) {
-    await applyCloudAgentStatus({
+    // Conditional cancel: the initial status read above can race with
+    // a concurrent user cancel from the dashboard. Only flip to
+    // `cancelled` if the row is still in `waiting_for_approval`;
+    // otherwise the user already moved it and we should leave it
+    // alone. Sandbox destroy still runs in both cases — it's a
+    // best-effort cleanup of the resource the prior runtime owned.
+    const transitioned = await applyCloudAgentStatusIfFrom({
       userId: input.userId,
       taskId: input.taskId,
+      allowedFromStatuses: ["waiting_for_approval"],
       update: {
         status: "cancelled",
         summary: input.note ?? "Push denied.",
       },
       phase: "Push denied",
     })
+    if (!transitioned) {
+      logger.info(
+        "Skipping deny: task moved out of waiting_for_approval before deny landed.",
+        input
+      )
+    }
     if (task.sandboxId) {
       const adapter = resolveCloudAgentSandboxAdapter(
         resolveCloudAgentRuntimeMode()
