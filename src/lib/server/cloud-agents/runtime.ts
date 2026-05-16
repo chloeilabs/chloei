@@ -187,6 +187,25 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
       }
     }
 
+    // `setup_only` keeps network access open during the setup phase
+    // so package installers can reach registries, then flips to
+    // `deny-all` for the agent phase. Best-effort — a failed tighten
+    // is logged but doesn't kill the run because the policy is a
+    // hardening measure, not a correctness requirement.
+    if (environment.networkPolicy.mode === "setup_only") {
+      await adapter
+        .setNetworkPolicy({
+          sandboxId,
+          policy: { mode: "off" },
+        })
+        .catch((error: unknown) => {
+          logger.warn(
+            "Failed to tighten sandbox network policy after setup; continuing with the policy provisioned at create time.",
+            { userId: input.userId, taskId: input.taskId, sandboxId, error }
+          )
+        })
+    }
+
     await applyCloudAgentStatus({
       userId: input.userId,
       taskId: input.taskId,
@@ -448,6 +467,22 @@ export async function continueCloudAgentTaskAfterApproval(input: {
       )
       return
     }
+    // The post-setup tightening for `setup_only` flips the live
+    // sandbox to `deny-all`, but `createBranchAndPush` runs `git
+    // push` from inside that same sandbox and needs GitHub network.
+    // Re-open network just before the push — the sandbox is
+    // destroyed in the `finally` below right after the push +
+    // PR-create round-trip, so the brief widening is bounded.
+    if (environment.networkPolicy.mode === "setup_only") {
+      await adapter
+        .setNetworkPolicy({ sandboxId, policy: { mode: "open" } })
+        .catch((error: unknown) => {
+          logger.warn(
+            "Failed to re-open network policy before push; push will likely fail under setup_only.",
+            { sandboxId, error }
+          )
+        })
+    }
     await adapter.createBranchAndPush({
       sandboxId,
       repoOwner: environment.repoOwner,
@@ -500,6 +535,33 @@ export async function continueCloudAgentTaskAfterApproval(input: {
         "PR shipped but task is no longer in `pushing` (likely user cancel). Not overwriting terminal status.",
         { ...input, prUrl: pr.url }
       )
+      // Best-effort backfill: the PR exists on GitHub even though the
+      // user cancelled, so attach prUrl + a summary to the cancelled
+      // row so the dashboard can surface the surprise PR. Leave
+      // status alone — the cancel must remain terminal.
+      await updateCloudAgentTask(input.userId, input.taskId, {
+        prUrl: pr.url,
+        summary: "PR shipped after task was cancelled; see prUrl.",
+      }).catch((error: unknown) => {
+        logger.warn("Failed to backfill prUrl on cancelled task after push.", {
+          ...input,
+          prUrl: pr.url,
+          error,
+        })
+      })
+      await emitCloudAgentEvent({
+        userId: input.userId,
+        taskId: input.taskId,
+        event: {
+          kind: "text_delta",
+          text: `Pull request was opened on GitHub before the cancel landed: ${pr.url}`,
+        },
+      }).catch((error: unknown) => {
+        logger.warn(
+          "Failed to emit text_delta about PR shipped after cancel.",
+          { ...input, prUrl: pr.url, error }
+        )
+      })
       return
     }
 

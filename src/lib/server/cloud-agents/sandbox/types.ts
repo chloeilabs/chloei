@@ -44,6 +44,19 @@ export interface CloudAgentSandboxAdapter {
   provision(
     input: CloudAgentSandboxProvisionInput
   ): Promise<CloudAgentSandboxProvisionResult>
+  // Mirrors the provision-time networkPolicy shape so the runtime can
+  // tighten or relax an existing sandbox's policy after a phase
+  // transition (e.g. flipping `setup_only` to `deny-all` once the
+  // setup phase completes). Implementations should be best-effort —
+  // callers wrap failures in `.catch(...)` rather than aborting the
+  // run.
+  setNetworkPolicy(params: {
+    sandboxId: string
+    policy: {
+      mode: "setup_only" | "open" | "off" | "allowlist"
+      allowlist?: string[]
+    }
+  }): Promise<void>
   runSetup(params: {
     sandboxId: string
     command: string

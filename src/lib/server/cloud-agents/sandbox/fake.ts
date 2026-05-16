@@ -89,6 +89,23 @@ export const fakeCloudAgentSandboxAdapter: CloudAgentSandboxAdapter = {
     return Promise.resolve({ sandboxId })
   },
 
+  setNetworkPolicy(params): Promise<void> {
+    try {
+      require(getStore().get(params.sandboxId), params.sandboxId)
+      // Fake adapter doesn't enforce network access, so this is a
+      // no-op apart from validating that the sandbox still exists —
+      // mirrors the real adapter's behavior of erroring on a missing
+      // session.
+      return Promise.resolve()
+    } catch (error) {
+      return Promise.reject(
+        error instanceof Error
+          ? error
+          : new Error("fake sandbox setNetworkPolicy failed")
+      )
+    }
+  },
+
   runSetup(params): Promise<CloudAgentSandboxCommandResult> {
     try {
       require(getStore().get(params.sandboxId), params.sandboxId)
