@@ -123,27 +123,6 @@ export async function getCloudAgentTask(
   }
 }
 
-export async function countActiveCloudAgentTasksForUser(
-  userId: string
-): Promise<number> {
-  if (isCloudAgentMockModeEnabled()) {
-    return mockCountActiveTasks(userId)
-  }
-  const database = getDatabase()
-  try {
-    const result = await sql<{ count: string | number | bigint }>`
-      SELECT COUNT(*)::bigint AS count
-      FROM cloud_agent_task
-      WHERE "userId" = ${userId}
-        AND status NOT IN ('completed', 'failed', 'cancelled')
-    `.execute(database)
-    const row = result.rows[0]
-    return row ? Number(row.count) : 0
-  } catch (error) {
-    throw wrapCloudAgentStoreError(error)
-  }
-}
-
 export async function createCloudAgentTask(params: {
   userId: string
   environmentId: string

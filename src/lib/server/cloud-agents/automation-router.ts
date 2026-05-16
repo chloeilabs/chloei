@@ -1,4 +1,5 @@
 import { createLogger } from "@/lib/logger"
+import { CLOUD_AGENT_MAX_CONCURRENT_PER_USER } from "@/lib/server/agent-runtime-config"
 
 import { dispatchCloudAgentTaskRequested } from "./dispatcher"
 import { listCloudAgentEnvironments } from "./environments"
@@ -40,11 +41,23 @@ export async function routeAutomationTriggerToCloudAgent(params: {
     }
   }
 
-  const task = await createCloudAgentTask({
-    userId,
-    environmentId: target.id,
-    prompt: params.prompt,
-  })
+  let task
+  try {
+    task = await createCloudAgentTask({
+      userId,
+      environmentId: target.id,
+      prompt: params.prompt,
+      maxConcurrentPerUser: CLOUD_AGENT_MAX_CONCURRENT_PER_USER,
+    })
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("concurrency limit")) {
+      return {
+        skipped: true,
+        reason: `Cloud agent concurrency limit (${String(CLOUD_AGENT_MAX_CONCURRENT_PER_USER)}) reached for user ${userId}.`,
+      }
+    }
+    throw error
+  }
   await appendCloudAgentTaskEvent({
     userId,
     taskId: task.id,

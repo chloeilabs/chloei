@@ -1,5 +1,6 @@
 import { type NextRequest } from "next/server"
 
+import { CLOUD_AGENT_MAX_CONCURRENT_PER_USER } from "@/lib/server/agent-runtime-config"
 import {
   cloudAgentJsonResponse,
   CloudAgentNotFoundError,
@@ -15,8 +16,6 @@ import {
 } from "@/lib/server/cloud-agents"
 
 export const runtime = "nodejs"
-
-const MAX_CONCURRENT_CLOUD_TASKS_PER_USER = 3
 
 export async function GET(request: NextRequest) {
   const context = createCloudAgentRouteContext({
@@ -69,7 +68,7 @@ export async function POST(request: NextRequest) {
         userId: session.user.id,
         environmentId: input.environmentId,
         prompt: input.prompt,
-        maxConcurrentPerUser: MAX_CONCURRENT_CLOUD_TASKS_PER_USER,
+        maxConcurrentPerUser: CLOUD_AGENT_MAX_CONCURRENT_PER_USER,
       })
     } catch (error) {
       if (
@@ -85,7 +84,7 @@ export async function POST(request: NextRequest) {
           {
             status: 429,
             headers: {
-              "X-RateLimit-Limit": String(MAX_CONCURRENT_CLOUD_TASKS_PER_USER),
+              "X-RateLimit-Limit": String(CLOUD_AGENT_MAX_CONCURRENT_PER_USER),
               "X-RateLimit-Remaining": "0",
               "Retry-After": "60",
             },
