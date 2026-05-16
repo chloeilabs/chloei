@@ -85,7 +85,6 @@
     "react-dom": "^19.2.6",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
-    "shadcn": "4.7.0",
     "shiki": "^4.0.2",
     "sonner": "^2.0.6",
     "tailwind-merge": "^3.5.0",
@@ -117,6 +116,7 @@
     "postcss": "^8.5.14",
     "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.8.0",
+    "shadcn": "4.7.0",
     "tailwindcss": "^4.3.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.59.2"
