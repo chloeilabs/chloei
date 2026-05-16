@@ -14,6 +14,10 @@ export async function dispatchCloudAgentTaskRequested(params) {
 }
 
 export async function dispatchCloudAgentApprovalReceived(params) {
-  dispatched.push({ approval: params.taskId, approved: params.approved })
+  dispatched.push({
+    userId: params.userId,
+    taskId: params.taskId,
+    approved: params.approved,
+  })
   return { delivery: "inline" }
 }

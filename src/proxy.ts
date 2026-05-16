@@ -47,8 +47,13 @@ export async function proxy(request: NextRequest) {
   if (
     pathname.startsWith("/api/auth") ||
     pathname === "/api/inngest" ||
-    pathname.startsWith("/api/webhooks/") ||
-    pathname.startsWith("/api/internal-dev/")
+    pathname.startsWith("/api/webhooks/")
+  ) {
+    return NextResponse.next()
+  }
+  if (
+    pathname.startsWith("/api/internal-dev/") &&
+    process.env.NODE_ENV !== "production"
   ) {
     return NextResponse.next()
   }

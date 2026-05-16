@@ -36,17 +36,21 @@ const watchlistRefreshSchema = z.object({
   watchlistId: z.string().trim().min(1),
 })
 
-const cloudAgentTaskRequestedSchema = z.object({
-  userId: z.string().trim().min(1),
-  taskId: z.string().trim().min(1),
-})
+const cloudAgentTaskRequestedSchema = z
+  .object({
+    userId: z.string().trim().min(1),
+    taskId: z.string().trim().min(1),
+  })
+  .strict()
 
-const cloudAgentApprovalReceivedSchema = z.object({
-  userId: z.string().trim().min(1),
-  taskId: z.string().trim().min(1),
-  approved: z.boolean(),
-  note: z.string().trim().max(2_000).optional(),
-})
+const cloudAgentApprovalReceivedSchema = z
+  .object({
+    userId: z.string().trim().min(1),
+    taskId: z.string().trim().min(1),
+    approved: z.boolean(),
+    note: z.string().trim().max(2_000).optional(),
+  })
+  .strict()
 
 export const documentUploaded = inngest.createFunction(
   {
@@ -116,6 +120,7 @@ export const cloudAgentTaskRequested = inngest.createFunction(
 export const cloudAgentApprovalReceived = inngest.createFunction(
   {
     id: "cloud-agent-approval-received",
+    idempotency: "event.data.userId + ':' + event.data.taskId",
     triggers: [{ event: "cloud-agent/approval.received" }],
   },
   async ({ event, step }) => {

@@ -73,9 +73,7 @@ export async function deleteCloudAgentEnvironment(
     `/api/cloud-agents/environments/${encodeURIComponent(environmentId)}`,
     { method: "DELETE" }
   )
-  if (!response.ok) {
-    throw new Error("Failed to delete environment.")
-  }
+  await readJson<Record<string, never>>(response)
 }
 
 export interface CloudAgentListTasksResponse {
@@ -148,9 +146,7 @@ export async function cancelCloudAgentTask(taskId: string): Promise<void> {
     `/api/cloud-agents/tasks/${encodeURIComponent(taskId)}/cancel`,
     { method: "POST" }
   )
-  if (!response.ok) {
-    throw new Error("Failed to cancel task.")
-  }
+  await readJson<Record<string, never>>(response)
 }
 
 export async function sendCloudAgentTaskMessage(params: {
@@ -165,9 +161,7 @@ export async function sendCloudAgentTaskMessage(params: {
       body: JSON.stringify({ message: params.message }),
     }
   )
-  if (!response.ok) {
-    throw new Error("Failed to send message.")
-  }
+  await readJson<Record<string, never>>(response)
 }
 
 export async function approveCloudAgentTask(params: {
@@ -188,7 +182,5 @@ export async function approveCloudAgentTask(params: {
       }),
     }
   )
-  if (!response.ok) {
-    throw new Error("Failed to record approval.")
-  }
+  await readJson<Record<string, never>>(response)
 }

@@ -228,6 +228,11 @@ export async function startCloudAgentTaskRunWithLlm(
           chunk: clampTerminalChunk(setupResult.stdout || setupResult.stderr),
         },
       })
+      if (setupResult.exitCode !== 0) {
+        throw new Error(
+          `Setup failed (exit ${String(setupResult.exitCode)}). Cloud agent did not enter the planning phase.`
+        )
+      }
     }
 
     await applyStatus({
@@ -399,14 +404,17 @@ export async function startCloudAgentTaskRunWithLlm(
     })
     await emit({ userId: input.userId, taskId: input.taskId, event })
   } catch (error) {
-    await failTask({
-      userId: input.userId,
-      taskId: input.taskId,
-      error,
-      errorCode: "CLOUD_AGENT_LLM_RUN_FAILED",
-    })
-    if (sandboxId) {
-      await input.adapter.destroy({ sandboxId }).catch(() => undefined)
+    try {
+      await failTask({
+        userId: input.userId,
+        taskId: input.taskId,
+        error,
+        errorCode: "CLOUD_AGENT_LLM_RUN_FAILED",
+      })
+    } finally {
+      if (sandboxId) {
+        await input.adapter.destroy({ sandboxId }).catch(() => undefined)
+      }
     }
   }
 }

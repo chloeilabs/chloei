@@ -120,53 +120,28 @@ export function mockUpdateEnvironment(
   if (!existing) {
     throw new CloudAgentNotFoundError("environment", environmentId)
   }
-  const merged: CloudAgentEnvironment = {
-    ...existing,
-    ...(input.name !== undefined ? { name: input.name } : {}),
-    ...(input.baseBranch !== undefined ? { baseBranch: input.baseBranch } : {}),
-    ...(input.setupCommand !== undefined
-      ? input.setupCommand
-        ? { setupCommand: input.setupCommand }
-        : (() => {
-            const { setupCommand: _omit, ...rest } = existing
-            void _omit
-            return rest
-          })()
-      : {}),
-    ...(input.testCommand !== undefined
-      ? input.testCommand
-        ? { testCommand: input.testCommand }
-        : (() => {
-            const { testCommand: _omit, ...rest } = existing
-            void _omit
-            return rest
-          })()
-      : {}),
-    ...(input.devCommand !== undefined
-      ? input.devCommand
-        ? { devCommand: input.devCommand }
-        : (() => {
-            const { devCommand: _omit, ...rest } = existing
-            void _omit
-            return rest
-          })()
-      : {}),
-    ...(input.networkPolicy !== undefined
-      ? { networkPolicy: input.networkPolicy }
-      : {}),
-    ...(input.vercelProjectId !== undefined
-      ? input.vercelProjectId
-        ? { vercelProjectId: input.vercelProjectId }
-        : (() => {
-            const { vercelProjectId: _omit, ...rest } = existing
-            void _omit
-            return rest
-          })()
-      : {}),
-    ...(input.sandboxRuntime !== undefined
-      ? { sandboxRuntime: input.sandboxRuntime }
-      : {}),
-    updatedAt: nowIso(),
+  const merged: CloudAgentEnvironment = { ...existing, updatedAt: nowIso() }
+  if (input.name !== undefined) merged.name = input.name
+  if (input.baseBranch !== undefined) merged.baseBranch = input.baseBranch
+  if (input.networkPolicy !== undefined)
+    merged.networkPolicy = input.networkPolicy
+  if (input.sandboxRuntime !== undefined)
+    merged.sandboxRuntime = input.sandboxRuntime
+  if (input.setupCommand !== undefined) {
+    if (input.setupCommand) merged.setupCommand = input.setupCommand
+    else delete merged.setupCommand
+  }
+  if (input.testCommand !== undefined) {
+    if (input.testCommand) merged.testCommand = input.testCommand
+    else delete merged.testCommand
+  }
+  if (input.devCommand !== undefined) {
+    if (input.devCommand) merged.devCommand = input.devCommand
+    else delete merged.devCommand
+  }
+  if (input.vercelProjectId !== undefined) {
+    if (input.vercelProjectId) merged.vercelProjectId = input.vercelProjectId
+    else delete merged.vercelProjectId
   }
   map.set(environmentId, merged)
   return merged

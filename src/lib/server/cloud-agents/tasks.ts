@@ -79,11 +79,25 @@ export async function findCloudAgentTaskByBranch(params: {
   userId: string
   branch: string
 }): Promise<CloudAgentTask | null> {
-  const tasks = await listCloudAgentTasks({
-    userId: params.userId,
-    limit: 200,
-  })
-  return tasks.find((task) => task.branch === params.branch) ?? null
+  if (isCloudAgentMockModeEnabled()) {
+    const tasks = mockListTasks({ userId: params.userId })
+    return tasks.find((task) => task.branch === params.branch) ?? null
+  }
+  const database = getDatabase()
+  try {
+    const result = await sql<CloudAgentTaskRow>`
+      SELECT ${SELECT_FIELDS}
+      FROM cloud_agent_task
+      WHERE "userId" = ${params.userId}
+        AND branch = ${params.branch}
+      ORDER BY "updatedAt" DESC, id ASC
+      LIMIT 1
+    `.execute(database)
+    const row = result.rows[0]
+    return row ? parseTaskRow(row) : null
+  } catch (error) {
+    throw wrapCloudAgentStoreError(error)
+  }
 }
 
 export async function getCloudAgentTask(
@@ -134,14 +148,31 @@ export async function createCloudAgentTask(params: {
   userId: string
   environmentId: string
   prompt: string
+  maxConcurrentPerUser?: number
 }): Promise<CloudAgentTask> {
   if (isCloudAgentMockModeEnabled()) {
-    return mockCreateTask(params)
+    if (params.maxConcurrentPerUser !== undefined) {
+      const active = mockCountActiveTasks(params.userId)
+      if (active >= params.maxConcurrentPerUser) {
+        throw new CloudAgentTransitionError(
+          "Cloud agent concurrency limit reached."
+        )
+      }
+    }
+    return mockCreateTask({
+      userId: params.userId,
+      environmentId: params.environmentId,
+      prompt: params.prompt,
+    })
   }
   const database = getDatabase()
   const id = randomUUID()
   const now = new Date()
+  const maxConcurrent = params.maxConcurrentPerUser ?? null
   try {
+    // INSERT...SELECT keeps the count-and-create atomic at the DB level:
+    // the SELECT runs against the same snapshot as the conditional INSERT,
+    // so two concurrent requests can't both pass the cap.
     const result = await sql<CloudAgentTaskRow>`
       INSERT INTO cloud_agent_task (
         id,
@@ -152,7 +183,7 @@ export async function createCloudAgentTask(params: {
         "createdAt",
         "updatedAt"
       )
-      VALUES (
+      SELECT
         ${id},
         ${params.userId},
         ${params.environmentId},
@@ -160,12 +191,20 @@ export async function createCloudAgentTask(params: {
         'queued',
         ${now},
         ${now}
-      )
+      WHERE
+        ${maxConcurrent} IS NULL
+        OR (
+          SELECT COUNT(*) FROM cloud_agent_task
+          WHERE "userId" = ${params.userId}
+            AND status NOT IN ('completed', 'failed', 'cancelled')
+        ) < ${maxConcurrent}
       RETURNING ${SELECT_FIELDS}
     `.execute(database)
     const row = result.rows[0]
     if (!row) {
-      throw new Error("Cloud agent task could not be created.")
+      throw new CloudAgentTransitionError(
+        "Cloud agent concurrency limit reached."
+      )
     }
     return parseTaskRow(row)
   } catch (error) {
@@ -236,7 +275,8 @@ export async function updateCloudAgentTask(
         END,
         "updatedAt" = CURRENT_TIMESTAMP,
         "completedAt" = CASE
-          WHEN ${shouldStampCompletion} THEN CURRENT_TIMESTAMP
+          WHEN ${shouldStampCompletion} AND "completedAt" IS NULL
+            THEN CURRENT_TIMESTAMP
           ELSE "completedAt"
         END
       WHERE "userId" = ${userId}

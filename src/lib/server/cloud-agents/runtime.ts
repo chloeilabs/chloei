@@ -453,6 +453,12 @@ export async function continueCloudAgentTaskAfterApproval(input: {
       },
       phase: "Push denied",
     })
+    if (task.sandboxId) {
+      const adapter = resolveSandboxAdapter(resolveCloudAgentRuntimeMode())
+      await adapter
+        .destroy({ sandboxId: task.sandboxId })
+        .catch(() => undefined)
+    }
     return
   }
 

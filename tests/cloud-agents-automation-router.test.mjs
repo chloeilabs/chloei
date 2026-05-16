@@ -34,13 +34,20 @@ const { clearAllStores, seedEnvironment, getStoredTask, getStoredEvents } =
   await import(storesUrl)
 const { getDispatchedTasks, resetDispatchedTasks } = await import(dispatcherUrl)
 
+let previousAutomationUserId
+
 beforeEach(() => {
+  previousAutomationUserId = process.env.AGENT_CLOUD_AGENT_AUTOMATION_USER_ID
   clearAllStores()
   resetDispatchedTasks()
 })
 
 afterEach(() => {
-  delete process.env.AGENT_CLOUD_AGENT_AUTOMATION_USER_ID
+  if (previousAutomationUserId === undefined) {
+    delete process.env.AGENT_CLOUD_AGENT_AUTOMATION_USER_ID
+  } else {
+    process.env.AGENT_CLOUD_AGENT_AUTOMATION_USER_ID = previousAutomationUserId
+  }
 })
 
 test("routeAutomationTriggerToCloudAgent skips when automation user is not configured", async () => {

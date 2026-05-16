@@ -106,6 +106,15 @@ export async function getLatestCloudAgentTaskEventSeq(params: {
   userId: string
   taskId: string
 }): Promise<number> {
+  if (isCloudAgentMockModeEnabled()) {
+    const events = mockListEvents({
+      userId: params.userId,
+      taskId: params.taskId,
+      limit: 1000,
+    })
+    if (events.length === 0) return 0
+    return Math.max(...events.map((event) => event.seq))
+  }
   const database = getDatabase()
   try {
     const result = await sql<{ max: string | number | bigint | null }>`

@@ -322,7 +322,7 @@ export function CloudAgentTaskDetail({
   initialTask: CloudAgentTask
 }) {
   const queryClient = useQueryClient()
-  const eventsBottomRef = useRef<HTMLDivElement | null>(null)
+  const eventsBottomRef = useRef<HTMLLIElement | null>(null)
 
   const taskQuery = useQuery({
     queryKey: ["cloud-agent-task", taskId],
@@ -500,7 +500,11 @@ export function CloudAgentTaskDetail({
           ) : (
             events.map((event) => <EventEntry key={event.id} event={event} />)
           )}
-          <div ref={eventsBottomRef} />
+          <li
+            aria-hidden
+            className="m-0 h-0 list-none p-0"
+            ref={eventsBottomRef}
+          />
         </ul>
       </section>
 

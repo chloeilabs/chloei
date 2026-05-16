@@ -315,11 +315,21 @@ export const vercelCloudAgentSandboxAdapter: CloudAgentSandboxAdapter = {
     if (commit.exitCode !== 0) {
       throw new Error(`git commit failed: ${await commit.stderr()}`)
     }
-    const remoteUrl = `https://x-access-token:${githubToken}@github.com/${session.repoOwner}/${session.repoName}.git`
+    const remoteUrl = `https://github.com/${session.repoOwner}/${session.repoName}.git`
+    // Pass the token via http.extraHeader and an env var rather than
+    // embedding it in the URL — keeps the token out of command args, ps
+    // listings, and any captured stderr output.
     const push = await session.sandbox.runCommand({
       cmd: "git",
-      args: ["push", remoteUrl, `HEAD:refs/heads/${params.branch}`],
+      args: [
+        "-c",
+        "http.extraHeader=Authorization: Bearer ${CHLOEI_GITHUB_TOKEN}",
+        "push",
+        remoteUrl,
+        `HEAD:refs/heads/${params.branch}`,
+      ],
       cwd: session.repoCwd,
+      env: { CHLOEI_GITHUB_TOKEN: githubToken },
     })
     if (push.exitCode !== 0) {
       throw new Error(`git push failed: ${await push.stderr()}`)

@@ -82,14 +82,17 @@ export function cloudAgentErrorResponse(
 export function cloudAgentJsonResponse(
   context: CloudAgentRouteContext,
   body: unknown,
-  init: { status?: number } = {}
+  init: { status?: number; headers?: Record<string, string> } = {}
 ) {
+  const headers = createApiHeaders({ requestId: context.requestId })
+  if (init.headers) {
+    for (const [key, value] of Object.entries(init.headers)) {
+      headers.set(key, value)
+    }
+  }
   return observeRouteResponse(
     context.observation,
-    Response.json(body, {
-      status: init.status ?? 200,
-      headers: createApiHeaders({ requestId: context.requestId }),
-    }),
+    Response.json(body, { status: init.status ?? 200, headers }),
     { outcome: "success" }
   )
 }

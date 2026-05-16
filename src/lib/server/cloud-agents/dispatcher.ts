@@ -58,7 +58,7 @@ export async function dispatchCloudAgentApprovalReceived(params: {
   }
 
   await inngest.send({
-    id: `cloud-agent/approval.received:${params.userId}:${params.taskId}:${Date.now().toString()}`,
+    id: `cloud-agent/approval.received:${params.userId}:${params.taskId}`,
     name: "cloud-agent/approval.received",
     data: params,
   })

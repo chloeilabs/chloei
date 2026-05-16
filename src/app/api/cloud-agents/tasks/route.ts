@@ -4,7 +4,6 @@ import {
   cloudAgentJsonResponse,
   CloudAgentNotFoundError,
   cloudAgentTaskCreateSchema,
-  countActiveCloudAgentTasksForUser,
   createCloudAgentRouteContext,
   createCloudAgentTask,
   dispatchCloudAgentTaskRequested,
@@ -64,22 +63,37 @@ export async function POST(request: NextRequest) {
     if (!environment) {
       throw new CloudAgentNotFoundError("environment", input.environmentId)
     }
-    const activeCount = await countActiveCloudAgentTasksForUser(session.user.id)
-    if (activeCount >= MAX_CONCURRENT_CLOUD_TASKS_PER_USER) {
-      return cloudAgentJsonResponse(
-        context,
-        {
-          error: "Too many concurrent cloud agent tasks.",
-          errorCode: "CLOUD_AGENT_TASK_CONCURRENCY_LIMIT",
-        },
-        { status: 429 }
-      )
+    let task
+    try {
+      task = await createCloudAgentTask({
+        userId: session.user.id,
+        environmentId: input.environmentId,
+        prompt: input.prompt,
+        maxConcurrentPerUser: MAX_CONCURRENT_CLOUD_TASKS_PER_USER,
+      })
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.includes("concurrency limit")
+      ) {
+        return cloudAgentJsonResponse(
+          context,
+          {
+            error: "Too many concurrent cloud agent tasks.",
+            errorCode: "CLOUD_AGENT_TASK_CONCURRENCY_LIMIT",
+          },
+          {
+            status: 429,
+            headers: {
+              "X-RateLimit-Limit": String(MAX_CONCURRENT_CLOUD_TASKS_PER_USER),
+              "X-RateLimit-Remaining": "0",
+              "Retry-After": "60",
+            },
+          }
+        )
+      }
+      throw error
     }
-    const task = await createCloudAgentTask({
-      userId: session.user.id,
-      environmentId: input.environmentId,
-      prompt: input.prompt,
-    })
     const dispatch = await dispatchCloudAgentTaskRequested({
       userId: session.user.id,
       taskId: task.id,

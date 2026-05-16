@@ -65,12 +65,11 @@ export function getStoredTask(userId, taskId) {
 }
 
 export function getStoredEvents(userId, taskId) {
-  return events.get(`${userId}:${taskId}`) ?? []
+  return [...(events.get(`${userId}:${taskId}`) ?? [])]
 }
 
 export function getStoredArtifacts(userId, taskId) {
-  const key = `${userId}:${taskId}`
-  return artifacts.get(key) ?? []
+  return [...(artifacts.get(`${userId}:${taskId}`) ?? [])]
 }
 
 export function clearAllStores() {

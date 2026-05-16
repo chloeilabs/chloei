@@ -41,7 +41,7 @@ export async function POST(request: NextRequest, routeContext: RouteContext) {
       taskId,
       payload: {
         kind: "text_delta",
-        text: `@${session.user.email}: ${input.message}`,
+        text: `[user:${session.user.id}] ${input.message}`,
       },
     })
     return cloudAgentJsonResponse(context, { event })
