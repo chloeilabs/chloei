@@ -1,6 +1,6 @@
 # Managed Integrations Rollout
 
-Last verified: May 9, 2026, 5:13 PM CDT.
+Last verified: May 16, 2026.
 
 This runbook covers the Chloei managed integration stack for financial-services
 agent capabilities. The default posture is privacy-first: all new production
@@ -13,15 +13,13 @@ must not be sent to telemetry providers.
 `vercel integration list chloei` should show exactly one available resource for
 each managed capability, all connected to the `chloei` project:
 
-| Resource                  | Product        | Purpose                                        |
-| ------------------------- | -------------- | ---------------------------------------------- |
-| `chloei-posthog`          | PostHog        | Product analytics and rollout flags            |
-| `chloei-sentry`           | Sentry         | Errors, performance traces, source maps        |
-| `chloei-braintrust`       | Braintrust     | Finance eval publication and trace correlation |
-| `chloei-knowledge-search` | Upstash Search | Governed static knowledge retrieval            |
-| `chloei-browserbase`      | Browserbase    | Consented dynamic browser automation           |
-| `chloei-workflows`        | Inngest        | Durable agent workflows and jobs               |
-| `chloei-db`               | Neon           | Primary PostgreSQL system of record            |
+| Resource                  | Product        | Purpose                                 |
+| ------------------------- | -------------- | --------------------------------------- |
+| `chloei-posthog`          | PostHog        | Product analytics and rollout flags     |
+| `chloei-sentry`           | Sentry         | Errors, performance traces, source maps |
+| `chloei-knowledge-search` | Upstash Search | Governed static knowledge retrieval     |
+| `chloei-workflows`        | Inngest        | Durable agent workflows and jobs        |
+| `chloei-db`               | Neon           | Primary PostgreSQL system of record     |
 
 There should be no duplicate project-level Sentry or PostHog resources. If the
 Vercel integrations console shows an extra product tile that is not connected to
@@ -41,7 +39,6 @@ reports, and finance workflows:
 ```text
 AGENT_ENABLE_NEW_CAPABILITIES_FOR_INTERNAL_USERS=true
 AGENT_KNOWLEDGE_SEARCH_ENABLED=<unset>
-AGENT_BROWSERBASE_ENABLED=false
 AGENT_ASYNC_REPORTS_ENABLED=<unset>
 AGENT_TELEMETRY_RECORD_IO=false
 AGENT_FINANCE_WORKFLOWS_ENABLED=<unset>
@@ -58,7 +55,6 @@ Preview is the integration test surface:
 AGENT_KNOWLEDGE_SEARCH_ENABLED=true
 AGENT_ASYNC_REPORTS_ENABLED=true
 AGENT_FINANCE_WORKFLOWS_ENABLED=true
-AGENT_BROWSERBASE_ENABLED=false
 AGENT_TELEMETRY_RECORD_IO=false
 POSTHOG_ANALYTICS_ENABLED=true
 NEXT_PUBLIC_POSTHOG_ANALYTICS_ENABLED=true
@@ -85,19 +81,17 @@ Runtime flag resolution is implemented in
 Edge Config values for a capability key override internal-user defaults. During
 the internal-only production rollout, the global rollout keys for knowledge
 search, async reports, and finance workflows must stay absent from Edge Config.
-Browserbase and raw telemetry IO remain explicitly false in both environment
-variables and Edge Config.
+Raw telemetry IO remains explicitly false in both environment variables and
+Edge Config.
 
 Edge Config store `chloei-flags` should contain:
 
 ```json
 {
   "agent_flags": {
-    "agent.browserbase.enabled": false,
     "agent.telemetry.record_io": false
   },
   "flags": {
-    "agent-browserbase-enabled": false,
     "agent-telemetry-record-io": false,
     "analytics-posthog-enabled": false
   },
@@ -122,7 +116,7 @@ fully locked-down state:
    internally enabled:
 
    ```bash
-   vercel edge-config update chloei-flags --scope chloei --patch '{"items":[{"operation":"update","key":"agent_flags","value":{"agent.browserbase.enabled":false,"agent.telemetry.record_io":false}},{"operation":"update","key":"flags","value":{"agent-browserbase-enabled":false,"agent-telemetry-record-io":false,"analytics-posthog-enabled":false}},{"operation":"update","key":"analytics_flags","value":{"analytics.posthog.enabled":false}}]}'
+   vercel edge-config update chloei-flags --scope chloei --patch '{"items":[{"operation":"update","key":"agent_flags","value":{"agent.telemetry.record_io":false}},{"operation":"update","key":"flags","value":{"agent-telemetry-record-io":false,"analytics-posthog-enabled":false}},{"operation":"update","key":"analytics_flags","value":{"analytics.posthog.enabled":false}}]}'
    ```
 
 3. Remove the explicit production env overrides for the capabilities being
@@ -156,10 +150,8 @@ fully locked-down state:
 
    Expected response includes `"Successfully registered"`.
 
-Keep `AGENT_BROWSERBASE_ENABLED=false` until there is an explicit user-consent
-smoke for allowlisted domains. Keep `AGENT_TELEMETRY_RECORD_IO=false` unless a
-separate privacy review approves raw prompt/output capture for a controlled
-non-production eval cohort.
+Keep `AGENT_TELEMETRY_RECORD_IO=false` unless a separate privacy review approves
+raw prompt/output capture for a controlled non-production eval cohort.
 
 Leave `NEXT_PUBLIC_POSTHOG_ANALYTICS_ENABLED=false` for production unless client
 analytics receives a separate privacy review.
@@ -207,7 +199,6 @@ pnpm build
 pnpm test:smoke:mock
 pnpm eval:finance
 pnpm eval:finance:grade
-pnpm eval:finance:braintrust
 ```
 
 The finance eval gate should fail on regressions in citation presence, numerical
@@ -220,12 +211,11 @@ Fastest capability rollback:
 
 ```bash
 printf '%s' false | vercel env add AGENT_KNOWLEDGE_SEARCH_ENABLED production --force --yes
-printf '%s' false | vercel env add AGENT_BROWSERBASE_ENABLED production --force --yes
 printf '%s' false | vercel env add AGENT_ASYNC_REPORTS_ENABLED production --force --yes
 printf '%s' false | vercel env add AGENT_TELEMETRY_RECORD_IO production --force --yes
 printf '%s' false | vercel env add AGENT_FINANCE_WORKFLOWS_ENABLED production --force --yes
 printf '%s' false | vercel env add POSTHOG_ANALYTICS_ENABLED production --force --yes
-vercel edge-config update chloei-flags --scope chloei --patch '{"items":[{"operation":"update","key":"agent_flags","value":{"agent.knowledge_search.enabled":false,"agent.browserbase.enabled":false,"agent.async_reports.enabled":false,"agent.telemetry.record_io":false,"agent.finance_workflows.enabled":false}},{"operation":"update","key":"flags","value":{"agent-knowledge-search-enabled":false,"agent-browserbase-enabled":false,"agent-async-reports-enabled":false,"agent-telemetry-record-io":false,"agent-finance-workflows-enabled":false,"analytics-posthog-enabled":false}},{"operation":"update","key":"analytics_flags","value":{"analytics.posthog.enabled":false}}]}'
+vercel edge-config update chloei-flags --scope chloei --patch '{"items":[{"operation":"update","key":"agent_flags","value":{"agent.knowledge_search.enabled":false,"agent.async_reports.enabled":false,"agent.telemetry.record_io":false,"agent.finance_workflows.enabled":false}},{"operation":"update","key":"flags","value":{"agent-knowledge-search-enabled":false,"agent-async-reports-enabled":false,"agent-telemetry-record-io":false,"agent-finance-workflows-enabled":false,"analytics-posthog-enabled":false}},{"operation":"update","key":"analytics_flags","value":{"analytics.posthog.enabled":false}}]}'
 vercel redeploy https://chloei.ai
 ```
 
@@ -246,8 +236,8 @@ Config values to false.
 - Use Upstash Search only for governed static/internal material. Live financial
   facts stay routed through `finance_data`, SEC, FRED, FMP, Tavily, and AI
   Gateway web search.
-- Browserbase requires an enabled flag, explicit user consent, a start URL, and
-  an allowlist. It must not collect or store credentials.
+- `browser_research` is retired as a live tool; the shared tool name remains
+  only for historical thread payload compatibility.
 - Private Blob downloads must go through authenticated app routes, never direct
   public URLs.
 - Inngest events must use idempotency keys derived from user, document, report,

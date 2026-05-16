@@ -4,7 +4,6 @@ const logger = createLogger("integration-flags")
 
 export const AGENT_FLAG_KEYS = [
   "agent.knowledge_search.enabled",
-  "agent.browserbase.enabled",
   "agent.async_reports.enabled",
   "agent.telemetry.record_io",
   "agent.finance_workflows.enabled",
@@ -15,7 +14,6 @@ export type IntegrationFlagKey = AgentFlagKey | "analytics.posthog.enabled"
 
 export interface AgentFeatureFlags {
   knowledgeSearchEnabled: boolean
-  browserbaseEnabled: boolean
   asyncReportsEnabled: boolean
   telemetryRecordIo: boolean
   financeWorkflowsEnabled: boolean
@@ -27,7 +25,6 @@ interface ResolveAgentFeatureFlagsParams {
 
 const DEFAULT_FLAGS: AgentFeatureFlags = {
   knowledgeSearchEnabled: false,
-  browserbaseEnabled: false,
   asyncReportsEnabled: false,
   telemetryRecordIo: false,
   financeWorkflowsEnabled: false,
@@ -35,7 +32,6 @@ const DEFAULT_FLAGS: AgentFeatureFlags = {
 
 const ENV_FLAG_NAMES: Record<keyof AgentFeatureFlags, string> = {
   knowledgeSearchEnabled: "AGENT_KNOWLEDGE_SEARCH_ENABLED",
-  browserbaseEnabled: "AGENT_BROWSERBASE_ENABLED",
   asyncReportsEnabled: "AGENT_ASYNC_REPORTS_ENABLED",
   telemetryRecordIo: "AGENT_TELEMETRY_RECORD_IO",
   financeWorkflowsEnabled: "AGENT_FINANCE_WORKFLOWS_ENABLED",
@@ -43,7 +39,6 @@ const ENV_FLAG_NAMES: Record<keyof AgentFeatureFlags, string> = {
 
 const EDGE_FLAG_KEYS: Record<keyof AgentFeatureFlags, IntegrationFlagKey> = {
   knowledgeSearchEnabled: "agent.knowledge_search.enabled",
-  browserbaseEnabled: "agent.browserbase.enabled",
   asyncReportsEnabled: "agent.async_reports.enabled",
   telemetryRecordIo: "agent.telemetry.record_io",
   financeWorkflowsEnabled: "agent.finance_workflows.enabled",

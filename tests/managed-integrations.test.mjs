@@ -23,9 +23,6 @@ const postHogCapturesKey = Symbol.for("chloei.tests.posthog-captures")
 const privateBlobStorageUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/private-blob-storage.ts")
 ).href
-const browserResearchUrl = pathToFileURL(
-  path.join(cwd, "src/lib/server/llm/ai-sdk-browser-research-tools.ts")
-).href
 const agentAttachmentBlobsUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/agent-attachment-blobs.ts")
 ).href
@@ -61,7 +58,6 @@ const {
   normalizeBlobPathname,
 } = await import(privateBlobStorageUrl)
 const { hydrateBlobBackedAttachments } = await import(agentAttachmentBlobsUrl)
-const { isAllowedBrowserResearchUrl } = await import(browserResearchUrl)
 const {
   buildKnowledgeSearchUserScopeFilter,
   getAiSdkKnowledgeSearchToolResultMetadata,
@@ -126,44 +122,6 @@ test("private Blob path helpers keep downloads user-scoped", () => {
       filename: "statement.pdf",
       attachmentId: "foo/bar",
     })
-  )
-})
-
-test("Browserbase research allowlist blocks internal and off-domain URLs", () => {
-  assert.equal(
-    isAllowedBrowserResearchUrl({
-      startUrl: "https://portal.example.com/reports",
-      allowedDomains: ["example.com"],
-    }),
-    true
-  )
-  assert.equal(
-    isAllowedBrowserResearchUrl({
-      startUrl: "https://evil.example.net/reports",
-      allowedDomains: ["example.com"],
-    }),
-    false
-  )
-  assert.equal(
-    isAllowedBrowserResearchUrl({
-      startUrl: "http://127.0.0.1:3000/admin",
-      allowedDomains: ["127.0.0.1"],
-    }),
-    false
-  )
-  assert.equal(
-    isAllowedBrowserResearchUrl({
-      startUrl: "http://[::1]:3000/admin",
-      allowedDomains: ["::1"],
-    }),
-    false
-  )
-  assert.equal(
-    isAllowedBrowserResearchUrl({
-      startUrl: "http://[fd00::1]/admin",
-      allowedDomains: ["fd00::1"],
-    }),
-    false
   )
 })
 
@@ -365,7 +323,6 @@ test("agent feature flags default off and respect explicit env overrides", async
     delete process.env.EDGE_CONFIG
     assert.deepEqual(await resolveAgentFeatureFlags(), {
       knowledgeSearchEnabled: false,
-      browserbaseEnabled: false,
       asyncReportsEnabled: false,
       telemetryRecordIo: false,
       financeWorkflowsEnabled: false,
@@ -439,7 +396,6 @@ test("agent feature flags can read Vercel/Flags-SDK Edge Config shape", async ()
     globalThis[edgeConfigStoreKey] = {
       flags: {
         "agent-knowledge-search-enabled": true,
-        "agent-browserbase-enabled": false,
         "agent-async-reports-enabled": true,
         "agent-telemetry-record-io": false,
         "agent-finance-workflows-enabled": true,
@@ -448,7 +404,6 @@ test("agent feature flags can read Vercel/Flags-SDK Edge Config shape", async ()
 
     const flags = await resolveAgentFeatureFlags()
     assert.equal(flags.knowledgeSearchEnabled, true)
-    assert.equal(flags.browserbaseEnabled, false)
     assert.equal(flags.asyncReportsEnabled, true)
     assert.equal(flags.telemetryRecordIo, false)
     assert.equal(flags.financeWorkflowsEnabled, true)
@@ -605,7 +560,6 @@ test("PostHog product analytics is gated and emits privacy-safe events", async (
       userId: "user-1",
       featureFlags: {
         knowledgeSearchEnabled: true,
-        browserbaseEnabled: false,
         asyncReportsEnabled: false,
         telemetryRecordIo: false,
         financeWorkflowsEnabled: true,
@@ -768,16 +722,6 @@ test("agent attachment validation requires exactly one payload form", () => {
 
   assert.match(source, /hasInlinePayload === hasBlobPayload/)
   assert.match(source, /hasBlobPathname !== hasBlobSha256/)
-})
-
-test("Browserbase browser research guards every request and final URL", () => {
-  const source = readFileSync(
-    path.join(cwd, "src/lib/server/llm/ai-sdk-browser-research-tools.ts"),
-    "utf8"
-  )
-
-  assert.match(source, /context\.route\("\*\*\/\*"/)
-  assert.match(source, /BROWSER_RESEARCH_FINAL_URL_NOT_ALLOWED/)
 })
 
 test("knowledge search tool result metadata rejects invalid successful output", () => {
@@ -960,17 +904,6 @@ test("PostHog capture uses public shutdown API", () => {
 
   assert.match(source, /client\.shutdown\(POSTHOG_CAPTURE_TIMEOUT_MS\)/)
   assert.doesNotMatch(source, /client\._shutdown/)
-})
-
-test("Braintrust finance eval publisher tolerates missing grade objects", () => {
-  const source = readFileSync(
-    path.join(cwd, "evals/finance/publish-braintrust-eval.mjs"),
-    "utf8"
-  )
-
-  assert.match(source, /grade\?\.maxScore/)
-  assert.match(source, /normalizedMaxScore > 0/)
-  assert.doesNotMatch(source, /grade\.maxScore > 0/)
 })
 
 test("Inngest environment resolver uses explicit and branch names", () => {

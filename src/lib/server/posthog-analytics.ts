@@ -122,7 +122,6 @@ function toPostHogFlagProperties(
 
   const flagValues: Record<IntegrationFlagKey, boolean> = {
     "agent.knowledge_search.enabled": flags.knowledgeSearchEnabled,
-    "agent.browserbase.enabled": flags.browserbaseEnabled,
     "agent.async_reports.enabled": flags.asyncReportsEnabled,
     "agent.telemetry.record_io": flags.telemetryRecordIo,
     "agent.finance_workflows.enabled": flags.financeWorkflowsEnabled,
