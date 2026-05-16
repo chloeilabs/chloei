@@ -40,12 +40,6 @@ import {
   toModelMessages,
 } from "./agent-runtime-messages"
 import {
-  createAiSdkBrowserResearchTools,
-  getAiSdkBrowserResearchToolCallMetadata,
-  getAiSdkBrowserResearchToolResultMetadata,
-  isAiSdkBrowserResearchToolName,
-} from "./ai-sdk-browser-research-tools"
-import {
   createAiSdkFinanceDataTools,
   getAiSdkFinanceDataToolCallMetadata,
   getAiSdkFinanceDataToolResultMetadata,
@@ -439,11 +433,6 @@ export async function* startAgentRuntimeStream(
         enabled: featureFlags.knowledgeSearchEnabled,
         userId,
       }),
-      ...createAiSdkBrowserResearchTools({
-        enabled: featureFlags.browserbaseEnabled,
-        userId,
-        requestId: params.requestId,
-      }),
       ...(runtimeProfile.financeDataEnabled
         ? createAiSdkFinanceDataTools({
             fmpApiKey: normalizedFmpApiKey,
@@ -585,7 +574,6 @@ export async function* startAgentRuntimeStream(
           getAiSdkTavilyToolCallMetadata(part) ??
           getAiSdkManagedSearchToolCallMetadata(part) ??
           getAiSdkKnowledgeSearchToolCallMetadata(part) ??
-          getAiSdkBrowserResearchToolCallMetadata(part) ??
           getAiSdkFinanceDataToolCallMetadata(part) ??
           getAiSdkSecFilingsToolCallMetadata(part) ??
           fmpToolsContext?.getToolCallMetadata(part)
@@ -625,7 +613,6 @@ export async function* startAgentRuntimeStream(
           getAiSdkTavilyToolResultMetadata(part) ??
           getAiSdkManagedSearchToolResultMetadata(part) ??
           getAiSdkKnowledgeSearchToolResultMetadata(part) ??
-          getAiSdkBrowserResearchToolResultMetadata(part) ??
           getAiSdkFinanceDataToolResultMetadata(part) ??
           getAiSdkSecFilingsToolResultMetadata(part) ??
           fmpToolsContext?.getToolResultMetadata(part)
@@ -683,7 +670,6 @@ export async function* startAgentRuntimeStream(
           isAiSdkTavilyToolName(part.toolName) ||
           isAiSdkManagedSearchToolName(part.toolName) ||
           isAiSdkKnowledgeSearchToolName(part.toolName) ||
-          isAiSdkBrowserResearchToolName(part.toolName) ||
           isAiSdkFinanceDataToolName(part.toolName) ||
           isAiSdkSecFilingsToolName(part.toolName) ||
           fmpToolsContext?.isToolName(part.toolName)) &&
@@ -695,7 +681,6 @@ export async function* startAgentRuntimeStream(
           isAiSdkTavilyToolName(part.toolName) ||
           isAiSdkManagedSearchToolName(part.toolName) ||
           isAiSdkKnowledgeSearchToolName(part.toolName) ||
-          isAiSdkBrowserResearchToolName(part.toolName) ||
           isAiSdkFinanceDataToolName(part.toolName) ||
           isAiSdkSecFilingsToolName(part.toolName)
             ? part.toolName
