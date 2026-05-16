@@ -126,6 +126,12 @@ function toPostHogFlagProperties(
     "agent.async_reports.enabled": flags.asyncReportsEnabled,
     "agent.telemetry.record_io": flags.telemetryRecordIo,
     "agent.finance_workflows.enabled": flags.financeWorkflowsEnabled,
+    "agent.cloud_agents.enabled": flags.cloudAgentsEnabled,
+    "agent.cloud_agents.github.enabled": flags.cloudAgentsGithubEnabled,
+    "agent.cloud_agents.vercel_deployments.enabled":
+      flags.cloudAgentsVercelDeploymentsEnabled,
+    "agent.cloud_agents.automations.enabled":
+      flags.cloudAgentsAutomationsEnabled,
     [POSTHOG_ANALYTICS_FLAG_KEY]: true,
   }
   const properties: PostHogSafeProperties = {}
