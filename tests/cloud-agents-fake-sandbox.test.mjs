@@ -119,6 +119,9 @@ test("fake adapter creates a stub branch and PR url", async () => {
   })
   const push = await fakeCloudAgentSandboxAdapter.createBranchAndPush({
     sandboxId,
+    repoOwner: "chloeilabs",
+    repoName: "chloei",
+    baseBranch: "main",
     branch: "chloei/test-12345678",
   })
   assert.equal(push.pushedRef, "refs/heads/chloei/test-12345678")

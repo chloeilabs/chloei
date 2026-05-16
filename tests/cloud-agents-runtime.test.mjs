@@ -202,6 +202,26 @@ test("startCloudAgentTaskRun fails fast when environment is missing", async () =
   assert.equal(errorEvent?.payload.errorCode, "CLOUD_AGENT_ENVIRONMENT_MISSING")
 })
 
+test("scripted runtime fails the task when the configured test command exits non-zero", async () => {
+  const { userId, taskId } = seedFixtures({
+    taskId: "task-failing-tests",
+    environmentOverrides: { testCommand: "fake-fail-tests" },
+  })
+  await startCloudAgentTaskRun({ userId, taskId })
+  const task = getStoredTask(userId, taskId)
+  assert.equal(task.status, "failed")
+  assert.match(task.error ?? "", /Tests failed/)
+  const events = getStoredEvents(userId, taskId)
+  const approvalEvent = events.find(
+    (event) => event.payload.kind === "approval_required"
+  )
+  assert.equal(
+    approvalEvent,
+    undefined,
+    "task should fail before requesting push approval"
+  )
+})
+
 test("post-approval runtime no longer emits a placeholder preview URL", async () => {
   const { userId, taskId } = seedFixtures({
     taskId: "task-vercel",

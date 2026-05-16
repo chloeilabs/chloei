@@ -64,6 +64,9 @@ export interface CloudAgentSandboxAdapter {
   }): Promise<CloudAgentSandboxDiff>
   createBranchAndPush(params: {
     sandboxId: string
+    repoOwner: string
+    repoName: string
+    baseBranch: string
     branch: string
   }): Promise<{ pushedRef: string }>
   createPullRequest(params: {

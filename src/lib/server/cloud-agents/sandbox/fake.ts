@@ -98,6 +98,14 @@ export const fakeCloudAgentSandboxAdapter: CloudAgentSandboxAdapter = {
     try {
       require(getStore().get(params.sandboxId), params.sandboxId)
       const command = params.command.trim()
+      if (command.startsWith("fake-fail")) {
+        return Promise.resolve({
+          exitCode: 1,
+          stdout: "",
+          stderr: `[fake] command failed: ${command}\n`,
+          durationMs: 5,
+        })
+      }
       if (command.startsWith("ls")) {
         const state = require(getStore().get(
           params.sandboxId

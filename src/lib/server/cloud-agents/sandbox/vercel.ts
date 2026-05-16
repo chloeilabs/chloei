@@ -73,6 +73,33 @@ function require(sandboxId: string): VercelSandboxSession {
   return session
 }
 
+async function rehydrateSession(params: {
+  sandboxId: string
+  repoOwner: string
+  repoName: string
+  baseBranch: string
+}): Promise<VercelSandboxSession> {
+  const existing = sessions.get(params.sandboxId)
+  if (existing) return existing
+  const { Sandbox } = await import("@vercel/sandbox")
+  const sandbox = await Sandbox.get({ sandboxId: params.sandboxId })
+  const session: VercelSandboxSession = {
+    sandbox: sandbox as unknown as VercelSandboxSession["sandbox"],
+    repoCwd: SANDBOX_REPO_CWD,
+    baseBranch: params.baseBranch,
+    repoOwner: params.repoOwner,
+    repoName: params.repoName,
+    fileChanges: new Map(),
+  }
+  sessions.set(params.sandboxId, session)
+  logger.info("Rehydrated Vercel sandbox session.", {
+    sandboxId: params.sandboxId,
+    repoOwner: params.repoOwner,
+    repoName: params.repoName,
+  })
+  return session
+}
+
 const SANDBOX_REPO_CWD = "/vercel/sandbox"
 
 async function readFileContent(
@@ -237,7 +264,12 @@ export const vercelCloudAgentSandboxAdapter: CloudAgentSandboxAdapter = {
   },
 
   async createBranchAndPush(params) {
-    const session = require(params.sandboxId)
+    const session = await rehydrateSession({
+      sandboxId: params.sandboxId,
+      repoOwner: params.repoOwner,
+      repoName: params.repoName,
+      baseBranch: params.baseBranch,
+    })
     const credentials = resolveGithubAppCredentials()
     if (!credentials) {
       throw new Error(
@@ -322,18 +354,20 @@ export const vercelCloudAgentSandboxAdapter: CloudAgentSandboxAdapter = {
   },
 
   async destroy(params) {
-    const session = sessions.get(params.sandboxId)
-    if (!session) return
     sessions.delete(params.sandboxId)
-    if (typeof session.sandbox.stop === "function") {
-      try {
-        await session.sandbox.stop()
-      } catch (error) {
-        logger.warn("Failed to stop Vercel sandbox.", {
-          sandboxId: params.sandboxId,
-          error,
-        })
+    try {
+      const { Sandbox } = await import("@vercel/sandbox")
+      const live = (await Sandbox.get({
+        sandboxId: params.sandboxId,
+      })) as unknown as { stop?: () => Promise<unknown> }
+      if (typeof live.stop === "function") {
+        await live.stop()
       }
+    } catch (error) {
+      logger.warn("Failed to stop Vercel sandbox.", {
+        sandboxId: params.sandboxId,
+        error,
+      })
     }
   },
 }

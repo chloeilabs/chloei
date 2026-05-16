@@ -379,6 +379,17 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
           status: testResult.exitCode === 0 ? "success" : "error",
         },
       })
+      if (testResult.exitCode !== 0) {
+        await failTask({
+          userId: input.userId,
+          taskId: input.taskId,
+          error: new Error(
+            `Tests failed (exit ${String(testResult.exitCode)}). Cloud agent edits were not pushed.`
+          ),
+          errorCode: "CLOUD_AGENT_TESTS_FAILED",
+        })
+        return
+      }
     }
 
     const branch = deriveCloudAgentTaskBranchName({
@@ -480,7 +491,13 @@ export async function continueCloudAgentTaskAfterApproval(input: {
       update: { status: "pushing" },
       phase: "Pushing branch",
     })
-    await adapter.createBranchAndPush({ sandboxId, branch })
+    await adapter.createBranchAndPush({
+      sandboxId,
+      repoOwner: environment.repoOwner,
+      repoName: environment.repoName,
+      baseBranch: environment.baseBranch,
+      branch,
+    })
     const pr = await adapter.createPullRequest({
       sandboxId,
       repoOwner: environment.repoOwner,
