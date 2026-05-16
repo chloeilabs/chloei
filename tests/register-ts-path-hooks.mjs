@@ -25,12 +25,7 @@ function resolveCandidatePath(specifier, parentURL) {
       return null
     }
 
-    const parentPath = fileURLToPath(parentURL)
-    if (parentPath.includes(`${path.sep}node_modules${path.sep}`)) {
-      return null
-    }
-
-    basePath = path.resolve(path.dirname(parentPath), specifier)
+    basePath = path.resolve(path.dirname(fileURLToPath(parentURL)), specifier)
   } else {
     return null
   }

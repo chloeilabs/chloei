@@ -8,10 +8,6 @@ export const AGENT_FLAG_KEYS = [
   "agent.async_reports.enabled",
   "agent.telemetry.record_io",
   "agent.finance_workflows.enabled",
-  "agent.cloud_agents.enabled",
-  "agent.cloud_agents.github.enabled",
-  "agent.cloud_agents.vercel_deployments.enabled",
-  "agent.cloud_agents.automations.enabled",
 ] as const
 
 export type AgentFlagKey = (typeof AGENT_FLAG_KEYS)[number]
@@ -23,10 +19,6 @@ export interface AgentFeatureFlags {
   asyncReportsEnabled: boolean
   telemetryRecordIo: boolean
   financeWorkflowsEnabled: boolean
-  cloudAgentsEnabled: boolean
-  cloudAgentsGithubEnabled: boolean
-  cloudAgentsVercelDeploymentsEnabled: boolean
-  cloudAgentsAutomationsEnabled: boolean
 }
 
 interface ResolveAgentFeatureFlagsParams {
@@ -39,10 +31,6 @@ const DEFAULT_FLAGS: AgentFeatureFlags = {
   asyncReportsEnabled: false,
   telemetryRecordIo: false,
   financeWorkflowsEnabled: false,
-  cloudAgentsEnabled: false,
-  cloudAgentsGithubEnabled: false,
-  cloudAgentsVercelDeploymentsEnabled: false,
-  cloudAgentsAutomationsEnabled: false,
 }
 
 const ENV_FLAG_NAMES: Record<keyof AgentFeatureFlags, string> = {
@@ -51,11 +39,6 @@ const ENV_FLAG_NAMES: Record<keyof AgentFeatureFlags, string> = {
   asyncReportsEnabled: "AGENT_ASYNC_REPORTS_ENABLED",
   telemetryRecordIo: "AGENT_TELEMETRY_RECORD_IO",
   financeWorkflowsEnabled: "AGENT_FINANCE_WORKFLOWS_ENABLED",
-  cloudAgentsEnabled: "AGENT_CLOUD_AGENTS_ENABLED",
-  cloudAgentsGithubEnabled: "AGENT_CLOUD_AGENTS_GITHUB_ENABLED",
-  cloudAgentsVercelDeploymentsEnabled:
-    "AGENT_CLOUD_AGENTS_VERCEL_DEPLOYMENTS_ENABLED",
-  cloudAgentsAutomationsEnabled: "AGENT_CLOUD_AGENTS_AUTOMATIONS_ENABLED",
 }
 
 const EDGE_FLAG_KEYS: Record<keyof AgentFeatureFlags, IntegrationFlagKey> = {
@@ -64,11 +47,6 @@ const EDGE_FLAG_KEYS: Record<keyof AgentFeatureFlags, IntegrationFlagKey> = {
   asyncReportsEnabled: "agent.async_reports.enabled",
   telemetryRecordIo: "agent.telemetry.record_io",
   financeWorkflowsEnabled: "agent.finance_workflows.enabled",
-  cloudAgentsEnabled: "agent.cloud_agents.enabled",
-  cloudAgentsGithubEnabled: "agent.cloud_agents.github.enabled",
-  cloudAgentsVercelDeploymentsEnabled:
-    "agent.cloud_agents.vercel_deployments.enabled",
-  cloudAgentsAutomationsEnabled: "agent.cloud_agents.automations.enabled",
 }
 
 export function toEdgeConfigFlagKey(key: IntegrationFlagKey): string {
