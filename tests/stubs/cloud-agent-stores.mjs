@@ -2,12 +2,21 @@ const tasks = new Map()
 const environments = new Map()
 const events = new Map()
 const artifacts = new Map()
+let appendEventHook = null
 
 function resetStores() {
   tasks.clear()
   environments.clear()
   events.clear()
   artifacts.clear()
+  appendEventHook = null
+}
+
+// Test seam: lets a test inject side effects (e.g. flipping a task
+// to "cancelled" mid-run) immediately after an event is recorded.
+// Cleared on every `clearAllStores()` call.
+export function setAppendCloudAgentTaskEventHook(hook) {
+  appendEventHook = hook
 }
 
 function nowIso() {
@@ -151,7 +160,11 @@ export async function updateCloudAgentTaskIfStatusIn(params) {
 
 // --- Events stub module exports ---
 export async function appendCloudAgentTaskEvent(params) {
-  return recordEvent(params.userId, params.taskId, params.payload)
+  const record = recordEvent(params.userId, params.taskId, params.payload)
+  if (appendEventHook) {
+    await appendEventHook(params)
+  }
+  return record
 }
 
 // --- Artifacts stub module exports ---

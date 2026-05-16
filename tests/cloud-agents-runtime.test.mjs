@@ -37,6 +37,7 @@ const {
   getStoredTask,
   seedEnvironment,
   seedTask,
+  setAppendCloudAgentTaskEventHook,
 } = await import(storesStubUrl)
 const { resetFakeCloudAgentSandboxes } = await import(fakeUrl)
 
@@ -219,6 +220,81 @@ test("scripted runtime fails the task when the configured test command exits non
     approvalEvent,
     undefined,
     "task should fail before requesting push approval"
+  )
+})
+
+test("continueCloudAgentTaskAfterApproval backfills prUrl and notifies when cancel lands mid-push", async () => {
+  const { userId, taskId } = seedFixtures({ taskId: "task-race-cancel" })
+  await startCloudAgentTaskRun({ userId, taskId })
+
+  // Simulate the race: as soon as the runtime emits the "pushing"
+  // status event, an out-of-band cancel (e.g. user clicks cancel
+  // from the dashboard) flips the row to "cancelled". By the time
+  // the runtime tries the conditional `pushing` → `pr_ready`
+  // update, the row is no longer in "pushing" and the update
+  // returns null — but the GitHub PR has already shipped.
+  setAppendCloudAgentTaskEventHook(async (params) => {
+    if (
+      params.payload.kind === "status" &&
+      params.payload.status === "pushing"
+    ) {
+      const current = getStoredTask(params.userId, params.taskId)
+      if (current && current.status === "pushing") {
+        seedTask(params.userId, {
+          ...current,
+          status: "cancelled",
+          summary: "User cancelled.",
+        })
+      }
+    }
+  })
+
+  await continueCloudAgentTaskAfterApproval({
+    userId,
+    taskId,
+    approved: true,
+  })
+
+  const task = getStoredTask(userId, taskId)
+  assert.equal(task.status, "cancelled", "status should remain cancelled")
+  assert.match(
+    task.prUrl ?? "",
+    /^https:\/\/github\.com\/chloeilabs\/chloei\/pull\/\d+/,
+    "prUrl should be backfilled even though the row stayed cancelled"
+  )
+  assert.match(
+    task.summary ?? "",
+    /PR shipped after task was cancelled/,
+    "summary should explain the surprise PR"
+  )
+
+  const textDeltas = getStoredEvents(userId, taskId).filter(
+    (event) => event.payload.kind === "text_delta"
+  )
+  const notice = textDeltas.find((event) =>
+    event.payload.text.startsWith(
+      "Pull request was opened on GitHub before the cancel landed:"
+    )
+  )
+  assert.ok(notice, "expected a text_delta notice about the shipped PR")
+  assert.match(
+    notice.payload.text,
+    /https:\/\/github\.com\/chloeilabs\/chloei\/pull\/\d+/,
+    "notice text should include the PR url"
+  )
+
+  const statuses = getStoredEvents(userId, taskId)
+    .filter((event) => event.payload.kind === "status")
+    .map((event) => event.payload.status)
+  assert.equal(
+    statuses.includes("pr_ready"),
+    false,
+    "should not have emitted pr_ready status after cancel"
+  )
+  assert.equal(
+    statuses.includes("completed"),
+    false,
+    "should not have emitted completed status after cancel"
   )
 })
 
