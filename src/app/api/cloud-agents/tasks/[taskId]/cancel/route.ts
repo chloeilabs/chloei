@@ -1,5 +1,6 @@
 import { type NextRequest } from "next/server"
 
+import { createLogger } from "@/lib/logger"
 import {
   appendCloudAgentTaskEvent,
   cloudAgentJsonResponse,
@@ -8,10 +9,14 @@ import {
   requireCloudAgentsEnabled,
   requireCloudAgentSession,
   requireCloudAgentTaskTransition,
+  resolveCloudAgentRuntimeMode,
+  resolveCloudAgentSandboxAdapter,
   updateCloudAgentTask,
 } from "@/lib/server/cloud-agents"
 
 export const runtime = "nodejs"
+
+const logger = createLogger("cloud-agent-cancel")
 
 interface RouteContext {
   params: Promise<{ taskId: string }>
@@ -29,7 +34,7 @@ export async function POST(request: NextRequest, routeContext: RouteContext) {
     const flagsOrError = await requireCloudAgentsEnabled(context, session)
     if (flagsOrError instanceof Response) return flagsOrError
     const { taskId } = await routeContext.params
-    await requireCloudAgentTaskTransition({
+    const priorTask = await requireCloudAgentTaskTransition({
       userId: session.user.id,
       taskId,
       from: [
@@ -58,6 +63,20 @@ export async function POST(request: NextRequest, routeContext: RouteContext) {
         phase: "Cancelled by user",
       },
     })
+    if (priorTask.sandboxId) {
+      const adapter = resolveCloudAgentSandboxAdapter(
+        resolveCloudAgentRuntimeMode()
+      )
+      await adapter
+        .destroy({ sandboxId: priorTask.sandboxId })
+        .catch((error: unknown) => {
+          logger.warn("Failed to destroy sandbox on cancel.", {
+            taskId,
+            sandboxId: priorTask.sandboxId,
+            error,
+          })
+        })
+    }
     return cloudAgentJsonResponse(context, { task })
   } catch (error) {
     return handleCloudAgentError(context, error, {

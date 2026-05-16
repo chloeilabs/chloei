@@ -1,5 +1,5 @@
 import { createGateway } from "@ai-sdk/gateway"
-import { generateText, type ToolSet } from "ai"
+import { generateText, stepCountIs, type ToolSet } from "ai"
 
 import { createLogger } from "@/lib/logger"
 import {
@@ -316,7 +316,7 @@ export async function startCloudAgentTaskRunWithLlm(
       system: buildSystemPrompt(environment),
       prompt: task.prompt,
       tools,
-      stopWhen: ({ steps }) => steps.length >= maxSteps,
+      stopWhen: stepCountIs(maxSteps),
       maxOutputTokens: DEFAULT_MAX_OUTPUT_TOKENS,
       abortSignal: input.signal,
     })

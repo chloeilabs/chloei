@@ -44,7 +44,7 @@ export function resolveCloudAgentRuntimeType(): CloudAgentRuntimeType {
   return "scripted"
 }
 
-function resolveSandboxAdapter(
+export function resolveCloudAgentSandboxAdapter(
   mode: CloudAgentRuntimeMode
 ): CloudAgentSandboxAdapter {
   if (mode === "real") {
@@ -189,7 +189,7 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
   }
 
   const mode = resolveCloudAgentRuntimeMode()
-  const adapter = resolveSandboxAdapter(mode)
+  const adapter = resolveCloudAgentSandboxAdapter(mode)
 
   if (resolveCloudAgentRuntimeType() === "llm") {
     const aiGatewayApiKey = process.env.AI_GATEWAY_API_KEY
@@ -454,7 +454,9 @@ export async function continueCloudAgentTaskAfterApproval(input: {
       phase: "Push denied",
     })
     if (task.sandboxId) {
-      const adapter = resolveSandboxAdapter(resolveCloudAgentRuntimeMode())
+      const adapter = resolveCloudAgentSandboxAdapter(
+        resolveCloudAgentRuntimeMode()
+      )
       await adapter
         .destroy({ sandboxId: task.sandboxId })
         .catch(() => undefined)
@@ -472,7 +474,7 @@ export async function continueCloudAgentTaskAfterApproval(input: {
   }
 
   const mode = resolveCloudAgentRuntimeMode()
-  const adapter = resolveSandboxAdapter(mode)
+  const adapter = resolveCloudAgentSandboxAdapter(mode)
   const sandboxId = task.sandboxId
   if (!sandboxId) {
     await failTask({
