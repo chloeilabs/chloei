@@ -94,31 +94,33 @@ Vercel dashboard/CLI checks:
 
 - Deployment Protection is enabled for generated deployments.
 - Firewall system mitigations are active.
-- No custom WAF rules or IP blocks are configured yet.
-- No Log Drains are configured yet.
+- A custom WAF rule blocks common scanner paths.
+- A project-scoped Sentry Log Drain is enabled: `drn_s60eMRuih4HINeal`.
+- No IP blocks are configured yet.
 - Production env has required app secrets, including `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `AI_GATEWAY_API_KEY`, and `BLOB_READ_WRITE_TOKEN`.
 
-Recommended WAF rules before public launch:
+WAF follow-up:
 
-1. Add a log-only rule for `/api/agent` by IP to observe high request rates.
-2. Add a deny rule for common scanner paths:
+1. The deny rule for common scanner paths is live:
 
    ```text
    ^/(wp-admin|wp-login\.php|xmlrpc\.php|phpmyadmin|\.env|\.git)(/|$)
    ```
 
+2. Add a log-only rule for `/api/agent` by IP to observe high request rates.
 3. Add a challenge or deny rule for unwanted bot categories after reviewing real traffic.
-4. Publish only after checking the draft:
+4. For future firewall edits, publish only after checking the draft:
 
    ```bash
    vercel firewall diff
    vercel firewall publish --yes
    ```
 
-Recommended Log Drain:
+Current Log Drain:
 
-- Create a project-scoped drain for logs to the Sentry/Vercel drain endpoint or another durable log sink.
-- Verify it appears in:
+- `Chloei Sentry Logs` sends production and preview logs for `lambda`, `edge`, `static`, `build`, `firewall`, `external`, and `redirect` sources to Sentry.
+- The manual Sentry drain requires the `x-sentry-auth` header documented in Sentry Project Settings > Client Keys (DSN) > Vercel.
+- Verify it appears in Vercel with:
 
   ```bash
   vercel api '/v1/drains?teamId=team_8zGk2XORbbDx04iMB2hVxYlo' --raw
@@ -138,7 +140,6 @@ Handled:
 Remaining Pro-plan actions:
 
 - Enable Observability Plus if launch debugging needs longer retention or deeper traffic inspection.
-- Configure a durable Log Drain.
 - Add deployment checks if an external smoke-test or approval gate should block production aliasing.
 
 Enterprise-only checklist items:
