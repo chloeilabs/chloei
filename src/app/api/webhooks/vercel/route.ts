@@ -154,6 +154,25 @@ export async function POST(request: NextRequest) {
     }
     const { userId, task } = match
 
+    // Skip late deployments for tasks the user already abandoned —
+    // a `cancelled` / `failed` row shouldn't gain a previewUrl or a
+    // new preview_ready event because the workflow that owned it is
+    // done. `completed` / `pr_ready` still accept the URL since the
+    // preview is for the PR they just shipped.
+    if (task.status === "cancelled" || task.status === "failed") {
+      return observeRouteResponse(
+        observation,
+        Response.json(
+          {
+            accepted: false,
+            reason: `Task ${task.id} is in terminal status ${task.status}; ignoring late preview deployment.`,
+          },
+          { status: 200, headers: createApiHeaders({ requestId }) }
+        ),
+        { outcome: "ignored" }
+      )
+    }
+
     await updateCloudAgentTask(userId, task.id, {
       previewUrl: parsed.url,
     })
