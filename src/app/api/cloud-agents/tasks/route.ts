@@ -14,6 +14,7 @@ import {
   listCloudAgentTasks,
   requireCloudAgentsEnabled,
   requireCloudAgentSession,
+  updateCloudAgentTask,
 } from "@/lib/server/cloud-agents"
 
 const CLOUD_AGENT_TASK_RETRY_AFTER_SECONDS = 60
@@ -96,10 +97,36 @@ export async function POST(request: NextRequest) {
       }
       throw error
     }
-    const dispatch = await dispatchCloudAgentTaskRequested({
-      userId: session.user.id,
-      taskId: task.id,
-    })
+    // The task row is already persisted. If dispatch throws, mark the
+    // task as failed (best effort) so the orphaned row doesn't sit in
+    // `queued` consuming a CLOUD_AGENT_MAX_CONCURRENT_PER_USER slot
+    // forever — matches the same compensation in automation-router.ts.
+    let dispatch
+    try {
+      dispatch = await dispatchCloudAgentTaskRequested({
+        userId: session.user.id,
+        taskId: task.id,
+      })
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to dispatch cloud agent task."
+      await updateCloudAgentTask(session.user.id, task.id, {
+        status: "failed",
+        error: message,
+      }).catch((rollbackError: unknown) => {
+        context.logger.error(
+          "Failed to mark cloud agent task as failed after dispatch error.",
+          {
+            taskId: task.id,
+            userId: session.user.id,
+            rollbackError,
+          }
+        )
+      })
+      throw error
+    }
     return cloudAgentJsonResponse(
       context,
       { task, dispatch: dispatch.delivery },
