@@ -187,6 +187,25 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
       }
     }
 
+    // `setup_only` keeps network access open during the setup phase
+    // so package installers can reach registries, then flips to
+    // `deny-all` for the agent phase. Best-effort — a failed tighten
+    // is logged but doesn't kill the run because the policy is a
+    // hardening measure, not a correctness requirement.
+    if (environment.networkPolicy.mode === "setup_only") {
+      await adapter
+        .setNetworkPolicy({
+          sandboxId,
+          policy: { mode: "off" },
+        })
+        .catch((error: unknown) => {
+          logger.warn(
+            "Failed to tighten sandbox network policy after setup; continuing with the policy provisioned at create time.",
+            { userId: input.userId, taskId: input.taskId, sandboxId, error }
+          )
+        })
+    }
+
     await applyCloudAgentStatus({
       userId: input.userId,
       taskId: input.taskId,
