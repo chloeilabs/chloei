@@ -44,7 +44,12 @@ export async function proxy(request: NextRequest) {
   const logger = createLogger(`proxy:${requestId}`)
   const { pathname } = request.nextUrl
 
-  if (pathname.startsWith("/api/auth") || pathname === "/api/inngest") {
+  if (
+    pathname.startsWith("/api/auth") ||
+    pathname === "/api/inngest" ||
+    pathname.startsWith("/api/webhooks/") ||
+    pathname.startsWith("/api/internal-dev/")
+  ) {
     return NextResponse.next()
   }
 
