@@ -27,11 +27,34 @@ const proxyClientMaxBodySize = parseSizeLimitFromEnv(
   "12mb"
 )
 
+function buildContentSecurityPolicy() {
+  const directives = [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "form-action 'self'",
+    "font-src 'self' data:",
+    "img-src 'self' blob: data: https://www.google.com https://t0.gstatic.com https://t1.gstatic.com https://t2.gstatic.com https://t3.gstatic.com",
+    "media-src 'self' blob: data:",
+    "connect-src 'self' https://va.vercel-scripts.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io",
+    "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com",
+    "style-src 'self' 'unsafe-inline'",
+    "worker-src 'self' blob:",
+    "manifest-src 'self'",
+    "upgrade-insecure-requests",
+  ]
+
+  return directives.join("; ")
+}
+
 const securityHeaders = [
   { key: "X-DNS-Prefetch-Control", value: "on" },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+  { key: "X-Permitted-Cross-Domain-Policies", value: "none" },
   {
     key: "Permissions-Policy",
     value: "camera=(), microphone=(), geolocation=()",
@@ -41,6 +64,10 @@ const securityHeaders = [
         {
           key: "Strict-Transport-Security",
           value: "max-age=63072000; includeSubDomains; preload",
+        },
+        {
+          key: "Content-Security-Policy",
+          value: buildContentSecurityPolicy(),
         },
       ]
     : []),
