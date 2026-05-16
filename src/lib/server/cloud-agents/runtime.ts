@@ -467,6 +467,22 @@ export async function continueCloudAgentTaskAfterApproval(input: {
       )
       return
     }
+    // The post-setup tightening for `setup_only` flips the live
+    // sandbox to `deny-all`, but `createBranchAndPush` runs `git
+    // push` from inside that same sandbox and needs GitHub network.
+    // Re-open network just before the push — the sandbox is
+    // destroyed in the `finally` below right after the push +
+    // PR-create round-trip, so the brief widening is bounded.
+    if (environment.networkPolicy.mode === "setup_only") {
+      await adapter
+        .setNetworkPolicy({ sandboxId, policy: { mode: "open" } })
+        .catch((error: unknown) => {
+          logger.warn(
+            "Failed to re-open network policy before push; push will likely fail under setup_only.",
+            { sandboxId, error }
+          )
+        })
+    }
     await adapter.createBranchAndPush({
       sandboxId,
       repoOwner: environment.repoOwner,
