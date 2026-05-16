@@ -63,6 +63,14 @@ function getSearchToolLabel(toolName: SearchToolName): string {
     return "X"
   }
 
+  if (toolName === "parallel_search") {
+    return "Parallel"
+  }
+
+  if (toolName === "gateway_web_search") {
+    return "AI Gateway"
+  }
+
   return "Tavily"
 }
 

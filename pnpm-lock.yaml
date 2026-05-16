@@ -43,6 +43,9 @@ importers:
       '@napi-rs/canvas':
         specifier: 0.1.80
         version: 0.1.80
+      '@parallel-web/ai-sdk-tools':
+        specifier: ^0.2.1
+        version: 0.2.1(ai@6.0.177(zod@4.4.3))
       '@radix-ui/react-dropdown-menu':
         specifier: ^2.1.16
         version: 2.1.16(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -1998,6 +2001,11 @@ packages:
     engines: {node: ^18.19.0 || >=20.6.0}
     peerDependencies:
       '@opentelemetry/api': ^1.1.0
+
+  '@parallel-web/ai-sdk-tools@0.2.1':
+    resolution: {integrity: sha512-eDlL2XO58EWspgLgpP9FomaaqLTjICvlOZV2wBLRsTkUQXwq2pSqysbAqz6NVJWXjoojHZp3J+n5Lk7jZH3exQ==}
+    peerDependencies:
+      ai: ^5.0.0
 
   '@playwright/test@1.59.1':
     resolution: {integrity: sha512-PG6q63nQg5c9rIi4/Z5lR5IVF7yU5MqmKaPOe0HSc0O2cX1fPi96sUQu5j7eo4gKCkB2AnNGoWt7y4/Xx3Kcqg==}
@@ -6325,6 +6333,9 @@ packages:
     resolution: {integrity: sha512-LaNjtRWUBY++zB5nE/NwcaoMylSPk+S+ZHNB1TzdbMJMny6dynpAGt7X/tl/QYq3TIeE6nxHppbo2LGymrG5Pw==}
     engines: {node: '>=10'}
 
+  parallel-web@0.3.2:
+    resolution: {integrity: sha512-PVCECmqn4cADf5LIWZJ+I6aeYG5/Endt3AbOJP/tWQK3Y+yobjMlmOJAhaUgJvNWXXcvqW75qapILWcEqCiMHw==}
+
   parent-module@1.0.1:
     resolution: {integrity: sha512-GQ2EWRpQV8/o+Aw8YqtfZZPfNRWZYkbidE9k5rpl/hC3vtHHBfGm2Ifi6qWV+coDGkrUKZAxE3Lot5kcsRlh+g==}
     engines: {node: '>=6'}
@@ -9844,6 +9855,12 @@ snapshots:
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.1)
+
+  '@parallel-web/ai-sdk-tools@0.2.1(ai@6.0.177(zod@4.4.3))':
+    dependencies:
+      ai: 6.0.177(zod@4.4.3)
+      parallel-web: 0.3.2
+      zod: 4.4.3
 
   '@playwright/test@1.59.1':
     dependencies:
@@ -14568,6 +14585,8 @@ snapshots:
   p-locate@5.0.0:
     dependencies:
       p-limit: 3.1.0
+
+  parallel-web@0.3.2: {}
 
   parent-module@1.0.1:
     dependencies:

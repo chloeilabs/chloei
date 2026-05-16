@@ -152,6 +152,7 @@ interface CreateAgentStreamResponseParams {
   selectedModel: ModelType
   aiGatewayApiKey: string
   tavilyApiKey?: string
+  parallelApiKey?: string
   fmpApiKey?: string
   userTimeZone?: string
   runtimeProfile?: AgentRuntimeProfileId
@@ -853,6 +854,7 @@ export function createAgentStreamResponse(
           model: params.selectedModel,
           aiGatewayApiKey: params.aiGatewayApiKey,
           tavilyApiKey: params.tavilyApiKey,
+          parallelApiKey: params.parallelApiKey,
           fmpApiKey: params.fmpApiKey,
           userTimeZone: params.userTimeZone,
           runtimeProfile: params.runtimeProfile,

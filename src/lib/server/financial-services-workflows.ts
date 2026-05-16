@@ -271,7 +271,7 @@ function formatToolAvailability(
     "- Filings/facts: use SEC-backed finance_data when available; cite returned filing/source URLs.",
     filingRetrievalGuidance,
     "- Macro/rates: use FRED-backed finance_data when available.",
-    "- News/source research: use Tavily or native search when structured tools do not cover the claim.",
+    "- News/source research: use Tavily, Parallel, or AI Gateway search when structured tools do not cover the claim.",
     "- Modeling/math/artifacts: use code_execution with the finance backend.",
     "",
     "Provider signals for this request:",

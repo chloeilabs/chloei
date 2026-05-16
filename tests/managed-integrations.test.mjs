@@ -32,6 +32,9 @@ const agentAttachmentBlobsUrl = pathToFileURL(
 const knowledgeSearchUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/llm/ai-sdk-knowledge-search-tools.ts")
 ).href
+const managedSearchUrl = pathToFileURL(
+  path.join(cwd, "src/lib/server/llm/ai-sdk-managed-search-tools.ts")
+).href
 const knowledgeIndexingUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/knowledge-indexing.ts")
 ).href
@@ -63,6 +66,11 @@ const {
   buildKnowledgeSearchUserScopeFilter,
   getAiSdkKnowledgeSearchToolResultMetadata,
 } = await import(knowledgeSearchUrl)
+const {
+  createAiSdkManagedSearchTools,
+  getAiSdkManagedSearchToolCallMetadata,
+  getAiSdkManagedSearchToolResultMetadata,
+} = await import(managedSearchUrl)
 const {
   buildUploadedDocumentSearchRecords,
   chunkKnowledgeText,
@@ -790,6 +798,120 @@ test("knowledge search tool result metadata rejects invalid successful output", 
       provider: "upstash_search",
       errorCode: "INVALID_TOOL_OUTPUT",
       retryable: false,
+    }
+  )
+})
+
+test("managed search tools expose Parallel only when configured and always expose Gateway search", () => {
+  assert.deepEqual(Object.keys(createAiSdkManagedSearchTools({})).sort(), [
+    "gateway_web_search",
+  ])
+  assert.deepEqual(
+    Object.keys(
+      createAiSdkManagedSearchTools({ parallelApiKey: "parallel-key" })
+    ).sort(),
+    ["gateway_web_search", "parallel_search"]
+  )
+})
+
+test("managed search metadata labels Parallel and Gateway search sources", () => {
+  assert.deepEqual(
+    getAiSdkManagedSearchToolCallMetadata({
+      toolCallId: "call-parallel",
+      toolName: "parallel_search",
+      input: {
+        objective: "Find current AI funding news",
+        search_queries: ["AI funding"],
+      },
+    }),
+    {
+      callId: "call-parallel",
+      toolName: "parallel_search",
+      label: "Searching with Parallel",
+      query: "Find current AI funding news",
+      operation: "search",
+      provider: "parallel",
+    }
+  )
+
+  assert.deepEqual(
+    getAiSdkManagedSearchToolResultMetadata({
+      toolCallId: "call-gateway",
+      toolName: "gateway_web_search",
+      output: {
+        searchId: "gateway-1",
+        results: [
+          {
+            title: "Gateway Result",
+            url: "https://example.com/gateway",
+            excerpt: "Current result",
+          },
+        ],
+      },
+    }),
+    {
+      callId: "call-gateway",
+      toolName: "gateway_web_search",
+      status: "success",
+      sources: [
+        {
+          id: "gateway_web_search-gateway-1-0",
+          url: "https://example.com/gateway",
+          title: "Gateway Result",
+        },
+      ],
+      operation: "search",
+      provider: "vercel_ai_gateway",
+      retryable: false,
+    }
+  )
+})
+
+test("managed search metadata marks provider errors retryable", () => {
+  assert.deepEqual(
+    getAiSdkManagedSearchToolResultMetadata({
+      toolCallId: "call-parallel",
+      toolName: "parallel_search",
+      output: {
+        error: "rate_limit",
+        message: "Parallel rate limit exceeded.",
+      },
+    }),
+    {
+      callId: "call-parallel",
+      toolName: "parallel_search",
+      status: "error",
+      sources: [],
+      operation: "search",
+      provider: "parallel",
+      errorCode: "rate_limit",
+      retryable: true,
+    }
+  )
+})
+
+test("managed search metadata treats explicit errors as failures with empty results", () => {
+  assert.deepEqual(
+    getAiSdkManagedSearchToolResultMetadata({
+      toolCallId: "call-gateway",
+      toolName: "gateway_web_search",
+      output: {
+        error: {
+          code: "quota_exceeded",
+          message: "Gateway search quota exceeded.",
+        },
+        results: [],
+      },
+    }),
+    {
+      callId: "call-gateway",
+      toolName: "gateway_web_search",
+      status: "error",
+      sources: [],
+      operation: "search",
+      provider: "vercel_ai_gateway",
+      errorCode: "quota_exceeded",
+      retryable: true,
     }
   )
 })

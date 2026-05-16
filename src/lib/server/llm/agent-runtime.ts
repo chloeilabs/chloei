@@ -3,8 +3,10 @@ import path from "node:path"
 
 import { createGateway } from "@ai-sdk/gateway"
 import {
+  type ContentPart,
   type LanguageModelUsage,
   stepCountIs,
+  type StepResult,
   streamText,
   type ToolSet,
 } from "ai"
@@ -58,6 +60,12 @@ import {
   isAiSdkKnowledgeSearchToolName,
 } from "./ai-sdk-knowledge-search-tools"
 import {
+  createAiSdkManagedSearchTools,
+  getAiSdkManagedSearchToolCallMetadata,
+  getAiSdkManagedSearchToolResultMetadata,
+  isAiSdkManagedSearchToolName,
+} from "./ai-sdk-managed-search-tools"
+import {
   createAiSdkSecFilingsTools,
   getAiSdkSecFilingsToolCallMetadata,
   getAiSdkSecFilingsToolResultMetadata,
@@ -106,6 +114,7 @@ export interface StartAgentRuntimeStreamParams {
   model: ModelType
   aiGatewayApiKey: string
   tavilyApiKey?: string
+  parallelApiKey?: string
   fmpApiKey?: string
   fredApiKey?: string
   secUserAgent?: string
@@ -194,6 +203,82 @@ function shouldForceFinalSynthesisStep(
   toolMaxSteps: number
 ): boolean {
   return stepNumber >= Math.max(0, toolMaxSteps - 1)
+}
+
+function outputHasError(output: unknown): boolean {
+  if (!output || typeof output !== "object") {
+    return false
+  }
+
+  const record = output as Record<string, unknown>
+  if (record.error) {
+    return true
+  }
+
+  const code = typeof record.code === "string" ? record.code.trim() : ""
+  const errorCode =
+    typeof record.errorCode === "string" ? record.errorCode.trim() : ""
+
+  return code.length > 0 || errorCode.length > 0
+}
+
+function isToolFailureResult(
+  result: {
+    toolName: string
+    output: unknown
+  },
+  toolName: string
+): boolean {
+  return result.toolName === toolName && outputHasError(result.output)
+}
+
+function isToolFailureContentPart(
+  part: ContentPart<ToolSet>,
+  toolName: string
+): boolean {
+  if (part.type !== "tool-error" && part.type !== "tool-result") {
+    return false
+  }
+
+  if (part.toolName !== toolName) {
+    return false
+  }
+
+  return part.type === "tool-error" || outputHasError(part.output)
+}
+
+function hasToolFailure(
+  steps: StepResult<ToolSet>[],
+  toolName: string
+): boolean {
+  return steps.some(
+    (step) =>
+      step.toolResults.some((result) =>
+        isToolFailureResult(result, toolName)
+      ) || step.content.some((part) => isToolFailureContentPart(part, toolName))
+  )
+}
+
+function getActiveToolsForSearchFallback(params: {
+  toolNames: string[]
+  steps: StepResult<ToolSet>[]
+  parallelEnabled: boolean
+}): string[] | undefined {
+  if (
+    !params.parallelEnabled ||
+    !params.toolNames.includes("parallel_search") ||
+    !params.toolNames.includes("gateway_web_search")
+  ) {
+    return undefined
+  }
+
+  if (hasToolFailure(params.steps, "parallel_search")) {
+    return params.toolNames.filter((toolName) => toolName !== "parallel_search")
+  }
+
+  return params.toolNames.filter(
+    (toolName) => toolName !== "gateway_web_search"
+  )
 }
 
 function getSourceEvent(
@@ -347,6 +432,9 @@ export async function* startAgentRuntimeStream(
             : undefined,
       }),
       ...createAiSdkTavilyTools(normalizedTavilyApiKey),
+      ...createAiSdkManagedSearchTools({
+        parallelApiKey: params.parallelApiKey,
+      }),
       ...createAiSdkKnowledgeSearchTools({
         enabled: featureFlags.knowledgeSearchEnabled,
         userId,
@@ -371,6 +459,7 @@ export async function* startAgentRuntimeStream(
       ...(fmpToolsContext?.tools ?? {}),
     } as ToolSet
     const toolNames = Object.keys(tools)
+    const parallelEnabled = Boolean(params.parallelApiKey?.trim())
 
     logger.info("Starting agent runtime stream.", {
       requestId: params.requestId,
@@ -406,13 +495,18 @@ export async function* startAgentRuntimeStream(
         },
       },
       tools,
-      prepareStep: ({ stepNumber }) => {
+      prepareStep: ({ stepNumber, steps }) => {
         const forceFinalSynthesis = shouldForceFinalSynthesisStep(
           stepNumber,
           runtimeProfile.toolMaxSteps
         )
+        const activeTools = getActiveToolsForSearchFallback({
+          toolNames,
+          steps,
+          parallelEnabled,
+        })
         if (!forceFinalSynthesis) {
-          return undefined
+          return activeTools ? { activeTools } : undefined
         }
 
         return {
@@ -489,6 +583,7 @@ export async function* startAgentRuntimeStream(
         const metadata =
           getAiSdkCodeExecutionToolCallMetadata(part) ??
           getAiSdkTavilyToolCallMetadata(part) ??
+          getAiSdkManagedSearchToolCallMetadata(part) ??
           getAiSdkKnowledgeSearchToolCallMetadata(part) ??
           getAiSdkBrowserResearchToolCallMetadata(part) ??
           getAiSdkFinanceDataToolCallMetadata(part) ??
@@ -528,6 +623,7 @@ export async function* startAgentRuntimeStream(
         const metadata =
           getAiSdkCodeExecutionToolResultMetadata(part) ??
           getAiSdkTavilyToolResultMetadata(part) ??
+          getAiSdkManagedSearchToolResultMetadata(part) ??
           getAiSdkKnowledgeSearchToolResultMetadata(part) ??
           getAiSdkBrowserResearchToolResultMetadata(part) ??
           getAiSdkFinanceDataToolResultMetadata(part) ??
@@ -585,6 +681,7 @@ export async function* startAgentRuntimeStream(
         part.type === "tool-error" &&
         (isAiSdkCodeExecutionToolName(part.toolName) ||
           isAiSdkTavilyToolName(part.toolName) ||
+          isAiSdkManagedSearchToolName(part.toolName) ||
           isAiSdkKnowledgeSearchToolName(part.toolName) ||
           isAiSdkBrowserResearchToolName(part.toolName) ||
           isAiSdkFinanceDataToolName(part.toolName) ||
@@ -596,6 +693,7 @@ export async function* startAgentRuntimeStream(
         const toolName =
           isAiSdkCodeExecutionToolName(part.toolName) ||
           isAiSdkTavilyToolName(part.toolName) ||
+          isAiSdkManagedSearchToolName(part.toolName) ||
           isAiSdkKnowledgeSearchToolName(part.toolName) ||
           isAiSdkBrowserResearchToolName(part.toolName) ||
           isAiSdkFinanceDataToolName(part.toolName) ||
