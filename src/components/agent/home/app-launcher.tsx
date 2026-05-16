@@ -30,6 +30,13 @@ function isFamilyApp(app: FamilyApp | undefined): app is FamilyApp {
 // Add future Chloei apps here as they come online.
 const CHLOEI_FAMILY_APPS: FamilyApp[] = [
   {
+    name: "Cloud agents",
+    shortName: "CA",
+    href: "/cloud-agents",
+    badgeClassName:
+      "border-stone-950/10 bg-linear-to-br from-stone-200 via-stone-100 to-white text-stone-950",
+  },
+  {
     name: "Space",
     shortName: "SP",
     href: "https://space.chloei.ai",
