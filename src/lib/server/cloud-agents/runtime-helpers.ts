@@ -25,6 +25,43 @@ export async function emitCloudAgentEvent(params: {
   })
 }
 
+// Emit stdout and stderr as separate events. Combining them with
+// `stdout || stderr` would drop one stream entirely and could mislabel
+// stdout chunks as stderr on failures; commands that write to both
+// streams need both visible in the activity timeline.
+export async function emitTerminalOutput(params: {
+  userId: string
+  taskId: string
+  stdout: string
+  stderr: string
+  callId?: string
+}): Promise<void> {
+  if (params.stdout) {
+    await emitCloudAgentEvent({
+      userId: params.userId,
+      taskId: params.taskId,
+      event: {
+        kind: "terminal_output",
+        stream: "stdout",
+        chunk: clampTerminalChunk(params.stdout),
+        ...(params.callId ? { callId: params.callId } : {}),
+      },
+    })
+  }
+  if (params.stderr) {
+    await emitCloudAgentEvent({
+      userId: params.userId,
+      taskId: params.taskId,
+      event: {
+        kind: "terminal_output",
+        stream: "stderr",
+        chunk: clampTerminalChunk(params.stderr),
+        ...(params.callId ? { callId: params.callId } : {}),
+      },
+    })
+  }
+}
+
 export async function applyCloudAgentStatus(params: {
   userId: string
   taskId: string

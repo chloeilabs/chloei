@@ -8,8 +8,8 @@ import {
 } from "@/lib/server/api-response"
 import {
   appendCloudAgentTaskEvent,
-  findCloudAgentTaskAnyUserByBranch,
   findCloudAgentTaskAnyUserById,
+  findCloudAgentTaskAnyUserByProjectAndBranch,
   parseVercelWebhookEvent,
   updateCloudAgentTask,
   verifyVercelWebhookSignature,
@@ -123,13 +123,20 @@ export async function POST(request: NextRequest) {
 
     // The Vercel webhook is HMAC-signed and carries no per-user auth, so
     // lookup the owning task across all users — both automation- and
-    // dashboard-created tasks need their previewUrl populated.
+    // dashboard-created tasks need their previewUrl populated. We require
+    // either an explicit chloei_task_id (set as deployment meta) or a
+    // (vercelProjectId, branch) pair so two unrelated environments that
+    // happen to share a branch name (e.g. `main`) never trample each
+    // other's previewUrl.
     const match =
       (parsed.taskId
         ? await findCloudAgentTaskAnyUserById(parsed.taskId)
         : null) ??
-      (parsed.branch
-        ? await findCloudAgentTaskAnyUserByBranch(parsed.branch)
+      (parsed.branch && parsed.projectId
+        ? await findCloudAgentTaskAnyUserByProjectAndBranch({
+            branch: parsed.branch,
+            vercelProjectId: parsed.projectId,
+          })
         : null)
     if (!match) {
       return observeRouteResponse(

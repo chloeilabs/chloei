@@ -20,6 +20,7 @@ import {
   mockCreateTask,
   mockGetTask,
   mockListAllUserIds,
+  mockListEnvironments,
   mockListTasks,
   mockUpdateTask,
 } from "./mock-store"
@@ -131,24 +132,60 @@ export async function findCloudAgentTaskAnyUserById(
   }
 }
 
-export async function findCloudAgentTaskAnyUserByBranch(
+export async function findCloudAgentTaskAnyUserByProjectAndBranch(params: {
+  vercelProjectId: string
   branch: string
-): Promise<CloudAgentTaskWithOwner | null> {
+}): Promise<CloudAgentTaskWithOwner | null> {
   if (isCloudAgentMockModeEnabled()) {
     for (const userId of mockListAllUserIds()) {
+      const environments = mockListEnvironments(userId)
+      const matchingEnvIds = new Set(
+        environments
+          .filter((env) => env.vercelProjectId === params.vercelProjectId)
+          .map((env) => env.id)
+      )
+      if (matchingEnvIds.size === 0) continue
       const tasks = mockListTasks({ userId })
-      const found = tasks.find((task) => task.branch === branch)
+      const found = tasks.find(
+        (task) =>
+          task.branch === params.branch &&
+          matchingEnvIds.has(task.environmentId)
+      )
       if (found) return { userId, task: found }
     }
     return null
   }
   const database = getDatabase()
   try {
+    // Scope the branch lookup to the deployment's Vercel project so two
+    // unrelated users / environments that happen to use the same branch
+    // name (e.g. main) never see each other's previewUrl get overwritten.
+    // The join enforces (userId, environmentId) co-tenancy via the
+    // cloud_agent_task foreign key.
     const result = await sql<CloudAgentTaskRow & { userId: string }>`
-      SELECT "userId", ${SELECT_FIELDS}
-      FROM cloud_agent_task
-      WHERE branch = ${branch}
-      ORDER BY "updatedAt" DESC, id ASC
+      SELECT
+        t."userId",
+        t.id,
+        t."environmentId",
+        t.prompt,
+        t.status,
+        t.phase,
+        t.branch,
+        t."sandboxId",
+        t."snapshotId",
+        t."prUrl",
+        t."previewUrl",
+        t.summary,
+        t.error,
+        t."createdAt",
+        t."updatedAt",
+        t."completedAt"
+      FROM cloud_agent_task AS t
+      INNER JOIN cloud_agent_environment AS e
+        ON e."userId" = t."userId" AND e.id = t."environmentId"
+      WHERE t.branch = ${params.branch}
+        AND e."vercelProjectId" = ${params.vercelProjectId}
+      ORDER BY t."updatedAt" DESC, t.id ASC
       LIMIT 1
     `.execute(database)
     const row = result.rows[0]

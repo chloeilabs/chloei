@@ -12,8 +12,8 @@ import { requestCloudAgentApproval } from "./approvals"
 import { getCloudAgentEnvironment } from "./environments"
 import {
   applyCloudAgentStatus,
-  clampTerminalChunk,
   emitCloudAgentEvent,
+  emitTerminalOutput,
   failCloudAgentTask,
 } from "./runtime-helpers"
 import {
@@ -144,14 +144,11 @@ export async function startCloudAgentTaskRunWithLlm(
         sandboxId,
         command: environment.setupCommand,
       })
-      await emitCloudAgentEvent({
+      await emitTerminalOutput({
         userId: input.userId,
         taskId: input.taskId,
-        event: {
-          kind: "terminal_output",
-          stream: setupResult.exitCode === 0 ? "stdout" : "stderr",
-          chunk: clampTerminalChunk(setupResult.stdout || setupResult.stderr),
-        },
+        stdout: setupResult.stdout,
+        stderr: setupResult.stderr,
       })
       if (setupResult.exitCode !== 0) {
         throw new Error(
@@ -280,14 +277,11 @@ export async function startCloudAgentTaskRunWithLlm(
         sandboxId,
         command: environment.testCommand,
       })
-      await emitCloudAgentEvent({
+      await emitTerminalOutput({
         userId: input.userId,
         taskId: input.taskId,
-        event: {
-          kind: "terminal_output",
-          stream: testResult.exitCode === 0 ? "stdout" : "stderr",
-          chunk: clampTerminalChunk(testResult.stdout || testResult.stderr),
-        },
+        stdout: testResult.stdout,
+        stderr: testResult.stderr,
       })
       if (testResult.exitCode !== 0) {
         await failCloudAgentTask({

@@ -11,8 +11,8 @@ import { getCloudAgentEnvironment } from "./environments"
 import { startCloudAgentTaskRunWithLlm } from "./llm-runtime"
 import {
   applyCloudAgentStatus,
-  clampTerminalChunk,
   emitCloudAgentEvent,
+  emitTerminalOutput,
   failCloudAgentTask,
 } from "./runtime-helpers"
 import { fakeCloudAgentSandboxAdapter } from "./sandbox/fake"
@@ -182,15 +182,12 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
         sandboxId,
         command: environment.setupCommand,
       })
-      await emitCloudAgentEvent({
+      await emitTerminalOutput({
         userId: input.userId,
         taskId: input.taskId,
-        event: {
-          kind: "terminal_output",
-          stream: setupResult.exitCode === 0 ? "stdout" : "stderr",
-          chunk: clampTerminalChunk(setupResult.stdout || setupResult.stderr),
-          callId: setupCallId,
-        },
+        stdout: setupResult.stdout,
+        stderr: setupResult.stderr,
+        callId: setupCallId,
       })
       await emitCloudAgentEvent({
         userId: input.userId,
@@ -293,15 +290,12 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
         sandboxId,
         command: environment.testCommand,
       })
-      await emitCloudAgentEvent({
+      await emitTerminalOutput({
         userId: input.userId,
         taskId: input.taskId,
-        event: {
-          kind: "terminal_output",
-          stream: testResult.exitCode === 0 ? "stdout" : "stderr",
-          chunk: clampTerminalChunk(testResult.stdout || testResult.stderr),
-          callId: testCallId,
-        },
+        stdout: testResult.stdout,
+        stderr: testResult.stderr,
+        callId: testCallId,
       })
       await emitCloudAgentEvent({
         userId: input.userId,
