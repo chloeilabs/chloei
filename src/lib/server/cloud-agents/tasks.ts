@@ -260,12 +260,17 @@ export async function createCloudAgentTask(params: {
           ${now},
           ${now}
         WHERE
-          ${maxConcurrent} IS NULL
+          -- Explicit ::int cast on both maxConcurrent uses: IS NULL
+          -- alone doesn't constrain the type, and the < comparison
+          -- is against bigint COUNT(*), so the pg driver otherwise
+          -- fails with SQLSTATE 42P18 ('could not determine data
+          -- type of parameter') on the bind.
+          ${maxConcurrent}::int IS NULL
           OR (
             SELECT COUNT(*) FROM cloud_agent_task
             WHERE "userId" = ${params.userId}
               AND status NOT IN ('completed', 'failed', 'cancelled')
-          ) < ${maxConcurrent}
+          ) < ${maxConcurrent}::int
         RETURNING ${SELECT_FIELDS}
       `.execute(trx)
     })
