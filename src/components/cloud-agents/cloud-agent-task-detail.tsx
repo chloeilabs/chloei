@@ -12,6 +12,7 @@ import {
   type CloudAgentEvent,
   type CloudAgentTask,
   type CloudAgentTaskEvent,
+  isCancelableCloudAgentTaskStatus,
   isTerminalCloudAgentTaskStatus,
 } from "@/lib/shared/cloud-agents"
 
@@ -440,7 +441,7 @@ export function CloudAgentTaskDetail({
             ) : null}
           </div>
         </div>
-        {!isTerminalCloudAgentTaskStatus(task.status) ? (
+        {isCancelableCloudAgentTaskStatus(task.status) ? (
           <Button
             variant="outline"
             size="sm"

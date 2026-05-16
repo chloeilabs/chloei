@@ -31,6 +31,31 @@ const CLOUD_AGENT_IN_PROGRESS_STATUSES = new Set<CloudAgentTaskStatus>([
   "pushing",
 ])
 
+// Statuses the cancel API will accept. `pr_ready` and `completed`
+// are intentionally excluded: the PR is already shipped and a late
+// cancel would clobber the summary and break the Vercel preview
+// attachment. UI and server share this set so the cancel button is
+// only shown when the request will actually succeed.
+export const CLOUD_AGENT_CANCELABLE_STATUSES = [
+  "queued",
+  "provisioning",
+  "setting_up",
+  "planning",
+  "editing",
+  "testing",
+  "waiting_for_approval",
+  "pushing",
+] as const satisfies readonly CloudAgentTaskStatus[]
+const CLOUD_AGENT_CANCELABLE_STATUS_SET = new Set<CloudAgentTaskStatus>(
+  CLOUD_AGENT_CANCELABLE_STATUSES
+)
+
+export function isCancelableCloudAgentTaskStatus(
+  status: CloudAgentTaskStatus
+): boolean {
+  return CLOUD_AGENT_CANCELABLE_STATUS_SET.has(status)
+}
+
 export function isTerminalCloudAgentTaskStatus(
   status: CloudAgentTaskStatus
 ): boolean {

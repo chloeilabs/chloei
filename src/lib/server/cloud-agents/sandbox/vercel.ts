@@ -395,29 +395,54 @@ export const vercelCloudAgentSandboxAdapter: CloudAgentSandboxAdapter = {
     const statusText = await status.stdout()
     const statusEntries = parseGitStatusPorcelainZ(statusText)
 
+    // Tracked-file numstat from git. Invoked directly (no shell) so
+    // the call is portable across the busybox / dash / bash variants
+    // a sandbox image might ship.
     const numstat = await session.sandbox.runCommand({
-      cmd: "sh",
-      args: [
-        "-lc",
-        // Use `git add --intent-to-add` semantics implicitly: diff
-        // HEAD (already at the base commit since we cloned single-
-        // revision) against the working tree. `git diff` doesn't
-        // report untracked files, so we layer those in from status.
-        "git diff --numstat HEAD -- 2>/dev/null; " +
-          // For each untracked file, count its line count as
-          // additions (deletions=0). Pipes to wc -l for each path.
-          "git status --porcelain --untracked-files=all -z " +
-          "| while IFS= read -r -d '' entry; do " +
-          "case \"$entry\" in '?? '*) " +
-          'p="${entry:3}"; ' +
-          'lines=$(wc -l < "$p" 2>/dev/null || echo 0); ' +
-          'printf "%s\\t0\\t%s\\n" "$lines" "$p" ;; ' +
-          "esac; done",
-      ],
+      cmd: "git",
+      args: ["diff", "--numstat", "HEAD"],
       cwd: session.repoCwd,
     })
-    const numstatText = numstat.exitCode === 0 ? await numstat.stdout() : ""
-    const numstatByPath = parseGitNumstat(numstatText)
+    const numstatByPath =
+      numstat.exitCode === 0
+        ? parseGitNumstat(await numstat.stdout())
+        : new Map<string, { additions: number; deletions: number }>()
+
+    // Untracked files don't appear in `git diff`. Layer them in with
+    // a single `wc -l` invocation that accepts all paths as args —
+    // POSIX-portable and exactly one extra command regardless of
+    // count. Paths come from the validated status parse above; the
+    // tool layer already rejects traversal/NUL/etc.
+    const untrackedPaths = statusEntries
+      .filter(
+        (entry) => entry.change === "added" && !numstatByPath.has(entry.path)
+      )
+      .map((entry) => entry.path)
+    if (untrackedPaths.length > 0) {
+      const wc = await session.sandbox.runCommand({
+        cmd: "wc",
+        args: ["-l", ...untrackedPaths],
+        cwd: session.repoCwd,
+      })
+      if (wc.exitCode === 0) {
+        const wcText = await wc.stdout()
+        for (const line of wcText.split("\n")) {
+          const trimmed = line.trim()
+          if (!trimmed) continue
+          // `wc -l` output: `<lines> <path>`, with a trailing
+          // `<total> total` summary when multiple files are given.
+          const match = /^(\d+)\s+(.+)$/.exec(trimmed)
+          if (!match) continue
+          const path = match[2] ?? ""
+          if (path === "total") continue
+          const lines = Number.parseInt(match[1] ?? "0", 10)
+          numstatByPath.set(path, {
+            additions: Number.isFinite(lines) ? lines : 0,
+            deletions: 0,
+          })
+        }
+      }
+    }
 
     const files: CloudAgentSandboxDiff["files"] = []
     let totalAdditions = 0

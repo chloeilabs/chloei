@@ -12,6 +12,7 @@ import {
   resolveCloudAgentRuntimeMode,
   resolveCloudAgentSandboxAdapter,
 } from "@/lib/server/cloud-agents"
+import { CLOUD_AGENT_CANCELABLE_STATUSES } from "@/lib/shared/cloud-agents"
 
 export const runtime = "nodejs"
 
@@ -41,20 +42,11 @@ export async function POST(request: NextRequest, routeContext: RouteContext) {
     const task = await cancelCloudAgentTaskIfActive({
       userId: session.user.id,
       taskId,
-      // `pr_ready` and `completed` are intentionally excluded: the
-      // PR is already on GitHub and the Vercel webhook also stops
-      // attaching previewUrl once the row goes terminal, so a late
-      // cancel would silently strand the shipped PR's summary.
-      allowedFromStatuses: [
-        "queued",
-        "provisioning",
-        "setting_up",
-        "planning",
-        "editing",
-        "testing",
-        "waiting_for_approval",
-        "pushing",
-      ],
+      // Shared with the UI so the cancel button is only shown when
+      // this endpoint will actually accept the request — see
+      // CLOUD_AGENT_CANCELABLE_STATUSES for the rationale around
+      // excluding `pr_ready` / `completed`.
+      allowedFromStatuses: [...CLOUD_AGENT_CANCELABLE_STATUSES],
       phase: "Cancelled by user",
       summary: "Cancelled by user.",
     })
