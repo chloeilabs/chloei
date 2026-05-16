@@ -311,6 +311,7 @@ function emitLog(
   console.error(formattedMessage, normalizedDetails)
 }
 
+/** Returns a scoped logger with info, warn, and error methods. */
 export function createLogger(scope: string) {
   return {
     info(message: string, details?: unknown) {
