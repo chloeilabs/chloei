@@ -40,11 +40,12 @@ afterEach(() => {
   resetFakeCloudAgentSandboxes()
 })
 
-function buildTools() {
+function buildTools({ testCommand } = {}) {
   return buildCloudAgentSandboxTools({
     adapter: fakeCloudAgentSandboxAdapter,
     sandboxId,
     baseBranch: "main",
+    ...(testCommand ? { testCommand } : {}),
     onCall: async (event) => {
       onCallEvents.push(event)
     },
@@ -110,4 +111,36 @@ test("summarize_changes records the summary text on the result event input", asy
   const result = onResultEvents.at(-1)
   assert.equal(result.status, "success")
   assert.equal(result.input.summary, "Tightened the docs.")
+})
+
+test("run_tests uses the environment's configured test command", async () => {
+  const tools = buildTools({ testCommand: "pnpm test" })
+  const result = await tools.run_tests.execute({})
+  assert.match(result, /exit_code=0/)
+  assert.match(result, /PASS/)
+  assert.equal(onCallEvents.at(-1).input.command, "pnpm test")
+  assert.equal(onResultEvents.at(-1).status, "success")
+})
+
+test("run_tests reports a skip notice when no test command is configured", async () => {
+  const tools = buildTools()
+  const result = await tools.run_tests.execute({})
+  assert.match(result, /^no test command configured/)
+  assert.equal(onResultEvents.at(-1).output.skipped, true)
+  assert.equal(
+    onResultEvents.at(-1).output.reason,
+    "no_test_command_configured"
+  )
+})
+
+test("tool call ids are scoped to the buildCloudAgentSandboxTools invocation", async () => {
+  const toolsA = buildTools()
+  const toolsB = buildTools()
+  await toolsA.write_file.execute({ path: "a.txt", content: "a" })
+  await toolsB.write_file.execute({ path: "b.txt", content: "b" })
+  // First call in each invocation should both start at counter 1.
+  const aCall = onCallEvents[onCallEvents.length - 2]
+  const bCall = onCallEvents[onCallEvents.length - 1]
+  assert.equal(aCall.callId, "write_file-1")
+  assert.equal(bCall.callId, "write_file-1")
 })

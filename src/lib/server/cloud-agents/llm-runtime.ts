@@ -242,6 +242,9 @@ export async function startCloudAgentTaskRunWithLlm(
       adapter: input.adapter,
       sandboxId,
       baseBranch: environment.baseBranch,
+      ...(environment.testCommand
+        ? { testCommand: environment.testCommand }
+        : {}),
       onCall: async (event) => {
         await emit({
           userId: input.userId,

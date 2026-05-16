@@ -12,7 +12,6 @@ import {
   type CloudAgentEvent,
   type CloudAgentTask,
   type CloudAgentTaskEvent,
-  type CloudAgentTaskStatus,
   isTerminalCloudAgentTaskStatus,
 } from "@/lib/shared/cloud-agents"
 
@@ -23,21 +22,7 @@ import {
   getCloudAgentTaskEvents,
   sendCloudAgentTaskMessage,
 } from "./cloud-agent-api"
-
-const STATUS_LABELS: Record<CloudAgentTaskStatus, string> = {
-  queued: "Queued",
-  provisioning: "Provisioning",
-  setting_up: "Setting up",
-  planning: "Planning",
-  editing: "Editing",
-  testing: "Testing",
-  waiting_for_approval: "Awaiting approval",
-  pushing: "Pushing",
-  pr_ready: "PR ready",
-  completed: "Completed",
-  failed: "Failed",
-  cancelled: "Cancelled",
-}
+import { STATUS_LABELS } from "./cloud-agent-status-labels"
 
 function formatEventTime(iso: string): string {
   try {

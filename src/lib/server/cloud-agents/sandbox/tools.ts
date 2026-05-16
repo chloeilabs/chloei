@@ -46,6 +46,7 @@ export interface BuildCloudAgentToolsParams {
   adapter: CloudAgentSandboxAdapter
   sandboxId: string
   baseBranch: string
+  testCommand?: string
   onCall: (event: {
     callId: string
     toolName: string
@@ -89,12 +90,6 @@ function summarizeCommandResult(
   return sections.join("\n\n")
 }
 
-let toolCallCounter = 0
-function nextCallId(prefix: string): string {
-  toolCallCounter += 1
-  return `${prefix}-${String(toolCallCounter)}`
-}
-
 const TERMINAL_CHUNK_MAX_CHARS = 11_800
 function clampTerminalChunk(value: string): string {
   if (value.length <= TERMINAL_CHUNK_MAX_CHARS) {
@@ -106,6 +101,11 @@ function clampTerminalChunk(value: string): string {
 export function buildCloudAgentSandboxTools(
   params: BuildCloudAgentToolsParams
 ) {
+  let toolCallCounter = 0
+  const nextCallId = (prefix: string): string => {
+    toolCallCounter += 1
+    return `${prefix}-${String(toolCallCounter)}`
+  }
   const { adapter, sandboxId } = params
 
   return {
@@ -244,17 +244,29 @@ export function buildCloudAgentSandboxTools(
       inputSchema: z.object({}),
       async execute() {
         const callId = nextCallId("run_tests")
-        const label = "Run tests"
+        const label = params.testCommand
+          ? `Run tests: ${params.testCommand.slice(0, 80)}`
+          : "Run tests"
         await params.onCall({
           callId,
           toolName: "run_tests",
           label,
-          input: {},
+          input: { command: params.testCommand ?? null },
         })
+        if (!params.testCommand) {
+          await params.onResult({
+            callId,
+            toolName: "run_tests",
+            label,
+            status: "success",
+            output: { skipped: true, reason: "no_test_command_configured" },
+          })
+          return "no test command configured on this environment; skipping"
+        }
         try {
           const result = await adapter.runCommand({
             sandboxId,
-            command: "npm test",
+            command: params.testCommand,
           })
           await params.onResult({
             callId,
