@@ -1,0 +1,358 @@
+import { tool } from "ai"
+import { z } from "zod"
+
+import type {
+  CloudAgentSandboxAdapter,
+  CloudAgentSandboxCommandResult,
+  CloudAgentSandboxDiff,
+} from "./types"
+
+const FILE_PATH_SCHEMA = z
+  .string()
+  .trim()
+  .min(1)
+  .max(1_000)
+  .describe("Repo-relative file path (no leading slash, no '..' segments).")
+const FILE_CONTENT_SCHEMA = z
+  .string()
+  .max(200_000)
+  .describe("Full file contents (writes overwrite the file).")
+const COMMAND_SCHEMA = z
+  .string()
+  .trim()
+  .min(1)
+  .max(2_000)
+  .describe("Single shell command to run inside the sandbox.")
+
+export interface CloudAgentToolEvent {
+  callId: string
+  toolName: string
+  label: string
+  input?: unknown
+  output?: unknown
+  errorMessage?: string
+  terminal?: {
+    stream: "stdout" | "stderr"
+    chunk: string
+  }
+  fileChange?: {
+    path: string
+    change: "added" | "modified" | "deleted" | "renamed"
+  }
+  status: "success" | "error"
+}
+
+export interface BuildCloudAgentToolsParams {
+  adapter: CloudAgentSandboxAdapter
+  sandboxId: string
+  baseBranch: string
+  onCall: (event: {
+    callId: string
+    toolName: string
+    label: string
+    input: unknown
+  }) => Promise<void>
+  onResult: (event: CloudAgentToolEvent) => Promise<void>
+}
+
+function summarizeDiff(diff: CloudAgentSandboxDiff): string {
+  if (diff.totals.filesChanged === 0) {
+    return "No file changes."
+  }
+  const lines = diff.files
+    .slice(0, 10)
+    .map(
+      (file) =>
+        `- ${file.change} ${file.path} (+${String(file.additions)}/-${String(file.deletions)})`
+    )
+  const truncated =
+    diff.files.length > 10
+      ? `\n…and ${String(diff.files.length - 10)} more.`
+      : ""
+  return `${String(diff.totals.filesChanged)} file(s) changed, +${String(diff.totals.additions)}/-${String(diff.totals.deletions)}:\n${lines.join("\n")}${truncated}`
+}
+
+function summarizeCommandResult(
+  result: CloudAgentSandboxCommandResult
+): string {
+  const trimmedStdout =
+    result.stdout.length > 4_000
+      ? `${result.stdout.slice(0, 4_000)}\n…[truncated]`
+      : result.stdout
+  const trimmedStderr =
+    result.stderr.length > 4_000
+      ? `${result.stderr.slice(0, 4_000)}\n…[truncated]`
+      : result.stderr
+  const sections: string[] = [`exit_code=${String(result.exitCode)}`]
+  if (trimmedStdout) sections.push(`stdout:\n${trimmedStdout}`)
+  if (trimmedStderr) sections.push(`stderr:\n${trimmedStderr}`)
+  return sections.join("\n\n")
+}
+
+let toolCallCounter = 0
+function nextCallId(prefix: string): string {
+  toolCallCounter += 1
+  return `${prefix}-${String(toolCallCounter)}`
+}
+
+const TERMINAL_CHUNK_MAX_CHARS = 11_800
+function clampTerminalChunk(value: string): string {
+  if (value.length <= TERMINAL_CHUNK_MAX_CHARS) {
+    return value
+  }
+  return `${value.slice(0, TERMINAL_CHUNK_MAX_CHARS)}\n…[truncated ${String(value.length - TERMINAL_CHUNK_MAX_CHARS)} chars]`
+}
+
+export function buildCloudAgentSandboxTools(
+  params: BuildCloudAgentToolsParams
+) {
+  const { adapter, sandboxId } = params
+
+  return {
+    read_file: tool({
+      description:
+        "Read the full contents of a file inside the sandbox repo. Use to inspect existing code before editing.",
+      inputSchema: z.object({
+        path: FILE_PATH_SCHEMA,
+      }),
+      async execute({ path: filePath }) {
+        const callId = nextCallId("read_file")
+        const label = `Read ${filePath}`
+        await params.onCall({
+          callId,
+          toolName: "read_file",
+          label,
+          input: { path: filePath },
+        })
+        try {
+          const result = await adapter.readFile({ sandboxId, path: filePath })
+          await params.onResult({
+            callId,
+            toolName: "read_file",
+            label,
+            status: "success",
+            output: { bytes: result.content.length },
+          })
+          return result.content
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "read failed"
+          await params.onResult({
+            callId,
+            toolName: "read_file",
+            label,
+            status: "error",
+            errorMessage: message,
+          })
+          return `error: ${message}`
+        }
+      },
+    }),
+
+    write_file: tool({
+      description:
+        "Write (or overwrite) a file in the sandbox repo with the given content. Use after planning your edits; prefer minimal changes.",
+      inputSchema: z.object({
+        path: FILE_PATH_SCHEMA,
+        content: FILE_CONTENT_SCHEMA,
+      }),
+      async execute({ path: filePath, content }) {
+        const callId = nextCallId("write_file")
+        const label = `Write ${filePath}`
+        await params.onCall({
+          callId,
+          toolName: "write_file",
+          label,
+          input: { path: filePath, bytes: content.length },
+        })
+        try {
+          await adapter.writeFile({ sandboxId, path: filePath, content })
+          await params.onResult({
+            callId,
+            toolName: "write_file",
+            label,
+            status: "success",
+            output: { bytes: content.length },
+            fileChange: { path: filePath, change: "modified" },
+          })
+          return `wrote ${String(content.length)} bytes to ${filePath}`
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "write failed"
+          await params.onResult({
+            callId,
+            toolName: "write_file",
+            label,
+            status: "error",
+            errorMessage: message,
+          })
+          return `error: ${message}`
+        }
+      },
+    }),
+
+    run_command: tool({
+      description:
+        "Run a shell command inside the sandbox. Use for linting, formatting, file listing, or installing extra deps. Network access follows the environment policy.",
+      inputSchema: z.object({
+        command: COMMAND_SCHEMA,
+      }),
+      async execute({ command }) {
+        const callId = nextCallId("run_command")
+        const label = `Run ${command.slice(0, 80)}`
+        await params.onCall({
+          callId,
+          toolName: "run_command",
+          label,
+          input: { command },
+        })
+        try {
+          const result = await adapter.runCommand({ sandboxId, command })
+          await params.onResult({
+            callId,
+            toolName: "run_command",
+            label,
+            status: result.exitCode === 0 ? "success" : "error",
+            output: {
+              exitCode: result.exitCode,
+              stdoutBytes: result.stdout.length,
+              stderrBytes: result.stderr.length,
+            },
+            terminal: {
+              stream: result.exitCode === 0 ? "stdout" : "stderr",
+              chunk: clampTerminalChunk(result.stdout || result.stderr),
+            },
+          })
+          return summarizeCommandResult(result)
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "command failed"
+          await params.onResult({
+            callId,
+            toolName: "run_command",
+            label,
+            status: "error",
+            errorMessage: message,
+          })
+          return `error: ${message}`
+        }
+      },
+    }),
+
+    run_tests: tool({
+      description:
+        "Run the environment's configured test command and return the result. If no test command is configured, returns a notice.",
+      inputSchema: z.object({}),
+      async execute() {
+        const callId = nextCallId("run_tests")
+        const label = "Run tests"
+        await params.onCall({
+          callId,
+          toolName: "run_tests",
+          label,
+          input: {},
+        })
+        try {
+          const result = await adapter.runCommand({
+            sandboxId,
+            command: "npm test",
+          })
+          await params.onResult({
+            callId,
+            toolName: "run_tests",
+            label,
+            status: result.exitCode === 0 ? "success" : "error",
+            output: { exitCode: result.exitCode },
+            terminal: {
+              stream: result.exitCode === 0 ? "stdout" : "stderr",
+              chunk: clampTerminalChunk(result.stdout || result.stderr),
+            },
+          })
+          return summarizeCommandResult(result)
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "tests failed"
+          await params.onResult({
+            callId,
+            toolName: "run_tests",
+            label,
+            status: "error",
+            errorMessage: message,
+          })
+          return `error: ${message}`
+        }
+      },
+    }),
+
+    get_diff: tool({
+      description:
+        "Return a summary of unstaged changes the agent has made in this sandbox vs. the base branch. Use right before finishing to confirm scope.",
+      inputSchema: z.object({}),
+      async execute() {
+        const callId = nextCallId("get_diff")
+        const label = "Inspect diff"
+        await params.onCall({
+          callId,
+          toolName: "get_diff",
+          label,
+          input: {},
+        })
+        try {
+          const diff = await adapter.getDiff({
+            sandboxId,
+            baseBranch: params.baseBranch,
+          })
+          await params.onResult({
+            callId,
+            toolName: "get_diff",
+            label,
+            status: "success",
+            output: diff.totals,
+          })
+          return summarizeDiff(diff)
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "diff failed"
+          await params.onResult({
+            callId,
+            toolName: "get_diff",
+            label,
+            status: "error",
+            errorMessage: message,
+          })
+          return `error: ${message}`
+        }
+      },
+    }),
+
+    summarize_changes: tool({
+      description:
+        "Mark the task as ready for human approval. Provide a short PR-style summary; the runtime will request approval to push and open a pull request.",
+      inputSchema: z.object({
+        summary: z
+          .string()
+          .trim()
+          .min(1)
+          .max(4_000)
+          .describe("1-3 sentence PR-ready summary of what changed and why."),
+      }),
+      async execute({ summary }) {
+        const callId = nextCallId("summarize_changes")
+        const label = "Summarize for review"
+        await params.onCall({
+          callId,
+          toolName: "summarize_changes",
+          label,
+          input: { summary },
+        })
+        await params.onResult({
+          callId,
+          toolName: "summarize_changes",
+          label,
+          status: "success",
+          input: { summary },
+          output: { summary },
+        })
+        return `summary recorded: ${summary}`
+      },
+    }),
+  }
+}
