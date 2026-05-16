@@ -9,6 +9,7 @@ import { createCloudAgentArtifact } from "./artifacts"
 import { startCloudAgentTaskRunWithLlm } from "./llm-runtime"
 import {
   applyCloudAgentStatus,
+  applyCloudAgentStatusIfFrom,
   emitCloudAgentEvent,
   emitTerminalOutput,
   failCloudAgentTask,
@@ -402,12 +403,24 @@ export async function continueCloudAgentTaskAfterApproval(input: {
     })
 
   try {
-    await applyCloudAgentStatus({
+    // Conditional transition guards each push-phase write so a
+    // concurrent cancel can't be silently overwritten. The cancel
+    // route uses an atomic UPDATE in the reverse direction; this is
+    // the matching guard for `cancelled` → push completion.
+    const pushing = await applyCloudAgentStatusIfFrom({
       userId: input.userId,
       taskId: input.taskId,
+      allowedFromStatuses: ["waiting_for_approval"],
       update: { status: "pushing" },
       phase: "Pushing branch",
     })
+    if (!pushing) {
+      logger.info(
+        "Skipping push: task is no longer waiting_for_approval (likely cancelled).",
+        input
+      )
+      return
+    }
     await adapter.createBranchAndPush({
       sandboxId,
       repoOwner: environment.repoOwner,
@@ -439,9 +452,15 @@ export async function continueCloudAgentTaskAfterApproval(input: {
     // Preview URL is populated asynchronously by the Vercel deployment webhook
     // (POST /api/webhooks/vercel) once the PR deployment finishes.
 
-    await applyCloudAgentStatus({
+    // If the user cancelled while we were pushing, the PR has
+    // already shipped on GitHub but we honor the cancel by NOT
+    // flipping the row out of `cancelled` into pr_ready/completed.
+    // The cancel route's atomic UPDATE wins; the user can see the
+    // PR on GitHub directly.
+    const prReady = await applyCloudAgentStatusIfFrom({
       userId: input.userId,
       taskId: input.taskId,
+      allowedFromStatuses: ["pushing"],
       update: {
         status: "pr_ready",
         prUrl: pr.url,
@@ -449,10 +468,18 @@ export async function continueCloudAgentTaskAfterApproval(input: {
       },
       phase: "Pull request ready",
     })
+    if (!prReady) {
+      logger.warn(
+        "PR shipped but task is no longer in `pushing` (likely user cancel). Not overwriting terminal status.",
+        { ...input, prUrl: pr.url }
+      )
+      return
+    }
 
-    await applyCloudAgentStatus({
+    await applyCloudAgentStatusIfFrom({
       userId: input.userId,
       taskId: input.taskId,
+      allowedFromStatuses: ["pr_ready"],
       update: { status: "completed" },
       phase: "Completed",
     })

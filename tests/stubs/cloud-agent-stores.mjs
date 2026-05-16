@@ -137,6 +137,13 @@ export async function updateCloudAgentTask(userId, taskId, update) {
   return next
 }
 
+export async function updateCloudAgentTaskIfStatusIn(params) {
+  const existing = getTaskMap(params.userId).get(params.taskId)
+  if (!existing) return null
+  if (!params.allowedFromStatuses.includes(existing.status)) return null
+  return updateCloudAgentTask(params.userId, params.taskId, params.update)
+}
+
 // --- Events stub module exports ---
 export async function appendCloudAgentTaskEvent(params) {
   return recordEvent(params.userId, params.taskId, params.payload)

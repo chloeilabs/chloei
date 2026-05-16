@@ -13,6 +13,7 @@ import {
 } from "./mock-store"
 import {
   type CloudAgentArtifactCreateInput,
+  cloudAgentArtifactCreateSchema,
   type CloudAgentArtifactRow,
   parseArtifactRow,
 } from "./payloads"
@@ -35,8 +36,14 @@ export async function createCloudAgentArtifact(params: {
   taskId: string
   input: CloudAgentArtifactCreateInput
 }): Promise<CloudAgentArtifact> {
+  // Defense in depth: the input type is enforced at compile time, but
+  // also run it through the Zod schema so things like the metadata
+  // default and field caps apply consistently even when callers hand-
+  // build the input object (e.g. the runtime). Keeps the schema from
+  // being dead code.
+  const input = cloudAgentArtifactCreateSchema.parse(params.input)
   if (isCloudAgentMockModeEnabled()) {
-    return mockCreateArtifact(params)
+    return mockCreateArtifact({ ...params, input })
   }
   const database = getDatabase()
   const id = randomUUID()
@@ -60,13 +67,13 @@ export async function createCloudAgentArtifact(params: {
         ${id},
         ${params.userId},
         ${params.taskId},
-        ${params.input.kind},
-        ${params.input.label},
-        ${params.input.mediaType ?? null},
-        ${params.input.sizeBytes ?? null},
-        ${params.input.url ?? null},
-        ${params.input.blobPathname ?? null},
-        CAST(${JSON.stringify(params.input.metadata)} AS jsonb),
+        ${input.kind},
+        ${input.label},
+        ${input.mediaType ?? null},
+        ${input.sizeBytes ?? null},
+        ${input.url ?? null},
+        ${input.blobPathname ?? null},
+        CAST(${JSON.stringify(input.metadata)} AS jsonb),
         ${now}
       )
       RETURNING ${SELECT_FIELDS}

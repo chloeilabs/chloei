@@ -362,6 +362,83 @@ export async function updateCloudAgentTask(
   }
 }
 
+// Atomic conditional update: only writes if the row's current status
+// is in `allowedFromStatuses`. Returns null if the row no longer
+// qualifies (e.g. a concurrent cancel moved it to `cancelled`). Used
+// by the push flow so completion of a shipped PR never silently
+// overwrites a user cancel mid-push.
+export async function updateCloudAgentTaskIfStatusIn(params: {
+  userId: string
+  taskId: string
+  allowedFromStatuses: CloudAgentTaskStatus[]
+  update: CloudAgentTaskUpdate
+}): Promise<CloudAgentTask | null> {
+  if (isCloudAgentMockModeEnabled()) {
+    const existing = mockGetTask(params.userId, params.taskId)
+    if (!existing) return null
+    if (!params.allowedFromStatuses.includes(existing.status)) return null
+    return mockUpdateTask(params.userId, params.taskId, params.update)
+  }
+  const database = getDatabase()
+  const { update } = params
+  const status = update.status
+  const shouldStampCompletion =
+    status !== undefined && isTerminalCloudAgentTaskStatus(status)
+  try {
+    const result = await sql<CloudAgentTaskRow>`
+      UPDATE cloud_agent_task
+      SET
+        status = COALESCE(${status ?? null}, status),
+        phase = CASE
+          WHEN ${update.phase === undefined} THEN phase
+          ELSE ${update.phase}
+        END,
+        branch = CASE
+          WHEN ${update.branch === undefined} THEN branch
+          ELSE ${update.branch}
+        END,
+        "sandboxId" = CASE
+          WHEN ${update.sandboxId === undefined} THEN "sandboxId"
+          ELSE ${update.sandboxId}
+        END,
+        "snapshotId" = CASE
+          WHEN ${update.snapshotId === undefined} THEN "snapshotId"
+          ELSE ${update.snapshotId}
+        END,
+        "prUrl" = CASE
+          WHEN ${update.prUrl === undefined} THEN "prUrl"
+          ELSE ${update.prUrl}
+        END,
+        "previewUrl" = CASE
+          WHEN ${update.previewUrl === undefined} THEN "previewUrl"
+          ELSE ${update.previewUrl}
+        END,
+        summary = CASE
+          WHEN ${update.summary === undefined} THEN summary
+          ELSE ${update.summary}
+        END,
+        error = CASE
+          WHEN ${update.error === undefined} THEN error
+          ELSE ${update.error}
+        END,
+        "updatedAt" = CURRENT_TIMESTAMP,
+        "completedAt" = CASE
+          WHEN ${shouldStampCompletion} AND "completedAt" IS NULL
+            THEN CURRENT_TIMESTAMP
+          ELSE "completedAt"
+        END
+      WHERE "userId" = ${params.userId}
+        AND id = ${params.taskId}
+        AND status = ANY(${params.allowedFromStatuses}::text[])
+      RETURNING ${SELECT_FIELDS}
+    `.execute(database)
+    const row = result.rows[0]
+    return row ? parseTaskRow(row) : null
+  } catch (error) {
+    throw wrapCloudAgentStoreError(error)
+  }
+}
+
 export async function requireCloudAgentTaskTransition(params: {
   userId: string
   taskId: string

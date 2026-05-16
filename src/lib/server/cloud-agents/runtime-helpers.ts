@@ -2,11 +2,17 @@ import { createLogger } from "@/lib/logger"
 import type {
   CloudAgentEnvironment,
   CloudAgentEvent,
+  CloudAgentTask,
+  CloudAgentTaskStatus,
 } from "@/lib/shared/cloud-agents"
 
 import { getCloudAgentEnvironment } from "./environments"
 import { appendCloudAgentTaskEvent } from "./events"
-import { type CloudAgentTaskUpdate, updateCloudAgentTask } from "./tasks"
+import {
+  type CloudAgentTaskUpdate,
+  updateCloudAgentTask,
+  updateCloudAgentTaskIfStatusIn,
+} from "./tasks"
 
 export const TERMINAL_CHUNK_MAX_CHARS = 11_800
 
@@ -87,6 +93,44 @@ export async function applyCloudAgentStatus(params: {
       },
     })
   }
+}
+
+// Conditional sibling of applyCloudAgentStatus: writes only if the
+// row's current status is in `allowedFromStatuses`, and emits the
+// status event only when the write actually landed. Returns the
+// updated task, or null if a concurrent transition (e.g. user
+// cancel mid-push) moved the row out of the allowed set. Push-flow
+// callers use this so completion of a shipped PR can't silently
+// overwrite a user cancel.
+export async function applyCloudAgentStatusIfFrom(params: {
+  userId: string
+  taskId: string
+  allowedFromStatuses: CloudAgentTaskStatus[]
+  update: CloudAgentTaskUpdate
+  phase?: string
+}): Promise<CloudAgentTask | null> {
+  const updated = await updateCloudAgentTaskIfStatusIn({
+    userId: params.userId,
+    taskId: params.taskId,
+    allowedFromStatuses: params.allowedFromStatuses,
+    update: {
+      ...params.update,
+      ...(params.phase !== undefined ? { phase: params.phase } : {}),
+    },
+  })
+  if (!updated) return null
+  if (params.update.status) {
+    await emitCloudAgentEvent({
+      userId: params.userId,
+      taskId: params.taskId,
+      event: {
+        kind: "status",
+        status: params.update.status,
+        ...(params.phase ? { phase: params.phase } : {}),
+      },
+    })
+  }
+  return updated
 }
 
 // Shared environment-lookup guard used by both scripted and LLM
