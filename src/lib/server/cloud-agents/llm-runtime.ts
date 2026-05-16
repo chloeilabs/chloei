@@ -9,12 +9,12 @@ import {
 } from "@/lib/shared/cloud-agents"
 
 import { requestCloudAgentApproval } from "./approvals"
-import { getCloudAgentEnvironment } from "./environments"
 import {
   applyCloudAgentStatus,
   emitCloudAgentEvent,
   emitTerminalOutput,
   failCloudAgentTask,
+  getCloudAgentEnvironmentOrFail,
 } from "./runtime-helpers"
 import {
   buildCloudAgentSandboxTools,
@@ -89,28 +89,12 @@ export async function startCloudAgentTaskRunWithLlm(
     return
   }
 
-  const environment = await getCloudAgentEnvironment(
-    input.userId,
-    task.environmentId
-  )
-  if (!environment) {
-    await applyCloudAgentStatus({
-      userId: input.userId,
-      taskId: input.taskId,
-      update: { status: "failed", error: "Environment not found." },
-    })
-    await emitCloudAgentEvent({
-      userId: input.userId,
-      taskId: input.taskId,
-      event: {
-        kind: "error",
-        message: "Environment not found for this task.",
-        errorCode: "CLOUD_AGENT_ENVIRONMENT_MISSING",
-        retryable: false,
-      },
-    })
-    return
-  }
+  const environment = await getCloudAgentEnvironmentOrFail({
+    userId: input.userId,
+    taskId: input.taskId,
+    environmentId: task.environmentId,
+  })
+  if (!environment) return
 
   let sandboxId: string | null = null
   const summaryRef = { value: null as string | null }

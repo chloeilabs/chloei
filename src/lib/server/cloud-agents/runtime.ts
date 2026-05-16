@@ -1,19 +1,18 @@
 import { createLogger } from "@/lib/logger"
 import {
   type CloudAgentApprovalAction,
-  type CloudAgentEnvironment,
   deriveCloudAgentTaskBranchName,
 } from "@/lib/shared/cloud-agents"
 
 import { requestCloudAgentApproval } from "./approvals"
 import { createCloudAgentArtifact } from "./artifacts"
-import { getCloudAgentEnvironment } from "./environments"
 import { startCloudAgentTaskRunWithLlm } from "./llm-runtime"
 import {
   applyCloudAgentStatus,
   emitCloudAgentEvent,
   emitTerminalOutput,
   failCloudAgentTask,
+  getCloudAgentEnvironmentOrFail,
 } from "./runtime-helpers"
 import { fakeCloudAgentSandboxAdapter } from "./sandbox/fake"
 import type { CloudAgentSandboxAdapter } from "./sandbox/types"
@@ -65,39 +64,6 @@ interface RunInput {
   taskId: string
 }
 
-async function getEnvironmentOrFail(params: {
-  userId: string
-  taskId: string
-  environmentId: string
-}): Promise<CloudAgentEnvironment | null> {
-  const environment = await getCloudAgentEnvironment(
-    params.userId,
-    params.environmentId
-  )
-  if (!environment) {
-    await applyCloudAgentStatus({
-      userId: params.userId,
-      taskId: params.taskId,
-      update: {
-        status: "failed",
-        error: "Environment not found.",
-      },
-    })
-    await emitCloudAgentEvent({
-      userId: params.userId,
-      taskId: params.taskId,
-      event: {
-        kind: "error",
-        message: "Environment not found for this task.",
-        errorCode: "CLOUD_AGENT_ENVIRONMENT_MISSING",
-        retryable: false,
-      },
-    })
-    return null
-  }
-  return environment
-}
-
 export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
   const task = await getCloudAgentTask(input.userId, input.taskId)
   if (!task) {
@@ -112,7 +78,7 @@ export async function startCloudAgentTaskRun(input: RunInput): Promise<void> {
     return
   }
 
-  const environment = await getEnvironmentOrFail({
+  const environment = await getCloudAgentEnvironmentOrFail({
     userId: input.userId,
     taskId: input.taskId,
     environmentId: task.environmentId,
@@ -407,7 +373,7 @@ export async function continueCloudAgentTaskAfterApproval(input: {
     return
   }
 
-  const environment = await getEnvironmentOrFail({
+  const environment = await getCloudAgentEnvironmentOrFail({
     userId: input.userId,
     taskId: input.taskId,
     environmentId: task.environmentId,

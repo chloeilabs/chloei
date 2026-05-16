@@ -41,6 +41,10 @@ export async function POST(request: NextRequest, routeContext: RouteContext) {
     const task = await cancelCloudAgentTaskIfActive({
       userId: session.user.id,
       taskId,
+      // `pr_ready` and `completed` are intentionally excluded: the
+      // PR is already on GitHub and the Vercel webhook also stops
+      // attaching previewUrl once the row goes terminal, so a late
+      // cancel would silently strand the shipped PR's summary.
       allowedFromStatuses: [
         "queued",
         "provisioning",
@@ -50,24 +54,32 @@ export async function POST(request: NextRequest, routeContext: RouteContext) {
         "testing",
         "waiting_for_approval",
         "pushing",
-        "pr_ready",
       ],
       phase: "Cancelled by user",
       summary: "Cancelled by user.",
     })
-    await appendCloudAgentTaskEvent({
-      userId: session.user.id,
-      taskId,
-      payload: {
-        kind: "status",
-        status: "cancelled",
-        phase: "Cancelled by user",
-      },
-    })
-    // Re-read after cancel so we destroy the sandbox the canceled row
-    // actually owns (the conditional UPDATE returned the full task too,
-    // but `task.sandboxId` is already accurate as of the same write).
+    // The DB row is now `cancelled` (atomic). From here on, every
+    // cleanup step is best-effort: a transient event-append or
+    // destroy failure must not skip the others, otherwise a retry
+    // hits the transition guard and leaves the sandbox running
+    // until the 90-min timeout.
     const sandboxId = task.sandboxId
+    try {
+      await appendCloudAgentTaskEvent({
+        userId: session.user.id,
+        taskId,
+        payload: {
+          kind: "status",
+          status: "cancelled",
+          phase: "Cancelled by user",
+        },
+      })
+    } catch (error) {
+      logger.warn("Failed to append cancel event after task cancelled.", {
+        taskId,
+        error,
+      })
+    }
     if (sandboxId) {
       const adapter = resolveCloudAgentSandboxAdapter(
         resolveCloudAgentRuntimeMode()

@@ -12,6 +12,13 @@ import type {
 // adversarial instructions could otherwise prompt-inject the tool
 // into reading or writing outside the checkout (e.g. into the host
 // container's filesystem). The Vercel adapter also re-validates.
+// Bound LLM-controlled commands so a hung lint/test/install can be
+// aborted via the adapter's AbortController path instead of stalling
+// the Inngest step until the 90-min sandbox timeout. Tests get a
+// longer ceiling than ad-hoc commands.
+const TOOL_RUN_COMMAND_TIMEOUT_MS = 5 * 60 * 1000
+const TOOL_RUN_TESTS_TIMEOUT_MS = 15 * 60 * 1000
+
 const FILE_PATH_SCHEMA = z
   .string()
   .trim()
@@ -223,7 +230,11 @@ export function buildCloudAgentSandboxTools(
           input: { command },
         })
         try {
-          const result = await adapter.runCommand({ sandboxId, command })
+          const result = await adapter.runCommand({
+            sandboxId,
+            command,
+            timeoutMs: TOOL_RUN_COMMAND_TIMEOUT_MS,
+          })
           await params.onResult({
             callId,
             toolName: "run_command",
@@ -281,6 +292,7 @@ export function buildCloudAgentSandboxTools(
           const result = await adapter.runCommand({
             sandboxId,
             command: params.testCommand,
+            timeoutMs: TOOL_RUN_TESTS_TIMEOUT_MS,
           })
           await params.onResult({
             callId,

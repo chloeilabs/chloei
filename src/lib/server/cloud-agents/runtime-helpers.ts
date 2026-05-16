@@ -1,6 +1,10 @@
 import { createLogger } from "@/lib/logger"
-import type { CloudAgentEvent } from "@/lib/shared/cloud-agents"
+import type {
+  CloudAgentEnvironment,
+  CloudAgentEvent,
+} from "@/lib/shared/cloud-agents"
 
+import { getCloudAgentEnvironment } from "./environments"
 import { appendCloudAgentTaskEvent } from "./events"
 import { type CloudAgentTaskUpdate, updateCloudAgentTask } from "./tasks"
 
@@ -83,6 +87,37 @@ export async function applyCloudAgentStatus(params: {
       },
     })
   }
+}
+
+// Shared environment-lookup guard used by both scripted and LLM
+// runtimes. On miss, marks the task `failed` and emits an `error`
+// event before returning null so callers can early-return.
+export async function getCloudAgentEnvironmentOrFail(params: {
+  userId: string
+  taskId: string
+  environmentId: string
+}): Promise<CloudAgentEnvironment | null> {
+  const environment = await getCloudAgentEnvironment(
+    params.userId,
+    params.environmentId
+  )
+  if (environment) return environment
+  await applyCloudAgentStatus({
+    userId: params.userId,
+    taskId: params.taskId,
+    update: { status: "failed", error: "Environment not found." },
+  })
+  await emitCloudAgentEvent({
+    userId: params.userId,
+    taskId: params.taskId,
+    event: {
+      kind: "error",
+      message: "Environment not found for this task.",
+      errorCode: "CLOUD_AGENT_ENVIRONMENT_MISSING",
+      retryable: false,
+    },
+  })
+  return null
 }
 
 export async function failCloudAgentTask(params: {
