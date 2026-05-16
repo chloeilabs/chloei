@@ -541,13 +541,21 @@ export const vercelCloudAgentSandboxAdapter: CloudAgentSandboxAdapter = {
     // expands to the literal value even if it contains `$(...)` or other
     // shell metacharacters. Using `cmd: "git"` directly skips shell
     // expansion, so the auth header token would land as literal text; we
-    // need `sh -lc` to expand $CHLOEI_GITHUB_TOKEN into the header.
+    // need `sh -lc` to expand $CHLOEI_GITHUB_TOKEN into the URL.
+    //
+    // Auth uses the GitHub-recommended x-access-token URL form rather than
+    // http.extraHeader because the latter was observed to silently fail
+    // against github.com on Vercel Sandbox (git fell back to credential
+    // helper and errored with "could not read Username for
+    // 'https://github.com'"). `credential.helper=` is forced to empty so a
+    // misbehaving inherited helper can't prompt or rewrite the URL.
     const push = await session.sandbox.runCommand({
       cmd: "sh",
       args: [
         "-lc",
-        'git -c "http.extraHeader=Authorization: Bearer $CHLOEI_GITHUB_TOKEN" ' +
-          'push "https://github.com/$CHLOEI_REPO_OWNER/$CHLOEI_REPO_NAME.git" ' +
+        "git -c credential.helper= " +
+          "push " +
+          '"https://x-access-token:$CHLOEI_GITHUB_TOKEN@github.com/$CHLOEI_REPO_OWNER/$CHLOEI_REPO_NAME.git" ' +
           '"HEAD:refs/heads/$CHLOEI_BRANCH"',
       ],
       cwd: session.repoCwd,
