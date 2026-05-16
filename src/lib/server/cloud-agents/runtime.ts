@@ -519,6 +519,33 @@ export async function continueCloudAgentTaskAfterApproval(input: {
         "PR shipped but task is no longer in `pushing` (likely user cancel). Not overwriting terminal status.",
         { ...input, prUrl: pr.url }
       )
+      // Best-effort backfill: the PR exists on GitHub even though the
+      // user cancelled, so attach prUrl + a summary to the cancelled
+      // row so the dashboard can surface the surprise PR. Leave
+      // status alone — the cancel must remain terminal.
+      await updateCloudAgentTask(input.userId, input.taskId, {
+        prUrl: pr.url,
+        summary: "PR shipped after task was cancelled; see prUrl.",
+      }).catch((error: unknown) => {
+        logger.warn("Failed to backfill prUrl on cancelled task after push.", {
+          ...input,
+          prUrl: pr.url,
+          error,
+        })
+      })
+      await emitCloudAgentEvent({
+        userId: input.userId,
+        taskId: input.taskId,
+        event: {
+          kind: "text_delta",
+          text: `Pull request was opened on GitHub before the cancel landed: ${pr.url}`,
+        },
+      }).catch((error: unknown) => {
+        logger.warn(
+          "Failed to emit text_delta about PR shipped after cancel.",
+          { ...input, prUrl: pr.url, error }
+        )
+      })
       return
     }
 

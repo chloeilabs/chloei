@@ -463,21 +463,47 @@ export function CloudAgentTaskDetail({
       ) : null}
 
       {task.prUrl ? (
-        <section className="flex items-center gap-2 border border-emerald-500/40 bg-emerald-50/40 p-3 text-sm dark:bg-emerald-950/20">
-          <span className="font-departureMono text-xs tracking-[0.18em] text-emerald-700 uppercase dark:text-emerald-300">
-            Pull request
-          </span>
-          <a
-            className="inline-flex items-center gap-1 underline"
-            href={task.prUrl}
-            target="_blank"
-            rel="noreferrer noopener"
-            data-testid="cloud-agent-pr-link"
+        task.status === "cancelled" ? (
+          <section
+            className="flex flex-col gap-1 border border-amber-500/50 bg-amber-50/60 p-3 text-sm dark:bg-amber-950/20"
+            data-testid="cloud-agent-pr-shipped-after-cancel"
           >
-            {task.prUrl}
-            <ExternalLink className="size-3" />
-          </a>
-        </section>
+            <span className="font-departureMono text-xs tracking-[0.18em] text-amber-700 uppercase dark:text-amber-300">
+              PR shipped before cancel
+            </span>
+            <p className="text-xs text-muted-foreground">
+              The push completed on GitHub before your cancel landed. The task
+              is still cancelled — close the PR there if you don&apos;t want it
+              to ship.
+            </p>
+            <a
+              className="inline-flex items-center gap-1 underline"
+              href={task.prUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              data-testid="cloud-agent-pr-link"
+            >
+              {task.prUrl}
+              <ExternalLink className="size-3" />
+            </a>
+          </section>
+        ) : (
+          <section className="flex items-center gap-2 border border-emerald-500/40 bg-emerald-50/40 p-3 text-sm dark:bg-emerald-950/20">
+            <span className="font-departureMono text-xs tracking-[0.18em] text-emerald-700 uppercase dark:text-emerald-300">
+              Pull request
+            </span>
+            <a
+              className="inline-flex items-center gap-1 underline"
+              href={task.prUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              data-testid="cloud-agent-pr-link"
+            >
+              {task.prUrl}
+              <ExternalLink className="size-3" />
+            </a>
+          </section>
+        )
       ) : null}
 
       {task.previewUrl ? (
