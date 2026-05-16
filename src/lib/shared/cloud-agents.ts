@@ -197,11 +197,14 @@ export interface CloudAgentNetworkPolicy {
   allowlist?: string[]
 }
 
+// Mirror the runtimes the @vercel/sandbox SDK actually accepts so a
+// user-selected value lands the version they expect. (Previously we
+// exposed "python311"/"python312" and silently downgraded to 3.13.)
 export const CLOUD_AGENT_SANDBOX_RUNTIMES = [
   "node22",
   "node24",
-  "python311",
-  "python312",
+  "node26",
+  "python313",
 ] as const
 
 export type CloudAgentSandboxRuntime =

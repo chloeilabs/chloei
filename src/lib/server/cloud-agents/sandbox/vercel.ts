@@ -46,6 +46,7 @@ interface VercelSandboxSession {
       args?: string[]
       cwd?: string
       env?: Record<string, string>
+      signal?: AbortSignal
     }): Promise<{
       exitCode: number
       stdout: () => Promise<string>
@@ -123,6 +124,80 @@ function ensureSafeRepoPath(path: string): string {
   return trimmed
 }
 
+interface GitStatusEntry {
+  path: string
+  previousPath?: string
+  change: "added" | "modified" | "deleted" | "renamed"
+}
+
+// `git status --porcelain=v1 -z` separates entries with NUL bytes.
+// Each entry is `XY␣<path>` (and renames inline an extra NUL +
+// origin path). We only care about working-tree mutations the user
+// is about to push, so collapse the index + worktree fields into a
+// single change classification per path.
+function parseGitStatusPorcelainZ(text: string): GitStatusEntry[] {
+  const entries: GitStatusEntry[] = []
+  const tokens = text.split("\0")
+  let i = 0
+  while (i < tokens.length) {
+    const token = tokens[i]
+    if (!token || token.length < 3) {
+      i += 1
+      continue
+    }
+    const xy = token.slice(0, 2)
+    const path = token.slice(3)
+    const indexStatus = xy[0] ?? " "
+    const worktreeStatus = xy[1] ?? " "
+    if (indexStatus === "R" || worktreeStatus === "R") {
+      const previousPath = tokens[i + 1]
+      entries.push({
+        path,
+        change: "renamed",
+        ...(previousPath ? { previousPath } : {}),
+      })
+      i += 2
+      continue
+    }
+    const summary = `${indexStatus}${worktreeStatus}`
+    if (summary === "??" || indexStatus === "A") {
+      entries.push({ path, change: "added" })
+    } else if (indexStatus === "D" || worktreeStatus === "D") {
+      entries.push({ path, change: "deleted" })
+    } else {
+      entries.push({ path, change: "modified" })
+    }
+    i += 1
+  }
+  return entries
+}
+
+// `git diff --numstat` rows are `<additions>\t<deletions>\t<path>`.
+// Binary files use `-` for the numeric fields; treat those as 0/0.
+function parseGitNumstat(
+  text: string
+): Map<string, { additions: number; deletions: number }> {
+  const result = new Map<string, { additions: number; deletions: number }>()
+  for (const line of text.split("\n")) {
+    if (!line) continue
+    const parts = line.split("\t")
+    if (parts.length < 3) continue
+    const additionsRaw = parts[0] ?? "0"
+    const deletionsRaw = parts[1] ?? "0"
+    const path = parts.slice(2).join("\t").trim()
+    if (!path) continue
+    const additions =
+      additionsRaw === "-" ? 0 : Number.parseInt(additionsRaw, 10)
+    const deletions =
+      deletionsRaw === "-" ? 0 : Number.parseInt(deletionsRaw, 10)
+    result.set(path, {
+      additions: Number.isFinite(additions) ? additions : 0,
+      deletions: Number.isFinite(deletions) ? deletions : 0,
+    })
+  }
+  return result
+}
+
 async function readFileContent(
   session: VercelSandboxSession,
   path: string
@@ -160,16 +235,22 @@ export function isVercelSandboxConfigured(): boolean {
   )
 }
 
-// Map our CloudAgentSandboxRuntime enum to the strings the @vercel/sandbox
-// SDK accepts. Unknown values pass through; the SDK types accept any
-// string so it will surface its own error if the runtime is unsupported.
+// Map our CloudAgentSandboxRuntime enum to the strings the
+// @vercel/sandbox SDK accepts ("node22"/"node24"/"node26"/"python3.13").
+// Throw on unknown values rather than silently picking a different
+// version — the schema only allows the supported set.
 function mapToVercelRuntime(value: string): string {
   switch (value) {
-    case "python311":
-    case "python312":
+    case "node22":
+    case "node24":
+    case "node26":
+      return value
+    case "python313":
       return "python3.13"
     default:
-      return value
+      throw new Error(
+        `Unsupported sandbox runtime ${value}; allowed: node22, node24, node26, python313.`
+      )
   }
 }
 
@@ -240,12 +321,29 @@ export const vercelCloudAgentSandboxAdapter: CloudAgentSandboxAdapter = {
   async runCommand(params): Promise<CloudAgentSandboxCommandResult> {
     const session = require(params.sandboxId)
     const startedAt = Date.now()
-    const result = await session.sandbox.runCommand({
-      cmd: "sh",
-      args: ["-lc", params.command],
-      cwd: session.repoCwd,
-    })
-    return asCommandResult(startedAt, result)
+    // Wire the adapter-level timeoutMs through to the Vercel SDK via
+    // an AbortController so a model-controlled command that hangs
+    // (LLM `run_command` tool) doesn't stall the entire Inngest step
+    // until the sandbox 90-minute timeout.
+    const controller =
+      params.timeoutMs !== undefined ? new AbortController() : null
+    const timeoutHandle =
+      controller && params.timeoutMs !== undefined
+        ? setTimeout(() => {
+            controller.abort()
+          }, params.timeoutMs)
+        : null
+    try {
+      const result = await session.sandbox.runCommand({
+        cmd: "sh",
+        args: ["-lc", params.command],
+        cwd: session.repoCwd,
+        ...(controller ? { signal: controller.signal } : {}),
+      })
+      return await asCommandResult(startedAt, result)
+    } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle)
+    }
   },
 
   async writeFile(params) {
@@ -291,33 +389,72 @@ export const vercelCloudAgentSandboxAdapter: CloudAgentSandboxAdapter = {
   async getDiff(params): Promise<CloudAgentSandboxDiff> {
     void params.baseBranch
     const session = require(params.sandboxId)
+    // Enumerate working-tree changes via git so we capture mutations
+    // from `run_command` (sed, formatters, codemods, pkg managers)
+    // alongside writeFile-tracked edits. Without this, the approval
+    // UI showed zero files while `git add -A` later included them in
+    // the pushed PR.
+    const status = await session.sandbox.runCommand({
+      cmd: "git",
+      args: ["status", "--porcelain=v1", "--untracked-files=all", "-z"],
+      cwd: session.repoCwd,
+    })
+    if (status.exitCode !== 0) {
+      const stderr = await status.stderr()
+      throw new Error(`git status failed: ${stderr}`)
+    }
+    const statusText = await status.stdout()
+    const statusEntries = parseGitStatusPorcelainZ(statusText)
+
+    const numstat = await session.sandbox.runCommand({
+      cmd: "sh",
+      args: [
+        "-lc",
+        // Use `git add --intent-to-add` semantics implicitly: diff
+        // HEAD (already at the base commit since we cloned single-
+        // revision) against the working tree. `git diff` doesn't
+        // report untracked files, so we layer those in from status.
+        "git diff --numstat HEAD -- 2>/dev/null; " +
+          // For each untracked file, count its line count as
+          // additions (deletions=0). Pipes to wc -l for each path.
+          "git status --porcelain --untracked-files=all -z " +
+          "| while IFS= read -r -d '' entry; do " +
+          "case \"$entry\" in '?? '*) " +
+          'p="${entry:3}"; ' +
+          'lines=$(wc -l < "$p" 2>/dev/null || echo 0); ' +
+          'printf "%s\\t0\\t%s\\n" "$lines" "$p" ;; ' +
+          "esac; done",
+      ],
+      cwd: session.repoCwd,
+    })
+    const numstatText = numstat.exitCode === 0 ? await numstat.stdout() : ""
+    const numstatByPath = parseGitNumstat(numstatText)
+
     const files: CloudAgentSandboxDiff["files"] = []
     let totalAdditions = 0
     let totalDeletions = 0
-    for (const [path, record] of session.fileChanges.entries()) {
-      const additions = record.wasNew
-        ? record.newLineCount
-        : Math.max(record.newLineCount - record.oldLineCount, 0)
-      const deletions = record.wasNew
-        ? 0
-        : Math.max(record.oldLineCount - record.newLineCount, 0)
+    for (const entry of statusEntries) {
+      const numstatRow = numstatByPath.get(entry.path)
+      const additions = numstatRow?.additions ?? 0
+      const deletions = numstatRow?.deletions ?? 0
       totalAdditions += additions
       totalDeletions += deletions
       files.push({
-        path,
-        change: record.wasNew ? "added" : "modified",
+        path: entry.path,
+        change: entry.change,
         additions,
         deletions,
+        ...(entry.previousPath ? { previousPath: entry.previousPath } : {}),
       })
     }
-    return Promise.resolve({
+    return {
       files,
       totals: {
         filesChanged: files.length,
         additions: totalAdditions,
         deletions: totalDeletions,
       },
-    })
+    }
   },
 
   async createBranchAndPush(params) {
