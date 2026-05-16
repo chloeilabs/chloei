@@ -5,6 +5,7 @@ import {
   cloudAgentJsonResponse,
   CloudAgentNotFoundError,
   cloudAgentTaskCreateSchema,
+  CloudAgentTransitionError,
   createCloudAgentRouteContext,
   createCloudAgentTask,
   dispatchCloudAgentTaskRequested,
@@ -14,6 +15,8 @@ import {
   requireCloudAgentsEnabled,
   requireCloudAgentSession,
 } from "@/lib/server/cloud-agents"
+
+const CLOUD_AGENT_TASK_RETRY_AFTER_SECONDS = 60
 
 export const runtime = "nodejs"
 
@@ -71,10 +74,9 @@ export async function POST(request: NextRequest) {
         maxConcurrentPerUser: CLOUD_AGENT_MAX_CONCURRENT_PER_USER,
       })
     } catch (error) {
-      if (
-        error instanceof Error &&
-        error.message.includes("concurrency limit")
-      ) {
+      if (error instanceof CloudAgentTransitionError) {
+        const resetAtSeconds =
+          Math.floor(Date.now() / 1000) + CLOUD_AGENT_TASK_RETRY_AFTER_SECONDS
         return cloudAgentJsonResponse(
           context,
           {
@@ -86,7 +88,8 @@ export async function POST(request: NextRequest) {
             headers: {
               "X-RateLimit-Limit": String(CLOUD_AGENT_MAX_CONCURRENT_PER_USER),
               "X-RateLimit-Remaining": "0",
-              "Retry-After": "60",
+              "X-RateLimit-Reset": String(resetAtSeconds),
+              "Retry-After": String(CLOUD_AGENT_TASK_RETRY_AFTER_SECONDS),
             },
           }
         )

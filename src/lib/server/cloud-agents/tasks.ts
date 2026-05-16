@@ -149,36 +149,44 @@ export async function createCloudAgentTask(params: {
   const now = new Date()
   const maxConcurrent = params.maxConcurrentPerUser ?? null
   try {
-    // INSERT...SELECT keeps the count-and-create atomic at the DB level:
-    // the SELECT runs against the same snapshot as the conditional INSERT,
-    // so two concurrent requests can't both pass the cap.
-    const result = await sql<CloudAgentTaskRow>`
-      INSERT INTO cloud_agent_task (
-        id,
-        "userId",
-        "environmentId",
-        prompt,
-        status,
-        "createdAt",
-        "updatedAt"
-      )
-      SELECT
-        ${id},
-        ${params.userId},
-        ${params.environmentId},
-        ${params.prompt},
-        'queued',
-        ${now},
-        ${now}
-      WHERE
-        ${maxConcurrent} IS NULL
-        OR (
-          SELECT COUNT(*) FROM cloud_agent_task
-          WHERE "userId" = ${params.userId}
-            AND status NOT IN ('completed', 'failed', 'cancelled')
-        ) < ${maxConcurrent}
-      RETURNING ${SELECT_FIELDS}
-    `.execute(database)
+    // Run the count-and-create inside a transaction with a per-user advisory
+    // lock so two concurrent requests can't both pass the cap under READ
+    // COMMITTED. The lock is keyed on hashtext(userId) so it's bounded per
+    // user, and pg_advisory_xact_lock auto-releases at COMMIT / ROLLBACK.
+    const result = await database.transaction().execute(async (trx) => {
+      if (maxConcurrent !== null) {
+        await sql`SELECT pg_advisory_xact_lock(hashtext(${params.userId})::int8)`.execute(
+          trx
+        )
+      }
+      return sql<CloudAgentTaskRow>`
+        INSERT INTO cloud_agent_task (
+          id,
+          "userId",
+          "environmentId",
+          prompt,
+          status,
+          "createdAt",
+          "updatedAt"
+        )
+        SELECT
+          ${id},
+          ${params.userId},
+          ${params.environmentId},
+          ${params.prompt},
+          'queued',
+          ${now},
+          ${now}
+        WHERE
+          ${maxConcurrent} IS NULL
+          OR (
+            SELECT COUNT(*) FROM cloud_agent_task
+            WHERE "userId" = ${params.userId}
+              AND status NOT IN ('completed', 'failed', 'cancelled')
+          ) < ${maxConcurrent}
+        RETURNING ${SELECT_FIELDS}
+      `.execute(trx)
+    })
     const row = result.rows[0]
     if (!row) {
       throw new CloudAgentTransitionError(

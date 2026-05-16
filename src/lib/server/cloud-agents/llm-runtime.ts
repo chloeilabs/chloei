@@ -373,6 +373,9 @@ export async function startCloudAgentTaskRunWithLlm(
           ),
           errorCode: "CLOUD_AGENT_TESTS_FAILED",
         })
+        if (sandboxId) {
+          await input.adapter.destroy({ sandboxId }).catch(() => undefined)
+        }
         return
       }
     }
