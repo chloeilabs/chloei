@@ -27,15 +27,13 @@ const SANDBOX_GIT_DEPTH = (() => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 50
 })()
 
+// Tracks whether writeFile saw the path before so the write_file tool
+// can label its file_change event as `added` vs `modified`. The per-
+// file line counts that used to live here are gone: getDiff now reads
+// the working tree via `git status` + `git diff --numstat` so it
+// captures `run_command` mutations too.
 interface FileChangeRecord {
   wasNew: boolean
-  newLineCount: number
-  oldLineCount: number
-}
-
-function countLines(text: string): number {
-  if (text.length === 0) return 0
-  return text.split("\n").length
 }
 
 interface VercelSandboxSession {
@@ -352,22 +350,13 @@ export const vercelCloudAgentSandboxAdapter: CloudAgentSandboxAdapter = {
     const existing = session.fileChanges.get(safePath)
     const wasNew =
       existing?.wasNew ?? (await readFileContent(session, safePath)) === null
-    const oldLineCount =
-      existing?.oldLineCount ??
-      (wasNew
-        ? 0
-        : countLines((await readFileContent(session, safePath)) ?? ""))
     await session.sandbox.writeFiles([
       {
         path: `${session.repoCwd}/${safePath}`,
         content: Buffer.from(params.content, "utf8"),
       },
     ])
-    session.fileChanges.set(safePath, {
-      wasNew,
-      oldLineCount,
-      newLineCount: countLines(params.content),
-    })
+    session.fileChanges.set(safePath, { wasNew })
     return { wasNew }
   },
 

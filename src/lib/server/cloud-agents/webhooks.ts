@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto"
 
-export interface GithubWebhookVerificationResult {
+export interface WebhookVerificationResult {
   ok: boolean
   reason?: string
 }
@@ -9,7 +9,7 @@ export function verifyGithubWebhookSignature(params: {
   payload: string
   signatureHeader: string | null
   secret: string
-}): GithubWebhookVerificationResult {
+}): WebhookVerificationResult {
   if (!params.signatureHeader) {
     return { ok: false, reason: "Missing X-Hub-Signature-256 header." }
   }
@@ -219,7 +219,7 @@ export function verifyVercelWebhookSignature(params: {
   payload: string
   signatureHeader: string | null
   secret: string
-}): GithubWebhookVerificationResult {
+}): WebhookVerificationResult {
   if (!params.signatureHeader) {
     return { ok: false, reason: "Missing x-vercel-signature header." }
   }
