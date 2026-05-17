@@ -1,7 +1,7 @@
 import Link from "next/link"
 
 import { RefreshGlow } from "@/components/graphics/effects/refresh-glow"
-import { LogoHover } from "@/components/graphics/logo/logo-hover"
+import { ChloeiLogoSvg } from "@/components/graphics/logo/logo-svg"
 import { cn } from "@/lib/utils"
 
 export function AuthShell({
@@ -29,7 +29,9 @@ export function AuthShell({
                   "inline-flex items-center gap-3 text-sm font-medium tracking-tight text-foreground"
                 )}
               >
-                <LogoHover size="md" />
+                <span className="block size-5 shrink-0 overflow-hidden">
+                  <ChloeiLogoSvg />
+                </span>
                 <span className="font-departureMono">Chloei</span>
               </Link>
 

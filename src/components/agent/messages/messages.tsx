@@ -1,3 +1,6 @@
+import "./messages.css"
+import "../shared/shell-styles.css"
+
 import { memo, useMemo } from "react"
 
 import {

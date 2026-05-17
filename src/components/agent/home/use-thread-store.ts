@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 
+import { redirectToSignIn } from "@/lib/auth-client"
 import { isAbortError } from "@/lib/cast"
 import {
   createHttpErrorFromResponse,
@@ -111,9 +112,34 @@ function isThreadPayload(payload: unknown): payload is Thread {
   )
 }
 
+function isThreadSummaryPayload(payload: unknown): payload is ThreadSummary {
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    "id" in payload &&
+    "title" in payload &&
+    "createdAt" in payload &&
+    "updatedAt" in payload &&
+    typeof payload.id === "string" &&
+    typeof payload.title === "string" &&
+    typeof payload.createdAt === "string" &&
+    typeof payload.updatedAt === "string" &&
+    (!("model" in payload) ||
+      payload.model === undefined ||
+      typeof payload.model === "string")
+  )
+}
+
+function isThreadSummaryArray(payload: unknown): payload is ThreadSummary[] {
+  return Array.isArray(payload) && payload.every(isThreadSummaryPayload)
+}
+
 export function useThreadStore(initialThreadSummaries: ThreadSummary[] = []) {
   const [threadSummaries, setThreadSummaries] = useState<ThreadSummary[]>(() =>
     sortThreadSummariesNewestFirst(initialThreadSummaries)
+  )
+  const [isLoadingThreadSummaries, setIsLoadingThreadSummaries] = useState(
+    initialThreadSummaries.length === 0
   )
   const [threads, setThreads] = useState<Thread[]>([])
   const [currentThreadId, setCurrentThreadIdState] = useState<string | null>(
@@ -134,6 +160,61 @@ export function useThreadStore(initialThreadSummaries: ThreadSummary[] = []) {
 
   const setCurrentThreadId = useCallback((id: string | null) => {
     setCurrentThreadIdState(id)
+  }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    void (async () => {
+      try {
+        const response = await fetch("/api/threads", {
+          headers: createRequestHeaders(),
+          signal: controller.signal,
+        })
+
+        if (response.status === 401) {
+          redirectToSignIn()
+          throw await createHttpErrorFromResponse(response, "Unauthorized.")
+        }
+
+        if (!response.ok) {
+          throw await createHttpErrorFromResponse(
+            response,
+            "Failed to load conversation history."
+          )
+        }
+
+        const payload: unknown = await response.json()
+
+        if (!isThreadSummaryArray(payload)) {
+          throw new Error("Invalid thread summary response.")
+        }
+
+        setThreadSummaries((prev) => mergeThreadSummaries(prev, payload))
+        toast.dismiss(THREAD_LOAD_ERROR_TOAST_ID)
+      } catch (error) {
+        if (isAbortError(error)) {
+          return
+        }
+
+        logger.error("Failed to load thread summaries.", { error })
+        toast.error("Failed to load recent conversations.", {
+          description: formatHttpErrorDescription(
+            error,
+            "Failed to load conversation history."
+          ),
+          id: THREAD_LOAD_ERROR_TOAST_ID,
+        })
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoadingThreadSummaries(false)
+        }
+      }
+    })()
+
+    return () => {
+      controller.abort()
+    }
   }, [])
 
   useEffect(() => {
@@ -472,6 +553,7 @@ export function useThreadStore(initialThreadSummaries: ThreadSummary[] = []) {
   }, [clearScheduledFlush])
 
   return {
+    isLoadingThreadSummaries,
     threadSummaries,
     threads,
     currentThreadId,

@@ -61,11 +61,13 @@ function writePinned(ids: Set<string>) {
 
 export function NavThreads({
   threadSummaries,
+  isLoading,
   currentThreadId,
   onSelectThread,
   onDeleteThread,
 }: {
   threadSummaries: ThreadSummary[]
+  isLoading?: boolean
   currentThreadId: string | null
   onSelectThread: (threadId: string) => void
   onDeleteThread: (threadId: string) => void
@@ -109,7 +111,15 @@ export function NavThreads({
         </CollapsibleTrigger>
         <CollapsibleContent>
           <SidebarMenu>
-            {ordered.length === 0 ? (
+            {isLoading && ordered.length === 0 ? (
+              <SidebarMenuItem>
+                <div className="space-y-1 px-2 py-1.5">
+                  <div className="h-6 animate-pulse bg-sidebar-accent/60" />
+                  <div className="h-6 animate-pulse bg-sidebar-accent/40" />
+                  <div className="h-6 animate-pulse bg-sidebar-accent/30" />
+                </div>
+              </SidebarMenuItem>
+            ) : ordered.length === 0 ? (
               <SidebarMenuItem>
                 <div className="px-2 py-1.5 text-xs text-muted-foreground">
                   No chats yet.

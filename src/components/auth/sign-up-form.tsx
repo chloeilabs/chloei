@@ -6,7 +6,7 @@ import { useState, useTransition } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { authClient } from "@/lib/auth-client"
+import { getAuthClient } from "@/lib/auth-client"
 
 import { buildAuthHref, getAuthErrorMessage } from "./auth-form-utils"
 import { PasswordInput } from "./password-input"
@@ -51,6 +51,7 @@ export function SignUpForm({ redirectTo }: { redirectTo: string }) {
         }
 
         try {
+          const authClient = await getAuthClient()
           const result = await authClient.signUp.email({
             name: trimmedName,
             email: normalizedEmail,

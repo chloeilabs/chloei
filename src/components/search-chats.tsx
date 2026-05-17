@@ -13,9 +13,11 @@ import {
 
 export function SearchChats({
   threadSummaries,
+  isLoading,
   onSelectThread,
 }: {
   threadSummaries: ThreadSummary[]
+  isLoading?: boolean
   onSelectThread: (threadId: string) => void
 }) {
   const [open, setOpen] = useState(false)
@@ -72,7 +74,11 @@ export function SearchChats({
             />
           </div>
           <div className="max-h-[60vh] overflow-y-auto p-1">
-            {filtered.length === 0 ? (
+            {isLoading && filtered.length === 0 ? (
+              <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                Loading chats...
+              </div>
+            ) : filtered.length === 0 ? (
               <div className="px-3 py-6 text-center text-sm text-muted-foreground">
                 No chats found.
               </div>

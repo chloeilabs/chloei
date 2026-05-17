@@ -3,12 +3,10 @@ import "./globals.css"
 import { Analytics } from "@vercel/analytics/next"
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import type { Metadata, Viewport } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
+import { Geist } from "next/font/google"
 import localFont from "next/font/local"
 import Script from "next/script"
-import { Toaster } from "sonner"
 
-import { QueryClientProvider } from "@/components/layout/query-client-provider"
 import { appBackgroundColor } from "@/lib/brand/colors"
 import { cn } from "@/lib/utils"
 
@@ -99,11 +97,6 @@ const geistSans = Geist({
   subsets: ["latin"],
 })
 
-const geistMono = Geist_Mono({
-  variable: "--font-mono",
-  subsets: ["latin"],
-})
-
 const departureMono = localFont({
   src: "./fonts/DepartureMono-Regular.woff2",
   variable: "--font-departure-mono",
@@ -156,7 +149,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("dark font-sans", geistSans.variable, geistMono.variable)}
+      className={cn("dark font-sans", geistSans.variable)}
     >
       <body
         className={cn(departureMono.variable, "overscroll-none antialiased")}
@@ -169,10 +162,7 @@ export default function RootLayout({
             {localhostDevCacheResetScript}
           </Script>
         )}
-        <QueryClientProvider>
-          {children}
-          <Toaster />
-        </QueryClientProvider>
+        {children}
         <Analytics />
         <SpeedInsights />
       </body>

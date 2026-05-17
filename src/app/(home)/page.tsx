@@ -6,10 +6,10 @@ import {
 import { redirect } from "next/navigation"
 
 import { HomePageContent } from "@/components/agent/home/home-content"
+import { QueryClientProvider } from "@/components/layout/query-client-provider"
 import { getModels } from "@/lib/actions/api-keys"
 import { isAuthConfigured } from "@/lib/server/auth"
 import { getCurrentViewer } from "@/lib/server/auth-session"
-import { listThreadSummariesForUser } from "@/lib/server/threads"
 import {
   getModelSelectorModels,
   resolveDefaultModelSelectorModel,
@@ -30,7 +30,6 @@ export default async function Home() {
 
   const availableModels = getModels()
   const modelSelectorModels = getModelSelectorModels(availableModels)
-  const initialThreadSummaries = await listThreadSummariesForUser(viewer.id)
 
   queryClient.setQueryData(["models"], availableModels)
 
@@ -40,12 +39,13 @@ export default async function Home() {
       : null
 
   return (
-    <HydrationBoundary state={dehydrate(queryClient)}>
-      <HomePageContent
-        initialSelectedModel={resolvedInitialSelectedModel}
-        initialThreadSummaries={initialThreadSummaries}
-        viewer={viewer}
-      />
-    </HydrationBoundary>
+    <QueryClientProvider>
+      <HydrationBoundary state={dehydrate(queryClient)}>
+        <HomePageContent
+          initialSelectedModel={resolvedInitialSelectedModel}
+          viewer={viewer}
+        />
+      </HydrationBoundary>
+    </QueryClientProvider>
   )
 }

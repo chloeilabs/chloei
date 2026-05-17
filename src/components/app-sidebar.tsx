@@ -2,15 +2,14 @@
 
 import "@/components/graphics/logo/logo-animation.css"
 
-import { SquarePenIcon } from "lucide-react"
+import { SearchIcon, SquarePenIcon } from "lucide-react"
+import dynamic from "next/dynamic"
 import Link from "next/link"
 import * as React from "react"
 
 import { ChloeiLogoHoverSvg } from "@/components/graphics/logo/logo-hover-svg"
 import { ChloeiLogoSvg } from "@/components/graphics/logo/logo-svg"
-import { NavThreads } from "@/components/nav-threads"
 import { NavUser } from "@/components/nav-user"
-import { SearchChats } from "@/components/search-chats"
 import {
   Sidebar,
   SidebarContent,
@@ -24,9 +23,54 @@ import {
 } from "@/components/ui/sidebar"
 import type { AuthViewer, ThreadSummary } from "@/lib/shared"
 
+function SearchChatsPlaceholder() {
+  return (
+    <SidebarMenuButton tooltip="Search chats" disabled className="gap-2">
+      <SearchIcon />
+      <span>Search chats</span>
+    </SidebarMenuButton>
+  )
+}
+
+function ThreadListSkeleton() {
+  return (
+    <SidebarGroup>
+      <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+        Threads
+      </div>
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <div className="space-y-1 px-2 py-1.5">
+            <div className="h-6 animate-pulse bg-sidebar-accent/60" />
+            <div className="h-6 animate-pulse bg-sidebar-accent/40" />
+            <div className="h-6 animate-pulse bg-sidebar-accent/30" />
+          </div>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    </SidebarGroup>
+  )
+}
+
+const SearchChats = dynamic(
+  () => import("@/components/search-chats").then((mod) => mod.SearchChats),
+  {
+    ssr: false,
+    loading: () => <SearchChatsPlaceholder />,
+  }
+)
+
+const NavThreads = dynamic(
+  () => import("@/components/nav-threads").then((mod) => mod.NavThreads),
+  {
+    ssr: false,
+    loading: () => <ThreadListSkeleton />,
+  }
+)
+
 export function AppSidebar({
   viewer,
   threadSummaries,
+  isThreadSummariesLoading,
   currentThreadId,
   onSelectThread,
   onDeleteThread,
@@ -35,6 +79,7 @@ export function AppSidebar({
 }: React.ComponentProps<typeof Sidebar> & {
   viewer: AuthViewer
   threadSummaries: ThreadSummary[]
+  isThreadSummariesLoading?: boolean
   currentThreadId: string | null
   onSelectThread: (threadId: string) => void
   onDeleteThread: (threadId: string) => void
@@ -60,6 +105,8 @@ export function AppSidebar({
     onNewChat()
     closeMobileSidebar()
   }, [onNewChat, closeMobileSidebar])
+  const shouldShowThreadLoading =
+    isThreadSummariesLoading && threadSummaries.length === 0
 
   return (
     <Sidebar variant="inset" {...props}>
@@ -102,19 +149,29 @@ export function AppSidebar({
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SearchChats
-                threadSummaries={threadSummaries}
-                onSelectThread={handleSelectThread}
-              />
+              {shouldShowThreadLoading ? (
+                <SearchChatsPlaceholder />
+              ) : (
+                <SearchChats
+                  threadSummaries={threadSummaries}
+                  isLoading={isThreadSummariesLoading}
+                  onSelectThread={handleSelectThread}
+                />
+              )}
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
-        <NavThreads
-          threadSummaries={threadSummaries}
-          currentThreadId={currentThreadId}
-          onSelectThread={handleSelectThread}
-          onDeleteThread={onDeleteThread}
-        />
+        {shouldShowThreadLoading ? (
+          <ThreadListSkeleton />
+        ) : (
+          <NavThreads
+            threadSummaries={threadSummaries}
+            isLoading={isThreadSummariesLoading}
+            currentThreadId={currentThreadId}
+            onSelectThread={handleSelectThread}
+            onDeleteThread={onDeleteThread}
+          />
+        )}
       </SidebarContent>
       <SidebarFooter>
         <NavUser viewer={viewer} />
