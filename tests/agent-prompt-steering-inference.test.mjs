@@ -101,6 +101,14 @@ test("inferPromptTaskMode classifies debugging tasks distinctly from coding", ()
     ),
     "debugging"
   )
+  assert.equal(
+    inferPromptTaskMode(
+      user(
+        "TypeError: cannot read property 'name' of undefined — where do I start?"
+      )
+    ),
+    "debugging"
+  )
 })
 
 test("inferPromptTaskMode still classifies pure coding requests as coding", () => {

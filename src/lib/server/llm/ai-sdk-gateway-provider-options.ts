@@ -52,6 +52,13 @@ export function getAiSdkGatewayProviderOptionsForTaskMode(params: {
     case "general":
       return {}
   }
+
+  // Exhaustiveness guard: if a new PromptTaskMode is added, this assignment
+  // becomes a type error so we don't silently fall through. At runtime, return
+  // the safe no-op so an unknown mode never blocks the request.
+  const _unhandledTaskMode: never = params.taskMode
+  void _unhandledTaskMode
+  return {}
 }
 
 export function getAiSdkGatewayProviderOptions() {

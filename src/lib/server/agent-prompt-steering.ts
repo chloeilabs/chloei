@@ -54,7 +54,7 @@ const CODING_PATTERN =
 // Debugging is a distinct category: triage/diagnosis work that benefits from
 // extra reasoning even when no explicit code is requested.
 const DEBUGGING_PATTERN =
-  /\b(stack trace|traceback|error message|exception|reproduce|repro|why does .{1,40}\s(fail|crash|break|hang|throw)|not working|broken|crashes?|hangs?|deadlock|memory leak|segfault|panic|enoent|undefined is not|cannot read propert|null pointer|race condition|flaky)\b/i
+  /\b(stack trace|traceback|error message|exception|reproduce|repro|why does .{1,40}\s(fail|crash|break|hang|throw)|not working|broken|crashes?|hangs?|deadlock|memory leak|segfault|panic|enoent|undefined is not|cannot read propert(?:y|ies)|null pointer|race condition|flaky)\b/i
 const WRITING_PATTERN =
   /\b(draft|rewrite|edit|proofread|proofreading|tone|copy|copywrit|essay|blog post|newsletter|paragraph|prose|grammar|punctuation|tighten|polish|shorter version|longer version|press release|release notes?|changelog entry|cover letter|outline this|outline for)\b/i
 const RESEARCH_PATTERN =

@@ -5,7 +5,7 @@ export function inferPromptTaskMode(messages, options) {
     getTestMocks().agentPromptSteering?.inferPromptTaskMode?.(
       messages,
       options
-    ) ?? "analysis"
+    ) ?? "general"
   )
 }
 
