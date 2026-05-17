@@ -29,6 +29,78 @@ test("thread payload helper preserves legacy activity timeline conversion", asyn
   )
 })
 
+test("thread payload sanitizes private prompt terminology in reasoning", () => {
+  const parsed = parseThreadPayload({
+    id: "thread-private-reasoning",
+    messages: [
+      {
+        id: "message-1",
+        role: "assistant",
+        content: "Done.",
+        llmModel: "moonshotai/kimi-k2.6",
+        createdAt: "2026-04-26T00:00:00.000Z",
+        metadata: {
+          reasoning: "Use SOUL.md and the system prompt.",
+          activityTimeline: [
+            {
+              id: "reasoning-1",
+              kind: "reasoning",
+              order: 0,
+              createdAt: "2026-04-26T00:00:00.000Z",
+              text: "Follow SHARED CONTEXT FILE: SOUL.md.",
+            },
+          ],
+        },
+      },
+    ],
+    createdAt: "2026-04-26T00:00:00.000Z",
+    updatedAt: "2026-04-26T00:00:00.000Z",
+  })
+
+  assert.equal(
+    parsed.messages[0].metadata.reasoning,
+    "Use private identity guidance and the private instructions."
+  )
+  assert.equal(
+    parsed.messages[0].metadata.activityTimeline[0].text,
+    "Follow private identity guidance."
+  )
+})
+
+test("thread payload truncates sanitized activity reasoning to the schema limit", () => {
+  const rawText = `SOUL.md ${"x".repeat(100_000 - "SOUL.md ".length)}`
+  const parsed = parseThreadPayload({
+    id: "thread-long-sanitized-reasoning",
+    messages: [
+      {
+        id: "message-1",
+        role: "assistant",
+        content: "Done.",
+        llmModel: "moonshotai/kimi-k2.6",
+        createdAt: "2026-04-26T00:00:00.000Z",
+        metadata: {
+          activityTimeline: [
+            {
+              id: "reasoning-1",
+              kind: "reasoning",
+              order: 0,
+              createdAt: "2026-04-26T00:00:00.000Z",
+              text: rawText,
+            },
+          ],
+        },
+      },
+    ],
+    createdAt: "2026-04-26T00:00:00.000Z",
+    updatedAt: "2026-04-26T00:00:00.000Z",
+  })
+
+  const text = parsed.messages[0].metadata.activityTimeline[0].text
+
+  assert.equal(text.length, 100_000)
+  assert.equal(text.startsWith("private identity guidance "), true)
+})
+
 test("thread store delegates parsing and persistence shaping to the payload helper", async () => {
   const source = await readFile(threadsPath, "utf8")
 

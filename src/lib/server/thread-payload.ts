@@ -19,6 +19,7 @@ import {
   isModelType,
   type ModelType,
   normalizeAgentAttachmentMimeType,
+  sanitizeReasoningForDisplay,
   SEARCH_TOOL_NAMES,
   type Thread,
   type ThreadSummary,
@@ -474,11 +475,23 @@ function convertLegacyActivityTimelineEntry(value: unknown) {
 
 function sanitizeActivityTimelineEntry(value: unknown) {
   const parsed = activityTimelineEntrySchema.safeParse(value)
-  if (parsed.success) {
-    return parsed.data
+  const entry = parsed.success
+    ? parsed.data
+    : convertLegacyActivityTimelineEntry(value)
+
+  if (!entry) {
+    return null
   }
 
-  return convertLegacyActivityTimelineEntry(value)
+  if (entry.kind === "reasoning") {
+    const text = sanitizeOptionalString(
+      sanitizeReasoningForDisplay(entry.text),
+      100_000
+    )
+    return text ? { ...entry, text } : null
+  }
+
+  return entry
 }
 
 function sanitizeMessageMetadata(value: unknown) {
@@ -493,7 +506,13 @@ function sanitizeMessageMetadata(value: unknown) {
   const agentStatus = AGENT_RUN_STATUS_SCHEMA.safeParse(metadata.agentStatus)
   const interactionId = sanitizeOptionalString(metadata.interactionId, 200)
   const lastEventId = sanitizeOptionalString(metadata.lastEventId, 500)
-  const reasoning = sanitizeOptionalString(metadata.reasoning, 100_000)
+  const reasoning =
+    typeof metadata.reasoning === "string"
+      ? sanitizeOptionalString(
+          sanitizeReasoningForDisplay(metadata.reasoning),
+          100_000
+        )
+      : undefined
   const parts = Array.isArray(metadata.parts)
     ? metadata.parts.flatMap((part) => {
         const parsed = assistantMessagePartSchema.safeParse(part)

@@ -135,7 +135,7 @@ CREATE TABLE thread (
 4. Task mode overlay (`TASK MODE OVERLAY: <MODE>`) — mode-specific guidance (see below)
 5. `LONG-TERM MEMORY CAPABILITY` — optional block shown only when Mem0 is fully configured, instructing the model that memory writes are available
 6. `LONG-TERM MEMORY CONTEXT` — optional Mem0-retrieved user memory, treated as context rather than instructions
-7. `SHARED CONTEXT FILE: SOUL.md` — from `DEFAULT_SOUL_FALLBACK_INSTRUCTION` in `src/lib/shared`
+7. `IDENTITY AND TONE CONTEXT` — from `DEFAULT_SOUL_FALLBACK_INSTRUCTION` in `src/lib/shared`
 8. `AUTH USER CONTEXT` — authenticated user id, name, email
 
 After assembly, `withAiSdkInlineCitationInstruction` appends inline citation rules and optionally FMP tool rules when `FMP_API_KEY` is set.

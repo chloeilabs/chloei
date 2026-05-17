@@ -215,6 +215,33 @@ test("normalizeAssistantActivityTimeline skips redacted entries before aggregate
   assert.equal(timeline[0]?.text, "Visible repaired text for MSFT.")
 })
 
+test("normalizeAssistantActivityTimeline sanitizes private prompt terminology", () => {
+  const timeline = normalizeAssistantActivityTimeline({
+    id: "assistant-private-prompt",
+    role: "assistant",
+    content: "",
+    llmModel: "moonshotai/kimi-k2.6",
+    createdAt: "2026-04-20T12:00:00.000Z",
+    metadata: {
+      activityTimeline: [
+        {
+          id: "reasoning-private",
+          kind: "reasoning",
+          order: 0,
+          createdAt: "2026-04-20T12:00:00.000Z",
+          text: "Use SOUL.md and the system prompt.",
+        },
+      ],
+    },
+  })
+
+  assert.equal(timeline[0]?.kind, "reasoning")
+  assert.equal(
+    timeline[0]?.text,
+    "Use private identity guidance and the private instructions."
+  )
+})
+
 test("normalizeAssistantActivityTimeline appends missing sources after legacy fallback entries", () => {
   const timeline = normalizeAssistantActivityTimeline({
     id: "assistant-2",
