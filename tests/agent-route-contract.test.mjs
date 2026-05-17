@@ -8,6 +8,10 @@ const cwd = fileURLToPath(new URL("..", import.meta.url))
 const routePath = path.join(cwd, "src/app/api/agent/route.ts")
 const helperPath = path.join(cwd, "src/lib/server/agent-route.ts")
 const runtimePath = path.join(cwd, "src/lib/server/llm/agent-runtime.ts")
+const synthesisGatingPath = path.join(
+  cwd,
+  "src/lib/server/llm/agent-runtime-synthesis-gating.ts"
+)
 
 test("agent route validates model, threadId, and messages", async () => {
   const source = await readFile(helperPath, "utf8")
@@ -83,6 +87,7 @@ test("agent route emits a visible fallback for tool-only completions", async () 
 
 test("agent runtime reserves the final loop step for synthesis", async () => {
   const runtimeSource = await readFile(runtimePath, "utf8")
+  const synthesisGatingSource = await readFile(synthesisGatingPath, "utf8")
 
   assert.match(
     runtimeSource,
@@ -95,7 +100,7 @@ test("agent runtime reserves the final loop step for synthesis", async () => {
     "Expected the last permitted model step to disable tools."
   )
   assert.match(
-    runtimeSource,
+    synthesisGatingSource,
     /stepNumber\s*>=\s*Math\.max\(0,\s*toolMaxSteps\s*-\s*1\)/,
     "Expected final synthesis to happen before the profile step budget stops the loop."
   )

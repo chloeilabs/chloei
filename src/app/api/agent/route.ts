@@ -5,6 +5,7 @@ import { createLogger } from "@/lib/logger"
 import { buildAgentSystemInstruction } from "@/lib/server/agent-context"
 import {
   inferPromptTaskMode,
+  inferUserExpertiseFromMemory,
   type PromptTaskMode,
   resolvePromptProvider,
 } from "@/lib/server/agent-prompt-steering"
@@ -188,27 +189,6 @@ export async function POST(request: NextRequest) {
       userEmail: session.user.email,
     })
     const promptProvider = resolvePromptProvider(selectedModel)
-    const inferredPromptTaskMode =
-      parsedRequest.runMode === "research"
-        ? "research"
-        : inferPromptTaskMode(parsedRequest.messages)
-    const financialServicesWorkflow = featureFlags.financeWorkflowsEnabled
-      ? resolveFinancialServicesWorkflow({
-          messages: parsedRequest.messages,
-          taskMode: inferredPromptTaskMode,
-          tools: {
-            fmpEnabled: Boolean(fmpApiKey?.trim()),
-            tavilyEnabled: Boolean(tavilyApiKey?.trim()),
-            fredEnabled: Boolean(process.env.FRED_API_KEY?.trim()),
-            secUserAgentConfigured: Boolean(
-              process.env.SEC_API_USER_AGENT?.trim()
-            ),
-          },
-        })
-      : null
-    const promptTaskMode = financialServicesWorkflow
-      ? "finance_analysis"
-      : inferredPromptTaskMode
     const longTermMemoryEnabled =
       !isE2eMockRequest && isLongTermMemoryEnabled(MEMORY_RUNTIME_CONFIG)
     const latestUserMessage =
@@ -232,6 +212,31 @@ export async function POST(request: NextRequest) {
         })
       }
     }
+    const userExpertise = inferUserExpertiseFromMemory(longTermMemoryContext)
+    const inferredPromptTaskMode =
+      parsedRequest.runMode === "research"
+        ? "research"
+        : inferPromptTaskMode(
+            parsedRequest.messages,
+            userExpertise ? { userExpertise } : {}
+          )
+    const financialServicesWorkflow = featureFlags.financeWorkflowsEnabled
+      ? resolveFinancialServicesWorkflow({
+          messages: parsedRequest.messages,
+          taskMode: inferredPromptTaskMode,
+          tools: {
+            fmpEnabled: Boolean(fmpApiKey?.trim()),
+            tavilyEnabled: Boolean(tavilyApiKey?.trim()),
+            fredEnabled: Boolean(process.env.FRED_API_KEY?.trim()),
+            secUserAgentConfigured: Boolean(
+              process.env.SEC_API_USER_AGENT?.trim()
+            ),
+          },
+        })
+      : null
+    const promptTaskMode = financialServicesWorkflow
+      ? "finance_analysis"
+      : inferredPromptTaskMode
     const systemInstruction = buildAgentSystemInstruction(
       {
         id: session.user.id,
@@ -332,6 +337,7 @@ export async function POST(request: NextRequest) {
           parsedRequest.runMode,
           financialServicesWorkflow?.workflow
         ),
+        user_expertise: userExpertise ?? "none",
       },
     })
 
@@ -353,6 +359,7 @@ export async function POST(request: NextRequest) {
           parsedRequest.runMode,
           financialServicesWorkflow?.workflow
         ),
+        taskMode: promptTaskMode,
         artifactOwnerId: session.user.id,
         userId: session.user.id,
         featureFlags,

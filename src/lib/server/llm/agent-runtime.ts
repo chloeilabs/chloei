@@ -18,6 +18,10 @@ import {
 } from "@/lib/server/agent-artifacts"
 import { hydrateBlobBackedAttachments } from "@/lib/server/agent-attachment-blobs"
 import {
+  type PromptTaskMode,
+  resolvePromptProvider,
+} from "@/lib/server/agent-prompt-steering"
+import {
   AGENT_EVAL_RESULTS_DIR,
   AGENT_FINANCE_TOOL_MAX_STEPS,
   AGENT_RESEARCH_TOOL_MAX_STEPS,
@@ -40,13 +44,20 @@ import {
   toModelMessages,
 } from "./agent-runtime-messages"
 import {
+  shouldForceFinalSynthesisStep,
+  shouldNudgeMidBudgetSynthesis,
+} from "./agent-runtime-synthesis-gating"
+import {
   createAiSdkFinanceDataTools,
   getAiSdkFinanceDataToolCallMetadata,
   getAiSdkFinanceDataToolResultMetadata,
   isAiSdkFinanceDataToolName,
 } from "./ai-sdk-finance-data-tools"
 import { createAiSdkFmpMcpToolsContext } from "./ai-sdk-fmp-mcp-tools"
-import { getAiSdkGatewayProviderOptionsForMode } from "./ai-sdk-gateway-provider-options"
+import {
+  getAiSdkGatewayProviderOptionsForMode,
+  getAiSdkGatewayProviderOptionsForTaskMode,
+} from "./ai-sdk-gateway-provider-options"
 import {
   createAiSdkKnowledgeSearchTools,
   getAiSdkKnowledgeSearchToolCallMetadata,
@@ -116,6 +127,7 @@ export interface StartAgentRuntimeStreamParams {
   messages: AgentInputMessage[]
   systemInstruction: string
   runtimeProfile?: AgentRuntimeProfileId
+  taskMode?: PromptTaskMode
   temperature?: number
   signal?: AbortSignal
   artifactOwnerId?: string
@@ -182,8 +194,26 @@ function buildAgentArtifactBaseUrl(artifactId: string): string | undefined {
 const FINAL_SYNTHESIS_STEP_INSTRUCTION = [
   "You are on the final synthesis step for this request.",
   "Do not call any tools on this step.",
-  "Use the tool results and sources already gathered to write the final answer now.",
-  "If the available evidence is incomplete, state the limitation directly and answer with the best supported facts; do not ask the user to retry.",
+  "You MUST write a final answer now using the tool results and sources already gathered.",
+  "An empty response is not acceptable. If evidence is incomplete or contradictory, write what you found, name the missing pieces, and end with a clear summary.",
+  "Mirror the user's exact terminology — if they asked about operating margin, CET1, net interest income, cash flow from operations, or any named metric, use those exact phrases in your answer.",
+  "Cite the sources you used inline. Do not stall, do not stay silent, and do not ask the user to retry.",
+].join(" ")
+
+const MID_BUDGET_SYNTHESIS_REMINDER = [
+  "Tool-budget checkpoint: most of your tool-call budget for this request is already spent.",
+  "Prefer synthesizing the final answer from the evidence you have over running deeper retrievals.",
+  "If another tool call would not materially change the conclusion, stop calling tools and write the answer.",
+  "When you write the answer, mirror the user's exact terminology (e.g., 'operating margin', 'CET1', 'net interest income') rather than paraphrasing.",
+].join(" ")
+
+const EMPTY_RESPONSE_SYNTHESIS_FALLBACK_SYSTEM = [
+  "Your previous turn finished without writing a final answer to the user.",
+  "Look at the tool results and any retrieved evidence in the conversation above, and write the answer now using only that evidence.",
+  "Do not call any tools.",
+  "Mirror the user's exact terminology in your answer (named metrics, defined terms, proper nouns).",
+  "If the evidence is incomplete or contradictory, write what you found, name the gap, and end with a clear summary.",
+  "An empty response is not acceptable.",
 ].join(" ")
 
 function resolveAgentRuntimeProfile(
@@ -192,11 +222,82 @@ function resolveAgentRuntimeProfile(
   return AGENT_RUNTIME_PROFILES[id ?? "chat_default"]
 }
 
-function shouldForceFinalSynthesisStep(
-  stepNumber: number,
-  toolMaxSteps: number
-): boolean {
-  return stepNumber >= Math.max(0, toolMaxSteps - 1)
+// When the main stream finishes mid-tool-call (e.g. abort or provider hiccup),
+// response.messages can include assistant tool-call parts that never received
+// a matching tool-result message. Sending that history straight to streamText
+// raises AI_MissingToolResultsError. This helper appends synthetic stub
+// tool-result messages for every orphan so the fallback call always parses.
+function sanitizeResponseMessagesForFallback<T extends { role: string }>(
+  responseMessages: readonly T[]
+): T[] {
+  const sanitized: T[] = []
+  const seenToolResultIds = new Set<string>()
+  for (const message of responseMessages) {
+    if (
+      message.role === "tool" &&
+      typeof (message as unknown as { content?: unknown }).content !== "string"
+    ) {
+      const parts = (
+        message as unknown as { content: { toolCallId?: string }[] }
+      ).content
+      for (const part of parts) {
+        if (typeof part.toolCallId === "string") {
+          seenToolResultIds.add(part.toolCallId)
+        }
+      }
+    }
+  }
+
+  const orphanCalls: { toolCallId: string; toolName: string }[] = []
+  for (const message of responseMessages) {
+    sanitized.push(message)
+    if (
+      message.role !== "assistant" ||
+      typeof (message as unknown as { content?: unknown }).content === "string"
+    ) {
+      continue
+    }
+    const parts = (
+      message as unknown as {
+        content: { type?: string; toolCallId?: string; toolName?: string }[]
+      }
+    ).content
+    for (const part of parts) {
+      if (
+        part.type === "tool-call" &&
+        typeof part.toolCallId === "string" &&
+        typeof part.toolName === "string" &&
+        !seenToolResultIds.has(part.toolCallId)
+      ) {
+        orphanCalls.push({
+          toolCallId: part.toolCallId,
+          toolName: part.toolName,
+        })
+        seenToolResultIds.add(part.toolCallId)
+      }
+    }
+  }
+
+  if (orphanCalls.length === 0) {
+    return sanitized
+  }
+
+  sanitized.push({
+    role: "tool",
+    content: orphanCalls.map((call) => ({
+      type: "tool-result",
+      toolCallId: call.toolCallId,
+      toolName: call.toolName,
+      output: {
+        type: "json",
+        value: {
+          error: "Tool call was not completed before the stream ended.",
+          errorCode: "TOOL_CALL_NOT_COMPLETED",
+        },
+      },
+    })),
+  } as unknown as T)
+  return sanitized
 }
 
 function outputHasError(output: unknown): boolean {
@@ -467,9 +568,14 @@ export async function* startAgentRuntimeStream(
       ...(params.temperature !== undefined
         ? { temperature: params.temperature }
         : {}),
-      providerOptions: getAiSdkGatewayProviderOptionsForMode({
-        deepResearch: runtimeProfile.id === "deep_research",
-      }),
+      providerOptions: params.taskMode
+        ? getAiSdkGatewayProviderOptionsForTaskMode({
+            provider: resolvePromptProvider(params.model),
+            taskMode: params.taskMode,
+          })
+        : getAiSdkGatewayProviderOptionsForMode({
+            deepResearch: runtimeProfile.id === "deep_research",
+          }),
       experimental_telemetry: {
         isEnabled: true,
         recordInputs: featureFlags.telemetryRecordIo,
@@ -494,17 +600,28 @@ export async function* startAgentRuntimeStream(
           steps,
           parallelEnabled,
         })
-        if (!forceFinalSynthesis) {
-          return activeTools ? { activeTools } : undefined
+        if (forceFinalSynthesis) {
+          return {
+            toolChoice: "none" as const,
+            system: `${systemInstruction}\n\n${FINAL_SYNTHESIS_STEP_INSTRUCTION}`,
+          }
         }
 
-        return {
-          toolChoice: "none" as const,
-          system: `${systemInstruction}\n\n${FINAL_SYNTHESIS_STEP_INSTRUCTION}`,
+        if (
+          shouldNudgeMidBudgetSynthesis(stepNumber, runtimeProfile.toolMaxSteps)
+        ) {
+          return {
+            ...(activeTools ? { activeTools } : {}),
+            system: `${systemInstruction}\n\n${MID_BUDGET_SYNTHESIS_REMINDER}`,
+          }
         }
+
+        return activeTools ? { activeTools } : undefined
       },
       stopWhen: stepCountIs(runtimeProfile.toolMaxSteps),
     })
+
+    let hasEmittedText = false
 
     for await (const part of result.fullStream) {
       if (part.type === "finish-step") {
@@ -543,6 +660,7 @@ export async function* startAgentRuntimeStream(
 
       if (part.type === "text-delta") {
         if (part.text.length > 0) {
+          hasEmittedText = true
           yield { type: "text_delta", delta: part.text }
         }
         continue
@@ -705,6 +823,106 @@ export async function* startAgentRuntimeStream(
               ? streamError
               : JSON.stringify(streamError)
         throw new Error(`Agent model stream error: ${message}`)
+      }
+    }
+
+    // Synthesis-fallback safety net: if the main stream completed without
+    // emitting any text (model called tools then stopped silent), re-invoke
+    // the model with the tool results in context and force a written answer.
+    // This is the most common failure mode on long multi-source retrieval
+    // chains where the model exhausts evidence-gathering and forgets to
+    // write the synthesis.
+    if (!hasEmittedText && !params.signal?.aborted) {
+      try {
+        const rawResponseMessages = (await result.response).messages
+        const responseMessages =
+          sanitizeResponseMessagesForFallback(rawResponseMessages)
+        logger.warn(
+          "Main stream emitted no text; running synthesis fallback.",
+          {
+            requestId: params.requestId,
+            model: params.model,
+            runtimeProfile: runtimeProfile.id,
+            responseMessageCount: responseMessages.length,
+            sanitizedToolStubCount:
+              responseMessages.length - rawResponseMessages.length,
+          }
+        )
+
+        const fallbackResult = streamText({
+          model: gatewayProvider(params.model),
+          system: EMPTY_RESPONSE_SYNTHESIS_FALLBACK_SYSTEM,
+          messages: [
+            ...messages,
+            ...responseMessages,
+            {
+              role: "user",
+              content:
+                "Now write the final answer to my original question using the tool results above. Mirror my exact terminology. Do not call any tools. An empty response is not acceptable — if the evidence is partial, write what you found and name the gap.",
+            },
+          ],
+          abortSignal: params.signal,
+          ...(params.temperature !== undefined
+            ? { temperature: params.temperature }
+            : {}),
+          providerOptions: params.taskMode
+            ? getAiSdkGatewayProviderOptionsForTaskMode({
+                provider: resolvePromptProvider(params.model),
+                taskMode: params.taskMode,
+              })
+            : getAiSdkGatewayProviderOptionsForMode({
+                deepResearch: runtimeProfile.id === "deep_research",
+              }),
+          tools,
+          toolChoice: "none" as const,
+          stopWhen: stepCountIs(1),
+        })
+
+        let fallbackEmittedText = false
+        for await (const part of fallbackResult.fullStream) {
+          if (part.type === "text-delta" && part.text.length > 0) {
+            hasEmittedText = true
+            fallbackEmittedText = true
+            yield { type: "text_delta", delta: part.text }
+            continue
+          }
+          if (part.type === "finish") {
+            logger.info("Synthesis fallback stream finished.", {
+              requestId: params.requestId,
+              model: params.model,
+              runtimeProfile: runtimeProfile.id,
+              finishReason: part.finishReason,
+              fallbackEmittedText,
+              ...getUsageLogFields(part.totalUsage),
+            })
+          }
+          if (part.type === "error") {
+            const streamError =
+              "error" in part ? (part as { error?: unknown }).error : part
+            logger.warn("Synthesis fallback stream emitted an error event.", {
+              requestId: params.requestId,
+              model: params.model,
+              runtimeProfile: runtimeProfile.id,
+              error: streamError,
+            })
+          }
+        }
+
+        if (!fallbackEmittedText) {
+          logger.warn("Synthesis fallback completed without emitting text.", {
+            requestId: params.requestId,
+            model: params.model,
+            runtimeProfile: runtimeProfile.id,
+            responseMessageCount: responseMessages.length,
+          })
+        }
+      } catch (fallbackError) {
+        logger.warn("Synthesis fallback failed; yielding nothing.", {
+          requestId: params.requestId,
+          model: params.model,
+          runtimeProfile: runtimeProfile.id,
+          error: fallbackError,
+        })
       }
     }
   } finally {

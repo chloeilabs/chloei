@@ -29,6 +29,7 @@ import {
   resolveDefaultModelSelectorModel,
 } from "@/lib/shared"
 
+import type { PromptTaskMode } from "./agent-prompt-steering"
 import {
   AGENT_MAX_MESSAGE_CHARS,
   AGENT_MAX_MESSAGES,
@@ -156,6 +157,7 @@ interface CreateAgentStreamResponseParams {
   fmpApiKey?: string
   userTimeZone?: string
   runtimeProfile?: AgentRuntimeProfileId
+  taskMode?: PromptTaskMode
   artifactOwnerId?: string
   userId?: string
   featureFlags?: AgentFeatureFlags
@@ -858,6 +860,7 @@ export function createAgentStreamResponse(
           fmpApiKey: params.fmpApiKey,
           userTimeZone: params.userTimeZone,
           runtimeProfile: params.runtimeProfile,
+          ...(params.taskMode ? { taskMode: params.taskMode } : {}),
           artifactOwnerId: params.artifactOwnerId,
           userId: params.userId,
           featureFlags: params.featureFlags,
