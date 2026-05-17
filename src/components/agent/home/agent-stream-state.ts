@@ -4,6 +4,7 @@ import {
   type AgentStreamEvent,
   isSearchToolName,
   type MessageSource,
+  sanitizeReasoningForDisplay,
   type ToolInvocation,
   type ToolRunMetadata,
 } from "@/lib/shared"
@@ -143,13 +144,15 @@ export function applyAgentStreamEvent(
   }
 
   if (event.type === "reasoning_delta") {
+    const delta = sanitizeReasoningForDisplay(event.delta)
+
     return {
       ...current,
       ...checkpointFields,
-      reasoning: `${current.reasoning}${event.delta}`,
+      reasoning: `${current.reasoning}${delta}`,
       activityTimeline: appendReasoningToTimeline(
         current.activityTimeline,
-        event.delta,
+        delta,
         nextOrder
       ),
       nextActivityOrder,
@@ -565,10 +568,12 @@ function appendReasoningToTimeline(
   nextOrder: () => number
 ): ActivityTimelineEntry[] {
   const normalizeReasoningText = (text: string): string =>
-    text
-      .replace(/\r\n/g, "\n")
-      .replace(/[ \t]+\n/g, "\n")
-      .replace(/\n{3,}/g, "\n\n")
+    sanitizeReasoningForDisplay(
+      text
+        .replace(/\r\n/g, "\n")
+        .replace(/[ \t]+\n/g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+    )
 
   if (delta.length === 0) {
     return current

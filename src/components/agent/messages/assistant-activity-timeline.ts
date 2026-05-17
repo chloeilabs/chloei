@@ -3,6 +3,7 @@ import {
   isSearchToolName,
   type Message,
   type MessageSource,
+  sanitizeReasoningForDisplay,
 } from "@/lib/shared"
 
 function isRedactedReasoningEntry(text: string): boolean {
@@ -10,15 +11,16 @@ function isRedactedReasoningEntry(text: string): boolean {
 }
 
 export function normalizeThinkingEntry(text: string): string {
-  return text
-    .replace(/\r\n/g, "\n")
-    .replace(/^#{1,6}\s+/gm, "")
-    .replace(/\*\*([^*\n][^*\n]*)\*\*/g, "$1")
-    .replace(/^\s*(thinking|reasoning)\s*:\s*/i, "")
-    .replace(/^\s*(thinking|reasoning)\s*\n+/i, "")
-    .replace(/^\s*(thinking|reasoning)\s*:?\s*$/i, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim()
+  return sanitizeReasoningForDisplay(
+    text
+      .replace(/\r\n/g, "\n")
+      .replace(/^#{1,6}\s+/gm, "")
+      .replace(/\*\*([^*\n][^*\n]*)\*\*/g, "$1")
+      .replace(/^\s*(thinking|reasoning)\s*:\s*/i, "")
+      .replace(/^\s*(thinking|reasoning)\s*\n+/i, "")
+      .replace(/^\s*(thinking|reasoning)\s*:?\s*$/i, "")
+      .replace(/\n{3,}/g, "\n\n")
+  ).trim()
 }
 
 export function getDedupedSources(

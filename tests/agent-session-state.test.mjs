@@ -85,6 +85,7 @@ test("assistant session state builds assistant messages from stream accumulators
   assert.equal(message.metadata?.agentStatus, "completed")
   assert.equal(message.metadata?.toolInvocations?.length, 1)
   assert.equal(message.metadata?.activityTimeline?.length, 1)
+  assert.equal(message.metadata?.activityTimeline?.[0]?.kind, "reasoning")
   assert.equal(message.metadata?.sources?.length, 1)
   assert.equal(hasVisibleStructuredOutput(accumulator), true)
 })

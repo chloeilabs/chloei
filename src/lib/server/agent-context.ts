@@ -176,7 +176,7 @@ function composeSystemInstruction(params: {
         ]
       : []),
     formatPromptBlock(
-      "SHARED CONTEXT FILE: SOUL.md",
+      "IDENTITY AND TONE CONTEXT",
       DEFAULT_SOUL_FALLBACK_INSTRUCTION
     )
   )

@@ -10,7 +10,10 @@ const moduleUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/llm/initial-reasoning-chunk-sanitizer.ts")
 ).href
 
-const { createInitialReasoningChunkSanitizer } = await import(moduleUrl)
+const {
+  createInitialReasoningChunkSanitizer,
+  createReasoningDisplaySanitizer,
+} = await import(moduleUrl)
 
 test("sanitizer strips a leading THINKING: label that arrives in its own chunk", () => {
   const sanitize = createInitialReasoningChunkSanitizer()
@@ -67,4 +70,34 @@ test("sanitizer buffers a split partial label that arrives after leading whitesp
 
   assert.equal(sanitize("          \nreasonin"), "")
   assert.equal(sanitize("g: hello"), "hello")
+})
+
+test("display sanitizer redacts private prompt terminology", () => {
+  const sanitize = createReasoningDisplaySanitizer()
+
+  assert.equal(
+    sanitize("Reasoning: use SOUL.md and the system prompt."),
+    "use private identity guidance and the private instructions."
+  )
+})
+
+test("display sanitizer redacts split private prompt terminology", () => {
+  const sanitize = createReasoningDisplaySanitizer()
+
+  assert.equal(sanitize("Check SO"), "Check ")
+  assert.equal(
+    sanitize("UL.md before answering."),
+    "private identity guidance before answering."
+  )
+})
+
+test("display sanitizer flushes harmless held suffixes at stream end", () => {
+  const sanitize = createReasoningDisplaySanitizer()
+
+  assert.equal(
+    sanitize("The answer depends on the system"),
+    "The answer depends on the "
+  )
+  assert.equal(sanitize.flush(), "system")
+  assert.equal(sanitize.flush(), "")
 })

@@ -91,7 +91,7 @@ import {
 } from "./code-execution-tools"
 import { aiGatewayFetch } from "./gateway-client"
 import { describeImagesForTextOnlyModel } from "./image-vision-preprocessor"
-import { createInitialReasoningChunkSanitizer } from "./initial-reasoning-chunk-sanitizer"
+import { createReasoningDisplaySanitizer } from "./initial-reasoning-chunk-sanitizer"
 import { preparePdfAttachmentsForModel } from "./pdf-attachment-preprocessor"
 
 const logger = createLogger("agent-runtime")
@@ -454,7 +454,7 @@ export async function* startAgentRuntimeStream(
   const seenToolCalls = new Set<string>()
   const finalizedToolCalls = new Set<string>()
   const seenSourceKeys = new Set<string>()
-  const sanitizeInitialReasoningChunk = createInitialReasoningChunkSanitizer()
+  const sanitizeReasoningChunk = createReasoningDisplaySanitizer()
 
   const createSourceEvent = (
     id: string,
@@ -667,7 +667,7 @@ export async function* startAgentRuntimeStream(
       }
 
       if (part.type === "reasoning-delta") {
-        const delta = sanitizeInitialReasoningChunk(part.text)
+        const delta = sanitizeReasoningChunk(part.text)
         if (delta.length > 0 && !shouldSkipReasoningChunk(delta)) {
           yield { type: "reasoning_delta", delta }
         }
@@ -824,6 +824,14 @@ export async function* startAgentRuntimeStream(
               : JSON.stringify(streamError)
         throw new Error(`Agent model stream error: ${message}`)
       }
+    }
+
+    const finalReasoningDelta = sanitizeReasoningChunk.flush()
+    if (
+      finalReasoningDelta.length > 0 &&
+      !shouldSkipReasoningChunk(finalReasoningDelta)
+    ) {
+      yield { type: "reasoning_delta", delta: finalReasoningDelta }
     }
 
     // Synthesis-fallback safety net: if the main stream completed without

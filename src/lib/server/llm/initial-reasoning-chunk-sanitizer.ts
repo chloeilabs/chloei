@@ -1,8 +1,23 @@
+import {
+  getPrivateReasoningCarryLength,
+  sanitizeReasoningForDisplay,
+} from "@/lib/shared"
+
+interface InitialReasoningChunkSanitizer {
+  (text: string): string
+  flush: () => string
+}
+
+interface ReasoningDisplaySanitizer {
+  (text: string): string
+  flush: () => string
+}
+
 export function createInitialReasoningChunkSanitizer() {
   let bufferedPrefix = ""
   let didResolvePrefix = false
 
-  return (text: string): string => {
+  const sanitize = ((text: string): string => {
     if (didResolvePrefix) {
       return text
     }
@@ -37,5 +52,45 @@ export function createInitialReasoningChunkSanitizer() {
     bufferedPrefix = ""
     didResolvePrefix = true
     return combined
+  }) as InitialReasoningChunkSanitizer
+
+  sanitize.flush = () => {
+    const text = bufferedPrefix
+    bufferedPrefix = ""
+    didResolvePrefix = true
+    return /^\s*(?:thinking|reasoning)\s*:?\s*$/i.test(text) ? "" : text
   }
+
+  return sanitize
+}
+
+export function createReasoningDisplaySanitizer(): ReasoningDisplaySanitizer {
+  const sanitizeInitialChunk = createInitialReasoningChunkSanitizer()
+  let carry = ""
+
+  const sanitize = ((text: string): string => {
+    const withoutInitialLabel = sanitizeInitialChunk(text)
+    if (withoutInitialLabel.length === 0) {
+      return ""
+    }
+
+    const combined = `${carry}${withoutInitialLabel}`
+    const carryLength = getPrivateReasoningCarryLength(combined)
+    const publicText =
+      carryLength > 0 ? combined.slice(0, -carryLength) : combined
+
+    carry = carryLength > 0 ? combined.slice(-carryLength) : ""
+
+    return sanitizeReasoningForDisplay(publicText)
+  }) as ReasoningDisplaySanitizer
+
+  sanitize.flush = () => {
+    const text = sanitizeReasoningForDisplay(
+      `${carry}${sanitizeInitialChunk.flush()}`
+    )
+    carry = ""
+    return text
+  }
+
+  return sanitize
 }

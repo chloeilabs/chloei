@@ -1,5 +1,6 @@
 export * from "./agent/attachments"
 export * from "./agent/messages"
+export * from "./agent/reasoning-privacy"
 export * from "./auth"
 export * from "./llm/financial-services"
 export * from "./llm/models"

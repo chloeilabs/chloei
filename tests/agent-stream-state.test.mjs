@@ -66,6 +66,18 @@ test("reasoning timeline ignores whitespace-only initial chunks", () => {
   assert.equal(accumulator.activityTimeline[0]?.text, expected)
 })
 
+test("reasoning timeline sanitizes private prompt terminology", () => {
+  const accumulator = applyReasoningDeltas([
+    "Follow SOUL.md and the system prompt.",
+  ])
+  const expected =
+    "Follow private identity guidance and the private instructions."
+
+  assert.equal(accumulator.reasoning, expected)
+  assert.equal(accumulator.activityTimeline[0]?.kind, "reasoning")
+  assert.equal(accumulator.activityTimeline[0]?.text, expected)
+})
+
 test("tool result events clear artifact manifests with explicit empty arrays", () => {
   const started = applyAgentStreamEvent(createAgentStreamAccumulator(), {
     type: "tool_call",
