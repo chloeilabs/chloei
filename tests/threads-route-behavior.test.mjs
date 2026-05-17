@@ -39,8 +39,7 @@ function createRequest(overrides = {}) {
   return {
     headers: new Headers(overrides.headers),
     json: overrides.json ?? (async () => ({})),
-    nextUrl:
-      overrides.nextUrl ?? new URL("https://chloei.example/api/threads"),
+    nextUrl: overrides.nextUrl ?? new URL("https://chloei.example/api/threads"),
     signal: overrides.signal ?? new AbortController().signal,
   }
 }
