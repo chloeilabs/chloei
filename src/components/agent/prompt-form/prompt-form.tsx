@@ -1,6 +1,6 @@
 "use client"
 
-import "../messages/messages.css"
+import "../shared/shell-styles.css"
 
 import {
   CornerRightUp,
@@ -55,16 +55,21 @@ import {
   agentSurfaceBackgroundClass,
   agentSurfaceClass,
 } from "../shared/shell-styles"
-import {
-  createImagePreviewDataUrl,
-  formatFileSize,
-  getNormalizedFileMediaType,
-  readFileAsDataUrl,
-  uploadAttachmentFile,
-} from "./attachments"
 import { ModelSelector } from "./model-selector"
 
 const DEFAULT_ATTACHMENT_PROMPT = "Analyze the attached file(s)."
+
+function formatAttachmentSize(sizeBytes: number): string {
+  if (sizeBytes < 1024) {
+    return `${String(sizeBytes)} B`
+  }
+
+  if (sizeBytes < 1024 * 1024) {
+    return `${(sizeBytes / 1024).toFixed(1)} KB`
+  }
+
+  return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`
+}
 
 export function PromptForm({
   onSubmit,
@@ -280,6 +285,13 @@ export function PromptForm({
       setIsReadingAttachments(true)
 
       try {
+        const {
+          createImagePreviewDataUrl,
+          getNormalizedFileMediaType,
+          readFileAsDataUrl,
+          uploadAttachmentFile,
+        } = await import("./attachments")
+
         for (const file of fileArray) {
           if (nextCount >= AGENT_ATTACHMENT_MAX_FILES) {
             toast.error("Too many attachments", {
@@ -306,14 +318,14 @@ export function PromptForm({
 
           if (file.size > AGENT_ATTACHMENT_MAX_FILE_BYTES) {
             toast.error("File too large", {
-              description: `${file.name || "This file"} must be ${formatFileSize(AGENT_ATTACHMENT_MAX_FILE_BYTES)} or smaller.`,
+              description: `${file.name || "This file"} must be ${formatAttachmentSize(AGENT_ATTACHMENT_MAX_FILE_BYTES)} or smaller.`,
             })
             continue
           }
 
           if (nextTotalBytes + file.size > AGENT_ATTACHMENT_MAX_TOTAL_BYTES) {
             toast.error("Attachments too large", {
-              description: `Keep all attachments under ${formatFileSize(AGENT_ATTACHMENT_MAX_TOTAL_BYTES)} per request.`,
+              description: `Keep all attachments under ${formatAttachmentSize(AGENT_ATTACHMENT_MAX_TOTAL_BYTES)} per request.`,
             })
             break
           }
@@ -564,7 +576,7 @@ export function PromptForm({
                       {attachment.filename}
                     </div>
                     <div className="text-muted-foreground">
-                      {formatFileSize(attachment.sizeBytes)}
+                      {formatAttachmentSize(attachment.sizeBytes)}
                     </div>
                   </div>
                   <Button

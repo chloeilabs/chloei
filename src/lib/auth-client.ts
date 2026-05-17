@@ -1,6 +1,6 @@
 "use client"
 
-import { createAuthClient } from "better-auth/react"
+import type { createAuthClient } from "better-auth/react"
 
 import {
   AUTH_REDIRECT_QUERY_PARAM,
@@ -25,9 +25,21 @@ function getCurrentPathnameWithSearch(): string {
   return `${pathname}${search}`
 }
 
-export const authClient = createAuthClient({
-  baseURL: getAuthClientBaseUrl(),
-})
+type AuthClient = ReturnType<typeof createAuthClient>
+
+let authClient: AuthClient | null = null
+
+export async function getAuthClient(): Promise<AuthClient> {
+  if (authClient) {
+    return authClient
+  }
+
+  const { createAuthClient } = await import("better-auth/react")
+  authClient = createAuthClient({
+    baseURL: getAuthClientBaseUrl(),
+  })
+  return authClient
+}
 
 export function redirectToSignIn(
   redirectTo: string = getCurrentPathnameWithSearch()

@@ -12,11 +12,10 @@ import {
   useTransition,
 } from "react"
 import { flushSync } from "react-dom"
+import { Toaster } from "sonner"
 import { StickToBottom } from "use-stick-to-bottom"
 
-import { AppLauncher } from "@/components/agent/home/app-launcher"
 import { AppSidebar } from "@/components/app-sidebar"
-import { DesktopUpdateButton } from "@/components/desktop/desktop-update-button"
 import { Button } from "@/components/ui/button"
 import {
   SidebarInset,
@@ -51,10 +50,32 @@ const STREAMING_SCROLL_EARLY_TRIGGER_PX = 72
 const STREAMING_SCROLL_PROMPT_BUFFER_PX = 24
 const conversationWidthClass = "max-w-[50rem]"
 
+const AppLauncher = dynamic(
+  () =>
+    import("@/components/agent/home/app-launcher").then(
+      (mod) => mod.AppLauncher
+    ),
+  {
+    ssr: false,
+    loading: () => <div className="size-7" />,
+  }
+)
+
+const DesktopUpdateButton = dynamic(
+  () =>
+    import("@/components/desktop/desktop-update-button").then(
+      (mod) => mod.DesktopUpdateButton
+    ),
+  {
+    ssr: false,
+    loading: () => null,
+  }
+)
+
 const Messages = dynamic(
   () => import("../messages/messages").then((mod) => mod.Messages),
   {
-    loading: () => null,
+    loading: () => <div className="mb-10 flex w-full grow" />,
   }
 )
 
@@ -305,6 +326,7 @@ export function HomePageContent({
       <AppSidebar
         viewer={viewer}
         threadSummaries={threadStore.threadSummaries}
+        isThreadSummariesLoading={threadStore.isLoadingThreadSummaries}
         currentThreadId={threadStore.currentThreadId}
         onSelectThread={threadStore.setCurrentThreadId}
         onDeleteThread={threadStore.deleteThread}
@@ -440,6 +462,7 @@ export function HomePageContent({
           </StickToBottom>
         ) : null}
       </SidebarInset>
+      <Toaster />
     </SidebarProvider>
   )
 }

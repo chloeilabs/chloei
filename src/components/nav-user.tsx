@@ -19,7 +19,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { authClient } from "@/lib/auth-client"
+import { getAuthClient } from "@/lib/auth-client"
 import type { AuthViewer } from "@/lib/shared"
 
 function getInitials(viewer: AuthViewer): string {
@@ -41,6 +41,7 @@ export function NavUser({ viewer }: { viewer: AuthViewer }) {
   const handleSignOut = () => {
     startTransition(async () => {
       try {
+        const authClient = await getAuthClient()
         const result = await authClient.signOut()
         if (result.error) {
           toast.error("Sign out failed", {
