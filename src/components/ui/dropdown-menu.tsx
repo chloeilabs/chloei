@@ -9,6 +9,8 @@ const DropdownMenu = DropdownMenuPrimitive.Root
 
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger
 
+const DropdownMenuGroup = DropdownMenuPrimitive.Group
+
 function DropdownMenuContent({
   className,
   sideOffset = 4,
@@ -97,6 +99,7 @@ function DropdownMenuSeparator({
 export {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
