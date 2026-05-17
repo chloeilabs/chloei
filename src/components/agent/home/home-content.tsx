@@ -326,7 +326,7 @@ export function HomePageContent({
           </div>
 
           <div ref={headerActionsRef} className="flex items-center gap-1">
-            {hasMessages ? (
+            {hasActiveThread ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button

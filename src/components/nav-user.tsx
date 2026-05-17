@@ -39,30 +39,28 @@ export function NavUser({ viewer }: { viewer: AuthViewer }) {
   const [isPending, startTransition] = useTransition()
 
   const handleSignOut = () => {
-    startTransition(() => {
-      void (async () => {
-        try {
-          const result = await authClient.signOut()
-          if (result.error) {
-            toast.error("Sign out failed", {
-              description: getAuthErrorMessage(
-                result.error,
-                "Unable to sign out. Please try again."
-              ),
-            })
-            return
-          }
-          router.replace("/sign-in")
-          router.refresh()
-        } catch (error) {
+    startTransition(async () => {
+      try {
+        const result = await authClient.signOut()
+        if (result.error) {
           toast.error("Sign out failed", {
             description: getAuthErrorMessage(
-              error,
+              result.error,
               "Unable to sign out. Please try again."
             ),
           })
+          return
         }
-      })()
+        router.replace("/sign-in")
+        router.refresh()
+      } catch (error) {
+        toast.error("Sign out failed", {
+          description: getAuthErrorMessage(
+            error,
+            "Unable to sign out. Please try again."
+          ),
+        })
+      }
     })
   }
 
