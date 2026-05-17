@@ -207,6 +207,15 @@ const MID_BUDGET_SYNTHESIS_REMINDER = [
   "When you write the answer, mirror the user's exact terminology (e.g., 'operating margin', 'CET1', 'net interest income') rather than paraphrasing.",
 ].join(" ")
 
+const EMPTY_RESPONSE_SYNTHESIS_FALLBACK_SYSTEM = [
+  "Your previous turn finished without writing a final answer to the user.",
+  "Look at the tool results and any retrieved evidence in the conversation above, and write the answer now using only that evidence.",
+  "Do not call any tools.",
+  "Mirror the user's exact terminology in your answer (named metrics, defined terms, proper nouns).",
+  "If the evidence is incomplete or contradictory, write what you found, name the gap, and end with a clear summary.",
+  "An empty response is not acceptable.",
+].join(" ")
+
 function resolveAgentRuntimeProfile(
   id: AgentRuntimeProfileId | undefined
 ): AgentRuntimeProfile {
@@ -534,6 +543,8 @@ export async function* startAgentRuntimeStream(
       stopWhen: stepCountIs(runtimeProfile.toolMaxSteps),
     })
 
+    let hasEmittedText = false
+
     for await (const part of result.fullStream) {
       if (part.type === "finish-step") {
         logger.info("Agent runtime model step finished.", {
@@ -571,6 +582,7 @@ export async function* startAgentRuntimeStream(
 
       if (part.type === "text-delta") {
         if (part.text.length > 0) {
+          hasEmittedText = true
           yield { type: "text_delta", delta: part.text }
         }
         continue
@@ -733,6 +745,82 @@ export async function* startAgentRuntimeStream(
               ? streamError
               : JSON.stringify(streamError)
         throw new Error(`Agent model stream error: ${message}`)
+      }
+    }
+
+    // Synthesis-fallback safety net: if the main stream completed without
+    // emitting any text (model called tools then stopped silent), re-invoke
+    // the model with the tool results in context and force a written answer.
+    // This is the most common failure mode on long multi-source retrieval
+    // chains where the model exhausts evidence-gathering and forgets to
+    // write the synthesis.
+    if (!hasEmittedText && !params.signal?.aborted) {
+      try {
+        const responseMessages = (await result.response).messages
+        if (responseMessages.length > 0) {
+          logger.warn(
+            "Main stream emitted no text; running synthesis fallback.",
+            {
+              requestId: params.requestId,
+              model: params.model,
+              runtimeProfile: runtimeProfile.id,
+              responseMessageCount: responseMessages.length,
+            }
+          )
+
+          const fallbackResult = streamText({
+            model: gatewayProvider(params.model),
+            system: EMPTY_RESPONSE_SYNTHESIS_FALLBACK_SYSTEM,
+            messages: [
+              ...messages,
+              ...responseMessages,
+              {
+                role: "user",
+                content:
+                  "Now write the final answer to my original question using the tool results above. Mirror my exact terminology. Do not call any tools. An empty response is not acceptable — if the evidence is partial, write what you found and name the gap.",
+              },
+            ],
+            abortSignal: params.signal,
+            ...(params.temperature !== undefined
+              ? { temperature: params.temperature }
+              : {}),
+            providerOptions: params.taskMode
+              ? getAiSdkGatewayProviderOptionsForTaskMode({
+                  provider: resolvePromptProvider(params.model),
+                  taskMode: params.taskMode,
+                })
+              : getAiSdkGatewayProviderOptionsForMode({
+                  deepResearch: runtimeProfile.id === "deep_research",
+                }),
+            tools,
+            toolChoice: "none" as const,
+            stopWhen: stepCountIs(1),
+          })
+
+          for await (const part of fallbackResult.fullStream) {
+            if (part.type === "text-delta" && part.text.length > 0) {
+              hasEmittedText = true
+              yield { type: "text_delta", delta: part.text }
+              continue
+            }
+            if (part.type === "finish") {
+              logger.info("Synthesis fallback stream finished.", {
+                requestId: params.requestId,
+                model: params.model,
+                runtimeProfile: runtimeProfile.id,
+                finishReason: part.finishReason,
+                ...getUsageLogFields(part.totalUsage),
+              })
+            }
+          }
+        }
+      } catch (fallbackError) {
+        logger.warn("Synthesis fallback failed; yielding nothing.", {
+          requestId: params.requestId,
+          model: params.model,
+          runtimeProfile: runtimeProfile.id,
+          error: fallbackError,
+        })
       }
     }
   } finally {
