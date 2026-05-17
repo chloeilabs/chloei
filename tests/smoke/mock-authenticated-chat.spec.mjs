@@ -145,7 +145,7 @@ test.describe("mock authenticated chat smoke", () => {
       .locator("[data-message-role='user']")
       .filter({ hasText: originalPrompt })
       .first()
-    await userMessage.getByRole("button").click()
+    await userMessage.getByRole("button", { name: originalPrompt }).click()
     const editTextarea = page.locator("[data-message-role='user'] textarea")
     await editTextarea.fill(editedPrompt)
     await editTextarea.press("Enter")
