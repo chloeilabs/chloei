@@ -20,19 +20,19 @@ test("shouldForceFinalSynthesisStep fires only on the last step", () => {
   assert.equal(shouldForceFinalSynthesisStep(20, 20), true)
 })
 
-test("shouldNudgeMidBudgetSynthesis kicks in around half budget", () => {
-  // finance_analysis budget = 20 → threshold = 10
-  assert.equal(shouldNudgeMidBudgetSynthesis(9, 20), false)
-  assert.equal(shouldNudgeMidBudgetSynthesis(10, 20), true)
+test("shouldNudgeMidBudgetSynthesis kicks in around one-third budget", () => {
+  // finance_analysis budget = 20 → threshold = floor(20/3) = 6
+  assert.equal(shouldNudgeMidBudgetSynthesis(5, 20), false)
+  assert.equal(shouldNudgeMidBudgetSynthesis(6, 20), true)
   assert.equal(shouldNudgeMidBudgetSynthesis(12, 20), true)
   // Don't double-fire on the final-synthesis step (that has its own instruction)
   assert.equal(shouldNudgeMidBudgetSynthesis(19, 20), false)
 })
 
 test("shouldNudgeMidBudgetSynthesis fires for chat_default budget too", () => {
-  // chat_default budget = 12 → threshold = 6
-  assert.equal(shouldNudgeMidBudgetSynthesis(5, 12), false)
-  assert.equal(shouldNudgeMidBudgetSynthesis(6, 12), true)
+  // chat_default budget = 12 → threshold = floor(12/3) = 4
+  assert.equal(shouldNudgeMidBudgetSynthesis(3, 12), false)
+  assert.equal(shouldNudgeMidBudgetSynthesis(4, 12), true)
   assert.equal(shouldNudgeMidBudgetSynthesis(10, 12), true)
   assert.equal(shouldNudgeMidBudgetSynthesis(11, 12), false)
 })

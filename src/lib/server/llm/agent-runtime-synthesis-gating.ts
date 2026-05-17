@@ -16,9 +16,9 @@ export function shouldNudgeMidBudgetSynthesis(
   if (toolMaxSteps <= 3) {
     return false
   }
-  // Kick in at half-budget so the model sees the nudge before it stops
-  // naturally with empty text around the 40-60% mark. Empirically the most
-  // common failure point on hard 10-K tasks (Kimi K2.6) is steps 8-12 of 20.
-  const threshold = Math.max(2, Math.floor(toolMaxSteps / 2))
+  // Kick in at one-third of budget. The failing 10-K tasks (Kimi K2.6 and
+  // Gemini 3.1 Pro) tend to stop naturally with empty text after only 5-8
+  // tool calls (~steps 4-7 of 20); half-budget fires too late to reach them.
+  const threshold = Math.max(2, Math.floor(toolMaxSteps / 3))
   return stepNumber >= threshold && stepNumber < toolMaxSteps - 1
 }
