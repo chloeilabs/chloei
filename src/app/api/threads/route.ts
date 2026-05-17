@@ -19,8 +19,9 @@ import {
 } from "@/lib/server/route-observability"
 import {
   deleteThreadForUser,
+  getThreadForUser,
   isThreadStoreNotInitializedError,
-  listThreadsForUser,
+  listThreadSummariesForUser,
   parseThreadPayload,
   upsertThreadForUser,
 } from "@/lib/server/threads"
@@ -32,6 +33,7 @@ const deleteThreadSchema = z
     id: z.string().trim().min(1).max(200),
   })
   .strict()
+const threadIdSchema = z.string().trim().min(1).max(200)
 
 function createHeaders(requestId: string) {
   return createApiHeaders({ requestId })
@@ -70,6 +72,16 @@ async function requireSession(request: NextRequest, requestId: string) {
   return session
 }
 
+function getRequestedThreadId(request: NextRequest): string | null {
+  const rawThreadId = request.nextUrl.searchParams.get("id")
+
+  if (rawThreadId === null) {
+    return null
+  }
+
+  return threadIdSchema.parse(rawThreadId)
+}
+
 export async function GET(request: NextRequest) {
   const requestId = resolveRequestIdFromHeaders(request.headers)
   const logger = createLogger(`threads:${requestId}`)
@@ -90,7 +102,39 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const threads = await listThreadsForUser(session.user.id)
+    const threadId = getRequestedThreadId(request)
+
+    if (threadId) {
+      const thread = await getThreadForUser(session.user.id, threadId)
+
+      if (!thread) {
+        return observeRouteResponse(
+          observation,
+          createErrorResponse(
+            requestId,
+            "Thread not found.",
+            "THREAD_NOT_FOUND",
+            404
+          ),
+          {
+            errorCode: "THREAD_NOT_FOUND",
+            outcome: "not_found",
+          }
+        )
+      }
+
+      return observeRouteResponse(
+        observation,
+        NextResponse.json(thread, {
+          headers: createHeaders(requestId),
+        }),
+        {
+          outcome: "success",
+        }
+      )
+    }
+
+    const threads = await listThreadSummariesForUser(session.user.id)
 
     return observeRouteResponse(
       observation,
@@ -102,6 +146,22 @@ export async function GET(request: NextRequest) {
       }
     )
   } catch (error) {
+    if (error instanceof ZodError) {
+      return observeRouteResponse(
+        observation,
+        createErrorResponse(
+          requestId,
+          "Invalid thread id.",
+          "THREAD_ID_INVALID",
+          400
+        ),
+        {
+          errorCode: "THREAD_ID_INVALID",
+          outcome: "invalid_request",
+        }
+      )
+    }
+
     if (isThreadStoreNotInitializedError(error)) {
       logger.error("Thread store is not initialized.", {
         error,

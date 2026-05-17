@@ -102,5 +102,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/sign-in", "/sign-up", "/api/:path*"],
+  matcher: ["/", "/sign-in", "/sign-up"],
 }

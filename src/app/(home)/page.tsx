@@ -9,7 +9,7 @@ import { HomePageContent } from "@/components/agent/home/home-content"
 import { getModels } from "@/lib/actions/api-keys"
 import { isAuthConfigured } from "@/lib/server/auth"
 import { getCurrentViewer } from "@/lib/server/auth-session"
-import { listThreadsForUser } from "@/lib/server/threads"
+import { listThreadSummariesForUser } from "@/lib/server/threads"
 import {
   getModelSelectorModels,
   resolveDefaultModelSelectorModel,
@@ -30,7 +30,7 @@ export default async function Home() {
 
   const availableModels = getModels()
   const modelSelectorModels = getModelSelectorModels(availableModels)
-  const initialThreads = await listThreadsForUser(viewer.id)
+  const initialThreadSummaries = await listThreadSummariesForUser(viewer.id)
 
   queryClient.setQueryData(["models"], availableModels)
 
@@ -43,7 +43,7 @@ export default async function Home() {
     <HydrationBoundary state={dehydrate(queryClient)}>
       <HomePageContent
         initialSelectedModel={resolvedInitialSelectedModel}
-        initialThreads={initialThreads}
+        initialThreadSummaries={initialThreadSummaries}
         viewer={viewer}
       />
     </HydrationBoundary>

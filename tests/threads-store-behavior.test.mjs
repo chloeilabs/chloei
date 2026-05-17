@@ -22,6 +22,7 @@ const {
   deleteThreadForUser,
   getThreadForUser,
   isThreadStoreNotInitializedError,
+  listThreadSummariesForUser,
   listThreadsForUser,
   upsertThreadForUser,
 } = await import(storeUrl)
@@ -126,6 +127,73 @@ test("listThreadsForUser sorts valid threads and skips invalid rows", async () =
   assert.equal(
     recorded.loggerErrors[0]?.message,
     "Skipping invalid stored thread."
+  )
+})
+
+test("listThreadSummariesForUser avoids selecting message payloads", async () => {
+  setTestMocks({
+    kysely: {
+      async execute(query) {
+        recorded.queries.push(query)
+        return {
+          rows: [
+            {
+              id: "summary-thread",
+              title: "Stored summary",
+              model: "moonshotai/kimi-k2.6",
+              createdAt: "2026-04-15T10:00:00.000Z",
+              updatedAt: "2026-04-15T10:05:00.000Z",
+            },
+          ],
+        }
+      },
+    },
+  })
+
+  const summaries = await listThreadSummariesForUser("user-1")
+
+  assert.deepEqual(summaries, [
+    {
+      id: "summary-thread",
+      title: "Stored summary",
+      model: "moonshotai/kimi-k2.6",
+      createdAt: "2026-04-15T10:00:00.000Z",
+      updatedAt: "2026-04-15T10:05:00.000Z",
+    },
+  ])
+  assert.equal(recorded.queries[0]?.values[0], "user-1")
+  assert.doesNotMatch(recorded.queries[0]?.text, /\bmessages\b/)
+  assert.match(recorded.queries[0]?.text, /\btitle\b/)
+  assert.match(recorded.queries[0]?.text, /LIMIT/)
+})
+
+test("listThreadSummariesForUser skips invalid summary rows", async () => {
+  setTestMocks({
+    kysely: {
+      async execute(query) {
+        recorded.queries.push(query)
+        return {
+          rows: [
+            {
+              id: "invalid-summary",
+              title: "Stored summary",
+              model: "moonshotai/kimi-k2.6",
+              createdAt: "not-a-date",
+              updatedAt: "2026-04-15T10:05:00.000Z",
+            },
+          ],
+        }
+      },
+    },
+  })
+
+  const summaries = await listThreadSummariesForUser("user-1")
+
+  assert.deepEqual(summaries, [])
+  assert.equal(recorded.loggerErrors.length, 1)
+  assert.equal(
+    recorded.loggerErrors[0]?.message,
+    "Skipping invalid stored thread summary."
   )
 })
 

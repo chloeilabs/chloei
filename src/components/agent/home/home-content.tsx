@@ -32,10 +32,9 @@ import {
   type AgentRequestAttachment,
   type AgentRunMode,
   type AuthViewer,
-  deriveThreadTitle,
   type ModelType,
-  sortThreadsNewestFirst,
-  type Thread,
+  sortThreadSummariesNewestFirst,
+  type ThreadSummary,
 } from "@/lib/shared"
 import { cn } from "@/lib/utils"
 
@@ -65,14 +64,14 @@ function ThreadsPanel({
   open,
   onClose,
   panelRef,
-  threads,
+  threadSummaries,
   currentThreadId,
   setCurrentThreadId,
 }: {
   open: boolean
   onClose: () => void
   panelRef: RefObject<HTMLDivElement | null>
-  threads: Thread[]
+  threadSummaries: ThreadSummary[]
   currentThreadId: string | null
   setCurrentThreadId: (threadId: string | null) => void
 }) {
@@ -97,7 +96,7 @@ function ThreadsPanel({
     }
   }, [closePanel, open])
 
-  const sortedThreads = sortThreadsNewestFirst(threads)
+  const sortedThreads = sortThreadSummariesNewestFirst(threadSummaries)
 
   const handleSelectThread = (threadId: string) => {
     closePanel()
@@ -119,8 +118,6 @@ function ThreadsPanel({
       {sortedThreads.length > 0 ? (
         <div className="space-y-1">
           {sortedThreads.map((thread) => {
-            const title = deriveThreadTitle(thread.messages)
-
             return (
               <button
                 key={thread.id}
@@ -134,7 +131,7 @@ function ThreadsPanel({
                     "border-border/70 bg-accent/40"
                 )}
               >
-                <span className="min-w-0 flex-1 truncate">{title}</span>
+                <span className="min-w-0 flex-1 truncate">{thread.title}</span>
               </button>
             )
           })}
@@ -150,11 +147,11 @@ function ThreadsPanel({
 
 export function HomePageContent({
   initialSelectedModel,
-  initialThreads = [],
+  initialThreadSummaries = [],
   viewer,
 }: {
   initialSelectedModel?: ModelType | null
-  initialThreads?: Thread[]
+  initialThreadSummaries?: ThreadSummary[]
   viewer: AuthViewer
 }) {
   const [isPending, startTransition] = useTransition()
@@ -170,7 +167,7 @@ export function HomePageContent({
   const threadsPanelRef = useRef<HTMLDivElement | null>(null)
   const headerActionsRef = useRef<HTMLDivElement | null>(null)
   const isMobile = useIsMobile()
-  const threadStore = useThreadStore(initialThreads)
+  const threadStore = useThreadStore(initialThreadSummaries)
   const {
     state,
     queuedSubmission,
@@ -512,7 +509,7 @@ export function HomePageContent({
           setIsThreadsOpen(false)
         }}
         panelRef={threadsPanelRef}
-        threads={threadStore.threads}
+        threadSummaries={threadStore.threadSummaries}
         currentThreadId={threadStore.currentThreadId}
         setCurrentThreadId={threadStore.setCurrentThreadId}
       />
