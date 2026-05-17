@@ -11,6 +11,21 @@ function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
 
+async function selectThreadFromSidebar(page, threadTitlePattern) {
+  const viewport = page.viewportSize()
+  const isMobile = viewport ? viewport.width < 768 : false
+
+  if (isMobile) {
+    await page.getByRole("button", { name: "Toggle Sidebar" }).first().click()
+  }
+
+  const threadButton = page
+    .getByRole("button", { name: threadTitlePattern })
+    .first()
+  await expect(threadButton).toBeVisible()
+  await threadButton.click()
+}
+
 test.describe("authenticated chat smoke", () => {
   test.skip(
     !smokeEmail || !smokePassword,
@@ -27,9 +42,6 @@ test.describe("authenticated chat smoke", () => {
 
     await expect(page).toHaveURL(/\/(?:$|\?)/, { timeout: 30_000 })
     await expect(page.getByPlaceholder("Ask anything")).toBeVisible()
-    await expect(
-      page.getByRole("button", { name: "Open threads" })
-    ).toBeVisible()
 
     const promptInput = page.getByPlaceholder("Ask anything")
     await promptInput.click()
@@ -57,13 +69,8 @@ test.describe("authenticated chat smoke", () => {
 
     await page.reload()
     await expect(page.getByPlaceholder("Ask anything")).toBeVisible()
-    await page.getByRole("button", { name: "Open threads" }).click()
     const threadTitlePattern = new RegExp(escapeRegex(smokePrompt.slice(0, 24)))
-    const persistedThread = page.getByRole("button", {
-      name: threadTitlePattern,
-    })
-    await expect(persistedThread.first()).toBeVisible()
-    await persistedThread.first().click()
+    await selectThreadFromSidebar(page, threadTitlePattern)
     await expect(page.locator("[data-message-role='user']")).toContainText(
       smokePrompt
     )
