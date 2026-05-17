@@ -518,51 +518,74 @@ function formatStockChange(output: StockCardOutput): string {
   return `${sign}${formatCurrency(output.dayChange, output.currency)}${percent}`
 }
 
+function getIsoDateAttr(value: string): string | undefined {
+  const trimmed = value.trim()
+  if (/^\d{4}(-\d{2}(-\d{2})?)?$/.test(trimmed)) {
+    return trimmed
+  }
+
+  const parsed = new Date(trimmed)
+  return Number.isNaN(parsed.getTime())
+    ? undefined
+    : parsed.toISOString().slice(0, 10)
+}
+
 function TimelineCard({ output }: { output: TimelineCardOutput }) {
   return (
-    <div className="my-2 max-w-2xl rounded-md border bg-muted/30 p-3">
-      <div className="flex items-start gap-2 text-xs font-medium text-muted-foreground">
+    <div className="my-2 max-w-2xl rounded-md border bg-muted/30 p-4">
+      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
         <CalendarClock className="size-4 text-vesper-teal" />
         <span>Timeline</span>
       </div>
-      <div className="mt-1 text-base font-semibold">{output.title}</div>
+      <div className="mt-1.5 text-base leading-tight font-semibold tracking-tight">
+        {output.title}
+      </div>
       {output.subtitle && (
-        <div className="mt-0.5 text-xs text-muted-foreground">
+        <div className="mt-1 text-xs text-muted-foreground">
           {output.subtitle}
         </div>
       )}
 
-      <ol className="mt-3 space-y-2.5 border-l pl-3">
-        {output.events.map((event, index) => (
-          <li key={`${event.date}-${String(index)}`} className="relative pl-3">
-            <span
-              aria-hidden="true"
-              className="absolute top-1.5 -left-[7px] size-2.5 rounded-full border bg-background"
-            />
-            <div className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-              {event.date}
-            </div>
-            <div className="text-xs font-medium">
-              {event.sourceUrl ? (
-                <a
-                  className="underline underline-offset-2 hover:text-foreground"
-                  href={event.sourceUrl}
-                  rel="noopener noreferrer"
-                  target="_blank"
-                >
-                  {event.label}
-                </a>
-              ) : (
-                event.label
-              )}
-            </div>
-            {event.description && (
-              <div className="mt-0.5 text-xs text-muted-foreground">
-                {event.description}
+      <ol
+        aria-label={`${output.title} timeline`}
+        className="mt-4 ml-[5px] space-y-3.5 border-l-2 border-border/70 pl-5"
+      >
+        {output.events.map((event, index) => {
+          const isoDate = getIsoDateAttr(event.date)
+          return (
+            <li key={`${event.date}-${String(index)}`} className="relative">
+              <span
+                aria-hidden="true"
+                className="absolute top-[5px] -left-[1.6875rem] size-2.5 rounded-full border-2 border-border bg-vesper-teal"
+              />
+              <time
+                className="font-departureMono text-[10px] tracking-[0.08em] text-muted-foreground/90 uppercase"
+                {...(isoDate ? { dateTime: isoDate } : {})}
+              >
+                {event.date}
+              </time>
+              <div className="mt-0.5 text-sm leading-snug font-medium text-foreground">
+                {event.sourceUrl ? (
+                  <a
+                    className="underline decoration-border underline-offset-[3px] transition-colors hover:decoration-foreground"
+                    href={event.sourceUrl}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    {event.label}
+                  </a>
+                ) : (
+                  event.label
+                )}
               </div>
-            )}
-          </li>
-        ))}
+              {event.description && (
+                <div className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  {event.description}
+                </div>
+              )}
+            </li>
+          )
+        })}
       </ol>
     </div>
   )
