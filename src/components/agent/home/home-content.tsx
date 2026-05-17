@@ -1,13 +1,9 @@
 "use client"
 
-import "../../graphics/logo/logo-animation.css"
-
-import { History, SquarePen } from "lucide-react"
+import { SquarePen } from "lucide-react"
 import dynamic from "next/dynamic"
-import Link from "next/link"
 import {
   type CSSProperties,
-  type RefObject,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -19,9 +15,14 @@ import { flushSync } from "react-dom"
 import { StickToBottom } from "use-stick-to-bottom"
 
 import { AppLauncher } from "@/components/agent/home/app-launcher"
-import { UserMenu } from "@/components/auth/user-menu"
+import { AppSidebar } from "@/components/app-sidebar"
 import { DesktopUpdateButton } from "@/components/desktop/desktop-update-button"
 import { Button } from "@/components/ui/button"
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar"
 import {
   Tooltip,
   TooltipContent,
@@ -33,13 +34,10 @@ import {
   type AgentRunMode,
   type AuthViewer,
   type ModelType,
-  sortThreadSummariesNewestFirst,
   type ThreadSummary,
 } from "@/lib/shared"
 import { cn } from "@/lib/utils"
 
-import { ChloeiLogoHoverSvg } from "../../graphics/logo/logo-hover-svg"
-import { ChloeiLogoSvg } from "../../graphics/logo/logo-svg"
 import { ScrollToBottom } from "../../task/scroll-to-bottom"
 import { PromptForm } from "../prompt-form/prompt-form"
 import { useAgentSession } from "./use-agent-session"
@@ -60,91 +58,6 @@ const Messages = dynamic(
   }
 )
 
-function ThreadsPanel({
-  open,
-  onClose,
-  panelRef,
-  threadSummaries,
-  currentThreadId,
-  setCurrentThreadId,
-}: {
-  open: boolean
-  onClose: () => void
-  panelRef: RefObject<HTMLDivElement | null>
-  threadSummaries: ThreadSummary[]
-  currentThreadId: string | null
-  setCurrentThreadId: (threadId: string | null) => void
-}) {
-  const closePanel = useCallback(() => {
-    onClose()
-  }, [onClose])
-
-  useEffect(() => {
-    if (!open) {
-      return
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        closePanel()
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown)
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown)
-    }
-  }, [closePanel, open])
-
-  const sortedThreads = sortThreadSummariesNewestFirst(threadSummaries)
-
-  const handleSelectThread = (threadId: string) => {
-    closePanel()
-    setCurrentThreadId(threadId)
-  }
-
-  if (!open) {
-    return null
-  }
-
-  return (
-    <div
-      ref={panelRef}
-      role="dialog"
-      aria-modal="false"
-      aria-label="Threads"
-      className="absolute top-14 right-3 z-30 flex max-h-[min(70vh,28rem)] w-[min(22rem,calc(100vw-1.5rem))] flex-col overflow-y-auto rounded-md border border-border bg-background p-2 shadow-[0_24px_80px_-40px_rgba(0,0,0,0.9)]"
-    >
-      {sortedThreads.length > 0 ? (
-        <div className="space-y-1">
-          {sortedThreads.map((thread) => {
-            return (
-              <button
-                key={thread.id}
-                type="button"
-                onClick={() => {
-                  handleSelectThread(thread.id)
-                }}
-                className={cn(
-                  "flex w-full min-w-0 cursor-pointer items-center rounded-md border border-transparent px-3 py-2.5 text-left text-sm text-foreground transition-colors hover:border-border/60 hover:bg-accent/30",
-                  thread.id === currentThreadId &&
-                    "border-border/70 bg-accent/40"
-                )}
-              >
-                <span className="min-w-0 flex-1 truncate">{thread.title}</span>
-              </button>
-            )
-          })}
-        </div>
-      ) : (
-        <div className="px-3 py-2 text-sm text-muted-foreground">
-          No chat history yet.
-        </div>
-      )}
-    </div>
-  )
-}
-
 export function HomePageContent({
   initialSelectedModel,
   initialThreadSummaries = [],
@@ -157,14 +70,11 @@ export function HomePageContent({
   const [isPending, startTransition] = useTransition()
   const [isFallbackEnteringConversation, setIsFallbackEnteringConversation] =
     useState(false)
-  const [isThreadsOpen, setIsThreadsOpen] = useState(false)
   const [mirroredHeaderWidth, setMirroredHeaderWidth] = useState<number | null>(
     null
   )
   const fallbackTransitionTimeoutRef = useRef<number | null>(null)
   const overflowPinnedTurnIdRef = useRef<string | null>(null)
-  const threadsTriggerRef = useRef<HTMLDivElement | null>(null)
-  const threadsPanelRef = useRef<HTMLDivElement | null>(null)
   const headerActionsRef = useRef<HTMLDivElement | null>(null)
   const isMobile = useIsMobile()
   const threadStore = useThreadStore(initialThreadSummaries)
@@ -193,6 +103,7 @@ export function HomePageContent({
   )
 
   const hasMessages = state.messages.length > 0
+  const hasActiveThread = threadStore.currentThreadId !== null
   const fallbackTransitionMs = isMobile
     ? MOBILE_FALLBACK_TRANSITION_MS
     : DEFAULT_FALLBACK_TRANSITION_MS
@@ -207,7 +118,9 @@ export function HomePageContent({
         viewTransitionName: "chloei-thread-pane",
       }
   const promptViewTransitionName = isMobile ? undefined : "chloei-prompt-shell"
-  const showHomeView = !hasMessages || isFallbackEnteringConversation
+  const showHomeView =
+    (!hasMessages && !hasActiveThread) || isFallbackEnteringConversation
+  const showConversationView = hasMessages || hasActiveThread
   const isActiveTurnInProgress = state.isSubmitting || state.isStreaming
   const targetThreadScrollTop = useCallback(
     (
@@ -353,34 +266,6 @@ export function HomePageContent({
     }
   }, [hasMessages])
 
-  useEffect(() => {
-    if (!isThreadsOpen) {
-      return
-    }
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target
-
-      if (!(target instanceof Node)) {
-        return
-      }
-
-      if (
-        threadsPanelRef.current?.contains(target) ||
-        threadsTriggerRef.current?.contains(target)
-      ) {
-        return
-      }
-
-      setIsThreadsOpen(false)
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown)
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown)
-    }
-  }, [isThreadsOpen])
-
   useLayoutEffect(() => {
     const actionsElement = headerActionsRef.current
 
@@ -412,185 +297,88 @@ export function HomePageContent({
   }, [isMobile])
 
   const handleNewChat = useCallback(() => {
-    setIsThreadsOpen(false)
     resetConversation()
   }, [resetConversation])
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden">
-      <div className="z-10 flex shrink-0 items-center justify-between bg-background p-3">
-        <div
-          className="flex min-w-0 items-center justify-start"
-          style={
-            !isMobile && mirroredHeaderWidth
-              ? {
-                  width: mirroredHeaderWidth,
-                }
-              : undefined
-          }
-        >
-          <Button
-            asChild
-            variant="ghost"
-            size="iconSm"
-            aria-label="Go to Chloei home"
-          >
-            <Link href="/" onClick={handleNewChat}>
-              <span className="relative block size-4 shrink-0 overflow-hidden">
-                <span className="absolute inset-0 transition-opacity duration-100 group-hover/button:opacity-0 group-focus-visible/button:opacity-0">
-                  <ChloeiLogoSvg className="size-full" />
-                </span>
-                <span className="absolute inset-0 opacity-0 transition-opacity duration-100 group-hover/button:opacity-100 group-focus-visible/button:opacity-100">
-                  <span className="block h-4 w-[240px]">
-                    <ChloeiLogoHoverSvg className="logo-sm size-full [animation-play-state:paused] group-hover/button:[animation-play-state:running] group-focus-visible/button:[animation-play-state:running]" />
-                  </span>
-                </span>
-              </span>
-            </Link>
-          </Button>
-        </div>
-
-        <div ref={headerActionsRef} className="flex items-center gap-1">
-          {hasMessages ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="iconSm"
-                  className="text-muted-foreground hover:text-foreground"
-                  onClick={handleNewChat}
-                  aria-label="Start a new chat"
-                >
-                  <SquarePen className="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" align="end">
-                New chat
-              </TooltipContent>
-            </Tooltip>
-          ) : null}
-
-          <DesktopUpdateButton />
-
-          <div ref={threadsTriggerRef}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="iconSm"
-                  className="text-muted-foreground hover:text-foreground"
-                  onClick={() => {
-                    setIsThreadsOpen((open) => !open)
-                  }}
-                  aria-label="Open threads"
-                  aria-expanded={isThreadsOpen}
-                >
-                  <History className="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" align="end">
-                Threads
-              </TooltipContent>
-            </Tooltip>
-          </div>
-          <AppLauncher className="size-7 text-muted-foreground hover:text-foreground" />
-          <UserMenu
-            viewer={viewer}
-            className="size-7 text-muted-foreground hover:text-foreground"
-          />
-        </div>
-      </div>
-
-      <ThreadsPanel
-        open={isThreadsOpen}
-        onClose={() => {
-          setIsThreadsOpen(false)
-        }}
-        panelRef={threadsPanelRef}
+    <SidebarProvider className="min-h-0 flex-1">
+      <AppSidebar
+        viewer={viewer}
         threadSummaries={threadStore.threadSummaries}
         currentThreadId={threadStore.currentThreadId}
-        setCurrentThreadId={threadStore.setCurrentThreadId}
+        onSelectThread={threadStore.setCurrentThreadId}
+        onDeleteThread={threadStore.deleteThread}
+        onNewChat={handleNewChat}
       />
+      <SidebarInset className="relative flex min-h-0 w-full flex-col overflow-hidden">
+        <div className="z-10 flex shrink-0 items-center justify-between bg-background p-3">
+          <div
+            className="flex min-w-0 items-center justify-start gap-1"
+            style={
+              !isMobile && mirroredHeaderWidth
+                ? {
+                    width: mirroredHeaderWidth,
+                  }
+                : undefined
+            }
+          >
+            <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
+          </div>
 
-      {showHomeView ? (
-        <div
-          className={cn(
-            "relative flex h-full w-full flex-col",
-            isFallbackEnteringConversation &&
-              (isMobile
-                ? "pointer-events-none absolute inset-0 z-20 animate-[chloei-home-layer-out_110ms_var(--ease-out-cubic)_forwards] bg-background"
-                : "pointer-events-none absolute inset-0 z-20 animate-[chloei-home-layer-out_140ms_var(--ease-in-out-cubic)_forwards] bg-background")
-          )}
-        >
+          <div ref={headerActionsRef} className="flex items-center gap-1">
+            {hasActiveThread ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="iconSm"
+                    className="text-muted-foreground hover:text-foreground"
+                    onClick={handleNewChat}
+                    aria-label="Start a new chat"
+                  >
+                    <SquarePen className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="end">
+                  New chat
+                </TooltipContent>
+              </Tooltip>
+            ) : null}
+
+            <DesktopUpdateButton />
+
+            <AppLauncher className="size-7 text-muted-foreground hover:text-foreground" />
+          </div>
+        </div>
+
+        {showHomeView ? (
           <div
             className={cn(
-              "mx-auto flex w-full flex-1 flex-col items-center gap-10 px-4 pt-[20vh] sm:px-6",
-              conversationWidthClass
+              "relative flex h-full w-full flex-col",
+              isFallbackEnteringConversation &&
+                (isMobile
+                  ? "pointer-events-none absolute inset-0 z-20 animate-[chloei-home-layer-out_110ms_var(--ease-out-cubic)_forwards] bg-background"
+                  : "pointer-events-none absolute inset-0 z-20 animate-[chloei-home-layer-out_140ms_var(--ease-in-out-cubic)_forwards] bg-background")
             )}
           >
             <div
-              style={homeHeroTransitionStyle}
-              className="text-center font-departureMono text-2xl font-medium tracking-tighter select-none"
-            >
-              Welcome to <span className="text-muted-foreground">Chloei</span>
-            </div>
-
-            <PromptForm
-              isHome
-              onSubmit={handleAnimatedPromptSubmit}
-              onStopStream={handleStopStream}
-              isStreaming={streamingState}
-              dismissKeyboardOnSubmit={isMobile}
-              initialSelectedModel={initialSelectedModel}
-              transition={{ isPending, startTransition }}
-              viewTransitionName={promptViewTransitionName}
-            />
-          </div>
-        </div>
-      ) : null}
-
-      {hasMessages ? (
-        <StickToBottom
-          className={cn(
-            "relative flex min-h-0 w-full grow flex-col overflow-y-auto",
-            isFallbackEnteringConversation &&
-              (isMobile
-                ? "animate-[chloei-thread-layer-in_110ms_var(--ease-out-cubic)_both]"
-                : "animate-[chloei-thread-layer-in_150ms_var(--ease-out-cubic)_both]")
-          )}
-          resize="smooth"
-          initial="smooth"
-          targetScrollTop={targetThreadScrollTop}
-        >
-          <StickToBottom.Content className="relative flex min-h-full w-full flex-col">
-            <div
               className={cn(
-                "relative z-0 mx-auto flex w-full grow flex-col items-center px-4 sm:px-6",
+                "mx-auto flex w-full flex-1 flex-col items-center gap-10 px-4 pt-[20vh] sm:px-6",
                 conversationWidthClass
               )}
             >
               <div
-                style={threadPaneTransitionStyle}
-                className="flex w-full grow flex-col"
+                style={homeHeroTransitionStyle}
+                className="text-center font-departureMono text-2xl font-medium tracking-tighter select-none"
               >
-                <Messages
-                  messages={state.messages}
-                  disableEditing={state.isSubmitting || state.isStreaming}
-                  onEditMessage={handleEditMessage}
-                />
+                Welcome to <span className="text-muted-foreground">Chloei</span>
               </div>
-
-              <ScrollToBottom />
 
               <PromptForm
                 isHome
-                onSubmit={handlePromptFormSubmit}
+                onSubmit={handleAnimatedPromptSubmit}
                 onStopStream={handleStopStream}
-                dockToBottomOnHome
-                queuedMessage={queuedSubmission?.message ?? null}
-                onClearQueuedMessage={clearQueuedSubmission}
                 isStreaming={streamingState}
                 dismissKeyboardOnSubmit={isMobile}
                 initialSelectedModel={initialSelectedModel}
@@ -598,9 +386,60 @@ export function HomePageContent({
                 viewTransitionName={promptViewTransitionName}
               />
             </div>
-          </StickToBottom.Content>
-        </StickToBottom>
-      ) : null}
-    </div>
+          </div>
+        ) : null}
+
+        {showConversationView ? (
+          <StickToBottom
+            className={cn(
+              "relative flex min-h-0 w-full grow flex-col overflow-y-auto",
+              isFallbackEnteringConversation &&
+                (isMobile
+                  ? "animate-[chloei-thread-layer-in_110ms_var(--ease-out-cubic)_both]"
+                  : "animate-[chloei-thread-layer-in_150ms_var(--ease-out-cubic)_both]")
+            )}
+            resize="smooth"
+            initial="smooth"
+            targetScrollTop={targetThreadScrollTop}
+          >
+            <StickToBottom.Content className="relative flex min-h-full w-full flex-col">
+              <div
+                className={cn(
+                  "relative z-0 mx-auto flex w-full grow flex-col items-center px-4 sm:px-6",
+                  conversationWidthClass
+                )}
+              >
+                <div
+                  style={threadPaneTransitionStyle}
+                  className="flex w-full grow flex-col"
+                >
+                  <Messages
+                    messages={state.messages}
+                    disableEditing={state.isSubmitting || state.isStreaming}
+                    onEditMessage={handleEditMessage}
+                  />
+                </div>
+
+                <ScrollToBottom />
+
+                <PromptForm
+                  isHome
+                  onSubmit={handlePromptFormSubmit}
+                  onStopStream={handleStopStream}
+                  dockToBottomOnHome
+                  queuedMessage={queuedSubmission?.message ?? null}
+                  onClearQueuedMessage={clearQueuedSubmission}
+                  isStreaming={streamingState}
+                  dismissKeyboardOnSubmit={isMobile}
+                  initialSelectedModel={initialSelectedModel}
+                  transition={{ isPending, startTransition }}
+                  viewTransitionName={promptViewTransitionName}
+                />
+              </div>
+            </StickToBottom.Content>
+          </StickToBottom>
+        ) : null}
+      </SidebarInset>
+    </SidebarProvider>
   )
 }

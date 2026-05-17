@@ -28,7 +28,21 @@ async function openMockChat({ baseURL, context, page }) {
   await authenticateMockUser({ baseURL, context })
   await page.goto("/")
   await expect(page.getByPlaceholder("Ask anything")).toBeVisible()
-  await expect(page.getByRole("button", { name: "Open threads" })).toBeVisible()
+}
+
+async function selectThreadFromSidebar(page, threadTitlePattern) {
+  const viewport = page.viewportSize()
+  const isMobile = viewport ? viewport.width < 768 : false
+
+  if (isMobile) {
+    await page.getByRole("button", { name: "Toggle Sidebar" }).first().click()
+  }
+
+  const threadButton = page
+    .getByRole("button", { name: threadTitlePattern })
+    .first()
+  await expect(threadButton).toBeVisible()
+  await threadButton.click()
 }
 
 async function sendPrompt(page, prompt, expectedText = expectedAssistantText) {
@@ -63,14 +77,9 @@ test.describe("mock authenticated chat smoke", () => {
 
     await page.reload()
     await expect(page.getByPlaceholder("Ask anything")).toBeVisible()
-    await page.getByRole("button", { name: "Open threads" }).click()
 
     const threadTitlePattern = new RegExp(escapeRegex(smokePrompt.slice(0, 24)))
-    const persistedThread = page.getByRole("button", {
-      name: threadTitlePattern,
-    })
-    await expect(persistedThread.first()).toBeVisible()
-    await persistedThread.first().click()
+    await selectThreadFromSidebar(page, threadTitlePattern)
     await expect(page.locator("[data-message-role='user']")).toContainText(
       smokePrompt
     )
@@ -91,35 +100,34 @@ test.describe("mock authenticated chat smoke", () => {
     await expect(page.locator("[data-message-role='user']")).toHaveCount(0)
 
     await sendPrompt(page, secondPrompt)
-    await page.getByRole("button", { name: "Open threads" }).click()
 
     const firstThreadTitle = new RegExp(escapeRegex(firstPrompt.slice(0, 24)))
-    const firstThread = page.getByRole("button", { name: firstThreadTitle })
-    await expect(firstThread.first()).toBeVisible()
-    await firstThread.first().click()
+    await selectThreadFromSidebar(page, firstThreadTitle)
     await expect(page.locator("[data-message-role='user']")).toContainText(
       firstPrompt
     )
   })
 
-  test("closes the thread panel with escape and outside clicks", async ({
+  test("filters chats from the sidebar search and closes with escape", async ({
     baseURL,
     context,
     page,
   }) => {
     await openMockChat({ baseURL, context, page })
+    await sendPrompt(page, smokePrompt)
 
-    await page.getByRole("button", { name: "Open threads" }).click()
-    await expect(page.getByRole("dialog", { name: "Threads" })).toBeVisible()
+    await page.getByRole("button", { name: "Search chats" }).click()
+    const searchInput = page.getByPlaceholder("Search chats…")
+    await expect(searchInput).toBeVisible()
+
+    await searchInput.fill(smokePrompt.slice(0, 12))
+    const filtered = page.getByRole("button", {
+      name: new RegExp(escapeRegex(smokePrompt.slice(0, 12))),
+    })
+    await expect(filtered.first()).toBeVisible()
 
     await page.keyboard.press("Escape")
-    await expect(page.getByRole("dialog", { name: "Threads" })).toHaveCount(0)
-
-    await page.getByRole("button", { name: "Open threads" }).click()
-    await expect(page.getByRole("dialog", { name: "Threads" })).toBeVisible()
-
-    await page.getByPlaceholder("Ask anything").click()
-    await expect(page.getByRole("dialog", { name: "Threads" })).toHaveCount(0)
+    await expect(searchInput).toHaveCount(0)
   })
 
   test("edits a user message and regenerates the assistant response", async ({
