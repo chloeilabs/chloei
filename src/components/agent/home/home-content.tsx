@@ -325,111 +325,60 @@ export function HomePageContent({
             <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
           </div>
 
-        <div ref={headerActionsRef} className="flex items-center gap-1">
-          {hasMessages ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="iconSm"
-                  className="text-muted-foreground hover:text-foreground"
-                  onClick={handleNewChat}
-                  aria-label="Start a new chat"
-                >
-                  <SquarePen className="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" align="end">
-                New chat
-              </TooltipContent>
-            </Tooltip>
-          ) : null}
+          <div ref={headerActionsRef} className="flex items-center gap-1">
+            {hasMessages ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="iconSm"
+                    className="text-muted-foreground hover:text-foreground"
+                    onClick={handleNewChat}
+                    aria-label="Start a new chat"
+                  >
+                    <SquarePen className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="end">
+                  New chat
+                </TooltipContent>
+              </Tooltip>
+            ) : null}
 
-          <DesktopUpdateButton />
+            <DesktopUpdateButton />
 
-          <AppLauncher className="size-7 text-muted-foreground hover:text-foreground" />
+            <AppLauncher className="size-7 text-muted-foreground hover:text-foreground" />
+          </div>
         </div>
-      </div>
 
-
-      {showHomeView ? (
-        <div
-          className={cn(
-            "relative flex h-full w-full flex-col",
-            isFallbackEnteringConversation &&
-              (isMobile
-                ? "pointer-events-none absolute inset-0 z-20 animate-[chloei-home-layer-out_110ms_var(--ease-out-cubic)_forwards] bg-background"
-                : "pointer-events-none absolute inset-0 z-20 animate-[chloei-home-layer-out_140ms_var(--ease-in-out-cubic)_forwards] bg-background")
-          )}
-        >
+        {showHomeView ? (
           <div
             className={cn(
-              "mx-auto flex w-full flex-1 flex-col items-center gap-10 px-4 pt-[20vh] sm:px-6",
-              conversationWidthClass
+              "relative flex h-full w-full flex-col",
+              isFallbackEnteringConversation &&
+                (isMobile
+                  ? "pointer-events-none absolute inset-0 z-20 animate-[chloei-home-layer-out_110ms_var(--ease-out-cubic)_forwards] bg-background"
+                  : "pointer-events-none absolute inset-0 z-20 animate-[chloei-home-layer-out_140ms_var(--ease-in-out-cubic)_forwards] bg-background")
             )}
           >
             <div
-              style={homeHeroTransitionStyle}
-              className="text-center font-departureMono text-2xl font-medium tracking-tighter select-none"
-            >
-              Welcome to <span className="text-muted-foreground">Chloei</span>
-            </div>
-
-            <PromptForm
-              isHome
-              onSubmit={handleAnimatedPromptSubmit}
-              onStopStream={handleStopStream}
-              isStreaming={streamingState}
-              dismissKeyboardOnSubmit={isMobile}
-              initialSelectedModel={initialSelectedModel}
-              transition={{ isPending, startTransition }}
-              viewTransitionName={promptViewTransitionName}
-            />
-          </div>
-        </div>
-      ) : null}
-
-      {showConversationView ? (
-        <StickToBottom
-          className={cn(
-            "relative flex min-h-0 w-full grow flex-col overflow-y-auto",
-            isFallbackEnteringConversation &&
-              (isMobile
-                ? "animate-[chloei-thread-layer-in_110ms_var(--ease-out-cubic)_both]"
-                : "animate-[chloei-thread-layer-in_150ms_var(--ease-out-cubic)_both]")
-          )}
-          resize="smooth"
-          initial="smooth"
-          targetScrollTop={targetThreadScrollTop}
-        >
-          <StickToBottom.Content className="relative flex min-h-full w-full flex-col">
-            <div
               className={cn(
-                "relative z-0 mx-auto flex w-full grow flex-col items-center px-4 sm:px-6",
+                "mx-auto flex w-full flex-1 flex-col items-center gap-10 px-4 pt-[20vh] sm:px-6",
                 conversationWidthClass
               )}
             >
               <div
-                style={threadPaneTransitionStyle}
-                className="flex w-full grow flex-col"
+                style={homeHeroTransitionStyle}
+                className="text-center font-departureMono text-2xl font-medium tracking-tighter select-none"
               >
-                <Messages
-                  messages={state.messages}
-                  disableEditing={state.isSubmitting || state.isStreaming}
-                  onEditMessage={handleEditMessage}
-                />
+                Welcome to <span className="text-muted-foreground">Chloei</span>
               </div>
-
-              <ScrollToBottom />
 
               <PromptForm
                 isHome
-                onSubmit={handlePromptFormSubmit}
+                onSubmit={handleAnimatedPromptSubmit}
                 onStopStream={handleStopStream}
-                dockToBottomOnHome
-                queuedMessage={queuedSubmission?.message ?? null}
-                onClearQueuedMessage={clearQueuedSubmission}
                 isStreaming={streamingState}
                 dismissKeyboardOnSubmit={isMobile}
                 initialSelectedModel={initialSelectedModel}
@@ -437,9 +386,59 @@ export function HomePageContent({
                 viewTransitionName={promptViewTransitionName}
               />
             </div>
-          </StickToBottom.Content>
-        </StickToBottom>
-      ) : null}
+          </div>
+        ) : null}
+
+        {showConversationView ? (
+          <StickToBottom
+            className={cn(
+              "relative flex min-h-0 w-full grow flex-col overflow-y-auto",
+              isFallbackEnteringConversation &&
+                (isMobile
+                  ? "animate-[chloei-thread-layer-in_110ms_var(--ease-out-cubic)_both]"
+                  : "animate-[chloei-thread-layer-in_150ms_var(--ease-out-cubic)_both]")
+            )}
+            resize="smooth"
+            initial="smooth"
+            targetScrollTop={targetThreadScrollTop}
+          >
+            <StickToBottom.Content className="relative flex min-h-full w-full flex-col">
+              <div
+                className={cn(
+                  "relative z-0 mx-auto flex w-full grow flex-col items-center px-4 sm:px-6",
+                  conversationWidthClass
+                )}
+              >
+                <div
+                  style={threadPaneTransitionStyle}
+                  className="flex w-full grow flex-col"
+                >
+                  <Messages
+                    messages={state.messages}
+                    disableEditing={state.isSubmitting || state.isStreaming}
+                    onEditMessage={handleEditMessage}
+                  />
+                </div>
+
+                <ScrollToBottom />
+
+                <PromptForm
+                  isHome
+                  onSubmit={handlePromptFormSubmit}
+                  onStopStream={handleStopStream}
+                  dockToBottomOnHome
+                  queuedMessage={queuedSubmission?.message ?? null}
+                  onClearQueuedMessage={clearQueuedSubmission}
+                  isStreaming={streamingState}
+                  dismissKeyboardOnSubmit={isMobile}
+                  initialSelectedModel={initialSelectedModel}
+                  transition={{ isPending, startTransition }}
+                  viewTransitionName={promptViewTransitionName}
+                />
+              </div>
+            </StickToBottom.Content>
+          </StickToBottom>
+        ) : null}
       </SidebarInset>
     </SidebarProvider>
   )

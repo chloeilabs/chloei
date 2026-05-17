@@ -51,7 +51,7 @@ export function SearchChats({
       />
       <DialogPrimitive.Portal>
         <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-black/40 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-backdrop-filter:backdrop-blur-xs" />
-        <DialogPrimitive.Popup className="fixed top-[20vh] left-1/2 z-50 flex w-[min(40rem,calc(100vw-2rem))] -translate-x-1/2 flex-col overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-lg outline-none transition duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0">
+        <DialogPrimitive.Popup className="fixed top-[20vh] left-1/2 z-50 flex w-[min(40rem,calc(100vw-2rem))] -translate-x-1/2 flex-col overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-lg transition duration-150 outline-none data-ending-style:opacity-0 data-starting-style:opacity-0">
           <DialogPrimitive.Title className="sr-only">
             Search chats
           </DialogPrimitive.Title>
@@ -86,7 +86,9 @@ export function SearchChats({
                   }}
                   className="flex w-full min-w-0 cursor-pointer items-center rounded-none px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
                 >
-                  <span className="min-w-0 flex-1 truncate">{thread.title}</span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {thread.title}
+                  </span>
                 </button>
               ))
             )}
