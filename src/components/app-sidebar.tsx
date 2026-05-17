@@ -20,6 +20,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import type { AuthViewer, ThreadSummary } from "@/lib/shared"
 
@@ -39,6 +40,27 @@ export function AppSidebar({
   onDeleteThread: (threadId: string) => void
   onNewChat: () => void
 }) {
+  const { isMobile, setOpenMobile } = useSidebar()
+
+  const closeMobileSidebar = React.useCallback(() => {
+    if (isMobile) {
+      setOpenMobile(false)
+    }
+  }, [isMobile, setOpenMobile])
+
+  const handleSelectThread = React.useCallback(
+    (threadId: string) => {
+      onSelectThread(threadId)
+      closeMobileSidebar()
+    },
+    [onSelectThread, closeMobileSidebar]
+  )
+
+  const handleNewChat = React.useCallback(() => {
+    onNewChat()
+    closeMobileSidebar()
+  }, [onNewChat, closeMobileSidebar])
+
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarHeader>
@@ -46,6 +68,7 @@ export function AppSidebar({
           <SidebarMenuItem>
             <SidebarMenuButton
               className="group/chloei-home h-7 gap-2 hover:bg-transparent hover:text-sidebar-foreground active:bg-transparent active:text-sidebar-foreground"
+              onClick={handleNewChat}
               render={<Link href="/" aria-label="Chloei home" />}
             >
               <span className="relative block size-4 shrink-0 overflow-hidden">
@@ -71,7 +94,7 @@ export function AppSidebar({
             <SidebarMenuItem>
               <SidebarMenuButton
                 tooltip="New chat"
-                onClick={onNewChat}
+                onClick={handleNewChat}
                 className="gap-2"
               >
                 <SquarePenIcon />
@@ -81,7 +104,7 @@ export function AppSidebar({
             <SidebarMenuItem>
               <SearchChats
                 threadSummaries={threadSummaries}
-                onSelectThread={onSelectThread}
+                onSelectThread={handleSelectThread}
               />
             </SidebarMenuItem>
           </SidebarMenu>
@@ -89,7 +112,7 @@ export function AppSidebar({
         <NavThreads
           threadSummaries={threadSummaries}
           currentThreadId={currentThreadId}
-          onSelectThread={onSelectThread}
+          onSelectThread={handleSelectThread}
           onDeleteThread={onDeleteThread}
         />
       </SidebarContent>
