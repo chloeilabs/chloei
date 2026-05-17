@@ -1,10 +1,14 @@
 import {
+  AlertCircle,
   Check,
   ChevronDown,
   CircleCheck,
   CircleX,
+  CloudSun,
   Copy,
   Download,
+  LoaderCircle,
+  TrendingUp,
 } from "lucide-react"
 import dynamic from "next/dynamic"
 import { useMemo, useState } from "react"
@@ -12,10 +16,13 @@ import { useMemo, useState } from "react"
 import { LogoHover } from "@/components/graphics/logo/logo-hover"
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard"
 import {
+  type AssistantMessagePart,
   type CodeExecutionArtifactMetadata,
   type Message,
   type SearchToolName,
+  type StockCardOutput,
   type ToolInvocationStatus,
+  type WeatherCardOutput,
 } from "@/lib/shared"
 
 import { Button } from "../../ui/button"
@@ -46,9 +53,17 @@ function getAssistantContent(message: Message): string {
     return message.content
   }
 
-  const text = parts.map((part) => part.text).join("")
+  const text = parts
+    .filter((part) => part.type === "text")
+    .map((part) => part.text)
+    .join("")
 
   return text.length > 0 ? text : message.content
+}
+
+function getAssistantParts(message: Message): AssistantMessagePart[] {
+  const parts = message.metadata?.parts ?? []
+  return parts.length > 0 ? parts : [{ type: "text", text: message.content }]
 }
 
 const activityLabelClassName =
@@ -216,8 +231,369 @@ function ArtifactDownloadList({
   )
 }
 
+function formatNumber(value: number, options: Intl.NumberFormatOptions = {}) {
+  return new Intl.NumberFormat("en-US", options).format(value)
+}
+
+function formatTemperature(value: number, unit: WeatherCardOutput["unit"]) {
+  return `${String(Math.round(value))}°${unit === "fahrenheit" ? "F" : "C"}`
+}
+
+function formatMaybeDateTime(value: string): string {
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    return value
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(parsed)
+}
+
+function formatShortDate(value: string): string {
+  const parsed = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) {
+    return value
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+  }).format(parsed)
+}
+
+function WeatherCard({ output }: { output: WeatherCardOutput }) {
+  return (
+    <div className="my-2 max-w-2xl rounded-md border bg-muted/30 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <CloudSun className="size-4 text-vesper-teal" />
+            <span>Weather</span>
+          </div>
+          <div className="mt-1 truncate text-base font-semibold">
+            {output.resolvedLocation ?? output.location}
+          </div>
+          <div className="mt-0.5 text-xs text-muted-foreground">
+            {formatMaybeDateTime(output.observedAt)}
+          </div>
+        </div>
+        <div className="shrink-0 text-right">
+          <div className="text-3xl font-semibold tracking-normal">
+            {formatTemperature(output.temperature, output.unit)}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {output.condition}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+        <Metric
+          label="Feels"
+          value={formatNullableTemperature(output.feelsLike, output.unit)}
+        />
+        <Metric
+          label="Humidity"
+          value={formatNullablePercent(output.humidity)}
+        />
+        <Metric
+          label="Wind"
+          value={formatNullableSpeed(output.windSpeed, output.unit)}
+        />
+        <Metric label="Provider" value="Open-Meteo" />
+      </div>
+
+      <div className="mt-3 grid grid-cols-5 gap-1.5">
+        {output.forecast.slice(0, 5).map((day) => (
+          <div
+            key={day.date}
+            className="min-w-0 rounded-none border bg-background/40 px-2 py-2 text-center"
+          >
+            <div className="truncate text-[11px] text-muted-foreground">
+              {formatShortDate(day.date)}
+            </div>
+            <div className="mt-1 text-xs font-medium">
+              {formatTemperature(day.temperatureMax, output.unit)}
+            </div>
+            <div className="text-[11px] text-muted-foreground">
+              {formatTemperature(day.temperatureMin, output.unit)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-none border bg-background/40 px-2 py-1.5">
+      <div className="truncate text-[11px] text-muted-foreground">{label}</div>
+      <div className="truncate text-xs font-medium">{value}</div>
+    </div>
+  )
+}
+
+function formatNullableTemperature(
+  value: number | null | undefined,
+  unit: WeatherCardOutput["unit"]
+): string {
+  return value == null ? "N/A" : formatTemperature(value, unit)
+}
+
+function formatNullablePercent(value: number | null | undefined): string {
+  return value == null
+    ? "N/A"
+    : `${formatNumber(value, { maximumFractionDigits: 0 })}%`
+}
+
+function formatNullableSpeed(
+  value: number | null | undefined,
+  unit: WeatherCardOutput["unit"]
+): string {
+  if (value == null) {
+    return "N/A"
+  }
+
+  return `${formatNumber(value, { maximumFractionDigits: 0 })} ${unit === "fahrenheit" ? "mph" : "km/h"}`
+}
+
+function StockSparkline({ points }: { points: StockCardOutput["history"] }) {
+  const path = useMemo(() => {
+    const values = points.map((point) => point.close)
+    if (values.length < 2) {
+      return ""
+    }
+
+    const min = Math.min(...values)
+    const max = Math.max(...values)
+    const spread = max - min || 1
+    return values
+      .map((value, index) => {
+        const x = (index / Math.max(values.length - 1, 1)) * 100
+        const y = 32 - ((value - min) / spread) * 28
+        return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`
+      })
+      .join(" ")
+  }, [points])
+
+  if (!path) {
+    return (
+      <div className="flex h-10 items-center justify-center border bg-background/40 text-xs text-muted-foreground">
+        Chart unavailable
+      </div>
+    )
+  }
+
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-10 w-full overflow-visible"
+      preserveAspectRatio="none"
+      viewBox="0 0 100 36"
+    >
+      <path
+        d={path}
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  )
+}
+
+function StockCard({ output }: { output: StockCardOutput }) {
+  const change = output.dayChange
+  const changeClass =
+    change == null
+      ? "text-muted-foreground"
+      : change >= 0
+        ? "text-green-600"
+        : "text-red-600"
+  const sourceLabel =
+    output.provider === "fmp" ? "Financial Modeling Prep" : "Stooq"
+
+  return (
+    <div className="my-2 max-w-2xl rounded-md border bg-muted/30 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <TrendingUp className="size-4 text-vesper-orange" />
+            <span>Stock</span>
+            <span className="rounded-none border px-1.5 py-0.5 text-[10px] uppercase">
+              {output.delayed ? "Delayed" : "Live"}
+            </span>
+          </div>
+          <div className="mt-1 flex min-w-0 items-baseline gap-2">
+            <span className="truncate text-base font-semibold">
+              {output.symbol}
+            </span>
+            {output.name && (
+              <span className="truncate text-xs text-muted-foreground">
+                {output.name}
+              </span>
+            )}
+          </div>
+          <div className="mt-0.5 text-xs text-muted-foreground">
+            {formatMaybeDateTime(output.asOf)}
+          </div>
+        </div>
+        <div className="shrink-0 text-right">
+          <div className="text-2xl font-semibold tracking-normal">
+            {formatCurrency(output.price, output.currency)}
+          </div>
+          <div className={`text-xs ${changeClass}`}>
+            {formatStockChange(output)}
+          </div>
+        </div>
+      </div>
+
+      <div className={`mt-3 ${changeClass}`}>
+        <StockSparkline points={output.history} />
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
+        <Metric
+          label="Open"
+          value={formatNullableCurrency(output.open, output.currency)}
+        />
+        <Metric
+          label="High"
+          value={formatNullableCurrency(output.high, output.currency)}
+        />
+        <Metric
+          label="Low"
+          value={formatNullableCurrency(output.low, output.currency)}
+        />
+        <Metric label="Volume" value={formatNullableCompact(output.volume)} />
+        <Metric label="Source" value={sourceLabel} />
+      </div>
+    </div>
+  )
+}
+
+function formatCurrency(value: number, currency = "USD"): string {
+  return formatNumber(value, {
+    currency,
+    maximumFractionDigits: value >= 100 ? 2 : 4,
+    minimumFractionDigits: 2,
+    style: "currency",
+  })
+}
+
+function formatNullableCurrency(
+  value: number | null | undefined,
+  currency?: string
+): string {
+  return value == null ? "N/A" : formatCurrency(value, currency)
+}
+
+function formatNullableCompact(value: number | null | undefined): string {
+  return value == null
+    ? "N/A"
+    : formatNumber(value, {
+        notation: "compact",
+        maximumFractionDigits: 1,
+      })
+}
+
+function formatStockChange(output: StockCardOutput): string {
+  if (output.dayChange == null) {
+    return "Change N/A"
+  }
+
+  const sign = output.dayChange >= 0 ? "+" : ""
+  const percent =
+    output.dayChangePercent == null
+      ? ""
+      : ` (${sign}${formatNumber(output.dayChangePercent, { maximumFractionDigits: 2 })}%)`
+
+  return `${sign}${formatCurrency(output.dayChange, output.currency)}${percent}`
+}
+
+function GenerativeUiLoading({ label }: { label: string }) {
+  return (
+    <div className="my-2 flex max-w-2xl items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+      <LoaderCircle className="size-3.5 animate-spin" />
+      <span className="shimmer">{label}</span>
+    </div>
+  )
+}
+
+function GenerativeUiError({ errorText }: { errorText: string }) {
+  return (
+    <div className="my-2 flex max-w-2xl items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+      <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
+      <span>{errorText}</span>
+    </div>
+  )
+}
+
+function AssistantMessagePartRenderer({
+  messageId,
+  part,
+  partIndex,
+  showSourceFavicon,
+  sources,
+}: {
+  messageId: string
+  part: AssistantMessagePart
+  partIndex: number
+  showSourceFavicon: boolean
+  sources: ReturnType<typeof getDedupedSources>
+}) {
+  if (part.type === "text") {
+    if (!part.text.trim()) {
+      return null
+    }
+
+    return (
+      <MemoizedMarkdown
+        content={part.text}
+        id={`${messageId}-text-${String(partIndex)}`}
+        showSourceFavicon={showSourceFavicon}
+        sources={sources}
+      />
+    )
+  }
+
+  if (part.type === "tool-display_weather") {
+    if (part.state === "input-available") {
+      return (
+        <GenerativeUiLoading
+          label={`Loading weather for ${part.input.location}`}
+        />
+      )
+    }
+
+    if (part.state === "output-error") {
+      return <GenerativeUiError errorText={part.errorText} />
+    }
+
+    return <WeatherCard output={part.output} />
+  }
+
+  if (part.state === "input-available") {
+    return (
+      <GenerativeUiLoading label={`Loading quote for ${part.input.symbol}`} />
+    )
+  }
+
+  if (part.state === "output-error") {
+    return <GenerativeUiError errorText={part.errorText} />
+  }
+
+  return <StockCard output={part.output} />
+}
+
 export function AssistantMessage({ message }: { message: Message }) {
   const content = useMemo(() => getAssistantContent(message), [message])
+  const messageParts = useMemo(() => getAssistantParts(message), [message])
   const [activityVisibility, setActivityVisibility] = useState<
     "auto" | "expanded" | "collapsed"
   >("auto")
@@ -253,6 +629,7 @@ export function AssistantMessage({ message }: { message: Message }) {
     message.metadata?.agentStatus === "in_progress"
 
   const hasContent = content.trim().length > 0
+  const hasGenerativeParts = messageParts.some((part) => part.type !== "text")
   const hasActivity = activityTimeline.length > 0
   const showActivitySection = hasActivity
   const isActivityShimmering =
@@ -261,7 +638,7 @@ export function AssistantMessage({ message }: { message: Message }) {
     activityVisibility === "collapsed" ||
     (activityVisibility === "auto" && !hasActiveActivity)
 
-  if (!hasContent && !hasActivity) {
+  if (!hasContent && !hasGenerativeParts && !hasActivity) {
     return null
   }
 
@@ -366,14 +743,24 @@ export function AssistantMessage({ message }: { message: Message }) {
         </div>
       )}
 
-      {hasContent && (
+      {(hasContent || hasGenerativeParts) && (
         <div className="px-3 py-2 text-sm">
-          <MemoizedMarkdown
-            content={content}
-            id={`${message.id}-text`}
-            showSourceFavicon={showSourceFavicon}
-            sources={sources}
-          />
+          <div className="flex flex-col gap-1">
+            {messageParts.map((part, index) => (
+              <AssistantMessagePartRenderer
+                key={
+                  part.type === "text"
+                    ? `${message.id}-text-${String(index)}`
+                    : `${part.type}-${part.toolCallId}`
+                }
+                messageId={message.id}
+                part={part}
+                partIndex={index}
+                showSourceFavicon={showSourceFavicon}
+                sources={sources}
+              />
+            ))}
+          </div>
           <ArtifactDownloadList artifacts={downloadableArtifacts} />
         </div>
       )}

@@ -48,6 +48,15 @@ import {
 import { createAiSdkFmpMcpToolsContext } from "./ai-sdk-fmp-mcp-tools"
 import { getAiSdkGatewayProviderOptionsForMode } from "./ai-sdk-gateway-provider-options"
 import {
+  createAiSdkGenerativeUiTools,
+  getAiSdkGenerativeUiToolCallMetadata,
+  getAiSdkGenerativeUiToolCallPart,
+  getAiSdkGenerativeUiToolErrorPart,
+  getAiSdkGenerativeUiToolResultMetadata,
+  getAiSdkGenerativeUiToolResultPart,
+  isAiSdkGenerativeUiToolName,
+} from "./ai-sdk-generative-ui-tools"
+import {
   createAiSdkKnowledgeSearchTools,
   getAiSdkKnowledgeSearchToolCallMetadata,
   getAiSdkKnowledgeSearchToolResultMetadata,
@@ -433,6 +442,9 @@ export async function* startAgentRuntimeStream(
         enabled: featureFlags.knowledgeSearchEnabled,
         userId,
       }),
+      ...createAiSdkGenerativeUiTools({
+        fmpApiKey: normalizedFmpApiKey,
+      }),
       ...(runtimeProfile.financeDataEnabled
         ? createAiSdkFinanceDataTools({
             fmpApiKey: normalizedFmpApiKey,
@@ -574,6 +586,7 @@ export async function* startAgentRuntimeStream(
           getAiSdkTavilyToolCallMetadata(part) ??
           getAiSdkManagedSearchToolCallMetadata(part) ??
           getAiSdkKnowledgeSearchToolCallMetadata(part) ??
+          getAiSdkGenerativeUiToolCallMetadata(part) ??
           getAiSdkFinanceDataToolCallMetadata(part) ??
           getAiSdkSecFilingsToolCallMetadata(part) ??
           fmpToolsContext?.getToolCallMetadata(part)
@@ -600,6 +613,13 @@ export async function* startAgentRuntimeStream(
             ? { attempt: metadata.attempt }
             : {}),
         }
+        const generativeUiPart = getAiSdkGenerativeUiToolCallPart(part)
+        if (generativeUiPart) {
+          yield {
+            type: "generative_ui",
+            part: generativeUiPart,
+          }
+        }
         continue
       }
 
@@ -613,6 +633,7 @@ export async function* startAgentRuntimeStream(
           getAiSdkTavilyToolResultMetadata(part) ??
           getAiSdkManagedSearchToolResultMetadata(part) ??
           getAiSdkKnowledgeSearchToolResultMetadata(part) ??
+          getAiSdkGenerativeUiToolResultMetadata(part) ??
           getAiSdkFinanceDataToolResultMetadata(part) ??
           getAiSdkSecFilingsToolResultMetadata(part) ??
           fmpToolsContext?.getToolResultMetadata(part)
@@ -661,6 +682,14 @@ export async function* startAgentRuntimeStream(
           }
         }
 
+        const generativeUiPart = getAiSdkGenerativeUiToolResultPart(part)
+        if (generativeUiPart) {
+          yield {
+            type: "generative_ui",
+            part: generativeUiPart,
+          }
+        }
+
         continue
       }
 
@@ -670,6 +699,7 @@ export async function* startAgentRuntimeStream(
           isAiSdkTavilyToolName(part.toolName) ||
           isAiSdkManagedSearchToolName(part.toolName) ||
           isAiSdkKnowledgeSearchToolName(part.toolName) ||
+          isAiSdkGenerativeUiToolName(part.toolName) ||
           isAiSdkFinanceDataToolName(part.toolName) ||
           isAiSdkSecFilingsToolName(part.toolName) ||
           fmpToolsContext?.isToolName(part.toolName)) &&
@@ -681,6 +711,7 @@ export async function* startAgentRuntimeStream(
           isAiSdkTavilyToolName(part.toolName) ||
           isAiSdkManagedSearchToolName(part.toolName) ||
           isAiSdkKnowledgeSearchToolName(part.toolName) ||
+          isAiSdkGenerativeUiToolName(part.toolName) ||
           isAiSdkFinanceDataToolName(part.toolName) ||
           isAiSdkSecFilingsToolName(part.toolName)
             ? part.toolName
@@ -692,6 +723,13 @@ export async function* startAgentRuntimeStream(
           status: "error",
           errorCode: "TOOL_EXECUTION_ERROR",
           retryable: true,
+        }
+        const generativeUiPart = getAiSdkGenerativeUiToolErrorPart(part)
+        if (generativeUiPart) {
+          yield {
+            type: "generative_ui",
+            part: generativeUiPart,
+          }
         }
       }
 

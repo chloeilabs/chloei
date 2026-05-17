@@ -170,12 +170,151 @@ const legacyAgentSwitchActivityTimelineEntrySchema = z
   })
   .strict()
 
-const assistantMessagePartSchema = z
+const weatherUnitSchema = z.enum(["fahrenheit", "celsius"])
+const stockRangeSchema = z.enum(["5d", "1m", "6m", "1y"])
+
+const weatherToolInputSchema = z
+  .object({
+    location: z.string().trim().min(1).max(500),
+    unit: weatherUnitSchema.optional(),
+  })
+  .strict()
+
+const stockToolInputSchema = z
+  .object({
+    symbol: z.string().trim().min(1).max(40),
+    range: stockRangeSchema.optional(),
+  })
+  .strict()
+
+const weatherForecastDaySchema = z
+  .object({
+    date: z.string().trim().min(1).max(40),
+    condition: z.string().trim().min(1).max(100),
+    temperatureMax: z.number(),
+    temperatureMin: z.number(),
+    precipitationProbability: z.number().nullable().optional(),
+  })
+  .strict()
+
+const weatherCardOutputSchema = z
+  .object({
+    location: z.string().trim().min(1).max(500),
+    resolvedLocation: z.string().trim().min(1).max(500).optional(),
+    latitude: z.number(),
+    longitude: z.number(),
+    unit: weatherUnitSchema,
+    condition: z.string().trim().min(1).max(100),
+    temperature: z.number(),
+    feelsLike: z.number().nullable().optional(),
+    humidity: z.number().nullable().optional(),
+    windSpeed: z.number().nullable().optional(),
+    windDirection: z.number().nullable().optional(),
+    observedAt: z.string().trim().min(1).max(80),
+    forecast: z.array(weatherForecastDaySchema).max(7),
+    provider: z.literal("open-meteo"),
+    sourceUrl: z.string().trim().min(1).max(2048).optional(),
+  })
+  .strict()
+
+const stockPricePointSchema = z
+  .object({
+    date: z.string().trim().min(1).max(40),
+    close: z.number(),
+  })
+  .strict()
+
+const stockCardOutputSchema = z
+  .object({
+    symbol: z.string().trim().min(1).max(40),
+    name: z.string().trim().min(1).max(500).optional(),
+    currency: z.string().trim().min(1).max(12).optional(),
+    price: z.number(),
+    open: z.number().nullable().optional(),
+    high: z.number().nullable().optional(),
+    low: z.number().nullable().optional(),
+    volume: z.number().nullable().optional(),
+    dayChange: z.number().nullable().optional(),
+    dayChangePercent: z.number().nullable().optional(),
+    asOf: z.string().trim().min(1).max(80),
+    delayed: z.boolean(),
+    provider: z.enum(["fmp", "stooq"]),
+    range: stockRangeSchema,
+    history: z.array(stockPricePointSchema).max(250),
+    sourceUrl: z.string().trim().min(1).max(2048).optional(),
+  })
+  .strict()
+
+const textAssistantMessagePartSchema = z
   .object({
     type: z.literal("text"),
     text: z.string().max(100_000),
   })
   .strict()
+
+const weatherGenerativeUiPartSchema = z.union([
+  z
+    .object({
+      type: z.literal("tool-display_weather"),
+      toolCallId: z.string().trim().min(1).max(200),
+      state: z.literal("input-available"),
+      input: weatherToolInputSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("tool-display_weather"),
+      toolCallId: z.string().trim().min(1).max(200),
+      state: z.literal("output-available"),
+      input: weatherToolInputSchema,
+      output: weatherCardOutputSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("tool-display_weather"),
+      toolCallId: z.string().trim().min(1).max(200),
+      state: z.literal("output-error"),
+      input: weatherToolInputSchema.optional(),
+      errorText: z.string().trim().min(1).max(1_000),
+    })
+    .strict(),
+])
+
+const stockGenerativeUiPartSchema = z.union([
+  z
+    .object({
+      type: z.literal("tool-display_stock"),
+      toolCallId: z.string().trim().min(1).max(200),
+      state: z.literal("input-available"),
+      input: stockToolInputSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("tool-display_stock"),
+      toolCallId: z.string().trim().min(1).max(200),
+      state: z.literal("output-available"),
+      input: stockToolInputSchema,
+      output: stockCardOutputSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("tool-display_stock"),
+      toolCallId: z.string().trim().min(1).max(200),
+      state: z.literal("output-error"),
+      input: stockToolInputSchema.optional(),
+      errorText: z.string().trim().min(1).max(1_000),
+    })
+    .strict(),
+])
+
+const assistantMessagePartSchema = z.union([
+  textAssistantMessagePartSchema,
+  weatherGenerativeUiPartSchema,
+  stockGenerativeUiPartSchema,
+])
 
 const attachmentMetadataSchema = z
   .object({

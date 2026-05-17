@@ -5,12 +5,31 @@ import {
   type AgentRunStatus,
   type AgentStreamEvent,
   type CodeExecutionArtifactMetadata,
+  type GenerativeUiMessagePart,
   isToolName,
+  type StockCardOutput,
+  type StockPricePoint,
+  type StockRange,
+  type StockToolInput,
+  type WeatherCardOutput,
+  type WeatherForecastDay,
+  type WeatherToolInput,
+  type WeatherUnit,
 } from "@/lib/shared"
 
 const AGENT_RUN_STATUS_SET: ReadonlySet<AgentRunStatus> = new Set(
   AGENT_RUN_STATUSES
 )
+const WEATHER_UNIT_SET: ReadonlySet<WeatherUnit> = new Set([
+  "fahrenheit",
+  "celsius",
+])
+const STOCK_RANGE_SET: ReadonlySet<StockRange> = new Set([
+  "5d",
+  "1m",
+  "6m",
+  "1y",
+])
 
 function isAgentRunStatus(value: unknown): value is AgentRunStatus {
   return (
@@ -159,6 +178,372 @@ function parseArtifactManifest(
   return artifacts
 }
 
+function asFiniteNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null
+}
+
+function parseOptionalFiniteNumber(
+  record: Record<string, unknown>,
+  key: string
+): number | null | undefined {
+  const value = record[key]
+  if (value === undefined || value === null) {
+    return undefined
+  }
+
+  return asFiniteNumber(value)
+}
+
+function parseOptionalStringField(
+  record: Record<string, unknown>,
+  key: string
+): string | null | undefined {
+  const value = record[key]
+  if (value === undefined || value === null) {
+    return undefined
+  }
+
+  const normalized = asString(value)?.trim()
+  if (!normalized) {
+    return null
+  }
+
+  return normalized
+}
+
+function parseWeatherToolInput(value: unknown): WeatherToolInput | null {
+  const record = asRecord(value)
+  if (!record) {
+    return null
+  }
+
+  const location = asString(record.location)?.trim()
+  if (!location) {
+    return null
+  }
+
+  const unit = record.unit
+  if (
+    unit !== undefined &&
+    unit !== null &&
+    !WEATHER_UNIT_SET.has(unit as WeatherUnit)
+  ) {
+    return null
+  }
+
+  return {
+    location,
+    ...(WEATHER_UNIT_SET.has(unit as WeatherUnit)
+      ? { unit: unit as WeatherUnit }
+      : {}),
+  }
+}
+
+function parseStockToolInput(value: unknown): StockToolInput | null {
+  const record = asRecord(value)
+  if (!record) {
+    return null
+  }
+
+  const symbol = asString(record.symbol)?.trim()
+  if (!symbol) {
+    return null
+  }
+
+  const range = record.range
+  if (
+    range !== undefined &&
+    range !== null &&
+    !STOCK_RANGE_SET.has(range as StockRange)
+  ) {
+    return null
+  }
+
+  return {
+    symbol,
+    ...(STOCK_RANGE_SET.has(range as StockRange)
+      ? { range: range as StockRange }
+      : {}),
+  }
+}
+
+function parseWeatherForecastDay(value: unknown): WeatherForecastDay | null {
+  const record = asRecord(value)
+  if (!record) {
+    return null
+  }
+
+  const date = asString(record.date)?.trim()
+  const condition = asString(record.condition)?.trim()
+  const temperatureMax = asFiniteNumber(record.temperatureMax)
+  const temperatureMin = asFiniteNumber(record.temperatureMin)
+  const precipitationProbability =
+    record.precipitationProbability === null
+      ? null
+      : parseOptionalFiniteNumber(record, "precipitationProbability")
+
+  if (
+    !date ||
+    !condition ||
+    temperatureMax === null ||
+    temperatureMin === null ||
+    precipitationProbability === null
+  ) {
+    return null
+  }
+
+  return {
+    date,
+    condition,
+    temperatureMax,
+    temperatureMin,
+    ...(precipitationProbability !== undefined
+      ? { precipitationProbability }
+      : {}),
+  }
+}
+
+function parseWeatherCardOutput(value: unknown): WeatherCardOutput | null {
+  const record = asRecord(value)
+  if (!record) {
+    return null
+  }
+
+  const location = asString(record.location)?.trim()
+  const resolvedLocation = parseOptionalStringField(record, "resolvedLocation")
+  const latitude = asFiniteNumber(record.latitude)
+  const longitude = asFiniteNumber(record.longitude)
+  const unit = record.unit
+  const condition = asString(record.condition)?.trim()
+  const temperature = asFiniteNumber(record.temperature)
+  const feelsLike =
+    record.feelsLike === null
+      ? null
+      : parseOptionalFiniteNumber(record, "feelsLike")
+  const humidity =
+    record.humidity === null
+      ? null
+      : parseOptionalFiniteNumber(record, "humidity")
+  const windSpeed =
+    record.windSpeed === null
+      ? null
+      : parseOptionalFiniteNumber(record, "windSpeed")
+  const windDirection =
+    record.windDirection === null
+      ? null
+      : parseOptionalFiniteNumber(record, "windDirection")
+  const observedAt = asString(record.observedAt)?.trim()
+  const provider = record.provider
+  const sourceUrl = parseOptionalStringField(record, "sourceUrl")
+  const forecast = Array.isArray(record.forecast)
+    ? record.forecast.flatMap((day) => {
+        const parsed = parseWeatherForecastDay(day)
+        return parsed ? [parsed] : []
+      })
+    : null
+
+  if (
+    !location ||
+    resolvedLocation === null ||
+    latitude === null ||
+    longitude === null ||
+    !WEATHER_UNIT_SET.has(unit as WeatherUnit) ||
+    !condition ||
+    temperature === null ||
+    feelsLike === null ||
+    humidity === null ||
+    windSpeed === null ||
+    windDirection === null ||
+    !observedAt ||
+    provider !== "open-meteo" ||
+    sourceUrl === null ||
+    forecast === null ||
+    forecast.length === 0 ||
+    forecast.length > 7
+  ) {
+    return null
+  }
+
+  return {
+    location,
+    ...(resolvedLocation ? { resolvedLocation } : {}),
+    latitude,
+    longitude,
+    unit: unit as WeatherUnit,
+    condition,
+    temperature,
+    ...(feelsLike !== undefined ? { feelsLike } : {}),
+    ...(humidity !== undefined ? { humidity } : {}),
+    ...(windSpeed !== undefined ? { windSpeed } : {}),
+    ...(windDirection !== undefined ? { windDirection } : {}),
+    observedAt,
+    forecast,
+    provider,
+    ...(sourceUrl ? { sourceUrl } : {}),
+  }
+}
+
+function parseStockPricePoint(value: unknown): StockPricePoint | null {
+  const record = asRecord(value)
+  if (!record) {
+    return null
+  }
+
+  const date = asString(record.date)?.trim()
+  const close = asFiniteNumber(record.close)
+  if (!date || close === null) {
+    return null
+  }
+
+  return { date, close }
+}
+
+function parseStockCardOutput(value: unknown): StockCardOutput | null {
+  const record = asRecord(value)
+  if (!record) {
+    return null
+  }
+
+  const symbol = asString(record.symbol)?.trim()
+  const name = parseOptionalStringField(record, "name")
+  const currency = parseOptionalStringField(record, "currency")
+  const price = asFiniteNumber(record.price)
+  const open =
+    record.open === null ? null : parseOptionalFiniteNumber(record, "open")
+  const high =
+    record.high === null ? null : parseOptionalFiniteNumber(record, "high")
+  const low =
+    record.low === null ? null : parseOptionalFiniteNumber(record, "low")
+  const volume =
+    record.volume === null ? null : parseOptionalFiniteNumber(record, "volume")
+  const dayChange =
+    record.dayChange === null
+      ? null
+      : parseOptionalFiniteNumber(record, "dayChange")
+  const dayChangePercent =
+    record.dayChangePercent === null
+      ? null
+      : parseOptionalFiniteNumber(record, "dayChangePercent")
+  const asOf = asString(record.asOf)?.trim()
+  const delayed = record.delayed
+  const provider = record.provider
+  const range = record.range
+  const sourceUrl = parseOptionalStringField(record, "sourceUrl")
+  const history = Array.isArray(record.history)
+    ? record.history.flatMap((point) => {
+        const parsed = parseStockPricePoint(point)
+        return parsed ? [parsed] : []
+      })
+    : null
+
+  if (
+    !symbol ||
+    name === null ||
+    currency === null ||
+    price === null ||
+    open === null ||
+    high === null ||
+    low === null ||
+    volume === null ||
+    dayChange === null ||
+    dayChangePercent === null ||
+    !asOf ||
+    typeof delayed !== "boolean" ||
+    (provider !== "fmp" && provider !== "stooq") ||
+    !STOCK_RANGE_SET.has(range as StockRange) ||
+    sourceUrl === null ||
+    history === null ||
+    history.length > 250
+  ) {
+    return null
+  }
+
+  return {
+    symbol,
+    ...(name ? { name } : {}),
+    ...(currency ? { currency } : {}),
+    price,
+    ...(open !== undefined ? { open } : {}),
+    ...(high !== undefined ? { high } : {}),
+    ...(low !== undefined ? { low } : {}),
+    ...(volume !== undefined ? { volume } : {}),
+    ...(dayChange !== undefined ? { dayChange } : {}),
+    ...(dayChangePercent !== undefined ? { dayChangePercent } : {}),
+    asOf,
+    delayed,
+    provider,
+    range: range as StockRange,
+    history,
+    ...(sourceUrl ? { sourceUrl } : {}),
+  }
+}
+
+function parseGenerativeUiPart(value: unknown): GenerativeUiMessagePart | null {
+  const record = asRecord(value)
+  if (!record) {
+    return null
+  }
+
+  const type = asString(record.type)
+  const toolCallId = asString(record.toolCallId)?.trim()
+  const state = asString(record.state)
+  if (!toolCallId) {
+    return null
+  }
+
+  if (type === "tool-display_weather") {
+    if (state === "input-available") {
+      const input = parseWeatherToolInput(record.input)
+      return input ? { type, toolCallId, state, input } : null
+    }
+
+    if (state === "output-available") {
+      const input = parseWeatherToolInput(record.input)
+      const output = parseWeatherCardOutput(record.output)
+      return input && output ? { type, toolCallId, state, input, output } : null
+    }
+
+    if (state === "output-error") {
+      const input =
+        record.input === undefined || record.input === null
+          ? undefined
+          : parseWeatherToolInput(record.input)
+      const errorText = asString(record.errorText)?.trim()
+      if (input === null || !errorText) {
+        return null
+      }
+      return { type, toolCallId, state, ...(input ? { input } : {}), errorText }
+    }
+  }
+
+  if (type === "tool-display_stock") {
+    if (state === "input-available") {
+      const input = parseStockToolInput(record.input)
+      return input ? { type, toolCallId, state, input } : null
+    }
+
+    if (state === "output-available") {
+      const input = parseStockToolInput(record.input)
+      const output = parseStockCardOutput(record.output)
+      return input && output ? { type, toolCallId, state, input, output } : null
+    }
+
+    if (state === "output-error") {
+      const input =
+        record.input === undefined || record.input === null
+          ? undefined
+          : parseStockToolInput(record.input)
+      const errorText = asString(record.errorText)?.trim()
+      if (input === null || !errorText) {
+        return null
+      }
+      return { type, toolCallId, state, ...(input ? { input } : {}), errorText }
+    }
+  }
+
+  return null
+}
+
 export function parseStreamEventLine(line: string): AgentStreamEvent | null {
   if (!line) {
     return null
@@ -301,6 +686,11 @@ export function parseStreamEventLine(line: string): AgentStreamEvent | null {
       },
       ...checkpointFields,
     }
+  }
+
+  if (type === "generative_ui") {
+    const part = parseGenerativeUiPart(record.part)
+    return part ? { type, part, ...checkpointFields } : null
   }
 
   if (type === "agent_status") {

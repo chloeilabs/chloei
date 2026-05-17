@@ -93,3 +93,65 @@ test("tool result events clear artifact manifests with explicit empty arrays", (
   assert.equal(completed.activityTimeline[0]?.kind, "tool")
   assert.deepEqual(completed.activityTimeline[0]?.artifactManifest, [])
 })
+
+test("generative UI parts preserve order and update by tool call", () => {
+  const withIntro = applyAgentStreamEvent(createAgentStreamAccumulator(), {
+    type: "text_delta",
+    delta: "Here is the forecast.",
+  })
+  const loading = applyAgentStreamEvent(withIntro, {
+    type: "generative_ui",
+    part: {
+      type: "tool-display_weather",
+      toolCallId: "call-weather",
+      state: "input-available",
+      input: {
+        location: "Chicago",
+        unit: "fahrenheit",
+      },
+    },
+  })
+  const completed = applyAgentStreamEvent(loading, {
+    type: "generative_ui",
+    part: {
+      type: "tool-display_weather",
+      toolCallId: "call-weather",
+      state: "output-available",
+      input: {
+        location: "Chicago",
+        unit: "fahrenheit",
+      },
+      output: {
+        location: "Chicago",
+        resolvedLocation: "Chicago, Illinois, United States",
+        latitude: 41.85,
+        longitude: -87.65,
+        unit: "fahrenheit",
+        condition: "Clear",
+        temperature: 72,
+        feelsLike: 73,
+        humidity: 45,
+        windSpeed: 8,
+        windDirection: 270,
+        observedAt: "2026-05-16T10:00",
+        forecast: [
+          {
+            date: "2026-05-16",
+            condition: "Clear",
+            temperatureMax: 76,
+            temperatureMin: 61,
+            precipitationProbability: 10,
+          },
+        ],
+        provider: "open-meteo",
+        sourceUrl: "https://api.open-meteo.com/v1/forecast?latitude=41.85",
+      },
+    },
+  })
+
+  assert.equal(completed.content, "Here is the forecast.")
+  assert.equal(completed.parts.length, 2)
+  assert.equal(completed.parts[0]?.type, "text")
+  assert.equal(completed.parts[1]?.type, "tool-display_weather")
+  assert.equal(completed.parts[1]?.state, "output-available")
+})

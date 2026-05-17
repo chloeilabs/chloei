@@ -56,8 +56,11 @@ export function pruneThreadAttachmentPayloads(
 export function hasVisibleStructuredOutput(
   current: AgentStreamAccumulator
 ): boolean {
+  const parts = getAccumulatorParts(current)
+
   return Boolean(
     current.reasoning.trim() ||
+    parts.some((part) => part.type !== "text") ||
     current.toolInvocations.length > 0 ||
     current.activityTimeline.length > 0 ||
     current.sources.length > 0
@@ -79,6 +82,8 @@ export function createAssistantMessageFromAccumulator({
   runMode: AgentRunMode
   isStreaming: boolean
 }): AgentMessage {
+  const parts = getAccumulatorParts(accumulator)
+
   return {
     id,
     role: "assistant",
@@ -88,7 +93,10 @@ export function createAssistantMessageFromAccumulator({
     metadata: {
       isStreaming,
       runMode,
-      parts: [{ type: "text", text: accumulator.content }],
+      parts:
+        parts.length > 0
+          ? parts
+          : [{ type: "text", text: accumulator.content }],
       ...(accumulator.agentStatus
         ? { agentStatus: accumulator.agentStatus }
         : {}),
@@ -106,6 +114,15 @@ export function createAssistantMessageFromAccumulator({
         : {}),
     },
   }
+}
+
+function getAccumulatorParts(
+  accumulator: AgentStreamAccumulator
+): AgentStreamAccumulator["parts"] {
+  const candidate = (
+    accumulator as Partial<Pick<AgentStreamAccumulator, "parts">>
+  ).parts
+  return candidate ?? []
 }
 
 export function upsertAgentMessage(

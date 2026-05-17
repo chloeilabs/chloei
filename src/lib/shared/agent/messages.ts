@@ -6,7 +6,125 @@ interface TextMessagePart {
   text: string
 }
 
-type AssistantMessagePart = TextMessagePart
+export const GENERATIVE_UI_TOOL_NAMES = [
+  "display_weather",
+  "display_stock",
+] as const
+export type GenerativeUiToolName = (typeof GENERATIVE_UI_TOOL_NAMES)[number]
+export type GenerativeUiPartState =
+  | "input-available"
+  | "output-available"
+  | "output-error"
+export type WeatherUnit = "fahrenheit" | "celsius"
+export type StockRange = "5d" | "1m" | "6m" | "1y"
+
+export interface WeatherForecastDay {
+  date: string
+  condition: string
+  temperatureMax: number
+  temperatureMin: number
+  precipitationProbability?: number | null
+}
+
+export interface WeatherCardOutput {
+  location: string
+  resolvedLocation?: string
+  latitude: number
+  longitude: number
+  unit: WeatherUnit
+  condition: string
+  temperature: number
+  feelsLike?: number | null
+  humidity?: number | null
+  windSpeed?: number | null
+  windDirection?: number | null
+  observedAt: string
+  forecast: WeatherForecastDay[]
+  provider: "open-meteo"
+  sourceUrl?: string
+}
+
+export interface StockPricePoint {
+  date: string
+  close: number
+}
+
+export interface StockCardOutput {
+  symbol: string
+  name?: string
+  currency?: string
+  price: number
+  open?: number | null
+  high?: number | null
+  low?: number | null
+  volume?: number | null
+  dayChange?: number | null
+  dayChangePercent?: number | null
+  asOf: string
+  delayed: boolean
+  provider: "fmp" | "stooq"
+  range: StockRange
+  history: StockPricePoint[]
+  sourceUrl?: string
+}
+
+export interface WeatherToolInput {
+  location: string
+  unit?: WeatherUnit
+}
+
+export interface StockToolInput {
+  symbol: string
+  range?: StockRange
+}
+
+interface BaseGenerativeUiMessagePart {
+  toolCallId: string
+  state: GenerativeUiPartState
+}
+
+export type WeatherGenerativeUiPart =
+  | (BaseGenerativeUiMessagePart & {
+      type: "tool-display_weather"
+      state: "input-available"
+      input: WeatherToolInput
+    })
+  | (BaseGenerativeUiMessagePart & {
+      type: "tool-display_weather"
+      state: "output-available"
+      input: WeatherToolInput
+      output: WeatherCardOutput
+    })
+  | (BaseGenerativeUiMessagePart & {
+      type: "tool-display_weather"
+      state: "output-error"
+      input?: WeatherToolInput
+      errorText: string
+    })
+
+export type StockGenerativeUiPart =
+  | (BaseGenerativeUiMessagePart & {
+      type: "tool-display_stock"
+      state: "input-available"
+      input: StockToolInput
+    })
+  | (BaseGenerativeUiMessagePart & {
+      type: "tool-display_stock"
+      state: "output-available"
+      input: StockToolInput
+      output: StockCardOutput
+    })
+  | (BaseGenerativeUiMessagePart & {
+      type: "tool-display_stock"
+      state: "output-error"
+      input?: StockToolInput
+      errorText: string
+    })
+
+export type GenerativeUiMessagePart =
+  | WeatherGenerativeUiPart
+  | StockGenerativeUiPart
+export type AssistantMessagePart = TextMessagePart | GenerativeUiMessagePart
 export const TOOL_NAMES = [
   "web_search",
   "x_search",
@@ -20,6 +138,7 @@ export const TOOL_NAMES = [
   "finance_data",
   "sec_filings",
   "fmp_mcp",
+  ...GENERATIVE_UI_TOOL_NAMES,
 ] as const
 export type ToolName = (typeof TOOL_NAMES)[number]
 
@@ -184,6 +303,11 @@ export interface SourceStreamEvent extends InteractionCheckpointFields {
   source: MessageSource
 }
 
+export interface GenerativeUiStreamEvent extends InteractionCheckpointFields {
+  type: "generative_ui"
+  part: GenerativeUiMessagePart
+}
+
 export interface AgentStatusStreamEvent extends InteractionCheckpointFields {
   type: "agent_status"
   status: AgentRunStatus
@@ -195,6 +319,7 @@ export type AgentStreamEvent =
   | ToolCallStreamEvent
   | ToolResultStreamEvent
   | SourceStreamEvent
+  | GenerativeUiStreamEvent
   | AgentStatusStreamEvent
 
 export interface Message {

@@ -41,6 +41,7 @@ function groupMessages(messages: Message[]) {
 
 function hasVisibleAssistantActivity(message: Message): boolean {
   const visibleTextParts = (message.metadata?.parts ?? [])
+    .filter((part) => part.type === "text")
     .map((part) => part.text)
     .join("")
     .trim()
@@ -48,6 +49,7 @@ function hasVisibleAssistantActivity(message: Message): boolean {
 
   return Boolean(
     visibleText ||
+    (message.metadata?.parts ?? []).some((part) => part.type !== "text") ||
     (message.metadata?.activityTimeline?.length ?? 0) ||
     (message.metadata?.toolInvocations?.length ?? 0) ||
     (message.metadata?.sources?.length ?? 0) ||

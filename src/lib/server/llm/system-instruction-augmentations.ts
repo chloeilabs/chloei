@@ -42,6 +42,16 @@ When FMP MCP tools are available:
 </ai_sdk_fmp_tool_rules>
 `.trim()
 
+const AI_SDK_GENERATIVE_UI_INSTRUCTION = `
+<ai_sdk_generative_ui_rules>
+- For direct weather requests, use \`display_weather\` to render the current conditions and short forecast card. Default to Fahrenheit unless the user asks for Celsius.
+- For simple stock quote, price, or compact chart requests, use \`display_stock\` to render the stock card.
+- Keep \`finance_data\` for deeper financial analysis, financial statements, SEC facts, valuation work, calculations, and research workflows.
+- Stock quote cards are informational only. Do not turn them into personalized investment advice.
+- Never expose provider API keys, credential-bearing URLs, or hidden provider details in the final answer.
+</ai_sdk_generative_ui_rules>
+`.trim()
+
 const AI_SDK_FINAL_ANSWER_COMPLETION_INSTRUCTION = `
 <ai_sdk_final_answer_completion_rules>
 - After using tools, finish with a complete final answer, not a progress note, search narration, or partial first finding.
@@ -70,6 +80,7 @@ export function withAiSdkInlineCitationInstruction(
     financeEnabled && options.fmpEnabled
       ? AI_SDK_FMP_TOOLING_INSTRUCTION
       : null,
+    AI_SDK_GENERATIVE_UI_INSTRUCTION,
     AI_SDK_FINAL_ANSWER_COMPLETION_INSTRUCTION,
   ].filter((block): block is string => Boolean(block))
 

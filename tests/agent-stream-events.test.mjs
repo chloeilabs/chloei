@@ -84,6 +84,86 @@ test("parseStreamEventLine parses extended tool result metadata", () => {
   })
 })
 
+test("parseStreamEventLine parses generative UI tool parts", () => {
+  const line = JSON.stringify({
+    type: "generative_ui",
+    part: {
+      type: "tool-display_weather",
+      toolCallId: "call-weather",
+      state: "output-available",
+      input: {
+        location: "Chicago",
+        unit: "fahrenheit",
+      },
+      output: {
+        location: "Chicago",
+        resolvedLocation: "Chicago, Illinois, United States",
+        latitude: 41.85,
+        longitude: -87.65,
+        unit: "fahrenheit",
+        condition: "Clear",
+        temperature: 72,
+        feelsLike: 73,
+        humidity: 45,
+        windSpeed: 8,
+        windDirection: 270,
+        observedAt: "2026-05-16T10:00",
+        forecast: [
+          {
+            date: "2026-05-16",
+            condition: "Clear",
+            temperatureMax: 76,
+            temperatureMin: 61,
+            precipitationProbability: 10,
+          },
+        ],
+        provider: "open-meteo",
+        sourceUrl: "https://api.open-meteo.com/v1/forecast?latitude=41.85",
+      },
+    },
+    interactionId: "interaction-1",
+  })
+
+  assert.deepEqual(parseStreamEventLine(line), {
+    type: "generative_ui",
+    part: {
+      type: "tool-display_weather",
+      toolCallId: "call-weather",
+      state: "output-available",
+      input: {
+        location: "Chicago",
+        unit: "fahrenheit",
+      },
+      output: {
+        location: "Chicago",
+        resolvedLocation: "Chicago, Illinois, United States",
+        latitude: 41.85,
+        longitude: -87.65,
+        unit: "fahrenheit",
+        condition: "Clear",
+        temperature: 72,
+        feelsLike: 73,
+        humidity: 45,
+        windSpeed: 8,
+        windDirection: 270,
+        observedAt: "2026-05-16T10:00",
+        forecast: [
+          {
+            date: "2026-05-16",
+            condition: "Clear",
+            temperatureMax: 76,
+            temperatureMin: 61,
+            precipitationProbability: 10,
+          },
+        ],
+        provider: "open-meteo",
+        sourceUrl: "https://api.open-meteo.com/v1/forecast?latitude=41.85",
+      },
+    },
+    interactionId: "interaction-1",
+  })
+})
+
 test("parseStreamEventLine rejects malformed checkpoint and tool data", () => {
   assert.equal(
     parseStreamEventLine(
@@ -148,6 +228,27 @@ test("parseStreamEventLine rejects malformed checkpoint and tool data", () => {
             url: "https://example.com/finance_artifact.xlsx",
           },
         ],
+      })
+    ),
+    null
+  )
+
+  assert.equal(
+    parseStreamEventLine(
+      JSON.stringify({
+        type: "generative_ui",
+        part: {
+          type: "tool-display_stock",
+          toolCallId: "call-stock",
+          state: "output-available",
+          input: {
+            symbol: "AAPL",
+          },
+          output: {
+            symbol: "AAPL",
+            price: "not-a-number",
+          },
+        },
       })
     ),
     null

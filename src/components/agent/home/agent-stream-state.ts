@@ -2,6 +2,8 @@ import {
   type ActivityTimelineEntry,
   type AgentRunStatus,
   type AgentStreamEvent,
+  type AssistantMessagePart,
+  type GenerativeUiMessagePart,
   isSearchToolName,
   type MessageSource,
   type ToolInvocation,
@@ -61,6 +63,7 @@ function getToolRunMetadata(
 
 export interface AgentStreamAccumulator {
   content: string
+  parts: AssistantMessagePart[]
   reasoning: string
   agentStatus?: AgentRunStatus
   interactionId?: string
@@ -74,6 +77,7 @@ export interface AgentStreamAccumulator {
 export function createAgentStreamAccumulator(): AgentStreamAccumulator {
   return {
     content: "",
+    parts: [],
     reasoning: "",
     agentStatus: undefined,
     interactionId: undefined,
@@ -96,6 +100,7 @@ export function appendRawStreamText(
   return {
     ...current,
     content: `${current.content}${text}`,
+    parts: appendTextPart(current.parts, text),
   }
 }
 
@@ -116,6 +121,7 @@ export function applyAgentStreamEvent(
       ...current,
       ...checkpointFields,
       content: `${current.content}${event.delta}`,
+      parts: appendTextPart(current.parts, event.delta),
     }
   }
 
@@ -139,6 +145,14 @@ export function applyAgentStreamEvent(
       ...current,
       ...checkpointFields,
       agentStatus: event.status,
+    }
+  }
+
+  if (event.type === "generative_ui") {
+    return {
+      ...current,
+      ...checkpointFields,
+      parts: upsertGenerativeUiPart(current.parts, event.part),
     }
   }
 
@@ -208,11 +222,52 @@ export function hasAgentStreamOutput(current: AgentStreamAccumulator): boolean {
   return Boolean(
     current.content.trim() ||
     current.reasoning.trim() ||
+    current.parts.some((part) => part.type !== "text") ||
     current.agentStatus != null ||
     current.toolInvocations.length > 0 ||
     current.activityTimeline.length > 0 ||
     current.sources.length > 0
   )
+}
+
+function appendTextPart(
+  current: AssistantMessagePart[],
+  text: string
+): AssistantMessagePart[] {
+  if (text.length === 0) {
+    return current
+  }
+
+  const lastPart = current[current.length - 1]
+  if (lastPart?.type === "text") {
+    return [
+      ...current.slice(0, -1),
+      {
+        type: "text",
+        text: `${lastPart.text}${text}`,
+      },
+    ]
+  }
+
+  return [...current, { type: "text", text }]
+}
+
+function upsertGenerativeUiPart(
+  current: AssistantMessagePart[],
+  part: GenerativeUiMessagePart
+): AssistantMessagePart[] {
+  const existingIndex = current.findIndex(
+    (candidate) =>
+      candidate.type === part.type && candidate.toolCallId === part.toolCallId
+  )
+
+  if (existingIndex === -1) {
+    return [...current, part]
+  }
+
+  const updated = [...current]
+  updated[existingIndex] = part
+  return updated
 }
 
 function getCheckpointFields(
