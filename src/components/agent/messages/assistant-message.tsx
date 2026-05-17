@@ -23,6 +23,7 @@ import {
   type SearchToolName,
   type StockCardOutput,
   type TimelineCardOutput,
+  type TimelineEvent,
   type ToolInvocationStatus,
   type WeatherCardOutput,
 } from "@/lib/shared"
@@ -530,14 +531,57 @@ function getIsoDateAttr(value: string): string | undefined {
     : parsed.toISOString().slice(0, 10)
 }
 
+function getEventYear(value: string): string | null {
+  const match = /\b(\d{4})\b/.exec(value)
+  return match ? (match[1] ?? null) : null
+}
+
+function getEventDateWithoutYear(value: string, year: string): string {
+  const withoutYear = value
+    .replace(new RegExp(`^${year}[-/.\\s]*`), "")
+    .replace(new RegExp(`[,\\s]+${year}\\b\\.?\\s*$`), "")
+    .replace(new RegExp(`\\b${year}\\b`), "")
+    .replace(/\s+/g, " ")
+    .replace(/^[,–\-\s]+|[,–\-\s]+$/g, "")
+    .trim()
+  return withoutYear || value
+}
+
+interface TimelineYearGroup {
+  year: string | null
+  events: { event: TimelineEvent; originalIndex: number }[]
+}
+
+function groupTimelineEventsByYear(
+  events: TimelineEvent[]
+): TimelineYearGroup[] {
+  const groups: TimelineYearGroup[] = []
+  events.forEach((event, originalIndex) => {
+    const year = getEventYear(event.date)
+    const last = groups[groups.length - 1]
+    if (last?.year === year) {
+      last.events.push({ event, originalIndex })
+    } else {
+      groups.push({ year, events: [{ event, originalIndex }] })
+    }
+  })
+  return groups
+}
+
 function TimelineCard({ output }: { output: TimelineCardOutput }) {
+  const yearGroups = useMemo(
+    () => groupTimelineEventsByYear(output.events),
+    [output.events]
+  )
+  const hasYearGroups = yearGroups.some((group) => group.year !== null)
+
   return (
     <div className="my-2 max-w-2xl rounded-md border bg-muted/30 p-4">
-      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-        <CalendarClock className="size-4 text-vesper-teal" />
+      <div className="flex items-center gap-1.5 font-departureMono text-[10px] font-medium tracking-[0.1em] text-muted-foreground uppercase">
+        <CalendarClock className="size-3.5 text-vesper-teal" />
         <span>Timeline</span>
       </div>
-      <div className="mt-1.5 text-base leading-tight font-semibold tracking-tight">
+      <div className="mt-2 text-base leading-tight font-semibold tracking-tight">
         {output.title}
       </div>
       {output.subtitle && (
@@ -546,47 +590,74 @@ function TimelineCard({ output }: { output: TimelineCardOutput }) {
         </div>
       )}
 
-      <ol
+      <div
         aria-label={`${output.title} timeline`}
-        className="mt-4 ml-[5px] space-y-3.5 border-l-2 border-border/70 pl-5"
+        className="relative mt-4 ml-[5px] pl-5"
+        role="list"
       >
-        {output.events.map((event, index) => {
-          const isoDate = getIsoDateAttr(event.date)
-          return (
-            <li key={`${event.date}-${String(index)}`} className="relative">
-              <span
-                aria-hidden="true"
-                className="absolute top-[5px] -left-[1.6875rem] size-2.5 rounded-full border-2 border-border bg-vesper-teal"
-              />
-              <time
-                className="font-departureMono text-[10px] tracking-[0.08em] text-muted-foreground/90 uppercase"
-                {...(isoDate ? { dateTime: isoDate } : {})}
-              >
-                {event.date}
-              </time>
-              <div className="mt-0.5 text-sm leading-snug font-medium text-foreground">
-                {event.sourceUrl ? (
-                  <a
-                    className="underline decoration-border underline-offset-[3px] transition-colors hover:decoration-foreground"
-                    href={event.sourceUrl}
-                    rel="noopener noreferrer"
-                    target="_blank"
+        <span
+          aria-hidden="true"
+          className="absolute top-1 bottom-1 left-0 w-[2px] rounded-full bg-gradient-to-b from-vesper-teal/60 via-border to-border/40"
+        />
+
+        {yearGroups.map((group, groupIndex) => (
+          <section
+            key={`${group.year ?? "year-unknown"}-${String(groupIndex)}`}
+            className={groupIndex === 0 ? "" : "mt-5"}
+          >
+            {group.year && hasYearGroups && (
+              <h4 className="-mt-0.5 mb-2 font-departureMono text-[11px] font-semibold tracking-[0.12em] text-vesper-teal uppercase">
+                {group.year}
+              </h4>
+            )}
+            <ol className="space-y-3.5">
+              {group.events.map(({ event, originalIndex }) => {
+                const isoDate = getIsoDateAttr(event.date)
+                const displayDate =
+                  group.year && hasYearGroups
+                    ? getEventDateWithoutYear(event.date, group.year)
+                    : event.date
+                return (
+                  <li
+                    key={`${event.date}-${String(originalIndex)}`}
+                    className="relative"
                   >
-                    {event.label}
-                  </a>
-                ) : (
-                  event.label
-                )}
-              </div>
-              {event.description && (
-                <div className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                  {event.description}
-                </div>
-              )}
-            </li>
-          )
-        })}
-      </ol>
+                    <span
+                      aria-hidden="true"
+                      className="absolute top-[5px] -left-[1.6875rem] size-2.5 rounded-full border-2 border-border bg-vesper-teal"
+                    />
+                    <time
+                      className="font-departureMono text-[10px] tracking-[0.08em] text-muted-foreground/90 uppercase"
+                      {...(isoDate ? { dateTime: isoDate } : {})}
+                    >
+                      {displayDate}
+                    </time>
+                    <div className="mt-0.5 text-sm leading-snug font-medium text-foreground">
+                      {event.sourceUrl ? (
+                        <a
+                          className="underline decoration-border underline-offset-[3px] transition-colors hover:decoration-foreground"
+                          href={event.sourceUrl}
+                          rel="noopener noreferrer"
+                          target="_blank"
+                        >
+                          {event.label}
+                        </a>
+                      ) : (
+                        event.label
+                      )}
+                    </div>
+                    {event.description && (
+                      <div className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                        {event.description}
+                      </div>
+                    )}
+                  </li>
+                )
+              })}
+            </ol>
+          </section>
+        ))}
+      </div>
     </div>
   )
 }
