@@ -46,6 +46,7 @@ const AI_SDK_GENERATIVE_UI_INSTRUCTION = `
 <ai_sdk_generative_ui_rules>
 - For direct weather requests, use \`display_weather\` to render the current conditions and short forecast card. Default to Fahrenheit unless the user asks for Celsius.
 - For simple stock quote, price, or compact chart requests, use \`display_stock\` to render the stock card.
+- For historical, chronological, or "what happened when" requests (e.g. timelines of events, eras, lives, or projects), use \`display_timeline\` to render a vertical timeline card. Pass between 1 and 40 events, each with a date (ISO or human-readable), a short label, and optional description and sourceUrl. Source events from your own knowledge or after a web_search / tavily_search call, and include sourceUrl when you have a canonical citation.
 - Keep \`finance_data\` for deeper financial analysis, financial statements, SEC facts, valuation work, calculations, and research workflows.
 - Stock quote cards are informational only. Do not turn them into personalized investment advice.
 - Never expose provider API keys, credential-bearing URLs, or hidden provider details in the final answer.

@@ -164,6 +164,58 @@ test("parseStreamEventLine parses generative UI tool parts", () => {
   })
 })
 
+test("parseStreamEventLine parses generative UI timeline parts", () => {
+  const line = JSON.stringify({
+    type: "generative_ui",
+    part: {
+      type: "tool-display_timeline",
+      toolCallId: "call-timeline",
+      state: "output-available",
+      input: {
+        title: "American Civil War",
+        events: [
+          {
+            date: "1861-04-12",
+            label: "Fort Sumter attacked",
+            description: "Confederate forces fire on Fort Sumter.",
+            sourceUrl: "https://example.com/sumter",
+          },
+          {
+            date: "1865-04-09",
+            label: "Surrender at Appomattox",
+          },
+        ],
+      },
+      output: {
+        title: "American Civil War",
+        events: [
+          {
+            date: "1861-04-12",
+            label: "Fort Sumter attacked",
+            description: "Confederate forces fire on Fort Sumter.",
+            sourceUrl: "https://example.com/sumter",
+          },
+          {
+            date: "1865-04-09",
+            label: "Surrender at Appomattox",
+          },
+        ],
+      },
+    },
+  })
+
+  const event = parseStreamEventLine(line)
+  assert.ok(event)
+  assert.equal(event.type, "generative_ui")
+  assert.equal(event.part.type, "tool-display_timeline")
+  assert.equal(event.part.state, "output-available")
+  assert.equal(event.part.output.events.length, 2)
+  assert.equal(
+    event.part.output.events[0].sourceUrl,
+    "https://example.com/sumter"
+  )
+})
+
 test("parseStreamEventLine rejects malformed checkpoint and tool data", () => {
   assert.equal(
     parseStreamEventLine(

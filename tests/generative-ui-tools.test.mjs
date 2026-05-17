@@ -17,7 +17,8 @@ setTestModuleStubs({
   ai: toProjectFileUrl("tests/stubs/ai.mjs"),
 })
 
-const { runStockCardTool, runWeatherCardTool } = await import(moduleUrl)
+const { runStockCardTool, runTimelineCardTool, runWeatherCardTool } =
+  await import(moduleUrl)
 
 test("weather card tool normalizes Open-Meteo geocoding and forecast data", async () => {
   const output = await runWeatherCardTool(
@@ -166,4 +167,42 @@ test("stock card tool labels finance_data internal FMP fallback as Stooq", async
   assert.equal(output.symbol, "MSFT.US")
   assert.equal(output.sourceUrl?.includes("stooq.com"), true)
   assert.equal(output.sourceUrl?.includes("secret-key"), false)
+})
+
+test("timeline card tool echoes the model-supplied events for rendering", async () => {
+  const output = await runTimelineCardTool({
+    title: "American Civil War",
+    subtitle: "Key turning points",
+    events: [
+      {
+        date: "1861-04-12",
+        label: "Fort Sumter attacked",
+        description: "Confederate forces fire on Fort Sumter.",
+        sourceUrl: "https://example.com/sumter",
+      },
+      {
+        date: "1865-04-09",
+        label: "Surrender at Appomattox",
+      },
+    ],
+  })
+
+  assert.equal(output.title, "American Civil War")
+  assert.equal(output.subtitle, "Key turning points")
+  assert.equal(output.events.length, 2)
+  assert.equal(output.events[0].date, "1861-04-12")
+  assert.equal(output.events[0].sourceUrl, "https://example.com/sumter")
+  assert.equal(output.events[1].label, "Surrender at Appomattox")
+  assert.equal(output.events[1].description, undefined)
+})
+
+test("timeline card tool rejects input without any valid events", async () => {
+  await assert.rejects(
+    () =>
+      runTimelineCardTool({
+        title: "Empty",
+        events: [{ date: "", label: "" }],
+      }),
+    /Timeline input is invalid/
+  )
 })

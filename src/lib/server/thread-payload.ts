@@ -310,10 +310,59 @@ const stockGenerativeUiPartSchema = z.union([
     .strict(),
 ])
 
+const timelineEventSchema = z
+  .object({
+    date: z.string().trim().min(1).max(80),
+    label: z.string().trim().min(1).max(200),
+    description: z.string().trim().min(1).max(1_000).optional(),
+    sourceUrl: z.string().trim().min(1).max(2048).optional(),
+  })
+  .strict()
+
+const timelineToolInputSchema = z
+  .object({
+    title: z.string().trim().min(1).max(200),
+    subtitle: z.string().trim().min(1).max(300).optional(),
+    events: z.array(timelineEventSchema).min(1).max(40),
+  })
+  .strict()
+
+const timelineCardOutputSchema = timelineToolInputSchema
+
+const timelineGenerativeUiPartSchema = z.union([
+  z
+    .object({
+      type: z.literal("tool-display_timeline"),
+      toolCallId: z.string().trim().min(1).max(200),
+      state: z.literal("input-available"),
+      input: timelineToolInputSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("tool-display_timeline"),
+      toolCallId: z.string().trim().min(1).max(200),
+      state: z.literal("output-available"),
+      input: timelineToolInputSchema,
+      output: timelineCardOutputSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("tool-display_timeline"),
+      toolCallId: z.string().trim().min(1).max(200),
+      state: z.literal("output-error"),
+      input: timelineToolInputSchema.optional(),
+      errorText: z.string().trim().min(1).max(1_000),
+    })
+    .strict(),
+])
+
 const assistantMessagePartSchema = z.union([
   textAssistantMessagePartSchema,
   weatherGenerativeUiPartSchema,
   stockGenerativeUiPartSchema,
+  timelineGenerativeUiPartSchema,
 ])
 
 const attachmentMetadataSchema = z

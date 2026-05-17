@@ -1,5 +1,6 @@
 import {
   AlertCircle,
+  CalendarClock,
   Check,
   ChevronDown,
   CircleCheck,
@@ -21,6 +22,7 @@ import {
   type Message,
   type SearchToolName,
   type StockCardOutput,
+  type TimelineCardOutput,
   type ToolInvocationStatus,
   type WeatherCardOutput,
 } from "@/lib/shared"
@@ -516,6 +518,56 @@ function formatStockChange(output: StockCardOutput): string {
   return `${sign}${formatCurrency(output.dayChange, output.currency)}${percent}`
 }
 
+function TimelineCard({ output }: { output: TimelineCardOutput }) {
+  return (
+    <div className="my-2 max-w-2xl rounded-md border bg-muted/30 p-3">
+      <div className="flex items-start gap-2 text-xs font-medium text-muted-foreground">
+        <CalendarClock className="size-4 text-vesper-teal" />
+        <span>Timeline</span>
+      </div>
+      <div className="mt-1 text-base font-semibold">{output.title}</div>
+      {output.subtitle && (
+        <div className="mt-0.5 text-xs text-muted-foreground">
+          {output.subtitle}
+        </div>
+      )}
+
+      <ol className="mt-3 space-y-2.5 border-l pl-3">
+        {output.events.map((event, index) => (
+          <li key={`${event.date}-${String(index)}`} className="relative pl-3">
+            <span
+              aria-hidden="true"
+              className="absolute top-1.5 -left-[7px] size-2.5 rounded-full border bg-background"
+            />
+            <div className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+              {event.date}
+            </div>
+            <div className="text-xs font-medium">
+              {event.sourceUrl ? (
+                <a
+                  className="underline underline-offset-2 hover:text-foreground"
+                  href={event.sourceUrl}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  {event.label}
+                </a>
+              ) : (
+                event.label
+              )}
+            </div>
+            {event.description && (
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                {event.description}
+              </div>
+            )}
+          </li>
+        ))}
+      </ol>
+    </div>
+  )
+}
+
 function GenerativeUiLoading({ label }: { label: string }) {
   return (
     <div className="my-2 flex max-w-2xl items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
@@ -578,9 +630,23 @@ function AssistantMessagePartRenderer({
     return <WeatherCard output={part.output} />
   }
 
+  if (part.type === "tool-display_stock") {
+    if (part.state === "input-available") {
+      return (
+        <GenerativeUiLoading label={`Loading quote for ${part.input.symbol}`} />
+      )
+    }
+
+    if (part.state === "output-error") {
+      return <GenerativeUiError errorText={part.errorText} />
+    }
+
+    return <StockCard output={part.output} />
+  }
+
   if (part.state === "input-available") {
     return (
-      <GenerativeUiLoading label={`Loading quote for ${part.input.symbol}`} />
+      <GenerativeUiLoading label={`Loading timeline for ${part.input.title}`} />
     )
   }
 
@@ -588,7 +654,7 @@ function AssistantMessagePartRenderer({
     return <GenerativeUiError errorText={part.errorText} />
   }
 
-  return <StockCard output={part.output} />
+  return <TimelineCard output={part.output} />
 }
 
 export function AssistantMessage({ message }: { message: Message }) {

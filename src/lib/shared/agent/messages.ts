@@ -9,6 +9,7 @@ interface TextMessagePart {
 export const GENERATIVE_UI_TOOL_NAMES = [
   "display_weather",
   "display_stock",
+  "display_timeline",
 ] as const
 export type GenerativeUiToolName = (typeof GENERATIVE_UI_TOOL_NAMES)[number]
 export type GenerativeUiPartState =
@@ -78,6 +79,25 @@ export interface StockToolInput {
   range?: StockRange
 }
 
+export interface TimelineEvent {
+  date: string
+  label: string
+  description?: string
+  sourceUrl?: string
+}
+
+export interface TimelineCardOutput {
+  title: string
+  subtitle?: string
+  events: TimelineEvent[]
+}
+
+export interface TimelineToolInput {
+  title: string
+  subtitle?: string
+  events: TimelineEvent[]
+}
+
 interface BaseGenerativeUiMessagePart {
   toolCallId: string
   state: GenerativeUiPartState
@@ -121,9 +141,29 @@ export type StockGenerativeUiPart =
       errorText: string
     })
 
+export type TimelineGenerativeUiPart =
+  | (BaseGenerativeUiMessagePart & {
+      type: "tool-display_timeline"
+      state: "input-available"
+      input: TimelineToolInput
+    })
+  | (BaseGenerativeUiMessagePart & {
+      type: "tool-display_timeline"
+      state: "output-available"
+      input: TimelineToolInput
+      output: TimelineCardOutput
+    })
+  | (BaseGenerativeUiMessagePart & {
+      type: "tool-display_timeline"
+      state: "output-error"
+      input?: TimelineToolInput
+      errorText: string
+    })
+
 export type GenerativeUiMessagePart =
   | WeatherGenerativeUiPart
   | StockGenerativeUiPart
+  | TimelineGenerativeUiPart
 export type AssistantMessagePart = TextMessagePart | GenerativeUiMessagePart
 export const TOOL_NAMES = [
   "web_search",

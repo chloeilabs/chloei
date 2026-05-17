@@ -10,6 +10,9 @@ import type {
   StockPricePoint,
   StockRange,
   StockToolInput,
+  TimelineCardOutput,
+  TimelineEvent,
+  TimelineToolInput,
   ToolName,
   WeatherCardOutput,
   WeatherForecastDay,
@@ -21,6 +24,7 @@ import { runFinanceDataOperation } from "./ai-sdk-finance-data-tools"
 
 const DISPLAY_WEATHER_TOOL_NAME = "display_weather" as const
 const DISPLAY_STOCK_TOOL_NAME = "display_stock" as const
+const DISPLAY_TIMELINE_TOOL_NAME = "display_timeline" as const
 const OPEN_METEO_GEOCODING_URL =
   "https://geocoding-api.open-meteo.com/v1/search"
 const OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
@@ -58,8 +62,22 @@ const stockInputSchema = z.object({
   range: z.enum(["5d", "1m", "6m", "1y"]).default("1m").optional(),
 })
 
+const timelineEventInputSchema = z.object({
+  date: z.string().trim().min(1).max(80),
+  label: z.string().trim().min(1).max(200),
+  description: z.string().trim().min(1).max(1_000).optional(),
+  sourceUrl: z.string().trim().min(1).max(2048).optional(),
+})
+
+const timelineInputSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  subtitle: z.string().trim().min(1).max(300).optional(),
+  events: z.array(timelineEventInputSchema).min(1).max(40),
+})
+
 type DisplayWeatherInput = z.infer<typeof weatherInputSchema>
 type DisplayStockInput = z.infer<typeof stockInputSchema>
+type DisplayTimelineInput = z.infer<typeof timelineInputSchema>
 
 function toOptionalString(value: unknown): string | undefined {
   const normalized = asString(value)?.trim()
@@ -105,6 +123,48 @@ function normalizeStockInput(input: unknown): StockToolInput | null {
   return {
     symbol,
     range: normalizeStockRange(record?.range),
+  }
+}
+
+function normalizeTimelineEvent(value: unknown): TimelineEvent | null {
+  const record = asRecord(value)
+  const date = toOptionalString(record?.date)
+  const label = toOptionalString(record?.label)
+  if (!date || !label) {
+    return null
+  }
+
+  const description = toOptionalString(record?.description)
+  const sourceUrl = toOptionalString(record?.sourceUrl)
+  return {
+    date,
+    label,
+    ...(description ? { description } : {}),
+    ...(sourceUrl ? { sourceUrl } : {}),
+  }
+}
+
+function normalizeTimelineInput(input: unknown): TimelineToolInput | null {
+  const record = asRecord(input)
+  const title = toOptionalString(record?.title)
+  const rawEvents = Array.isArray(record?.events) ? record.events : null
+  if (!title || !rawEvents) {
+    return null
+  }
+
+  const events = rawEvents.flatMap((event) => {
+    const normalized = normalizeTimelineEvent(event)
+    return normalized ? [normalized] : []
+  })
+  if (events.length === 0) {
+    return null
+  }
+
+  const subtitle = toOptionalString(record?.subtitle)
+  return {
+    title,
+    ...(subtitle ? { subtitle } : {}),
+    events,
   }
 }
 
@@ -531,6 +591,17 @@ export async function runStockCardTool(
     : new Error("Stock data is unavailable.")
 }
 
+export function runTimelineCardTool(
+  input: DisplayTimelineInput
+): Promise<TimelineCardOutput> {
+  const normalized = normalizeTimelineInput(input)
+  if (!normalized) {
+    return Promise.reject(new Error("Timeline input is invalid."))
+  }
+
+  return Promise.resolve(normalized)
+}
+
 export function createAiSdkGenerativeUiTools(
   config: GenerativeUiToolConfig = {}
 ) {
@@ -547,6 +618,12 @@ export function createAiSdkGenerativeUiTools(
       inputSchema: stockInputSchema,
       execute: async (input) => runStockCardTool(input, config),
     }),
+    display_timeline: tool({
+      description:
+        "Display a vertical timeline card for historical or chronological events. Use when the user asks for a timeline, chronology, sequence of events, or history of a topic. Pass between 1 and 40 events, each with a date string (ISO or human-readable), a short label, and optional description and sourceUrl. Source the events from your own knowledge or after a web_search / tavily_search call, and prefer sourceUrl when citing.",
+      inputSchema: timelineInputSchema,
+      execute: async (input) => runTimelineCardTool(input),
+    }),
   }
 }
 
@@ -554,7 +631,9 @@ export function isAiSdkGenerativeUiToolName(
   value: unknown
 ): value is Extract<ToolName, GenerativeUiToolName> {
   return (
-    value === DISPLAY_WEATHER_TOOL_NAME || value === DISPLAY_STOCK_TOOL_NAME
+    value === DISPLAY_WEATHER_TOOL_NAME ||
+    value === DISPLAY_STOCK_TOOL_NAME ||
+    value === DISPLAY_TIMELINE_TOOL_NAME
   )
 }
 
@@ -583,14 +662,25 @@ export function getAiSdkGenerativeUiToolCallMetadata(
     }
   }
 
-  const input = normalizeStockInput(part.input)
+  if (part.toolName === DISPLAY_STOCK_TOOL_NAME) {
+    const input = normalizeStockInput(part.input)
+    return {
+      callId: part.toolCallId,
+      toolName: part.toolName,
+      label: input ? `Stock: ${input.symbol}` : "Stock quote",
+      ...(input ? { query: input.symbol } : {}),
+      operation: "display_stock",
+      provider: "finance_data",
+    }
+  }
+
+  const input = normalizeTimelineInput(part.input)
   return {
     callId: part.toolCallId,
     toolName: part.toolName,
-    label: input ? `Stock: ${input.symbol}` : "Stock quote",
-    ...(input ? { query: input.symbol } : {}),
-    operation: "display_stock",
-    provider: "finance_data",
+    label: input ? `Timeline: ${input.title}` : "Timeline",
+    ...(input ? { query: input.title } : {}),
+    operation: "display_timeline",
   }
 }
 
@@ -619,10 +709,22 @@ export function getAiSdkGenerativeUiToolCallPart(
       : null
   }
 
-  const input = normalizeStockInput(part.input)
+  if (part.toolName === DISPLAY_STOCK_TOOL_NAME) {
+    const input = normalizeStockInput(part.input)
+    return input
+      ? {
+          type: "tool-display_stock",
+          toolCallId: part.toolCallId,
+          state: "input-available",
+          input,
+        }
+      : null
+  }
+
+  const input = normalizeTimelineInput(part.input)
   return input
     ? {
-        type: "tool-display_stock",
+        type: "tool-display_timeline",
         toolCallId: part.toolCallId,
         state: "input-available",
         input,
@@ -657,14 +759,27 @@ export function getAiSdkGenerativeUiToolResultPart(
       : null
   }
 
-  const input = normalizeStockInput(part.input)
+  if (part.toolName === DISPLAY_STOCK_TOOL_NAME) {
+    const input = normalizeStockInput(part.input)
+    return input
+      ? {
+          type: "tool-display_stock",
+          toolCallId: part.toolCallId,
+          state: "output-available",
+          input,
+          output: part.output as StockCardOutput,
+        }
+      : null
+  }
+
+  const input = normalizeTimelineInput(part.input)
   return input
     ? {
-        type: "tool-display_stock",
+        type: "tool-display_timeline",
         toolCallId: part.toolCallId,
         state: "output-available",
         input,
-        output: part.output as StockCardOutput,
+        output: part.output as TimelineCardOutput,
       }
     : null
 }
@@ -708,9 +823,20 @@ export function getAiSdkGenerativeUiToolErrorPart(
     }
   }
 
-  const input = normalizeStockInput(part.input)
+  if (part.toolName === DISPLAY_STOCK_TOOL_NAME) {
+    const input = normalizeStockInput(part.input)
+    return {
+      type: "tool-display_stock",
+      toolCallId: part.toolCallId,
+      state: "output-error",
+      ...(input ? { input } : {}),
+      errorText: getErrorText(part.error),
+    }
+  }
+
+  const input = normalizeTimelineInput(part.input)
   return {
-    type: "tool-display_stock",
+    type: "tool-display_timeline",
     toolCallId: part.toolCallId,
     state: "output-error",
     ...(input ? { input } : {}),
@@ -753,24 +879,48 @@ export function getAiSdkGenerativeUiToolResultMetadata(
     }
   }
 
-  const output = part.output as Partial<StockCardOutput>
-  const provider = output.provider
-  const sources = output.sourceUrl
-    ? [
-        createSource({
-          prefix: "generative-ui-stock",
-          title: provider === "fmp" ? "Financial Modeling Prep" : "Stooq",
-          url: output.sourceUrl,
-        }),
-      ]
-    : []
+  if (part.toolName === DISPLAY_STOCK_TOOL_NAME) {
+    const output = part.output as Partial<StockCardOutput>
+    const provider = output.provider
+    const sources = output.sourceUrl
+      ? [
+          createSource({
+            prefix: "generative-ui-stock",
+            title: provider === "fmp" ? "Financial Modeling Prep" : "Stooq",
+            url: output.sourceUrl,
+          }),
+        ]
+      : []
+
+    return {
+      callId: part.toolCallId,
+      toolName: part.toolName,
+      status: "success",
+      sources,
+      operation: "display_stock",
+      provider,
+    }
+  }
+
+  const output = part.output as Partial<TimelineCardOutput>
+  const events = Array.isArray(output.events) ? output.events : []
+  const sources = events.flatMap((event, index) =>
+    event.sourceUrl
+      ? [
+          createSource({
+            prefix: `generative-ui-timeline-${String(index)}`,
+            title: event.label || "Timeline source",
+            url: event.sourceUrl,
+          }),
+        ]
+      : []
+  )
 
   return {
     callId: part.toolCallId,
     toolName: part.toolName,
     status: "success",
     sources,
-    operation: "display_stock",
-    provider,
+    operation: "display_timeline",
   }
 }

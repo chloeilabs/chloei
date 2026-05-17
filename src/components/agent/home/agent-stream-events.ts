@@ -11,6 +11,9 @@ import {
   type StockPricePoint,
   type StockRange,
   type StockToolInput,
+  type TimelineCardOutput,
+  type TimelineEvent,
+  type TimelineToolInput,
   type WeatherCardOutput,
   type WeatherForecastDay,
   type WeatherToolInput,
@@ -478,6 +481,84 @@ function parseStockCardOutput(value: unknown): StockCardOutput | null {
   }
 }
 
+function parseTimelineEvent(value: unknown): TimelineEvent | null {
+  const record = asRecord(value)
+  if (!record) {
+    return null
+  }
+
+  const date = asString(record.date)?.trim()
+  const label = asString(record.label)?.trim()
+  if (!date || !label) {
+    return null
+  }
+
+  const description = parseOptionalStringField(record, "description")
+  if (description === null) {
+    return null
+  }
+
+  const sourceUrl = parseOptionalStringField(record, "sourceUrl")
+  if (sourceUrl === null) {
+    return null
+  }
+
+  return {
+    date,
+    label,
+    ...(description ? { description } : {}),
+    ...(sourceUrl ? { sourceUrl } : {}),
+  }
+}
+
+function parseTimelineToolInput(value: unknown): TimelineToolInput | null {
+  const record = asRecord(value)
+  if (!record) {
+    return null
+  }
+
+  const title = asString(record.title)?.trim()
+  if (!title) {
+    return null
+  }
+
+  const subtitle = parseOptionalStringField(record, "subtitle")
+  if (subtitle === null) {
+    return null
+  }
+
+  const rawEvents = Array.isArray(record.events) ? record.events : null
+  if (!rawEvents || rawEvents.length === 0 || rawEvents.length > 40) {
+    return null
+  }
+
+  const events: TimelineEvent[] = []
+  for (const entry of rawEvents) {
+    const parsed = parseTimelineEvent(entry)
+    if (!parsed) {
+      return null
+    }
+    events.push(parsed)
+  }
+
+  return {
+    title,
+    ...(subtitle ? { subtitle } : {}),
+    events,
+  }
+}
+
+function parseTimelineCardOutput(value: unknown): TimelineCardOutput | null {
+  const input = parseTimelineToolInput(value)
+  return input
+    ? {
+        title: input.title,
+        ...(input.subtitle ? { subtitle: input.subtitle } : {}),
+        events: input.events,
+      }
+    : null
+}
+
 function parseGenerativeUiPart(value: unknown): GenerativeUiMessagePart | null {
   const record = asRecord(value)
   if (!record) {
@@ -533,6 +614,31 @@ function parseGenerativeUiPart(value: unknown): GenerativeUiMessagePart | null {
         record.input === undefined || record.input === null
           ? undefined
           : parseStockToolInput(record.input)
+      const errorText = asString(record.errorText)?.trim()
+      if (input === null || !errorText) {
+        return null
+      }
+      return { type, toolCallId, state, ...(input ? { input } : {}), errorText }
+    }
+  }
+
+  if (type === "tool-display_timeline") {
+    if (state === "input-available") {
+      const input = parseTimelineToolInput(record.input)
+      return input ? { type, toolCallId, state, input } : null
+    }
+
+    if (state === "output-available") {
+      const input = parseTimelineToolInput(record.input)
+      const output = parseTimelineCardOutput(record.output)
+      return input && output ? { type, toolCallId, state, input, output } : null
+    }
+
+    if (state === "output-error") {
+      const input =
+        record.input === undefined || record.input === null
+          ? undefined
+          : parseTimelineToolInput(record.input)
       const errorText = asString(record.errorText)?.trim()
       if (input === null || !errorText) {
         return null

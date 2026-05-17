@@ -30,6 +30,11 @@ test("assistant message renders generative UI parts in message order", async () 
   )
   assert.match(
     source,
+    /<TimelineCard output=\{part\.output\}/,
+    "Expected timeline tool parts to render the timeline card."
+  )
+  assert.match(
+    source,
     /hidden=\{!hasContent\}/,
     "Expected response copy controls to stay tied to text content only."
   )

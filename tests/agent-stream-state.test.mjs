@@ -155,3 +155,54 @@ test("generative UI parts preserve order and update by tool call", () => {
   assert.equal(completed.parts[1]?.type, "tool-display_weather")
   assert.equal(completed.parts[1]?.state, "output-available")
 })
+
+test("generative UI accumulates timeline parts and upserts on completion", () => {
+  const loading = applyAgentStreamEvent(createAgentStreamAccumulator(), {
+    type: "generative_ui",
+    part: {
+      type: "tool-display_timeline",
+      toolCallId: "call-timeline",
+      state: "input-available",
+      input: {
+        title: "French Revolution",
+        events: [{ date: "1789-07-14", label: "Storming of the Bastille" }],
+      },
+    },
+  })
+
+  assert.equal(loading.parts.length, 1)
+  assert.equal(loading.parts[0]?.type, "tool-display_timeline")
+  assert.equal(loading.parts[0]?.state, "input-available")
+
+  const completed = applyAgentStreamEvent(loading, {
+    type: "generative_ui",
+    part: {
+      type: "tool-display_timeline",
+      toolCallId: "call-timeline",
+      state: "output-available",
+      input: {
+        title: "French Revolution",
+        events: [{ date: "1789-07-14", label: "Storming of the Bastille" }],
+      },
+      output: {
+        title: "French Revolution",
+        events: [
+          {
+            date: "1789-07-14",
+            label: "Storming of the Bastille",
+            description: "Parisians seize the Bastille fortress.",
+          },
+          {
+            date: "1793-01-21",
+            label: "Execution of Louis XVI",
+          },
+        ],
+      },
+    },
+  })
+
+  assert.equal(completed.parts.length, 1)
+  assert.equal(completed.parts[0]?.type, "tool-display_timeline")
+  assert.equal(completed.parts[0]?.state, "output-available")
+  assert.equal(completed.parts[0]?.output.events.length, 2)
+})
