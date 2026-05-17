@@ -99,7 +99,7 @@
     "@types/pg": "^8.20.0",
     "@types/react": "^19.2.10",
     "@types/react-dom": "^19.2.3",
-    "electron": "^42.0.1",
+    "electron": "^42.1.0",
     "electron-builder": "^26.8.1",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
