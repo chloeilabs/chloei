@@ -74,7 +74,7 @@ export function SearchChats({
             />
           </div>
           <div className="max-h-[60vh] overflow-y-auto p-1">
-            {isLoading ? (
+            {isLoading && filtered.length === 0 ? (
               <div className="px-3 py-6 text-center text-sm text-muted-foreground">
                 Loading chats...
               </div>

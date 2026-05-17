@@ -28,17 +28,31 @@ function getCurrentPathnameWithSearch(): string {
 type AuthClient = ReturnType<typeof createAuthClient>
 
 let authClient: AuthClient | null = null
+let authClientPromise: Promise<AuthClient> | null = null
 
 export async function getAuthClient(): Promise<AuthClient> {
   if (authClient) {
     return authClient
   }
 
-  const { createAuthClient } = await import("better-auth/react")
-  authClient = createAuthClient({
-    baseURL: getAuthClientBaseUrl(),
-  })
-  return authClient
+  if (authClientPromise) {
+    return authClientPromise
+  }
+
+  authClientPromise = (async () => {
+    try {
+      const { createAuthClient } = await import("better-auth/react")
+      authClient = createAuthClient({
+        baseURL: getAuthClientBaseUrl(),
+      })
+      return authClient
+    } catch (error) {
+      authClientPromise = null
+      throw error
+    }
+  })()
+
+  return authClientPromise
 }
 
 export function redirectToSignIn(
