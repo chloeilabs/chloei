@@ -1,8 +1,17 @@
-import { CornerRightUp, FileText, ImageIcon, Loader2, X } from "lucide-react"
+import {
+  Check,
+  Copy,
+  CornerRightUp,
+  FileText,
+  ImageIcon,
+  Loader2,
+  X,
+} from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { useModels } from "@/hooks/agent/use-models"
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard"
 import {
   type AgentAttachmentMetadata,
   type AgentRunMode,
@@ -144,6 +153,8 @@ export function UserMessage({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [isContentOverflowing, setIsContentOverflowing] = useState(false)
   const attachments = message.metadata?.attachments ?? []
+  const { copyToClipboard, isCopied } = useCopyToClipboard()
+  const hasCopyableContent = message.content.trim().length > 0
 
   useEffect(() => {
     if (messageContentRef.current) {
@@ -388,6 +399,34 @@ export function UserMessage({
               </div>
             </div>
           </div>
+
+          {hasCopyableContent ? (
+            <div className="-mt-1 h-5 opacity-0 transition-opacity group-hover/user-message:opacity-100 focus-within:opacity-100">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="iconXs"
+                    aria-label={isCopied ? "Copied message" : "Copy message"}
+                    className="text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      void copyToClipboard(message.content)
+                    }}
+                  >
+                    {isCopied ? (
+                      <Check className="size-3.5" />
+                    ) : (
+                      <Copy className="size-3.5" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" align="end">
+                  Copy message
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          ) : null}
         </>
       )}
     </div>

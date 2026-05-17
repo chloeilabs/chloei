@@ -449,7 +449,7 @@ export function HomePageContent({
                   onSubmit={handlePromptFormSubmit}
                   onStopStream={handleStopStream}
                   dockToBottomOnHome
-                  queuedMessage={queuedSubmission?.message ?? null}
+                  queuedSubmission={queuedSubmission}
                   onClearQueuedMessage={clearQueuedSubmission}
                   isStreaming={streamingState}
                   dismissKeyboardOnSubmit={isMobile}

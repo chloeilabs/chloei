@@ -59,6 +59,13 @@ import { ModelSelector } from "./model-selector"
 
 const DEFAULT_ATTACHMENT_PROMPT = "Analyze the attached file(s)."
 
+interface QueuedPromptSubmission {
+  message: string
+  model: ModelType
+  runMode: AgentRunMode
+  attachments: AgentRequestAttachment[]
+}
+
 function formatAttachmentSize(sizeBytes: number): string {
   if (sizeBytes < 1024) {
     return `${String(sizeBytes)} B`
@@ -81,7 +88,7 @@ export function PromptForm({
   onBlur,
   initialSelectedModel,
   dockToBottomOnHome = false,
-  queuedMessage,
+  queuedSubmission,
   onClearQueuedMessage,
   isPendingOverride,
   transition,
@@ -102,7 +109,7 @@ export function PromptForm({
   onBlur?: () => void
   initialSelectedModel?: ModelType | null
   dockToBottomOnHome?: boolean
-  queuedMessage?: string | null
+  queuedSubmission?: QueuedPromptSubmission | null
   onClearQueuedMessage?: () => void
   isPendingOverride?: boolean
   transition?: {
@@ -171,6 +178,30 @@ export function PromptForm({
     },
     [setSelectedModel]
   )
+
+  const restoreQueuedSubmission = useCallback(() => {
+    if (!queuedSubmission) {
+      return
+    }
+
+    setMessage(queuedSubmission.message)
+    setPendingAttachments(queuedSubmission.attachments)
+    setRunMode(queuedSubmission.runMode)
+    setSelectedModel(queuedSubmission.model)
+    onClearQueuedMessage?.()
+
+    window.requestAnimationFrame(() => {
+      const textarea = textareaRef.current
+      if (!textarea) {
+        return
+      }
+
+      textarea.focus()
+      const cursorPosition = textarea.value.length
+      textarea.setSelectionRange(cursorPosition, cursorPosition)
+      textarea.scrollTop = textarea.scrollHeight
+    })
+  }, [onClearQueuedMessage, queuedSubmission, setSelectedModel])
 
   const removeAttachment = useCallback((attachmentId: string) => {
     setPendingAttachments((current) =>
@@ -501,8 +532,12 @@ export function PromptForm({
 
       <div className="pointer-events-none absolute inset-x-0 -top-[calc(4rem-1px)] -z-10 h-16 -translate-y-px bg-gradient-to-t from-background via-background/45 to-transparent" />
 
-      {queuedMessage && onClearQueuedMessage && (
-        <QueuedAction message={queuedMessage} onClear={onClearQueuedMessage} />
+      {queuedSubmission && onClearQueuedMessage && (
+        <QueuedAction
+          message={queuedSubmission.message}
+          onClear={onClearQueuedMessage}
+          onRestore={restoreQueuedSubmission}
+        />
       )}
 
       <div
