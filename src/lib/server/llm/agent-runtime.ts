@@ -44,6 +44,10 @@ import {
   toModelMessages,
 } from "./agent-runtime-messages"
 import {
+  shouldForceFinalSynthesisStep,
+  shouldNudgeMidBudgetSynthesis,
+} from "./agent-runtime-synthesis-gating"
+import {
   createAiSdkFinanceDataTools,
   getAiSdkFinanceDataToolCallMetadata,
   getAiSdkFinanceDataToolResultMetadata,
@@ -190,21 +194,23 @@ function buildAgentArtifactBaseUrl(artifactId: string): string | undefined {
 const FINAL_SYNTHESIS_STEP_INSTRUCTION = [
   "You are on the final synthesis step for this request.",
   "Do not call any tools on this step.",
-  "Use the tool results and sources already gathered to write the final answer now.",
-  "If the available evidence is incomplete, state the limitation directly and answer with the best supported facts; do not ask the user to retry.",
+  "You MUST write a final answer now using the tool results and sources already gathered.",
+  "An empty response is not acceptable. If evidence is incomplete or contradictory, write what you found, name the missing pieces, and end with a clear summary.",
+  "Mirror the user's exact terminology — if they asked about operating margin, CET1, net interest income, cash flow from operations, or any named metric, use those exact phrases in your answer.",
+  "Cite the sources you used inline. Do not stall, do not stay silent, and do not ask the user to retry.",
+].join(" ")
+
+const MID_BUDGET_SYNTHESIS_REMINDER = [
+  "Tool-budget checkpoint: most of your tool-call budget for this request is already spent.",
+  "Prefer synthesizing the final answer from the evidence you have over running deeper retrievals.",
+  "If another tool call would not materially change the conclusion, stop calling tools and write the answer.",
+  "When you write the answer, mirror the user's exact terminology (e.g., 'operating margin', 'CET1', 'net interest income') rather than paraphrasing.",
 ].join(" ")
 
 function resolveAgentRuntimeProfile(
   id: AgentRuntimeProfileId | undefined
 ): AgentRuntimeProfile {
   return AGENT_RUNTIME_PROFILES[id ?? "chat_default"]
-}
-
-function shouldForceFinalSynthesisStep(
-  stepNumber: number,
-  toolMaxSteps: number
-): boolean {
-  return stepNumber >= Math.max(0, toolMaxSteps - 1)
 }
 
 function outputHasError(output: unknown): boolean {
@@ -507,14 +513,23 @@ export async function* startAgentRuntimeStream(
           steps,
           parallelEnabled,
         })
-        if (!forceFinalSynthesis) {
-          return activeTools ? { activeTools } : undefined
+        if (forceFinalSynthesis) {
+          return {
+            toolChoice: "none" as const,
+            system: `${systemInstruction}\n\n${FINAL_SYNTHESIS_STEP_INSTRUCTION}`,
+          }
         }
 
-        return {
-          toolChoice: "none" as const,
-          system: `${systemInstruction}\n\n${FINAL_SYNTHESIS_STEP_INSTRUCTION}`,
+        if (
+          shouldNudgeMidBudgetSynthesis(stepNumber, runtimeProfile.toolMaxSteps)
+        ) {
+          return {
+            ...(activeTools ? { activeTools } : {}),
+            system: `${systemInstruction}\n\n${MID_BUDGET_SYNTHESIS_REMINDER}`,
+          }
         }
+
+        return activeTools ? { activeTools } : undefined
       },
       stopWhen: stepCountIs(runtimeProfile.toolMaxSteps),
     })

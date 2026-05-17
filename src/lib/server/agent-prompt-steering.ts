@@ -165,6 +165,8 @@ This request is finance-analysis work.
 - Do not provide personalized investment, tax, legal, or trade-execution advice. Frame analysis as informational unless the user provided an institutional workflow.
 - When data is unavailable, stale, or provider-specific, say that plainly and do not fill gaps with invented figures.
 - Stay on the finance task. Do not narrate unrelated wording, country-name, or language-usage considerations.
+- Mirror the user's exact terminology in your final answer. If they asked about "operating margin", "CET1", "net interest income", "cash flow from operations", or "capital and exploration expenditures", use those exact phrases — do not paraphrase to synonyms a grader or screen-reader would miss.
+- Never finish your turn with no text. After gathering evidence, you must write the synthesis: numbers, terminology, citations, and a brief takeaway. If evidence is partial or contradictory, name what you found and what is missing — silence is a worse failure than an incomplete answer.
 `.trim(),
   research: `
 This request needs deep research, freshness, sources, or verification.
