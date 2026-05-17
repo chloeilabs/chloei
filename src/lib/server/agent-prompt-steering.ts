@@ -14,9 +14,17 @@ export type PromptTaskMode =
   | "instruction_following"
   | "closed_answer"
   | "coding"
+  | "debugging"
+  | "writing"
   | "finance_analysis"
   | "research"
   | "high_stakes"
+
+export type UserExpertiseHint =
+  | "finance"
+  | "engineering"
+  | "writing"
+  | "research"
 
 type PromptSteeringMessage = PromptTextMessage
 
@@ -32,23 +40,54 @@ interface CreatePromptSteeringBlocksParams {
   taskModeOverlaysEnabled?: boolean
 }
 
+interface InferPromptTaskModeOptions {
+  userExpertise?: UserExpertiseHint
+}
+
+// "stock up", "stocking up", and "in stock" are common non-finance idioms that
+// the bare /stock/ pattern would otherwise misclassify as finance_analysis.
+const FINANCE_FALSE_POSITIVE_PATTERN =
+  /\b(stock(?:ing|ed)?\s+up|in\s+stock|out\s+of\s+stock|gold\s+(?:medal|standard|star)|oil\s+(?:painting|change)|bitcoin\s+(?:movie|documentary))\b/i
+
 const CODING_PATTERN =
-  /\b(code|coding|function|class|script|algorithm|typescript|javascript|python|sql|regex|unit test|debug|bug fix|implement|write a program)\b/i
+  /\b(code|coding|function|class|script|algorithm|typescript|javascript|python|sql|regex|unit test|implement|write a program|refactor|module|library|api endpoint|compile|build error)\b/i
+// Debugging is a distinct category: triage/diagnosis work that benefits from
+// extra reasoning even when no explicit code is requested.
+const DEBUGGING_PATTERN =
+  /\b(stack trace|traceback|error message|exception|reproduce|repro|why does .{1,40}\s(fail|crash|break|hang|throw)|not working|broken|crashes?|hangs?|deadlock|memory leak|segfault|panic|enoent|undefined is not|cannot read propert|null pointer|race condition|flaky)\b/i
+const WRITING_PATTERN =
+  /\b(draft|rewrite|edit|proofread|proofreading|tone|copy|copywrit|essay|blog post|newsletter|paragraph|prose|grammar|punctuation|tighten|polish|shorter version|longer version|press release|release notes?|changelog entry|cover letter|outline this|outline for)\b/i
 const RESEARCH_PATTERN =
-  /\b(latest|current|today|recent|as of|source|sources|cite|citation|link|look up|lookup|verify|check the web|news|price right now|right now)\b/i
+  /\b(latest|current|today|recent|as of|sources?|cite|citation|link|look up|lookup|verify|check the web|news|price right now|right now|breaking|trending|happening (?:now|today))\b/i
 const HIGH_STAKES_PATTERN =
-  /\b(bank|password|phishing|security|medical|doctor|symptom|symptoms|dose|dosage|prescription|pregnant|lawsuit|legal|tax|suicid|self-harm|chest pain|emergency|infection)\b/i
+  /\b(bank|password|phish(?:ed|ing)?|security|medical|doctor|symptom|symptoms|dose|dosage|prescription|pregnant|lawsuit|legal|tax|suicid|self-harm|chest pain|emergency|infection|overdose)\b/i
+// "multiple" alone is too generic ("multiple choice") so only count it when it
+// follows a finance-specific qualifier.
 const FINANCE_ANALYSIS_PATTERN =
-  /\b(stock|stocks|equity|equities|ticker|symbol|quote|quotes|company profile|finance data|financial data|finance provider|finance providers|structured finance|etf|fundamental|valuation|dcf|multiple|ev\/ebitda|ebitda|revenue|gross margin|operating margin|free cash flow|fcf|cash flow|income statement|balance sheet|financial statement|filing|10-k|10-q|earnings|guidance|dividend|buyback|market cap|enterprise value|treasury|yield curve|interest rate|fed funds|cpi|inflation|gdp|macro|fred|fx|foreign exchange|currency pair|commodity|commodities|oil|gold|crypto|bitcoin|ethereum|portfolio return|sharpe|beta|drawdown)\b/i
+  /\b(stocks?|equit(?:y|ies)|ticker|symbol|quote|quotes|company profile|finance data|financial data|finance provider|finance providers|structured finance|etf|fundamental|valuation|dcf|(?:valuation|earnings|forward|trading|p\/e|pe|ev\/ebitda)\s+multiples?|ev\/ebitda|ebitda|revenue|gross margin|operating margin|free cash flow|fcf|cash flow|income statement|balance sheet|financial statement|filing|10-k|10-q|earnings|guidance|dividend|buyback|market cap|enterprise value|treasury|yield curve|interest rate|fed funds|cpi|inflation|gdp|macro|fred|fx|foreign exchange|currency pair|commodity|commodities|oil price|crude|gold price|crypto|bitcoin|ethereum|portfolio return|sharpe|beta|drawdown)\b/i
 const CLOSED_ANSWER_PATTERN =
   /\b(multiple choice|choose one|which option|final answer|exact answer|boxed|answer:|confidence:|A\)|B\)|C\)|D\))\b/i
 const STRICT_OUTPUT_PATTERN =
   /\b(return only|exactly|exact format|valid json|minified json|last line|single word|one word|single line|one line|two sentences|one sentence|one paragraph|no more than|under \d+ words|no surrounding prose|only one ```|schema|yaml|xml|csv)\b/i
 
+// Long-term memory often surfaces user-expertise tags the model has previously
+// committed about the user. We extract a coarse hint here to bias borderline
+// task-mode classifications.
+const USER_EXPERTISE_PATTERNS: Record<UserExpertiseHint, RegExp> = {
+  finance:
+    /\b(finance|financial)\s+(analyst|engineer|professional|background)|\b(portfolio manager|fund manager|trader|investment banker|cfa|equity research|sell-?side|buy-?side|fp&a)\b/i,
+  engineering:
+    /\b(software|backend|frontend|full-?stack|systems?|platform|infrastructure|devops|sre|data)\s+engineer|\b(developer|programmer|engineer at|technical lead|cto)\b/i,
+  writing:
+    /\b(writer|editor|journalist|copywriter|content strategist|technical writer|author)\b/i,
+  research:
+    /\b(researcher|research scientist|phd candidate|academic|professor)\b/i,
+}
+
 const PROVIDER_OVERLAYS: Record<PromptProvider, string> = {
   google: `
 Use Gemini reasoning mode efficiently.
-- Keep the final answer concise and grounded in the actual task.
+- Spend the thinking budget on the parts of the task that are actually uncertain; do not narrate planning that adds no information.
 - Prefer direct execution and verification over speculative narration.
 - On format-sensitive tasks, do a literal final-format check before finishing.
 - Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
@@ -56,7 +95,7 @@ Use Gemini reasoning mode efficiently.
 `.trim(),
   moonshotai: `
 Use Kimi reasoning mode efficiently.
-- Keep the final answer concise and grounded in the actual task.
+- Take advantage of the long context window: skim and cite earlier turns and retrieved memory before re-asking the user for information already present.
 - Prefer direct execution and verification over speculative narration.
 - On format-sensitive tasks, do a literal final-format check before finishing.
 - Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
@@ -64,7 +103,7 @@ Use Kimi reasoning mode efficiently.
 `.trim(),
   xiaomi: `
 Use MiMo reasoning mode efficiently.
-- Keep the final answer concise and grounded in the actual task.
+- Optimize for streaming latency: start producing the user-facing answer as soon as you have a defensible thread; refine in-line.
 - Prefer direct execution and verification over speculative narration.
 - On format-sensitive tasks, do a literal final-format check before finishing.
 - Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
@@ -95,6 +134,22 @@ This request is code-centric.
 - If the user requests code only or one code block, obey that literally.
 - Use the code_execution tool for arithmetic, spot checks, or quick validation when it reduces error risk.
 - Do not add prose that would break copy-paste or grading.
+`.trim(),
+  debugging: `
+This request is a diagnosis/debugging task.
+- Form a specific hypothesis about the root cause before recommending a fix; avoid generic "try restarting" advice.
+- Ask for the missing signal (exact error, repro steps, environment) only when it would materially change the diagnosis; otherwise reason from what is provided.
+- When the user shares a stack trace or error, identify the originating call site and explain *why* it fails, not just *that* it fails.
+- Prefer code_execution to validate the fix when arithmetic, parsing, or small reproductions can be checked locally.
+- End with a concrete next action: the patch, the command to run, or the data to collect.
+`.trim(),
+  writing: `
+This request is a writing/editing task.
+- Match the requested voice, length, and audience; do not impose a default Chloei voice when the user has specified one.
+- Preserve the user's factual claims and proper nouns verbatim unless asked to fact-check.
+- If asked to edit, return the edited text in the requested form. If asked to rewrite, do not paste back the original.
+- Length caps are hard caps; count before finishing when close to the limit.
+- Skip preambles like "Sure, here is your draft" — return the deliverable.
 `.trim(),
   finance_analysis: `
 This request is finance-analysis work.
@@ -148,8 +203,36 @@ export function resolvePromptProvider(model: ModelType): PromptProvider {
   throw new Error(`Unsupported model provider for model: ${model}`)
 }
 
+export function inferUserExpertiseFromMemory(
+  memoryContext: string | undefined | null
+): UserExpertiseHint | undefined {
+  if (!memoryContext) {
+    return undefined
+  }
+
+  for (const [hint, pattern] of Object.entries(USER_EXPERTISE_PATTERNS) as [
+    UserExpertiseHint,
+    RegExp,
+  ][]) {
+    if (pattern.test(memoryContext)) {
+      return hint
+    }
+  }
+
+  return undefined
+}
+
+function detectFinanceAnalysis(text: string): boolean {
+  if (!FINANCE_ANALYSIS_PATTERN.test(text)) {
+    return false
+  }
+
+  return !FINANCE_FALSE_POSITIVE_PATTERN.test(text)
+}
+
 export function inferPromptTaskMode(
-  messages: readonly PromptSteeringMessage[]
+  messages: readonly PromptSteeringMessage[],
+  options: InferPromptTaskModeOptions = {}
 ): PromptTaskMode {
   const lastUserMessage = getLastUserMessage(messages)
   if (!lastUserMessage) {
@@ -158,14 +241,19 @@ export function inferPromptTaskMode(
 
   const fullUserText = normalizeUserText(messages)
   const coding = CODING_PATTERN.test(lastUserMessage)
+  const debugging =
+    DEBUGGING_PATTERN.test(lastUserMessage) ||
+    DEBUGGING_PATTERN.test(fullUserText)
+  const writing =
+    WRITING_PATTERN.test(lastUserMessage) || WRITING_PATTERN.test(fullUserText)
   const strictOutput =
     STRICT_OUTPUT_PATTERN.test(lastUserMessage) ||
     STRICT_OUTPUT_PATTERN.test(fullUserText)
   const highStakes = HIGH_STAKES_PATTERN.test(lastUserMessage)
   const financialAdvice = hasPersonalFinancialAdviceIntent(lastUserMessage)
   const financeAnalysis =
-    FINANCE_ANALYSIS_PATTERN.test(lastUserMessage) ||
-    FINANCE_ANALYSIS_PATTERN.test(fullUserText)
+    detectFinanceAnalysis(lastUserMessage) ||
+    detectFinanceAnalysis(fullUserText)
   const research =
     RESEARCH_PATTERN.test(lastUserMessage) ||
     RESEARCH_PATTERN.test(fullUserText)
@@ -173,16 +261,22 @@ export function inferPromptTaskMode(
     CLOSED_ANSWER_PATTERN.test(lastUserMessage) ||
     CLOSED_ANSWER_PATTERN.test(fullUserText)
 
-  if (financeAnalysis && !financialAdvice) {
-    return "finance_analysis"
-  }
-
+  // High-stakes always wins over expertise hints so personalization can never
+  // downgrade a safety-relevant routing decision.
   if (financialAdvice) {
     return "high_stakes"
   }
 
   if (highStakes) {
     return "high_stakes"
+  }
+
+  if (financeAnalysis) {
+    return "finance_analysis"
+  }
+
+  if (debugging) {
+    return "debugging"
   }
 
   if (coding) {
@@ -193,12 +287,37 @@ export function inferPromptTaskMode(
     return "research"
   }
 
+  if (writing) {
+    return "writing"
+  }
+
   if (closedAnswer) {
     return "closed_answer"
   }
 
   if (strictOutput) {
     return "instruction_following"
+  }
+
+  // Expertise-driven fallback: a known finance analyst asking a borderline
+  // question that didn't trip any pattern still routes to finance_analysis.
+  if (options.userExpertise === "finance") {
+    return "finance_analysis"
+  }
+
+  if (options.userExpertise === "research") {
+    return "research"
+  }
+
+  if (options.userExpertise === "writing") {
+    return "writing"
+  }
+
+  if (
+    options.userExpertise === "engineering" &&
+    lastUserMessage.includes("?")
+  ) {
+    return "coding"
   }
 
   return "general"

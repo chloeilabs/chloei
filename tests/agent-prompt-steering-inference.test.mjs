@@ -1,0 +1,295 @@
+import assert from "node:assert/strict"
+import path from "node:path"
+import test from "node:test"
+import { fileURLToPath, pathToFileURL } from "node:url"
+
+import "./register-ts-path-hooks.mjs"
+
+const cwd = fileURLToPath(new URL("..", import.meta.url))
+const steeringUrl = pathToFileURL(
+  path.join(cwd, "src/lib/server/agent-prompt-steering.ts")
+).href
+
+const {
+  createPromptSteeringBlocks,
+  inferPromptTaskMode,
+  inferUserExpertiseFromMemory,
+} = await import(steeringUrl)
+
+function user(content) {
+  return [{ role: "user", content }]
+}
+
+test("inferPromptTaskMode classifies the standard finance baseline cases", () => {
+  assert.equal(
+    inferPromptTaskMode(
+      user(
+        "Compare AAPL valuation using revenue, EBITDA, FCF, and recent 10-K data."
+      )
+    ),
+    "finance_analysis"
+  )
+  assert.equal(
+    inferPromptTaskMode(user("Find the current quote for AAPL.")),
+    "finance_analysis"
+  )
+  assert.equal(
+    inferPromptTaskMode(user("What finance data providers are available?")),
+    "finance_analysis"
+  )
+})
+
+test("inferPromptTaskMode does not mistake stock-up idioms for finance", () => {
+  assert.equal(
+    inferPromptTaskMode(user("Stock up on supplies for the trip.")),
+    "general"
+  )
+  assert.equal(
+    inferPromptTaskMode(user("That product has been out of stock for weeks.")),
+    "general"
+  )
+  assert.equal(
+    inferPromptTaskMode(
+      user("I'm stocking up on canned beans before the storm.")
+    ),
+    "general"
+  )
+})
+
+test("inferPromptTaskMode keeps personal financial advice in high_stakes", () => {
+  assert.equal(
+    inferPromptTaskMode(
+      user("Should I buy this stock in my retirement account?")
+    ),
+    "high_stakes"
+  )
+  assert.equal(
+    inferPromptTaskMode(user("Help me plan tax deductions for my LLC.")),
+    "high_stakes"
+  )
+})
+
+test("inferPromptTaskMode classifies high_stakes medical/security questions", () => {
+  assert.equal(
+    inferPromptTaskMode(user("My account got phished — what do I do?")),
+    "high_stakes"
+  )
+  assert.equal(
+    inferPromptTaskMode(
+      user("I think I have an infection in my finger, what should I do?")
+    ),
+    "high_stakes"
+  )
+})
+
+test("inferPromptTaskMode classifies debugging tasks distinctly from coding", () => {
+  assert.equal(
+    inferPromptTaskMode(
+      user("My deploy script throws ENOENT, here's the trace…")
+    ),
+    "debugging"
+  )
+  assert.equal(
+    inferPromptTaskMode(
+      user("Why does the prod build fail with an undefined property error?")
+    ),
+    "debugging"
+  )
+  assert.equal(
+    inferPromptTaskMode(
+      user("The agent stream hangs at step 4 — what could cause a deadlock?")
+    ),
+    "debugging"
+  )
+})
+
+test("inferPromptTaskMode still classifies pure coding requests as coding", () => {
+  assert.equal(
+    inferPromptTaskMode(
+      user("Write a TypeScript function to debounce an async callback.")
+    ),
+    "coding"
+  )
+  assert.equal(
+    inferPromptTaskMode(user("Implement a quicksort in Python.")),
+    "coding"
+  )
+})
+
+test("inferPromptTaskMode classifies writing tasks", () => {
+  assert.equal(
+    inferPromptTaskMode(
+      user("Draft a release note for the new long-term memory feature.")
+    ),
+    "writing"
+  )
+  assert.equal(
+    inferPromptTaskMode(user("Proofread this paragraph and tighten the tone.")),
+    "writing"
+  )
+  assert.equal(
+    inferPromptTaskMode(user("Edit my cover letter for clarity.")),
+    "writing"
+  )
+})
+
+test("inferPromptTaskMode classifies research requests", () => {
+  assert.equal(
+    inferPromptTaskMode(
+      user(
+        "What's the latest reporting on the EU AI Act enforcement timeline? Cite sources."
+      )
+    ),
+    "research"
+  )
+  assert.equal(
+    inferPromptTaskMode(
+      user("Look up the current market share of Llama 3 derivatives.")
+    ),
+    "research"
+  )
+})
+
+test("inferPromptTaskMode routes closed-answer and strict-format prompts", () => {
+  assert.equal(
+    inferPromptTaskMode(
+      user(
+        "Multiple choice: which option is correct? A) ten B) eleven C) twelve. Final answer:"
+      )
+    ),
+    "closed_answer"
+  )
+  assert.equal(
+    inferPromptTaskMode(
+      user("Return only valid JSON with keys name and count.")
+    ),
+    "instruction_following"
+  )
+})
+
+test("inferPromptTaskMode falls back to general when nothing matches", () => {
+  assert.equal(inferPromptTaskMode(user("Hello!")), "general")
+  assert.equal(
+    inferPromptTaskMode(user("Tell me a fun fact about octopuses.")),
+    "general"
+  )
+})
+
+test("inferPromptTaskMode upgrades borderline queries when userExpertise=finance", () => {
+  assert.equal(
+    inferPromptTaskMode(user("Hello!"), { userExpertise: "finance" }),
+    "finance_analysis"
+  )
+  assert.equal(
+    inferPromptTaskMode(user("Tell me about Q2."), {
+      userExpertise: "finance",
+    }),
+    "finance_analysis"
+  )
+})
+
+test("inferPromptTaskMode never lets userExpertise downgrade high_stakes routing", () => {
+  assert.equal(
+    inferPromptTaskMode(
+      user("Should I buy this stock in my retirement account?"),
+      { userExpertise: "finance" }
+    ),
+    "high_stakes"
+  )
+})
+
+test("inferPromptTaskMode userExpertise=writing routes ambiguous prompts to writing", () => {
+  assert.equal(
+    inferPromptTaskMode(user("Quick thoughts on this?"), {
+      userExpertise: "writing",
+    }),
+    "writing"
+  )
+})
+
+test("inferUserExpertiseFromMemory picks up finance role tags", () => {
+  assert.equal(
+    inferUserExpertiseFromMemory(
+      "The user is a senior equity research analyst at a sell-side bank."
+    ),
+    "finance"
+  )
+  assert.equal(
+    inferUserExpertiseFromMemory(
+      "User mentioned they passed CFA Level 2 last year."
+    ),
+    "finance"
+  )
+})
+
+test("inferUserExpertiseFromMemory picks up engineering and writing roles", () => {
+  assert.equal(
+    inferUserExpertiseFromMemory(
+      "User is a backend engineer at a fintech startup."
+    ),
+    "engineering"
+  )
+  assert.equal(
+    inferUserExpertiseFromMemory(
+      "Prefers concise drafts. User is a technical writer who edits docs daily."
+    ),
+    "writing"
+  )
+})
+
+test("inferUserExpertiseFromMemory returns undefined for unrelated memory", () => {
+  assert.equal(
+    inferUserExpertiseFromMemory("User likes spicy food and dark mode."),
+    undefined
+  )
+  assert.equal(inferUserExpertiseFromMemory(undefined), undefined)
+  assert.equal(inferUserExpertiseFromMemory(""), undefined)
+})
+
+test("provider overlays are differentiated across providers", () => {
+  const google = createPromptSteeringBlocks({
+    provider: "google",
+    taskMode: "research",
+  })
+    .map((block) => block.body)
+    .join("\n\n")
+  const moonshot = createPromptSteeringBlocks({
+    provider: "moonshotai",
+    taskMode: "research",
+  })
+    .map((block) => block.body)
+    .join("\n\n")
+  const xiaomi = createPromptSteeringBlocks({
+    provider: "xiaomi",
+    taskMode: "research",
+  })
+    .map((block) => block.body)
+    .join("\n\n")
+
+  assert.match(google, /thinking budget/i)
+  assert.match(moonshot, /long context/i)
+  assert.match(xiaomi, /streaming latency/i)
+  assert.notEqual(
+    google.split("Use Gemini")[1],
+    moonshot.split("Use Kimi")[1],
+    "Gemini and Kimi overlays should not be byte-identical."
+  )
+})
+
+test("debugging and writing overlays appear when their task modes are selected", () => {
+  const debugging = createPromptSteeringBlocks({
+    provider: "google",
+    taskMode: "debugging",
+  })
+    .map((block) => block.body)
+    .join("\n\n")
+  const writing = createPromptSteeringBlocks({
+    provider: "google",
+    taskMode: "writing",
+  })
+    .map((block) => block.body)
+    .join("\n\n")
+
+  assert.match(debugging, /root cause/i)
+  assert.match(writing, /voice.*length.*audience/i)
+})

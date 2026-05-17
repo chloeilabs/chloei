@@ -18,6 +18,10 @@ import {
 } from "@/lib/server/agent-artifacts"
 import { hydrateBlobBackedAttachments } from "@/lib/server/agent-attachment-blobs"
 import {
+  type PromptTaskMode,
+  resolvePromptProvider,
+} from "@/lib/server/agent-prompt-steering"
+import {
   AGENT_EVAL_RESULTS_DIR,
   AGENT_FINANCE_TOOL_MAX_STEPS,
   AGENT_RESEARCH_TOOL_MAX_STEPS,
@@ -46,7 +50,10 @@ import {
   isAiSdkFinanceDataToolName,
 } from "./ai-sdk-finance-data-tools"
 import { createAiSdkFmpMcpToolsContext } from "./ai-sdk-fmp-mcp-tools"
-import { getAiSdkGatewayProviderOptionsForMode } from "./ai-sdk-gateway-provider-options"
+import {
+  getAiSdkGatewayProviderOptionsForMode,
+  getAiSdkGatewayProviderOptionsForTaskMode,
+} from "./ai-sdk-gateway-provider-options"
 import {
   createAiSdkKnowledgeSearchTools,
   getAiSdkKnowledgeSearchToolCallMetadata,
@@ -116,6 +123,7 @@ export interface StartAgentRuntimeStreamParams {
   messages: AgentInputMessage[]
   systemInstruction: string
   runtimeProfile?: AgentRuntimeProfileId
+  taskMode?: PromptTaskMode
   temperature?: number
   signal?: AbortSignal
   artifactOwnerId?: string
@@ -467,9 +475,14 @@ export async function* startAgentRuntimeStream(
       ...(params.temperature !== undefined
         ? { temperature: params.temperature }
         : {}),
-      providerOptions: getAiSdkGatewayProviderOptionsForMode({
-        deepResearch: runtimeProfile.id === "deep_research",
-      }),
+      providerOptions: params.taskMode
+        ? getAiSdkGatewayProviderOptionsForTaskMode({
+            provider: resolvePromptProvider(params.model),
+            taskMode: params.taskMode,
+          })
+        : getAiSdkGatewayProviderOptionsForMode({
+            deepResearch: runtimeProfile.id === "deep_research",
+          }),
       experimental_telemetry: {
         isEnabled: true,
         recordInputs: featureFlags.telemetryRecordIo,
