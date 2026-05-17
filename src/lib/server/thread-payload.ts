@@ -13,6 +13,7 @@ import {
   AGENT_RUN_MODES,
   AGENT_RUN_STATUSES,
   type AgentRunMode,
+  DEFAULT_THREAD_TITLE,
   getAgentAttachmentKind,
   isAgentAttachmentPreviewDataUrl,
   isModelType,
@@ -20,6 +21,7 @@ import {
   normalizeAgentAttachmentMimeType,
   SEARCH_TOOL_NAMES,
   type Thread,
+  type ThreadSummary,
   TOOL_NAMES,
 } from "@/lib/shared"
 
@@ -278,10 +280,28 @@ const threadSchema = z
   })
   .strict()
 
+const threadSummarySchema = z
+  .object({
+    id: z.string().trim().min(1).max(200),
+    title: z.string().trim().min(1).max(500),
+    model: MODEL_TYPE_SCHEMA.optional(),
+    createdAt: ISO_DATETIME_SCHEMA,
+    updatedAt: ISO_DATETIME_SCHEMA,
+  })
+  .strict()
+
 export interface StoredThreadRow {
   id: string
   model: string | null
   messages: unknown
+  createdAt: Date | string
+  updatedAt: Date | string
+}
+
+export interface StoredThreadSummaryRow {
+  id: string
+  title: string | null
+  model: string | null
   createdAt: Date | string
   updatedAt: Date | string
 }
@@ -314,6 +334,15 @@ function normalizeThreadForPersistence(thread: Thread): Thread {
 
 function sanitizeModelValue(value: unknown): ModelType | undefined {
   return isModelType(value) ? value : undefined
+}
+
+function sanitizeThreadTitle(value: unknown): string {
+  if (typeof value !== "string") {
+    return DEFAULT_THREAD_TITLE
+  }
+
+  const title = value.trim()
+  return title || DEFAULT_THREAD_TITLE
 }
 
 function sanitizeRunModeValue(value: unknown): AgentRunMode | undefined {
@@ -568,6 +597,23 @@ export function parseStoredThread(row: StoredThreadRow): Thread {
   )
 
   return normalizeThreadForPersistence(parsed)
+}
+
+export function parseStoredThreadSummary(
+  row: StoredThreadSummaryRow
+): ThreadSummary {
+  const parsed = threadSummarySchema.parse({
+    id: row.id,
+    title: sanitizeThreadTitle(row.title),
+    model: sanitizeModelValue(row.model),
+    createdAt: toIsoString(row.createdAt),
+    updatedAt: toIsoString(row.updatedAt),
+  })
+
+  return {
+    ...parsed,
+    model: parsed.model ?? undefined,
+  }
 }
 
 export function parseThreadPayload(payload: unknown): Thread {

@@ -15,6 +15,7 @@ const AUTH_DEFAULT_RATE_LIMIT_MAX_REQUESTS = 100
 const AUTH_CREDENTIAL_RATE_LIMIT_WINDOW_SECONDS = 15 * 60
 const AUTH_CREDENTIAL_RATE_LIMIT_MAX_REQUESTS = 5
 const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30
+const AUTH_SESSION_COOKIE_CACHE_MAX_AGE_SECONDS = 5 * 60
 const VERCEL_IMPLICIT_URL_ENV_NAMES = [
   "VERCEL_URL",
   "VERCEL_BRANCH_URL",
@@ -216,6 +217,10 @@ function createAuth() {
     },
     session: {
       expiresIn: THIRTY_DAYS_IN_SECONDS,
+      cookieCache: {
+        enabled: true,
+        maxAge: AUTH_SESSION_COOKIE_CACHE_MAX_AGE_SECONDS,
+      },
     },
     rateLimit: {
       enabled: true,

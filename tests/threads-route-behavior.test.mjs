@@ -39,6 +39,8 @@ function createRequest(overrides = {}) {
   return {
     headers: new Headers(overrides.headers),
     json: overrides.json ?? (async () => ({})),
+    nextUrl:
+      overrides.nextUrl ?? new URL("https://chloei.example/api/threads"),
     signal: overrides.signal ?? new AbortController().signal,
   }
 }
@@ -124,8 +126,11 @@ beforeEach(() => {
       },
     },
     threads: {
-      async listThreadsForUser() {
+      async listThreadSummariesForUser() {
         return []
+      },
+      async getThreadForUser() {
+        return null
       },
       parseThreadPayload(payload) {
         return payload
@@ -159,6 +164,75 @@ test("threads GET returns unauthorized when no session is available", async () =
     error: "Unauthorized.",
     errorCode: "THREADS_UNAUTHORIZED",
   })
+})
+
+test("threads GET returns metadata-only thread summaries by default", async () => {
+  setTestMocks({
+    threads: {
+      ...getTestMocks().threads,
+      async listThreadSummariesForUser(userId) {
+        assert.equal(userId, "user-1")
+        return [
+          {
+            id: "thread-1",
+            title: "Summarized thread",
+            createdAt: "2026-04-15T10:00:00.000Z",
+            updatedAt: "2026-04-15T10:05:00.000Z",
+          },
+        ]
+      },
+    },
+  })
+
+  const response = await GET(createRequest())
+  const body = await response.json()
+
+  assert.equal(response.status, 200)
+  assert.deepEqual(body, [
+    {
+      id: "thread-1",
+      title: "Summarized thread",
+      createdAt: "2026-04-15T10:00:00.000Z",
+      updatedAt: "2026-04-15T10:05:00.000Z",
+    },
+  ])
+})
+
+test("threads GET returns a full thread when an id is requested", async () => {
+  setTestMocks({
+    threads: {
+      ...getTestMocks().threads,
+      async getThreadForUser(userId, threadId) {
+        assert.equal(userId, "user-1")
+        assert.equal(threadId, "thread-1")
+        return {
+          id: "thread-1",
+          messages: [
+            {
+              id: "message-1",
+              role: "user",
+              content: "Open the thread",
+              llmModel: "moonshotai/kimi-k2.6",
+              createdAt: "2026-04-15T10:00:00.000Z",
+            },
+          ],
+          createdAt: "2026-04-15T10:00:00.000Z",
+          updatedAt: "2026-04-15T10:05:00.000Z",
+        }
+      },
+    },
+  })
+
+  const response = await GET(
+    createRequest({
+      nextUrl: new URL("https://chloei.example/api/threads?id=thread-1"),
+    })
+  )
+  const body = await response.json()
+
+  assert.equal(response.status, 200)
+  assert.equal(body.id, "thread-1")
+  assert.equal(body.messages[0]?.content, "Open the thread")
 })
 
 test("threads PUT returns 400 for invalid thread payloads", async () => {
@@ -250,7 +324,7 @@ test("threads GET surfaces thread-store initialization errors", async () => {
   setTestMocks({
     threads: {
       ...getTestMocks().threads,
-      async listThreadsForUser() {
+      async listThreadSummariesForUser() {
         const error = new Error(
           "Thread storage is not initialized. Run `pnpm app:migrate` to initialize app tables."
         )

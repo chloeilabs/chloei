@@ -14,11 +14,17 @@ const threadPayloadUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/thread-payload.ts")
 ).href
 
-const { deriveThreadTitle, sortThreadsNewestFirst } = await import(
-  sharedThreadsUrl
-)
-const { parseStoredThread, parseThreadPayload, prepareThreadForPersistence } =
-  await import(threadPayloadUrl)
+const {
+  deriveThreadTitle,
+  sortThreadSummariesNewestFirst,
+  sortThreadsNewestFirst,
+} = await import(sharedThreadsUrl)
+const {
+  parseStoredThread,
+  parseStoredThreadSummary,
+  parseThreadPayload,
+  prepareThreadForPersistence,
+} = await import(threadPayloadUrl)
 
 function createMessage(overrides = {}) {
   return {
@@ -67,6 +73,23 @@ test("thread helpers derive titles and sort predictably", () => {
   ]).map((thread) => thread.id)
 
   assert.deepEqual(sortedIds, ["a", "c", "b"])
+
+  const sortedSummaryIds = sortThreadSummariesNewestFirst([
+    {
+      id: "summary-b",
+      title: "B",
+      createdAt: "2026-04-15T08:00:00.000Z",
+      updatedAt: "2026-04-15T08:00:00.000Z",
+    },
+    {
+      id: "summary-a",
+      title: "A",
+      createdAt: "2026-04-15T12:00:00.000Z",
+      updatedAt: "2026-04-15T12:00:00.000Z",
+    },
+  ]).map((thread) => thread.id)
+
+  assert.deepEqual(sortedSummaryIds, ["summary-a", "summary-b"])
 })
 
 test("parseThreadPayload sanitizes invalid metadata and converts legacy activity entries", () => {
@@ -223,6 +246,36 @@ test("parseStoredThread normalizes stored rows with Date timestamps", () => {
   assert.equal(parsed.model, undefined)
   assert.equal(parsed.createdAt, "2026-04-15T09:00:00.000Z")
   assert.equal(parsed.updatedAt, "2026-04-15T12:05:00.000Z")
+})
+
+test("parseStoredThreadSummary normalizes stored rows without messages", () => {
+  const parsed = parseStoredThreadSummary({
+    id: "stored-thread-summary-1",
+    title: "  Stored summary  ",
+    model: null,
+    createdAt: new Date("2026-04-15T12:00:00.000Z"),
+    updatedAt: new Date("2026-04-15T12:05:00.000Z"),
+  })
+
+  assert.deepEqual(parsed, {
+    id: "stored-thread-summary-1",
+    title: "Stored summary",
+    model: undefined,
+    createdAt: "2026-04-15T12:00:00.000Z",
+    updatedAt: "2026-04-15T12:05:00.000Z",
+  })
+})
+
+test("parseStoredThreadSummary falls back when stored title is empty", () => {
+  const parsed = parseStoredThreadSummary({
+    id: "stored-thread-summary-2",
+    title: "",
+    model: null,
+    createdAt: "2026-04-15T12:00:00.000Z",
+    updatedAt: "2026-04-15T12:05:00.000Z",
+  })
+
+  assert.equal(parsed.title, "New Conversation")
 })
 
 test("parseStoredThread throws when stored row timestamps are invalid", () => {

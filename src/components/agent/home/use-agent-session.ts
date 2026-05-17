@@ -184,7 +184,14 @@ export function useAgentSession({
 
     if (currentThreadId) {
       if (!activeThread) {
-        return
+        messagesRef.current = []
+        const clearStateTimeout = window.setTimeout(() => {
+          setState(INITIAL_STATE)
+        }, 0)
+
+        return () => {
+          window.clearTimeout(clearStateTimeout)
+        }
       }
 
       // eslint-disable-next-line react-hooks/set-state-in-effect -- selected thread changes must hydrate local session state before user input resumes

@@ -4,15 +4,19 @@ import { createLogger } from "@/lib/logger"
 import {
   deriveThreadTitle,
   sortThreadsNewestFirst,
+  sortThreadSummariesNewestFirst,
   type Thread,
+  type ThreadSummary,
 } from "@/lib/shared"
 
 import { isE2eMockModeEnabled } from "./e2e-test-mode"
 import { getDatabase } from "./postgres"
 import {
   parseStoredThread,
+  parseStoredThreadSummary,
   prepareThreadForPersistence,
   type StoredThreadRow,
+  type StoredThreadSummaryRow,
 } from "./thread-payload"
 export { parseThreadPayload } from "./thread-payload"
 
@@ -26,6 +30,7 @@ const THREAD_STORE_SETUP_MESSAGE =
   "Thread storage is not initialized. Run `pnpm app:migrate` to initialize app tables."
 const POSTGRES_UNDEFINED_TABLE_ERROR_CODE = "42P01"
 const POSTGRES_UNDEFINED_COLUMN_ERROR_CODE = "42703"
+const THREAD_LIST_LIMIT = 100
 
 class ThreadStoreNotInitializedError extends Error {
   constructor() {
@@ -60,6 +65,58 @@ export function isThreadStoreNotInitializedError(
   error: unknown
 ): error is ThreadStoreNotInitializedError {
   return error instanceof ThreadStoreNotInitializedError
+}
+
+function toThreadSummary(thread: Thread): ThreadSummary {
+  return {
+    id: thread.id,
+    title: deriveThreadTitle(thread.messages),
+    ...(thread.model ? { model: thread.model } : {}),
+    createdAt: thread.createdAt,
+    updatedAt: thread.updatedAt,
+  }
+}
+
+export async function listThreadSummariesForUser(
+  userId: string
+): Promise<ThreadSummary[]> {
+  if (isE2eMockModeEnabled()) {
+    return sortThreadSummariesNewestFirst(
+      [...(globalThis.chloeiE2eThreads?.get(userId)?.values() ?? [])].map(
+        toThreadSummary
+      )
+    )
+  }
+
+  const database = getDatabase()
+  const result = await sql<StoredThreadSummaryRow>`
+    SELECT
+      id,
+      title,
+      model,
+      "createdAt",
+      "updatedAt"
+    FROM thread
+    WHERE "userId" = ${userId}
+    ORDER BY "updatedAt" DESC, id ASC
+    LIMIT ${THREAD_LIST_LIMIT}
+  `
+    .execute(database)
+    .catch((error: unknown) => {
+      throw wrapThreadStoreError(error)
+    })
+
+  const threads: ThreadSummary[] = []
+
+  for (const row of result.rows) {
+    try {
+      threads.push(parseStoredThreadSummary(row))
+    } catch (error) {
+      logger.error("Skipping invalid stored thread summary.", error)
+    }
+  }
+
+  return sortThreadSummariesNewestFirst(threads)
 }
 
 export async function listThreadsForUser(userId: string): Promise<Thread[]> {

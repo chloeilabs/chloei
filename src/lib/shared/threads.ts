@@ -12,6 +12,20 @@ export interface Thread {
   updatedAt: string
 }
 
+export interface ThreadSummary {
+  id: string
+  title: string
+  model?: ModelType
+  createdAt: string
+  updatedAt: string
+}
+
+interface SortableThreadRecord {
+  id: string
+  createdAt: string
+  updatedAt: string
+}
+
 function getSortTimestamp(value: string): number {
   const timestamp = Date.parse(value)
   return Number.isFinite(timestamp) ? timestamp : 0
@@ -24,7 +38,9 @@ export function deriveThreadTitle(messages: Message[]): string {
     : DEFAULT_THREAD_TITLE
 }
 
-export function sortThreadsNewestFirst(threads: Thread[]): Thread[] {
+function sortThreadRecordsNewestFirst<T extends SortableThreadRecord>(
+  threads: T[]
+): T[] {
   return [...threads].sort((left, right) => {
     const updatedDelta =
       getSortTimestamp(right.updatedAt) - getSortTimestamp(left.updatedAt)
@@ -42,4 +58,14 @@ export function sortThreadsNewestFirst(threads: Thread[]): Thread[] {
 
     return left.id.localeCompare(right.id)
   })
+}
+
+export function sortThreadsNewestFirst(threads: Thread[]): Thread[] {
+  return sortThreadRecordsNewestFirst(threads)
+}
+
+export function sortThreadSummariesNewestFirst(
+  threads: ThreadSummary[]
+): ThreadSummary[] {
+  return sortThreadRecordsNewestFirst(threads)
 }

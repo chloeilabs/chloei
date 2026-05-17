@@ -4,6 +4,16 @@ export async function listThreadsForUser(userId) {
   return (await getTestMocks().threads?.listThreadsForUser?.(userId)) ?? []
 }
 
+export async function listThreadSummariesForUser(userId) {
+  return (
+    (await getTestMocks().threads?.listThreadSummariesForUser?.(userId)) ?? []
+  )
+}
+
+export async function getThreadForUser(userId, threadId) {
+  return getTestMocks().threads?.getThreadForUser?.(userId, threadId) ?? null
+}
+
 export function parseThreadPayload(payload) {
   return getTestMocks().threads?.parseThreadPayload?.(payload) ?? payload
 }
