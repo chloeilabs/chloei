@@ -566,10 +566,12 @@ function sanitizeMessageMetadata(value: unknown) {
       })
     : undefined
   const followUpQuestions = Array.isArray(metadata.followUpQuestions)
-    ? metadata.followUpQuestions.slice(0, 3).flatMap((question) => {
-        const sanitized = sanitizeFollowUpQuestion(question)
-        return sanitized ? [sanitized] : []
-      })
+    ? metadata.followUpQuestions
+        .flatMap((question) => {
+          const sanitized = sanitizeFollowUpQuestion(question)
+          return sanitized ? [sanitized] : []
+        })
+        .slice(0, 3)
     : undefined
 
   return {
@@ -585,7 +587,7 @@ function sanitizeMessageMetadata(value: unknown) {
     ...(reasoning ? { reasoning } : {}),
     ...(activityTimeline ? { activityTimeline } : {}),
     ...(sources ? { sources } : {}),
-    ...(followUpQuestions ? { followUpQuestions } : {}),
+    ...(followUpQuestions?.length ? { followUpQuestions } : {}),
   }
 }
 

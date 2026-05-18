@@ -94,6 +94,11 @@ interface FollowUpQuestionRequestParams {
   threadId: string
 }
 
+interface PendingFollowUpQuestions {
+  questions: FollowUpQuestion[]
+  requestKind: FollowUpQuestionRequestKind
+}
+
 const INITIAL_STATE: AgentSessionState = {
   messages: [],
   isSubmitting: false,
@@ -264,9 +269,10 @@ export function useAgentSession({
     ((params: FollowUpQuestionRequestParams) => void) | null
   >(null)
   const requestedFollowUpMessageIdsRef = useRef<Set<string>>(new Set())
-  const pendingFollowUpQuestionsRef = useRef<Map<string, FollowUpQuestion[]>>(
-    new Map()
-  )
+  const finalFollowUpMessageIdsRef = useRef<Set<string>>(new Set())
+  const pendingFollowUpQuestionsRef = useRef<
+    Map<string, PendingFollowUpQuestions>
+  >(new Map())
 
   const setCurrentThreadId = useCallback(
     (id: string | null) => {
@@ -415,6 +421,7 @@ export function useAgentSession({
       assistantMessageId: string
       followUpQuestions: FollowUpQuestion[]
       model: ModelType
+      replaceExisting?: boolean
       replaceLegacyCanned?: boolean
       threadId: string
     }) => {
@@ -433,15 +440,17 @@ export function useAgentSession({
       )
       const existingFollowUpQuestions =
         sourceMessage?.metadata?.followUpQuestions
+      const hasExistingFollowUpQuestions =
+        (existingFollowUpQuestions?.length ?? 0) > 0
+      const canReplaceExistingFollowUpQuestions =
+        params.replaceExisting === true ||
+        (params.replaceLegacyCanned === true &&
+          hasOnlyLegacyCannedFollowUpQuestions(existingFollowUpQuestions))
       if (
         !sourceMessage ||
         sourceMessage.metadata?.isStreaming === true ||
         sourceMessage.metadata?.agentStatus !== "completed" ||
-        ((existingFollowUpQuestions?.length ?? 0) > 0 &&
-          !(
-            params.replaceLegacyCanned &&
-            hasOnlyLegacyCannedFollowUpQuestions(existingFollowUpQuestions)
-          ))
+        (hasExistingFollowUpQuestions && !canReplaceExistingFollowUpQuestions)
       ) {
         return false
       }
@@ -476,13 +485,27 @@ export function useAgentSession({
   const requestFollowUpQuestions = useCallback(
     (params: FollowUpQuestionRequestParams) => {
       requestedFollowUpMessageIdsRef.current.add(params.assistantMessageId)
+      if (params.requestKind === "final") {
+        finalFollowUpMessageIdsRef.current.add(params.assistantMessageId)
+      }
+
+      const clearRequestedFollowUpQuestion = () => {
+        requestedFollowUpMessageIdsRef.current.delete(params.assistantMessageId)
+        if (params.requestKind === "final") {
+          finalFollowUpMessageIdsRef.current.delete(params.assistantMessageId)
+        }
+      }
 
       const retryCompletedMessageAfterParallelMiss = () => {
         if (params.requestKind !== "parallel") {
+          clearRequestedFollowUpQuestion()
           return
         }
 
         requestedFollowUpMessageIdsRef.current.delete(params.assistantMessageId)
+        if (finalFollowUpMessageIdsRef.current.has(params.assistantMessageId)) {
+          return
+        }
 
         const sourceIndex = messagesRef.current.findIndex(
           (message) =>
@@ -523,6 +546,7 @@ export function useAgentSession({
           })
 
           if (response.status === 401) {
+            clearRequestedFollowUpQuestion()
             redirectToSignIn()
             return
           }
@@ -551,10 +575,15 @@ export function useAgentSession({
           )
           const existingFollowUpQuestions =
             sourceMessage?.metadata?.followUpQuestions
+          const hasExistingFollowUpQuestions =
+            (existingFollowUpQuestions?.length ?? 0) > 0
+          const canReplaceExistingFollowUpQuestions =
+            params.requestKind === "final" ||
+            hasOnlyLegacyCannedFollowUpQuestions(existingFollowUpQuestions)
           if (
             !sourceMessage ||
-            ((existingFollowUpQuestions?.length ?? 0) > 0 &&
-              !hasOnlyLegacyCannedFollowUpQuestions(existingFollowUpQuestions))
+            (hasExistingFollowUpQuestions &&
+              !canReplaceExistingFollowUpQuestions)
           ) {
             return
           }
@@ -563,10 +592,10 @@ export function useAgentSession({
             sourceMessage.metadata?.isStreaming === true ||
             sourceMessage.metadata?.agentStatus !== "completed"
           ) {
-            pendingFollowUpQuestionsRef.current.set(
-              params.assistantMessageId,
-              followUpQuestions
-            )
+            pendingFollowUpQuestionsRef.current.set(params.assistantMessageId, {
+              questions: followUpQuestions,
+              requestKind: params.requestKind,
+            })
             return
           }
 
@@ -574,6 +603,7 @@ export function useAgentSession({
             assistantMessageId: params.assistantMessageId,
             followUpQuestions,
             model: params.model,
+            replaceExisting: params.requestKind === "final",
             replaceLegacyCanned: true,
             threadId: params.threadId,
           })
@@ -608,6 +638,7 @@ export function useAgentSession({
     for (const messageId of requestedFollowUpMessageIdsRef.current) {
       if (!messageIds.has(messageId)) {
         requestedFollowUpMessageIdsRef.current.delete(messageId)
+        finalFollowUpMessageIdsRef.current.delete(messageId)
       }
     }
 
@@ -646,6 +677,7 @@ export function useAgentSession({
     messagesRef.current = []
     attachmentPayloadsRef.current.clear()
     requestedFollowUpMessageIdsRef.current.clear()
+    finalFollowUpMessageIdsRef.current.clear()
     pendingFollowUpQuestionsRef.current.clear()
     currentThreadIdRef.current = null
     submitLockRef.current = false
@@ -704,20 +736,20 @@ export function useAgentSession({
       const assistantCreatedAt = new Date().toISOString()
       let effectiveModel = params.model
       let accumulator = createAgentStreamAccumulator()
-      let startedParallelFollowUpRequest = false
+      const parallelFollowUpRequestState = { started: false }
 
       const startParallelFollowUpQuestions = () => {
         if (
           !shouldStartParallelFollowUpQuestions(
             accumulator,
-            startedParallelFollowUpRequest ||
+            parallelFollowUpRequestState.started ||
               requestedFollowUpMessageIdsRef.current.has(assistantId)
           )
         ) {
           return
         }
 
-        startedParallelFollowUpRequest = true
+        parallelFollowUpRequestState.started = true
         requestFollowUpQuestions({
           assistantMessageId: assistantId,
           messages: [
@@ -879,18 +911,22 @@ export function useAgentSession({
         const attachedPendingFollowUpQuestions = pendingFollowUpQuestions
           ? attachFollowUpQuestionsToCompletedMessage({
               assistantMessageId: assistantId,
-              followUpQuestions: pendingFollowUpQuestions,
+              followUpQuestions: pendingFollowUpQuestions.questions,
               model: effectiveModel,
+              replaceExisting: pendingFollowUpQuestions.requestKind === "final",
               replaceLegacyCanned: true,
               threadId: params.threadId,
             })
           : false
-        if (
+        const shouldRequestFinalFollowUpQuestions =
           params.threadId === currentThreadIdRef.current &&
           shouldRequestFollowUpQuestions(accumulator) &&
-          !attachedPendingFollowUpQuestions &&
-          !requestedFollowUpMessageIdsRef.current.has(assistantId)
-        ) {
+          ((parallelFollowUpRequestState.started &&
+            !finalFollowUpMessageIdsRef.current.has(assistantId)) ||
+            (!parallelFollowUpRequestState.started &&
+              !attachedPendingFollowUpQuestions &&
+              !requestedFollowUpMessageIdsRef.current.has(assistantId)))
+        if (shouldRequestFinalFollowUpQuestions) {
           requestFollowUpQuestions({
             assistantMessageId: assistantId,
             messages: messagesRef.current,
