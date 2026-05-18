@@ -20,7 +20,7 @@ const {
 } = require("electron")
 
 const APP_NAME = "Chloei"
-const APP_BACKGROUND_COLOR = "#0c0a09"
+const APP_BACKGROUND_COLOR = "#1c1917"
 const SERVER_HOST = "127.0.0.1"
 const SERVER_START_TIMEOUT_MS = 120_000
 const SERVER_POLL_INTERVAL_MS = 250

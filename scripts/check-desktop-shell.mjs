@@ -5,8 +5,7 @@ import { _electron as electron } from "playwright-core"
 
 const rootDir = path.resolve(import.meta.dirname, "..")
 const electronMainPath = path.join(rootDir, "electron", "main.cjs")
-const expectedAppBackgroundColor = "rgb(12, 10, 9)"
-const expectedAppThemeColor = "#0c0a09"
+const expectedDesktopThemeColor = "#1c1917"
 const expectedAgentResponse =
   process.env.E2E_MOCK_AGENT_RESPONSE?.trim() || "DESKTOP_SMOKE_OK"
 
@@ -79,6 +78,11 @@ try {
 
   if (desktopApi.platform === "darwin") {
     const desktopShellStyles = await page.evaluate(() => {
+      const sidebarProbe = document.createElement("div")
+      sidebarProbe.className = "bg-sidebar"
+      sidebarProbe.style.display = "none"
+      document.body.append(sidebarProbe)
+
       const titlebar = document.querySelector(".chloei-desktop-titlebar")
       const shell = document.querySelector(".chloei-desktop-shell")
       const themeColor = document
@@ -94,6 +98,9 @@ try {
 
       const titlebarStyle = window.getComputedStyle(titlebar)
       const shellStyle = window.getComputedStyle(shell)
+      const sidebarBackground =
+        window.getComputedStyle(sidebarProbe).backgroundColor
+      sidebarProbe.remove()
 
       return {
         bodyBackground: window.getComputedStyle(document.body).backgroundColor,
@@ -101,6 +108,7 @@ try {
           .backgroundColor,
         shellBackground: shellStyle.backgroundColor,
         shellPaddingTop: shellStyle.paddingTop,
+        sidebarBackground,
         themeColor,
         titlebarAppRegion: titlebarStyle.getPropertyValue("-webkit-app-region"),
         titlebarBackground: titlebarStyle.backgroundColor,
@@ -110,14 +118,23 @@ try {
     })
 
     assert.notEqual(desktopShellStyles, null)
-    assert.equal(desktopShellStyles.bodyBackground, expectedAppBackgroundColor)
-    assert.equal(desktopShellStyles.htmlBackground, expectedAppBackgroundColor)
-    assert.equal(desktopShellStyles.shellBackground, expectedAppBackgroundColor)
+    assert.equal(
+      desktopShellStyles.bodyBackground,
+      desktopShellStyles.sidebarBackground
+    )
+    assert.equal(
+      desktopShellStyles.htmlBackground,
+      desktopShellStyles.sidebarBackground
+    )
+    assert.equal(
+      desktopShellStyles.shellBackground,
+      desktopShellStyles.sidebarBackground
+    )
     assert.equal(
       desktopShellStyles.titlebarBackground,
-      expectedAppBackgroundColor
+      desktopShellStyles.sidebarBackground
     )
-    assert.equal(desktopShellStyles.themeColor, expectedAppThemeColor)
+    assert.equal(desktopShellStyles.themeColor, expectedDesktopThemeColor)
     assert.equal(desktopShellStyles.titlebarAppRegion, "drag")
     assert.equal(desktopShellStyles.titlebarDisplay, "flex")
     assert.equal(desktopShellStyles.titlebarHeight, "40px")
@@ -146,6 +163,11 @@ try {
     state: "visible",
     timeout: 30_000,
   })
+
+  const updateButtonCount = await page
+    .locator("[data-chloei-desktop-update-button]")
+    .count()
+  assert.equal(updateButtonCount, 0)
 
   console.log(
     `Desktop shell smoke passed for ${origin} with window.chloeiDesktop.version=${desktopApi.version}`

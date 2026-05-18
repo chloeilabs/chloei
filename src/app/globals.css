@@ -153,11 +153,11 @@
   }
 
   html {
-    @apply bg-background font-sans;
+    @apply bg-sidebar font-sans;
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-sidebar text-foreground;
   }
 }
 
@@ -180,7 +180,7 @@
     display: flex;
     height: var(--chloei-desktop-titlebar-height);
     align-items: center;
-    background: var(--background);
+    background: var(--sidebar);
     color: rgb(250 250 249 / 58%);
     font-family: var(--font-sans);
     font-size: 0.8125rem;
