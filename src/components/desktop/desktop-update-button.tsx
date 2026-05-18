@@ -70,6 +70,14 @@ function getButtonContent(state: ChloeiDesktopUpdateState) {
   }
 }
 
+function shouldShowDesktopUpdateButton(state: ChloeiDesktopUpdateState) {
+  return (
+    state.status === "available" ||
+    state.status === "downloaded" ||
+    state.status === "downloading"
+  )
+}
+
 export function DesktopUpdateButton() {
   const [state, setState] = useState<ChloeiDesktopUpdateState | null>(null)
   const [isClickPending, setIsClickPending] = useState(false)
@@ -136,7 +144,7 @@ export function DesktopUpdateButton() {
     })()
   }, [state])
 
-  if (!state || !content || state.status === "unavailable") {
+  if (!state || !content || !shouldShowDesktopUpdateButton(state)) {
     return null
   }
 
@@ -152,6 +160,7 @@ export function DesktopUpdateButton() {
     <Tooltip>
       <TooltipTrigger asChild>
         <Button
+          data-chloei-desktop-update-button=""
           type="button"
           variant={state.status === "downloaded" ? "default" : "outline"}
           size="sm"
