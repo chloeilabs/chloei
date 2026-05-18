@@ -11,6 +11,7 @@ const moduleUrl = pathToFileURL(
 ).href
 
 const {
+  attachFollowUpQuestionsToMessage,
   createAssistantMessageFromAccumulator,
   getThreadAttachmentPayloads,
   hasVisibleStructuredOutput,
@@ -113,6 +114,34 @@ test("assistant session state omits empty structured fields and upserts by id", 
   assert.deepEqual(upsertAgentMessage([], firstMessage), [firstMessage])
   assert.deepEqual(upsertAgentMessage([firstMessage], finalMessage), [
     finalMessage,
+  ])
+})
+
+test("assistant session state attaches follow-up questions without changing content", () => {
+  const assistantMessage = createAssistantMessageFromAccumulator({
+    id: "assistant-1",
+    createdAt: "2026-04-30T12:00:00.000Z",
+    accumulator: createAccumulator({ content: "Final answer." }),
+    model: "moonshotai/kimi-k2.6",
+    runMode: "chat",
+    isStreaming: false,
+  })
+  const updatedMessages = attachFollowUpQuestionsToMessage(
+    [assistantMessage],
+    "assistant-1",
+    [
+      { id: "follow-up-1", text: "Can you give an example?" },
+      { id: "follow-up-2", text: "What should I do next?" },
+    ]
+  )
+
+  assert.equal(updatedMessages[0]?.content, "Final answer.")
+  assert.deepEqual(updatedMessages[0]?.metadata?.parts, [
+    { type: "text", text: "Final answer." },
+  ])
+  assert.deepEqual(updatedMessages[0]?.metadata?.followUpQuestions, [
+    { id: "follow-up-1", text: "Can you give an example?" },
+    { id: "follow-up-2", text: "What should I do next?" },
   ])
 })
 

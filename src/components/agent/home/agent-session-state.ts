@@ -1,6 +1,7 @@
 import {
   type AgentRequestAttachment,
   type AgentRunMode,
+  type FollowUpQuestion,
   type Message as AgentMessage,
   type ModelType,
 } from "@/lib/shared"
@@ -106,6 +107,37 @@ export function createAssistantMessageFromAccumulator({
         : {}),
     },
   }
+}
+
+export function attachFollowUpQuestionsToMessage(
+  currentMessages: AgentMessage[],
+  messageId: string,
+  followUpQuestions: FollowUpQuestion[]
+): AgentMessage[] {
+  if (followUpQuestions.length === 0) {
+    return currentMessages
+  }
+
+  const targetIndex = currentMessages.findIndex(
+    (message) => message.id === messageId && message.role === "assistant"
+  )
+  if (targetIndex === -1) {
+    return currentMessages
+  }
+
+  return currentMessages.map((message, index) => {
+    if (index !== targetIndex) {
+      return message
+    }
+
+    return {
+      ...message,
+      metadata: {
+        ...message.metadata,
+        followUpQuestions,
+      },
+    }
+  })
 }
 
 export function upsertAgentMessage(

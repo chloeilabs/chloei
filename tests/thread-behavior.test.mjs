@@ -151,6 +151,24 @@ test("parseThreadPayload sanitizes invalid metadata and converts legacy activity
               title: "",
             },
           ],
+          followUpQuestions: [
+            {
+              id: "follow-up-1",
+              text: " Can you give an example? ",
+            },
+            {
+              id: "fallback-follow-up-1-old",
+              text: "What should I ask next about this?",
+            },
+            {
+              id: "",
+              text: "Bad id?",
+            },
+            {
+              id: "follow-up-too-long",
+              text: "x".repeat(161),
+            },
+          ],
         },
       },
     ],
@@ -188,6 +206,12 @@ test("parseThreadPayload sanitizes invalid metadata and converts legacy activity
       title: "Example",
     },
   ])
+  assert.deepEqual(parsed.messages[0]?.metadata?.followUpQuestions, [
+    {
+      id: "follow-up-1",
+      text: "Can you give an example?",
+    },
+  ])
 })
 
 test("parseThreadPayload drops removed model ids from stored thread metadata", () => {
@@ -207,6 +231,63 @@ test("parseThreadPayload drops removed model ids from stored thread metadata", (
 
   assert.equal(parsed.model, undefined)
   assert.equal(parsed.messages[0]?.metadata?.selectedModel, undefined)
+})
+
+test("parseThreadPayload keeps generated follow-ups after malformed entries", () => {
+  const parsed = parseThreadPayload({
+    id: "thread-follow-ups",
+    messages: [
+      createMessage({
+        id: "assistant-follow-ups",
+        role: "assistant",
+        metadata: {
+          followUpQuestions: [
+            {
+              id: "fallback-follow-up-1-old",
+              text: "What should I ask next about this?",
+            },
+            {
+              id: "",
+              text: "Missing id should be dropped.",
+            },
+            {
+              id: "follow-up-too-long",
+              text: "x".repeat(161),
+            },
+            {
+              id: "follow-up-1",
+              text: " How did Augustus consolidate power? ",
+            },
+            {
+              id: "follow-up-2",
+              text: "What caused the Western Empire to fall?",
+            },
+            {
+              id: "follow-up-3",
+              text: "How did Byzantine institutions preserve Roman law?",
+            },
+          ],
+        },
+      }),
+    ],
+    createdAt: "2026-04-15T11:00:00.000Z",
+    updatedAt: "2026-04-15T11:05:00.000Z",
+  })
+
+  assert.deepEqual(parsed.messages[0]?.metadata?.followUpQuestions, [
+    {
+      id: "follow-up-1",
+      text: "How did Augustus consolidate power?",
+    },
+    {
+      id: "follow-up-2",
+      text: "What caused the Western Empire to fall?",
+    },
+    {
+      id: "follow-up-3",
+      text: "How did Byzantine institutions preserve Roman law?",
+    },
+  ])
 })
 
 test("prepareThreadForPersistence aligns createdAt with the first message", () => {

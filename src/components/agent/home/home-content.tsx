@@ -123,6 +123,21 @@ export function HomePageContent({
     [handlePromptSubmit]
   )
 
+  const handleFollowUpQuestionClick = useCallback(
+    ({
+      model,
+      question,
+      runMode,
+    }: {
+      model: ModelType
+      question: string
+      runMode: AgentRunMode
+    }) => {
+      handlePromptSubmit(question, model, runMode)
+    },
+    [handlePromptSubmit]
+  )
+
   const hasMessages = state.messages.length > 0
   const hasActiveThread = threadStore.currentThreadId !== null
   const fallbackTransitionMs = isMobile
@@ -439,6 +454,7 @@ export function HomePageContent({
                     messages={state.messages}
                     disableEditing={state.isSubmitting || state.isStreaming}
                     onEditMessage={handleEditMessage}
+                    onFollowUpQuestionClick={handleFollowUpQuestionClick}
                   />
                 </div>
 

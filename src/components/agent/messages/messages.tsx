@@ -62,6 +62,7 @@ function MessagesComponent({
   messages,
   disableEditing,
   onEditMessage,
+  onFollowUpQuestionClick,
 }: {
   messages: Message[]
   disableEditing: boolean
@@ -71,6 +72,11 @@ function MessagesComponent({
     newModel: ModelType
     newRunMode: AgentRunMode
   }) => Promise<void> | void
+  onFollowUpQuestionClick?: (params: {
+    model: ModelType
+    question: string
+    runMode: AgentRunMode
+  }) => void
 }) {
   const messageGroups = useMemo(() => groupMessages(messages), [messages])
 
@@ -121,7 +127,13 @@ function MessagesComponent({
               }
 
               if (isAssistantMessage(message)) {
-                return <AssistantMessage key={message.id} message={message} />
+                return (
+                  <AssistantMessage
+                    key={message.id}
+                    message={message}
+                    onFollowUpQuestionClick={onFollowUpQuestionClick}
+                  />
+                )
               }
 
               return null
