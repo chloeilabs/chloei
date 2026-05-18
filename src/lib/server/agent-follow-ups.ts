@@ -30,18 +30,17 @@ export const generatedFollowUpQuestionsSchema = z
   })
   .strict()
 
-const generatedFollowUpQuestionsResponseSchema = z
-  .union([
-    generatedFollowUpQuestionsSchema,
-    z
-      .object({
-        follow_up_questions: generatedFollowUpQuestionTextsSchema,
-      })
-      .strict()
-      .transform((value) => ({
-        questions: value.follow_up_questions,
-      })),
-  ])
+const generatedFollowUpQuestionsResponseSchema = z.union([
+  generatedFollowUpQuestionsSchema,
+  z
+    .object({
+      follow_up_questions: generatedFollowUpQuestionTextsSchema,
+    })
+    .strict()
+    .transform((value) => ({
+      questions: value.follow_up_questions,
+    })),
+])
 
 export const followUpQuestionsResponseSchema = z
   .object({

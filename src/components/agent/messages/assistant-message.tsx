@@ -243,7 +243,7 @@ function FollowUpQuestions({
     >
       {questions.map((question) => (
         <Button
-          className="-mx-2 h-auto max-w-full justify-start gap-1.5 whitespace-normal border-transparent bg-transparent px-2 py-1 text-left text-sm font-normal leading-snug text-muted-foreground shadow-none hover:bg-muted/35 hover:text-foreground focus-visible:border-transparent focus-visible:bg-muted/35 focus-visible:ring-0 dark:hover:bg-muted/20"
+          className="-mx-2 h-auto max-w-full justify-start gap-1.5 border-transparent bg-transparent px-2 py-1 text-left text-sm leading-snug font-normal whitespace-normal text-muted-foreground shadow-none hover:bg-muted/35 hover:text-foreground focus-visible:border-transparent focus-visible:bg-muted/35 focus-visible:ring-0 dark:hover:bg-muted/20"
           key={question.id}
           onClick={() => {
             onSelect(question.text)
@@ -312,8 +312,7 @@ export function AssistantMessage({
   const followUpQuestions = isAssistantStreaming
     ? []
     : (message.metadata?.followUpQuestions ?? []).filter(
-        (question) =>
-          !question.id.startsWith(LEGACY_CANNED_FOLLOW_UP_ID_PREFIX)
+        (question) => !question.id.startsWith(LEGACY_CANNED_FOLLOW_UP_ID_PREFIX)
       )
 
   const hasContent = content.trim().length > 0

@@ -122,13 +122,12 @@ test.describe("mock authenticated chat smoke", () => {
     await expect(followUp).toBeVisible()
     await followUp.click()
 
-    await expect(page.locator("[data-message-role='user']").last()).toContainText(
-      "What is a practical next step?"
-    )
-    await expect(page.locator("[data-message-role='assistant']").last()).toContainText(
-      expectedAssistantText,
-      { timeout: 30_000 }
-    )
+    await expect(
+      page.locator("[data-message-role='user']").last()
+    ).toContainText("What is a practical next step?")
+    await expect(
+      page.locator("[data-message-role='assistant']").last()
+    ).toContainText(expectedAssistantText, { timeout: 30_000 })
   })
 
   test("filters chats from the sidebar search and closes with escape", async ({

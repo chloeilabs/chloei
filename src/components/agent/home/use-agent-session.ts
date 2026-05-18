@@ -138,7 +138,11 @@ function isFollowUpQuestion(value: unknown): value is FollowUpQuestion {
 }
 
 function parseFollowUpQuestionsResponse(payload: unknown): FollowUpQuestion[] {
-  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+  if (
+    typeof payload !== "object" ||
+    payload === null ||
+    Array.isArray(payload)
+  ) {
     return []
   }
 
@@ -163,8 +167,8 @@ function shouldRequestFollowUpQuestions(
 
   return Boolean(
     content &&
-      content !== EMPTY_ASSISTANT_RESPONSE_FALLBACK &&
-      accumulator.agentStatus === "completed"
+    content !== EMPTY_ASSISTANT_RESPONSE_FALLBACK &&
+    accumulator.agentStatus === "completed"
   )
 }
 
@@ -186,9 +190,9 @@ function hasOnlyLegacyCannedFollowUpQuestions(
 ): boolean {
   return Boolean(
     questions?.length &&
-      questions.every((question) =>
-        question.id.startsWith(LEGACY_CANNED_FOLLOW_UP_ID_PREFIX)
-      )
+    questions.every((question) =>
+      question.id.startsWith(LEGACY_CANNED_FOLLOW_UP_ID_PREFIX)
+    )
   )
 }
 
@@ -197,8 +201,7 @@ function hasGeneratedFollowUpQuestions(
 ): boolean {
   return Boolean(
     questions?.some(
-      (question) =>
-        !question.id.startsWith(LEGACY_CANNED_FOLLOW_UP_ID_PREFIX)
+      (question) => !question.id.startsWith(LEGACY_CANNED_FOLLOW_UP_ID_PREFIX)
     )
   )
 }
@@ -257,8 +260,9 @@ export function useAgentSession({
   const attachmentPayloadsRef = useRef<AttachmentPayloadsByThread>(new Map())
   const abortControllerRef = useRef<AbortController | null>(null)
   const currentThreadIdRef = useRef(currentThreadId)
-  const requestFollowUpQuestionsRef =
-    useRef<((params: FollowUpQuestionRequestParams) => void) | null>(null)
+  const requestFollowUpQuestionsRef = useRef<
+    ((params: FollowUpQuestionRequestParams) => void) | null
+  >(null)
   const requestedFollowUpMessageIdsRef = useRef<Set<string>>(new Set())
   const pendingFollowUpQuestionsRef = useRef<Map<string, FollowUpQuestion[]>>(
     new Map()
@@ -478,9 +482,7 @@ export function useAgentSession({
           return
         }
 
-        requestedFollowUpMessageIdsRef.current.delete(
-          params.assistantMessageId
-        )
+        requestedFollowUpMessageIdsRef.current.delete(params.assistantMessageId)
 
         const sourceIndex = messagesRef.current.findIndex(
           (message) =>
@@ -492,7 +494,9 @@ export function useAgentSession({
           !sourceMessage ||
           sourceMessage.metadata?.isStreaming === true ||
           sourceMessage.metadata?.agentStatus !== "completed" ||
-          hasGeneratedFollowUpQuestions(sourceMessage.metadata.followUpQuestions)
+          hasGeneratedFollowUpQuestions(
+            sourceMessage.metadata.followUpQuestions
+          )
         ) {
           return
         }
