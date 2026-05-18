@@ -7,6 +7,12 @@ interface TextMessagePart {
 }
 
 type AssistantMessagePart = TextMessagePart
+
+export interface FollowUpQuestion {
+  id: string
+  text: string
+}
+
 export const TOOL_NAMES = [
   "web_search",
   "x_search",
@@ -219,6 +225,7 @@ export interface MessageMetadata {
   reasoning?: string
   activityTimeline?: ActivityTimelineEntry[]
   sources?: MessageSource[]
+  followUpQuestions?: FollowUpQuestion[]
 }
 
 export const isUserMessage = (

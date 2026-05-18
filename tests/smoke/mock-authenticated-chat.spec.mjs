@@ -108,6 +108,29 @@ test.describe("mock authenticated chat smoke", () => {
     )
   })
 
+  test("shows follow-up chips and submits one as the next prompt", async ({
+    baseURL,
+    context,
+    page,
+  }) => {
+    await openMockChat({ baseURL, context, page })
+    await sendPrompt(page, "Follow-up chip smoke prompt")
+
+    const followUp = page.getByRole("button", {
+      name: /What is a practical next step\?/,
+    })
+    await expect(followUp).toBeVisible()
+    await followUp.click()
+
+    await expect(page.locator("[data-message-role='user']").last()).toContainText(
+      "What is a practical next step?"
+    )
+    await expect(page.locator("[data-message-role='assistant']").last()).toContainText(
+      expectedAssistantText,
+      { timeout: 30_000 }
+    )
+  })
+
   test("filters chats from the sidebar search and closes with escape", async ({
     baseURL,
     context,

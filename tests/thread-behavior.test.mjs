@@ -151,6 +151,24 @@ test("parseThreadPayload sanitizes invalid metadata and converts legacy activity
               title: "",
             },
           ],
+          followUpQuestions: [
+            {
+              id: "follow-up-1",
+              text: " Can you give an example? ",
+            },
+            {
+              id: "fallback-follow-up-1-old",
+              text: "What should I ask next about this?",
+            },
+            {
+              id: "",
+              text: "Bad id?",
+            },
+            {
+              id: "follow-up-too-long",
+              text: "x".repeat(161),
+            },
+          ],
         },
       },
     ],
@@ -186,6 +204,12 @@ test("parseThreadPayload sanitizes invalid metadata and converts legacy activity
       id: "source-1",
       url: "https://example.com",
       title: "Example",
+    },
+  ])
+  assert.deepEqual(parsed.messages[0]?.metadata?.followUpQuestions, [
+    {
+      id: "follow-up-1",
+      text: "Can you give an example?",
     },
   ])
 })

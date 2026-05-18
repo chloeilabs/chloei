@@ -51,6 +51,16 @@ const messageSourceSchema = z
   })
   .strict()
 
+const followUpQuestionSchema = z
+  .object({
+    id: z.string().trim().min(1).max(200),
+    text: z.string().trim().min(1).max(160),
+  })
+  .strict()
+// Drop canned suggestions saved by earlier local builds when threads are
+// loaded or persisted again.
+const LEGACY_CANNED_FOLLOW_UP_ID_PREFIX = "fallback-follow-up"
+
 const codeExecutionArtifactMetadataSchema = z
   .object({
     path: z.string().trim().min(1).max(500),
@@ -257,6 +267,7 @@ const messageMetadataSchema = z
     reasoning: z.string().max(100_000).optional(),
     activityTimeline: z.array(activityTimelineEntrySchema).optional(),
     sources: z.array(messageSourceSchema).optional(),
+    followUpQuestions: z.array(followUpQuestionSchema).max(3).optional(),
   })
   .strict()
 
@@ -375,6 +386,17 @@ function sanitizeOptionalBoolean(value: unknown): boolean | undefined {
 function sanitizeMessageSource(value: unknown) {
   const parsed = messageSourceSchema.safeParse(value)
   return parsed.success ? parsed.data : null
+}
+
+function sanitizeFollowUpQuestion(value: unknown) {
+  const parsed = followUpQuestionSchema.safeParse(value)
+  if (!parsed.success) {
+    return null
+  }
+
+  return parsed.data.id.startsWith(LEGACY_CANNED_FOLLOW_UP_ID_PREFIX)
+    ? null
+    : parsed.data
 }
 
 function sanitizeToolInvocation(value: unknown) {
@@ -543,6 +565,12 @@ function sanitizeMessageMetadata(value: unknown) {
         return sanitized ? [sanitized] : []
       })
     : undefined
+  const followUpQuestions = Array.isArray(metadata.followUpQuestions)
+    ? metadata.followUpQuestions.slice(0, 3).flatMap((question) => {
+        const sanitized = sanitizeFollowUpQuestion(question)
+        return sanitized ? [sanitized] : []
+      })
+    : undefined
 
   return {
     ...(parts ? { parts } : {}),
@@ -557,6 +585,7 @@ function sanitizeMessageMetadata(value: unknown) {
     ...(reasoning ? { reasoning } : {}),
     ...(activityTimeline ? { activityTimeline } : {}),
     ...(sources ? { sources } : {}),
+    ...(followUpQuestions ? { followUpQuestions } : {}),
   }
 }
 

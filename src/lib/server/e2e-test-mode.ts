@@ -80,3 +80,44 @@ export function createE2eAgentStreamResponse({
     headers,
   })
 }
+
+function getE2eFollowUpQuestionTexts(): string[] {
+  const configured = process.env.E2E_MOCK_FOLLOW_UP_QUESTIONS?.trim()
+  if (configured) {
+    const questions = configured
+      .split("|")
+      .map((question) => question.trim())
+      .filter(Boolean)
+      .slice(0, 3)
+
+    if (questions.length > 0) {
+      return questions
+    }
+  }
+
+  return [
+    "What is a practical next step?",
+    "Can you give a concrete example?",
+    "What should I watch out for?",
+  ]
+}
+
+export function createE2eFollowUpQuestionsResponse({
+  requestId,
+}: {
+  requestId: string
+}) {
+  const headers = createApiHeaders({ requestId })
+
+  return Response.json(
+    {
+      followUpQuestions: getE2eFollowUpQuestionTexts().map((text, index) => ({
+        id: `e2e-follow-up-${String(index + 1)}`,
+        text,
+      })),
+    },
+    {
+      headers,
+    }
+  )
+}

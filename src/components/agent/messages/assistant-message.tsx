@@ -4,6 +4,7 @@ import {
   CircleCheck,
   CircleX,
   Copy,
+  CornerDownRight,
   Download,
 } from "lucide-react"
 import dynamic from "next/dynamic"
@@ -12,8 +13,12 @@ import { useMemo, useState } from "react"
 import { LogoHover } from "@/components/graphics/logo/logo-hover"
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard"
 import {
+  type AgentRunMode,
   type CodeExecutionArtifactMetadata,
+  type FollowUpQuestion,
+  isModelType,
   type Message,
+  type ModelType,
   type SearchToolName,
   type ToolInvocationStatus,
 } from "@/lib/shared"
@@ -38,6 +43,10 @@ const MemoizedMarkdown = dynamic(
     ssr: false,
   }
 )
+
+// Hide canned suggestions persisted by earlier builds; new follow-ups must come
+// from /api/agent/follow-ups.
+const LEGACY_CANNED_FOLLOW_UP_ID_PREFIX = "fallback-follow-up"
 
 function getAssistantContent(message: Message): string {
   const parts = message.metadata?.parts ?? []
@@ -216,7 +225,52 @@ function ArtifactDownloadList({
   )
 }
 
-export function AssistantMessage({ message }: { message: Message }) {
+function FollowUpQuestions({
+  onSelect,
+  questions,
+}: {
+  onSelect: (question: string) => void
+  questions: FollowUpQuestion[]
+}) {
+  if (questions.length === 0) {
+    return null
+  }
+
+  return (
+    <div
+      aria-label="Follow-up questions"
+      className="mt-3 flex flex-col items-start gap-1"
+    >
+      {questions.map((question) => (
+        <Button
+          className="-mx-2 h-auto max-w-full justify-start gap-1.5 whitespace-normal border-transparent bg-transparent px-2 py-1 text-left text-sm font-normal leading-snug text-muted-foreground shadow-none hover:bg-muted/35 hover:text-foreground focus-visible:border-transparent focus-visible:bg-muted/35 focus-visible:ring-0 dark:hover:bg-muted/20"
+          key={question.id}
+          onClick={() => {
+            onSelect(question.text)
+          }}
+          size="sm"
+          type="button"
+          variant="ghost"
+        >
+          <CornerDownRight className="mt-0.5 size-3 shrink-0" />
+          <span className="min-w-0">{question.text}</span>
+        </Button>
+      ))}
+    </div>
+  )
+}
+
+export function AssistantMessage({
+  message,
+  onFollowUpQuestionClick,
+}: {
+  message: Message
+  onFollowUpQuestionClick?: (params: {
+    model: ModelType
+    question: string
+    runMode: AgentRunMode
+  }) => void
+}) {
   const content = useMemo(() => getAssistantContent(message), [message])
   const [activityVisibility, setActivityVisibility] = useState<
     "auto" | "expanded" | "collapsed"
@@ -251,6 +305,16 @@ export function AssistantMessage({ message }: { message: Message }) {
     isAssistantStreaming ||
     hasRunningActivity ||
     message.metadata?.agentStatus === "in_progress"
+  const followUpModel = isModelType(message.llmModel)
+    ? message.llmModel
+    : message.metadata?.selectedModel
+  const followUpRunMode = message.metadata?.runMode ?? "chat"
+  const followUpQuestions = isAssistantStreaming
+    ? []
+    : (message.metadata?.followUpQuestions ?? []).filter(
+        (question) =>
+          !question.id.startsWith(LEGACY_CANNED_FOLLOW_UP_ID_PREFIX)
+      )
 
   const hasContent = content.trim().length > 0
   const hasActivity = activityTimeline.length > 0
@@ -375,6 +439,18 @@ export function AssistantMessage({ message }: { message: Message }) {
             sources={sources}
           />
           <ArtifactDownloadList artifacts={downloadableArtifacts} />
+          {followUpModel && onFollowUpQuestionClick ? (
+            <FollowUpQuestions
+              questions={followUpQuestions}
+              onSelect={(question) => {
+                onFollowUpQuestionClick({
+                  model: followUpModel,
+                  question,
+                  runMode: followUpRunMode,
+                })
+              }}
+            />
+          ) : null}
         </div>
       )}
 
