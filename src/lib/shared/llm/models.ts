@@ -1,5 +1,6 @@
 export const AvailableModels = {
   GOOGLE_GEMINI_3_1_PRO_PREVIEW: "google/gemini-3.1-pro-preview",
+  GOOGLE_GEMINI_3_5_FLASH: "google/gemini-3.5-flash",
   MOONSHOTAI_KIMI_K2_6: "moonshotai/kimi-k2.6",
   XIAOMI_MIMO_V2_5_PRO: "xiaomi/mimo-v2.5-pro",
 } as const
@@ -20,6 +21,7 @@ export interface ModelInfo {
 
 export const SUPPORTED_MODELS = [
   AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW,
+  AvailableModels.GOOGLE_GEMINI_3_5_FLASH,
   AvailableModels.MOONSHOTAI_KIMI_K2_6,
   AvailableModels.XIAOMI_MIMO_V2_5_PRO,
 ] as const
@@ -29,6 +31,7 @@ export const ALL_MODELS = [...SUPPORTED_MODELS] as const
 export const RESEARCH_MODEL = AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW
 
 export const MODEL_SELECTOR_MODELS = [
+  AvailableModels.GOOGLE_GEMINI_3_5_FLASH,
   AvailableModels.MOONSHOTAI_KIMI_K2_6,
   AvailableModels.XIAOMI_MIMO_V2_5_PRO,
 ] as const
@@ -65,6 +68,10 @@ export const ModelInfos: Record<ModelType, ModelInfo> = {
     id: AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW,
     name: "Gemini 3.1 Pro Preview",
   },
+  [AvailableModels.GOOGLE_GEMINI_3_5_FLASH]: {
+    id: AvailableModels.GOOGLE_GEMINI_3_5_FLASH,
+    name: "Gemini 3.5 Flash",
+  },
   [AvailableModels.MOONSHOTAI_KIMI_K2_6]: {
     id: AvailableModels.MOONSHOTAI_KIMI_K2_6,
     name: "Kimi K2.6",
@@ -77,6 +84,7 @@ export const ModelInfos: Record<ModelType, ModelInfo> = {
 
 const VISION_CAPABLE_MODEL_SET: ReadonlySet<ModelType> = new Set([
   AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW,
+  AvailableModels.GOOGLE_GEMINI_3_5_FLASH,
   AvailableModels.MOONSHOTAI_KIMI_K2_6,
   AvailableModels.XIAOMI_MIMO_V2_5_PRO,
 ])
@@ -87,6 +95,7 @@ export function modelSupportsImageInput(model: ModelType): boolean {
 
 const FILE_INPUT_CAPABLE_MODEL_SET: ReadonlySet<ModelType> = new Set([
   AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW,
+  AvailableModels.GOOGLE_GEMINI_3_5_FLASH,
   AvailableModels.MOONSHOTAI_KIMI_K2_6,
   AvailableModels.XIAOMI_MIMO_V2_5_PRO,
 ])

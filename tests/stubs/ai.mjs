@@ -12,6 +12,15 @@ export function stepCountIs(count) {
   return { type: "step-count", count }
 }
 
+export const Output = {
+  object(config) {
+    return {
+      ...config,
+      type: "object",
+    }
+  },
+}
+
 export const gateway = {
   tools: {
     parallelSearch(config) {

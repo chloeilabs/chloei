@@ -2,6 +2,10 @@ import { getTestMocks } from "./mock-state.mjs"
 
 export function getModels() {
   return (
-    getTestMocks().apiKeys?.getModels?.() ?? [{ id: "moonshotai/kimi-k2.6" }]
+    getTestMocks().apiKeys?.getModels?.() ?? [
+      { id: "google/gemini-3.5-flash" },
+      { id: "moonshotai/kimi-k2.6" },
+      { id: "xiaomi/mimo-v2.5-pro" },
+    ]
   )
 }

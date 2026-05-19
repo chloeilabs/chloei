@@ -82,7 +82,7 @@ test("inline citation instructions avoid separate sources sections", async () =>
   )
 })
 
-test("stale and fallback-only model ids fall back to Kimi", () => {
+test("stale and fallback-only model ids fall back to Gemini 3.5 Flash", () => {
   assert.equal(parseStoredSelectedModel("qwen/qwen3.6-plus"), null)
   assert.equal(
     parseStoredSelectedModel(
@@ -102,11 +102,15 @@ test("stale and fallback-only model ids fall back to Kimi", () => {
           name: "Gemini 3.1 Pro Preview",
         },
         {
+          id: "google/gemini-3.5-flash",
+          name: "Gemini 3.5 Flash",
+        },
+        {
           id: "moonshotai/kimi-k2.6",
           name: "Kimi K2.6",
         },
       ],
     }),
-    "moonshotai/kimi-k2.6"
+    "google/gemini-3.5-flash"
   )
 })
