@@ -144,7 +144,10 @@ test("assistant session state attaches follow-up questions without changing cont
     { id: "follow-up-1", text: "Can you give an example?" },
     { id: "follow-up-2", text: "What should I do next?" },
   ])
-  assert.equal(updatedMessages[0]?.metadata?.followUpQuestionsPending, undefined)
+  assert.equal(
+    updatedMessages[0]?.metadata?.followUpQuestionsPending,
+    undefined
+  )
 })
 
 test("assistant session state tracks pending follow-up questions", () => {
@@ -162,10 +165,7 @@ test("assistant session state tracks pending follow-up questions", () => {
     "assistant-1",
     true
   )
-  assert.equal(
-    pendingMessages[0]?.metadata?.followUpQuestionsPending,
-    true
-  )
+  assert.equal(pendingMessages[0]?.metadata?.followUpQuestionsPending, true)
 
   const clearedMessages = setFollowUpQuestionsPendingForMessage(
     pendingMessages,

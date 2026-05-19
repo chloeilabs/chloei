@@ -643,7 +643,9 @@ export function useAgentSession({
             parallelFollowUpMessageIdsRef.current.delete(
               params.assistantMessageId
             )
-            pendingFollowUpQuestionsRef.current.delete(params.assistantMessageId)
+            pendingFollowUpQuestionsRef.current.delete(
+              params.assistantMessageId
+            )
             clearFollowUpBackfillRetry(params.assistantMessageId)
             redirectToSignIn()
             return
@@ -667,7 +669,9 @@ export function useAgentSession({
             parallelFollowUpMessageIdsRef.current.delete(
               params.assistantMessageId
             )
-            pendingFollowUpQuestionsRef.current.delete(params.assistantMessageId)
+            pendingFollowUpQuestionsRef.current.delete(
+              params.assistantMessageId
+            )
             clearFollowUpBackfillRetry(params.assistantMessageId)
             return
           }
@@ -768,7 +772,9 @@ export function useAgentSession({
             parallelFollowUpMessageIdsRef.current.delete(
               params.assistantMessageId
             )
-            pendingFollowUpQuestionsRef.current.delete(params.assistantMessageId)
+            pendingFollowUpQuestionsRef.current.delete(
+              params.assistantMessageId
+            )
             clearFollowUpBackfillRetry(params.assistantMessageId)
           }
         } catch (error) {
@@ -794,7 +800,9 @@ export function useAgentSession({
     }
 
     const messageIds = new Set(state.messages.map((message) => message.id))
-    for (const messageId of Array.from(requestedFollowUpMessageIdsRef.current)) {
+    for (const messageId of Array.from(
+      requestedFollowUpMessageIdsRef.current
+    )) {
       if (!messageIds.has(messageId)) {
         requestedFollowUpMessageIdsRef.current.delete(messageId)
         clearFollowUpBackfillRetry(messageId)

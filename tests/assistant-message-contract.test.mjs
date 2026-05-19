@@ -9,7 +9,10 @@ const assistantMessagePath = path.join(
   cwd,
   "src/components/agent/messages/assistant-message.tsx"
 )
-const messagesPath = path.join(cwd, "src/components/agent/messages/messages.tsx")
+const messagesPath = path.join(
+  cwd,
+  "src/components/agent/messages/messages.tsx"
+)
 
 test("assistant actions appear only after streaming above follow-ups", async () => {
   const source = await readFile(assistantMessagePath, "utf8")
