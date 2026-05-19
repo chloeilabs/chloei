@@ -51,3 +51,26 @@ test("prompt submissions queue while the submit lock is still active", async () 
     "Expected queueing to depend on the actual submit lock, not only the PromptForm streaming prop."
   )
 })
+
+test("follow-up questions are requested once after streaming completes", async () => {
+  const source = await readFile(
+    path.join(cwd, "src/components/agent/home/use-agent-session.ts"),
+    "utf8"
+  )
+
+  assert.doesNotMatch(
+    source,
+    /requestKind:\s*"parallel"/,
+    "Expected follow-up generation to avoid partial-stream requests."
+  )
+  assert.doesNotMatch(
+    source,
+    /shouldStartParallelFollowUpQuestions|PARALLEL_FOLLOW_UP_MIN_CHARS|pendingFollowUpQuestionsRef/,
+    "Expected no parallel follow-up state that can visibly replace chips after completion."
+  )
+  assert.match(
+    source,
+    /upsertAssistantMessage\(accumulator,\s*\{[\s\S]*isStreaming:\s*false[\s\S]*\}\)[\s\S]*const shouldRequestFinalFollowUpQuestions =[\s\S]*shouldRequestFollowUpQuestions\(accumulator\)[\s\S]*requestKind:\s*"final"/,
+    "Expected final follow-up generation to start only after the assistant stream is finalized."
+  )
+})
