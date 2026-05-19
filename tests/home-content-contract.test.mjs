@@ -74,3 +74,36 @@ test("follow-up questions are requested once after streaming completes", async (
     "Expected final follow-up generation to start only after the assistant stream is finalized."
   )
 })
+
+test("follow-up backfill retries are retriggered after transient misses", async () => {
+  const source = await readFile(
+    path.join(cwd, "src/components/agent/home/use-agent-session.ts"),
+    "utf8"
+  )
+
+  assert.match(
+    source,
+    /const \[followUpBackfillVersion,\s*setFollowUpBackfillVersion\] = useState\(0\)/,
+    "Expected follow-up backfill to have an explicit retry trigger."
+  )
+  assert.match(
+    source,
+    /const scheduleFollowUpBackfillRetry = useCallback\([\s\S]*setFollowUpBackfillVersion\(\(version\) => version \+ 1\)/,
+    "Expected transient follow-up misses to schedule a bounded backfill retry."
+  )
+  assert.match(
+    source,
+    /if \(!response\.ok\) \{[\s\S]*retryFollowUpQuestionBackfill\(\)[\s\S]*return[\s\S]*\}/,
+    "Expected failed follow-up responses to clear the in-flight guard and trigger backfill."
+  )
+  assert.match(
+    source,
+    /if \(followUpQuestions\.length === 0\) \{[\s\S]*retryFollowUpQuestionBackfill\(\)[\s\S]*return[\s\S]*\}/,
+    "Expected empty follow-up responses to clear the in-flight guard and trigger backfill."
+  )
+  assert.match(
+    source,
+    /if \(params\.threadId !== currentThreadIdRef\.current\) \{[\s\S]*clearRequestedFollowUpQuestion\(\)[\s\S]*return[\s\S]*\}/,
+    "Expected in-flight follow-up requests to be cleared when users switch threads."
+  )
+})

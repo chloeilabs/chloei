@@ -100,6 +100,9 @@ const INITIAL_STATE: AgentSessionState = {
   isStreaming: false,
 }
 
+const FOLLOW_UP_BACKFILL_RETRY_DELAY_MS = 1500
+const FOLLOW_UP_BACKFILL_MAX_RETRIES = 2
+
 // Older local threads may still contain canned suggestion ids from an earlier
 // implementation. Treat those as absent so only generated follow-ups render.
 const LEGACY_CANNED_FOLLOW_UP_ID_PREFIX = "fallback-follow-up"
@@ -241,12 +244,81 @@ export function useAgentSession({
   const [state, setState] = useState(INITIAL_STATE)
   const [queuedSubmission, setQueuedSubmission] =
     useState<QueuedSubmission | null>(null)
+  const [followUpBackfillVersion, setFollowUpBackfillVersion] = useState(0)
   const submitLockRef = useRef(false)
   const messagesRef = useRef<AgentMessage[]>([])
   const attachmentPayloadsRef = useRef<AttachmentPayloadsByThread>(new Map())
   const abortControllerRef = useRef<AbortController | null>(null)
   const currentThreadIdRef = useRef(currentThreadId)
   const requestedFollowUpMessageIdsRef = useRef<Set<string>>(new Set())
+  const followUpBackfillRetryCountsRef = useRef<Map<string, number>>(new Map())
+  const followUpBackfillRetryTimeoutsRef = useRef<Map<string, number>>(
+    new Map()
+  )
+
+  const clearFollowUpBackfillRetry = useCallback(
+    (assistantMessageId: string) => {
+      const timeoutId =
+        followUpBackfillRetryTimeoutsRef.current.get(assistantMessageId)
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId)
+        followUpBackfillRetryTimeoutsRef.current.delete(assistantMessageId)
+      }
+
+      followUpBackfillRetryCountsRef.current.delete(assistantMessageId)
+    },
+    []
+  )
+
+  const clearAllFollowUpBackfillRetries = useCallback(() => {
+    for (const timeoutId of followUpBackfillRetryTimeoutsRef.current.values()) {
+      window.clearTimeout(timeoutId)
+    }
+    followUpBackfillRetryTimeoutsRef.current.clear()
+    followUpBackfillRetryCountsRef.current.clear()
+  }, [])
+
+  const scheduleFollowUpBackfillRetry = useCallback(
+    (params: { assistantMessageId: string; threadId: string }) => {
+      if (params.threadId !== currentThreadIdRef.current) {
+        return
+      }
+
+      const retryCount =
+        followUpBackfillRetryCountsRef.current.get(params.assistantMessageId) ??
+        0
+      if (retryCount >= FOLLOW_UP_BACKFILL_MAX_RETRIES) {
+        return
+      }
+
+      const existingTimeoutId = followUpBackfillRetryTimeoutsRef.current.get(
+        params.assistantMessageId
+      )
+      if (existingTimeoutId !== undefined) {
+        window.clearTimeout(existingTimeoutId)
+      }
+
+      followUpBackfillRetryCountsRef.current.set(
+        params.assistantMessageId,
+        retryCount + 1
+      )
+      const timeoutId = window.setTimeout(() => {
+        followUpBackfillRetryTimeoutsRef.current.delete(
+          params.assistantMessageId
+        )
+        if (params.threadId !== currentThreadIdRef.current) {
+          return
+        }
+
+        setFollowUpBackfillVersion((version) => version + 1)
+      }, FOLLOW_UP_BACKFILL_RETRY_DELAY_MS)
+      followUpBackfillRetryTimeoutsRef.current.set(
+        params.assistantMessageId,
+        timeoutId
+      )
+    },
+    []
+  )
 
   const setCurrentThreadId = useCallback(
     (id: string | null) => {
@@ -364,9 +436,10 @@ export function useAgentSession({
     return () => {
       abortControllerRef.current?.abort()
       abortControllerRef.current = null
+      clearAllFollowUpBackfillRetries()
       submitLockRef.current = false
     }
-  }, [])
+  }, [clearAllFollowUpBackfillRetries])
 
   const createThreadSnapshot = useCallback(
     (threadId: string, messages: AgentMessage[], model?: ModelType): Thread => {
@@ -463,6 +536,14 @@ export function useAgentSession({
         requestedFollowUpMessageIdsRef.current.delete(params.assistantMessageId)
       }
 
+      const retryFollowUpQuestionBackfill = () => {
+        clearRequestedFollowUpQuestion()
+        scheduleFollowUpBackfillRetry({
+          assistantMessageId: params.assistantMessageId,
+          threadId: params.threadId,
+        })
+      }
+
       void (async () => {
         try {
           const response = await fetch("/api/agent/follow-ups", {
@@ -479,12 +560,13 @@ export function useAgentSession({
 
           if (response.status === 401) {
             clearRequestedFollowUpQuestion()
+            clearFollowUpBackfillRetry(params.assistantMessageId)
             redirectToSignIn()
             return
           }
 
           if (!response.ok) {
-            clearRequestedFollowUpQuestion()
+            retryFollowUpQuestionBackfill()
             return
           }
 
@@ -492,11 +574,13 @@ export function useAgentSession({
             await response.json()
           )
           if (followUpQuestions.length === 0) {
-            clearRequestedFollowUpQuestion()
+            retryFollowUpQuestionBackfill()
             return
           }
 
           if (params.threadId !== currentThreadIdRef.current) {
+            clearRequestedFollowUpQuestion()
+            clearFollowUpBackfillRetry(params.assistantMessageId)
             return
           }
 
@@ -517,6 +601,8 @@ export function useAgentSession({
             (hasExistingFollowUpQuestions &&
               !canReplaceExistingFollowUpQuestions)
           ) {
+            clearRequestedFollowUpQuestion()
+            clearFollowUpBackfillRetry(params.assistantMessageId)
             return
           }
 
@@ -524,11 +610,11 @@ export function useAgentSession({
             sourceMessage.metadata?.isStreaming === true ||
             sourceMessage.metadata?.agentStatus !== "completed"
           ) {
-            clearRequestedFollowUpQuestion()
+            retryFollowUpQuestionBackfill()
             return
           }
 
-          attachFollowUpQuestionsToCompletedMessage({
+          const attached = attachFollowUpQuestionsToCompletedMessage({
             assistantMessageId: params.assistantMessageId,
             followUpQuestions,
             model: params.model,
@@ -536,16 +622,24 @@ export function useAgentSession({
             replaceLegacyCanned: true,
             threadId: params.threadId,
           })
+          if (attached) {
+            clearRequestedFollowUpQuestion()
+            clearFollowUpBackfillRetry(params.assistantMessageId)
+          }
         } catch (error) {
           if (isAbortError(error)) {
             return
           }
 
-          clearRequestedFollowUpQuestion()
+          retryFollowUpQuestionBackfill()
         }
       })()
     },
-    [attachFollowUpQuestionsToCompletedMessage]
+    [
+      attachFollowUpQuestionsToCompletedMessage,
+      clearFollowUpBackfillRetry,
+      scheduleFollowUpBackfillRetry,
+    ]
   )
 
   useEffect(() => {
@@ -557,6 +651,14 @@ export function useAgentSession({
     for (const messageId of requestedFollowUpMessageIdsRef.current) {
       if (!messageIds.has(messageId)) {
         requestedFollowUpMessageIdsRef.current.delete(messageId)
+        clearFollowUpBackfillRetry(messageId)
+      }
+    }
+    for (const messageId of Array.from(
+      followUpBackfillRetryCountsRef.current.keys()
+    )) {
+      if (!messageIds.has(messageId)) {
+        clearFollowUpBackfillRetry(messageId)
       }
     }
 
@@ -575,7 +677,9 @@ export function useAgentSession({
     }
   }, [
     attachFollowUpQuestionsToCompletedMessage,
+    clearFollowUpBackfillRetry,
     currentThreadId,
+    followUpBackfillVersion,
     requestFollowUpQuestions,
     state.messages,
     streamingState,
@@ -595,10 +699,11 @@ export function useAgentSession({
     messagesRef.current = []
     attachmentPayloadsRef.current.clear()
     requestedFollowUpMessageIdsRef.current.clear()
+    clearAllFollowUpBackfillRetries()
     currentThreadIdRef.current = null
     submitLockRef.current = false
     setCurrentThreadId(null)
-  }, [deleteThread, setCurrentThreadId])
+  }, [clearAllFollowUpBackfillRetries, deleteThread, setCurrentThreadId])
 
   const clearQueuedSubmission = useCallback(() => {
     setQueuedSubmission(null)
