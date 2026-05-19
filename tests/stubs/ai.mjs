@@ -15,8 +15,8 @@ export function stepCountIs(count) {
 export const Output = {
   object(config) {
     return {
-      type: "object",
       ...config,
+      type: "object",
     }
   },
 }
