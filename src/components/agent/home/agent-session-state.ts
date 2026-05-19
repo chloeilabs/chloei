@@ -13,6 +13,14 @@ export type AttachmentPayloadsByThread = Map<
   Map<string, AgentRequestAttachment[]>
 >
 
+function withoutPendingFollowUpQuestions(
+  metadata: AgentMessage["metadata"]
+): NonNullable<AgentMessage["metadata"]> {
+  const nextMetadata = { ...metadata }
+  delete nextMetadata.followUpQuestionsPending
+  return nextMetadata
+}
+
 export function getThreadAttachmentPayloads(
   payloadsByThread: AttachmentPayloadsByThread,
   threadId: string
@@ -133,9 +141,50 @@ export function attachFollowUpQuestionsToMessage(
     return {
       ...message,
       metadata: {
-        ...message.metadata,
+        ...withoutPendingFollowUpQuestions(message.metadata),
         followUpQuestions,
       },
+    }
+  })
+}
+
+export function setFollowUpQuestionsPendingForMessage(
+  currentMessages: AgentMessage[],
+  messageId: string,
+  isPending: boolean
+): AgentMessage[] {
+  const targetIndex = currentMessages.findIndex(
+    (message) => message.id === messageId && message.role === "assistant"
+  )
+  if (targetIndex === -1) {
+    return currentMessages
+  }
+
+  const targetMessage = currentMessages[targetIndex]
+  const currentPending =
+    targetMessage?.metadata?.followUpQuestionsPending === true
+  if (currentPending === isPending) {
+    return currentMessages
+  }
+
+  return currentMessages.map((message, index) => {
+    if (index !== targetIndex) {
+      return message
+    }
+
+    if (isPending) {
+      return {
+        ...message,
+        metadata: {
+          ...message.metadata,
+          followUpQuestionsPending: true,
+        },
+      }
+    }
+
+    return {
+      ...message,
+      metadata: withoutPendingFollowUpQuestions(message.metadata),
     }
   })
 }

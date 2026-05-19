@@ -169,6 +169,7 @@ test("parseThreadPayload sanitizes invalid metadata and converts legacy activity
               text: "x".repeat(161),
             },
           ],
+          followUpQuestionsPending: true,
         },
       },
     ],
@@ -212,6 +213,7 @@ test("parseThreadPayload sanitizes invalid metadata and converts legacy activity
       text: "Can you give an example?",
     },
   ])
+  assert.equal(parsed.messages[0]?.metadata?.followUpQuestionsPending, true)
 })
 
 test("parseThreadPayload drops removed model ids from stored thread metadata", () => {

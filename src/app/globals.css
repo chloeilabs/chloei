@@ -191,9 +191,16 @@
   }
 
   .chloei-markdown {
+    --chloei-markdown-rule-color: rgb(15 23 42 / 13%);
+    --chloei-markdown-table-border-color: rgb(15 23 42 / 12%);
     overflow-wrap: anywhere;
     font-size: 0.9375rem;
     line-height: 1.75;
+  }
+
+  .dark .chloei-markdown {
+    --chloei-markdown-rule-color: rgb(250 250 249 / 7%);
+    --chloei-markdown-table-border-color: rgb(250 250 249 / 7%);
   }
 
   .chloei-markdown.prose :where(h1, h2, h3, h4) {
@@ -235,7 +242,7 @@
 
   .chloei-markdown.prose :where(hr) {
     margin-block: 0.55rem 0.2rem;
-    border-color: var(--border);
+    border-color: var(--chloei-markdown-rule-color) !important;
   }
 
   .chloei-markdown.prose :where(blockquote) {
@@ -249,6 +256,11 @@
 
   .chloei-markdown.prose :where(table) {
     margin-block: 1rem;
+  }
+
+  .chloei-markdown.prose :where(thead),
+  .chloei-markdown.prose :where(tbody tr) {
+    border-bottom-color: var(--chloei-markdown-table-border-color) !important;
   }
 
   .chloei-markdown-title {

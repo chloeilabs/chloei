@@ -6,6 +6,7 @@ import {
   Copy,
   CornerDownRight,
   Download,
+  RefreshCcw,
 } from "lucide-react"
 import dynamic from "next/dynamic"
 import { useMemo, useState } from "react"
@@ -260,9 +261,33 @@ function FollowUpQuestions({
   )
 }
 
+function FollowUpQuestionsPending() {
+  return (
+    <div
+      aria-busy="true"
+      aria-label="Follow-up questions"
+      className="mt-3 flex flex-col items-start gap-1"
+    >
+      <div className="-mx-2 flex h-7 max-w-full items-center gap-1.5 px-2 py-1">
+        <CornerDownRight className="mt-0.5 size-3 shrink-0 text-muted-foreground/30" />
+        <span className="h-3 w-72 max-w-[70vw] animate-pulse rounded-sm bg-muted/60 dark:bg-muted/40" />
+      </div>
+      <div className="-mx-2 flex h-7 max-w-full items-center gap-1.5 px-2 py-1">
+        <CornerDownRight className="mt-0.5 size-3 shrink-0 text-muted-foreground/30" />
+        <span className="h-3 w-64 max-w-[64vw] animate-pulse rounded-sm bg-muted/60 dark:bg-muted/40" />
+      </div>
+      <div className="-mx-2 flex h-7 max-w-full items-center gap-1.5 px-2 py-1">
+        <CornerDownRight className="mt-0.5 size-3 shrink-0 text-muted-foreground/30" />
+        <span className="h-3 w-80 max-w-[74vw] animate-pulse rounded-sm bg-muted/60 dark:bg-muted/40" />
+      </div>
+    </div>
+  )
+}
+
 export function AssistantMessage({
   message,
   onFollowUpQuestionClick,
+  onRegenerate,
 }: {
   message: Message
   onFollowUpQuestionClick?: (params: {
@@ -270,6 +295,7 @@ export function AssistantMessage({
     question: string
     runMode: AgentRunMode
   }) => void
+  onRegenerate?: () => void
 }) {
   const content = useMemo(() => getAssistantContent(message), [message])
   const [activityVisibility, setActivityVisibility] = useState<
@@ -314,6 +340,10 @@ export function AssistantMessage({
     : (message.metadata?.followUpQuestions ?? []).filter(
         (question) => !question.id.startsWith(LEGACY_CANNED_FOLLOW_UP_ID_PREFIX)
       )
+  const isFollowUpQuestionsPending =
+    !isAssistantStreaming &&
+    message.metadata?.followUpQuestionsPending === true &&
+    followUpQuestions.length === 0
 
   const hasContent = content.trim().length > 0
   const hasActivity = activityTimeline.length > 0
@@ -332,7 +362,7 @@ export function AssistantMessage({
     <div
       data-message-role="assistant"
       data-streaming={isAssistantStreaming ? "true" : "false"}
-      className="group/assistant-message relative flex flex-col gap-1"
+      className="relative flex flex-col gap-1"
     >
       {showActivitySection && (
         <div className="px-3 pt-2">
@@ -438,46 +468,68 @@ export function AssistantMessage({
             sources={sources}
           />
           <ArtifactDownloadList artifacts={downloadableArtifacts} />
+          {!isAssistantStreaming ? (
+            <div className="mt-2 flex items-center gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    aria-label={isCopied ? "Response copied" : "Copy response"}
+                    type="button"
+                    variant="ghost"
+                    size="iconXs"
+                    className="text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      void copyToClipboard(content)
+                    }}
+                  >
+                    {isCopied ? (
+                      <Check className="size-3.5" />
+                    ) : (
+                      <Copy className="size-3.5" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Copy response</TooltipContent>
+              </Tooltip>
+              {onRegenerate ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      aria-label="Regenerate response"
+                      type="button"
+                      variant="ghost"
+                      size="iconXs"
+                      className="text-muted-foreground hover:text-foreground"
+                      onClick={onRegenerate}
+                    >
+                      <RefreshCcw className="size-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    Regenerate response
+                  </TooltipContent>
+                </Tooltip>
+              ) : null}
+            </div>
+          ) : null}
           {followUpModel && onFollowUpQuestionClick ? (
-            <FollowUpQuestions
-              questions={followUpQuestions}
-              onSelect={(question) => {
-                onFollowUpQuestionClick({
-                  model: followUpModel,
-                  question,
-                  runMode: followUpRunMode,
-                })
-              }}
-            />
+            isFollowUpQuestionsPending ? (
+              <FollowUpQuestionsPending />
+            ) : (
+              <FollowUpQuestions
+                questions={followUpQuestions}
+                onSelect={(question) => {
+                  onFollowUpQuestionClick({
+                    model: followUpModel,
+                    question,
+                    runMode: followUpRunMode,
+                  })
+                }}
+              />
+            )
           ) : null}
         </div>
       )}
-
-      <div
-        className="opacity-0 transition-opacity group-hover/assistant-message:opacity-100"
-        hidden={!hasContent}
-      >
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="iconXs"
-              className="text-muted-foreground hover:text-foreground"
-              onClick={() => {
-                void copyToClipboard(content)
-              }}
-            >
-              {isCopied ? (
-                <Check className="size-3.5" />
-              ) : (
-                <Copy className="size-3.5" />
-              )}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="top">Copy response</TooltipContent>
-        </Tooltip>
-      </div>
     </div>
   )
 }

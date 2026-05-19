@@ -226,6 +226,7 @@ export interface MessageMetadata {
   activityTimeline?: ActivityTimelineEntry[]
   sources?: MessageSource[]
   followUpQuestions?: FollowUpQuestion[]
+  followUpQuestionsPending?: boolean
 }
 
 export const isUserMessage = (

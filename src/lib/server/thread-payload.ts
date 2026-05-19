@@ -268,6 +268,7 @@ const messageMetadataSchema = z
     activityTimeline: z.array(activityTimelineEntrySchema).optional(),
     sources: z.array(messageSourceSchema).optional(),
     followUpQuestions: z.array(followUpQuestionSchema).max(3).optional(),
+    followUpQuestionsPending: z.boolean().optional(),
   })
   .strict()
 
@@ -523,6 +524,9 @@ function sanitizeMessageMetadata(value: unknown) {
 
   const metadata = value as Record<string, unknown>
   const isStreaming = sanitizeOptionalBoolean(metadata.isStreaming)
+  const followUpQuestionsPending = sanitizeOptionalBoolean(
+    metadata.followUpQuestionsPending
+  )
   const selectedModel = sanitizeModelValue(metadata.selectedModel)
   const runMode = sanitizeRunModeValue(metadata.runMode)
   const agentStatus = AGENT_RUN_STATUS_SCHEMA.safeParse(metadata.agentStatus)
@@ -588,6 +592,9 @@ function sanitizeMessageMetadata(value: unknown) {
     ...(activityTimeline ? { activityTimeline } : {}),
     ...(sources ? { sources } : {}),
     ...(followUpQuestions?.length ? { followUpQuestions } : {}),
+    ...(followUpQuestionsPending !== undefined
+      ? { followUpQuestionsPending }
+      : {}),
   }
 }
 
