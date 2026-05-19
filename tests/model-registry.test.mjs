@@ -24,6 +24,12 @@ test("shared model registry includes the curated gateway models", async () => {
 
   assert.match(
     source,
+    /GOOGLE_GEMINI_3_5_FLASH:\s*"google\/gemini-3\.5-flash"/,
+    "Expected AvailableModels to include GOOGLE_GEMINI_3_5_FLASH."
+  )
+
+  assert.match(
+    source,
     /MOONSHOTAI_KIMI_K2_6:\s*"moonshotai\/kimi-k2\.6"/,
     "Expected AvailableModels to include MOONSHOTAI_KIMI_K2_6."
   )
@@ -36,8 +42,8 @@ test("shared model registry includes the curated gateway models", async () => {
 
   assert.match(
     source.replace(/\s+/g, " "),
-    /SUPPORTED_MODELS = \[ AvailableModels\.GOOGLE_GEMINI_3_1_PRO_PREVIEW, AvailableModels\.MOONSHOTAI_KIMI_K2_6, AvailableModels\.XIAOMI_MIMO_V2_5_PRO, \] as const/,
-    "Expected SUPPORTED_MODELS to list Gemini 3.1 Pro Preview, Kimi K2.6, and MiMo V2.5 Pro."
+    /SUPPORTED_MODELS = \[ AvailableModels\.GOOGLE_GEMINI_3_1_PRO_PREVIEW, AvailableModels\.GOOGLE_GEMINI_3_5_FLASH, AvailableModels\.MOONSHOTAI_KIMI_K2_6, AvailableModels\.XIAOMI_MIMO_V2_5_PRO, \] as const/,
+    "Expected SUPPORTED_MODELS to list Gemini 3.1 Pro Preview, Gemini 3.5 Flash, Kimi K2.6, and MiMo V2.5 Pro."
   )
 
   assert.match(
@@ -48,14 +54,20 @@ test("shared model registry includes the curated gateway models", async () => {
 
   assert.match(
     source.replace(/\s+/g, " "),
-    /MODEL_SELECTOR_MODELS = \[ AvailableModels\.MOONSHOTAI_KIMI_K2_6, AvailableModels\.XIAOMI_MIMO_V2_5_PRO, \] as const/,
-    "Expected the chat model selector to expose Kimi K2.6 and MiMo V2.5 Pro."
+    /MODEL_SELECTOR_MODELS = \[ AvailableModels\.GOOGLE_GEMINI_3_5_FLASH, AvailableModels\.MOONSHOTAI_KIMI_K2_6, AvailableModels\.XIAOMI_MIMO_V2_5_PRO, \] as const/,
+    "Expected the chat model selector to default to Gemini 3.5 Flash before Kimi K2.6 and MiMo V2.5 Pro."
   )
 
   assert.match(
     source,
     /\[AvailableModels\.GOOGLE_GEMINI_3_1_PRO_PREVIEW\]:\s*\{[\s\S]*name:\s*"Gemini 3\.1 Pro Preview"/,
     "Expected ModelInfos to define display metadata for GOOGLE_GEMINI_3_1_PRO_PREVIEW."
+  )
+
+  assert.match(
+    source,
+    /\[AvailableModels\.GOOGLE_GEMINI_3_5_FLASH\]:\s*\{[\s\S]*name:\s*"Gemini 3\.5 Flash"/,
+    "Expected ModelInfos to define display metadata for GOOGLE_GEMINI_3_5_FLASH."
   )
 
   assert.match(
@@ -73,6 +85,7 @@ test("shared model registry includes the curated gateway models", async () => {
   for (const modelKey of [
     "MOONSHOTAI_KIMI_K2_6",
     "GOOGLE_GEMINI_3_1_PRO_PREVIEW",
+    "GOOGLE_GEMINI_3_5_FLASH",
     "XIAOMI_MIMO_V2_5_PRO",
   ]) {
     assert.match(
@@ -86,6 +99,7 @@ test("shared model registry includes the curated gateway models", async () => {
 
   for (const modelKey of [
     "GOOGLE_GEMINI_3_1_PRO_PREVIEW",
+    "GOOGLE_GEMINI_3_5_FLASH",
     "MOONSHOTAI_KIMI_K2_6",
     "XIAOMI_MIMO_V2_5_PRO",
   ]) {

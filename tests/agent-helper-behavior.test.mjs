@@ -166,6 +166,29 @@ test("agent helper validates total size, last-message role, and default model su
   assert.equal(defaultModeResult.parsedRequest.runMode, "chat")
   assert.equal(defaultModeResult.selectedModel, "moonshotai/kimi-k2.6")
 
+  const defaultModeWithGeminiResult = parseAgentStreamRequest({
+    body: {
+      messages: [
+        {
+          role: "user",
+          content: "Use the default model.",
+        },
+      ],
+    },
+    availableModels: [
+      { id: "moonshotai/kimi-k2.6" },
+      { id: "google/gemini-3.5-flash" },
+      { id: "xiaomi/mimo-v2.5-pro" },
+    ],
+    requestId: "request-default-mode-gemini",
+  })
+
+  assert(!(defaultModeWithGeminiResult instanceof Response))
+  assert.equal(
+    defaultModeWithGeminiResult.selectedModel,
+    "google/gemini-3.5-flash"
+  )
+
   const researchModeResult = parseAgentStreamRequest({
     body: {
       model: "moonshotai/kimi-k2.6",
