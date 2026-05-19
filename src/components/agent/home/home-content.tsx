@@ -182,6 +182,7 @@ export function HomePageContent({
       }
 
       const latestTurnId = latestTurnGroup.dataset.userMessageId ?? null
+      const isOnlyTurn = latestTurnGroups.length === 1
       const contentTop = contentElement.getBoundingClientRect().top
       const latestTurnTop = latestTurnGroup.getBoundingClientRect().top
       const anchoredTarget = Math.max(latestTurnTop - contentTop, 0)
@@ -205,6 +206,16 @@ export function HomePageContent({
       const latestTurnNearPrompt =
         scrollViewportHeight > 0 &&
         latestVisibleTurnBoundary > scrollViewportHeight - earlyTriggerOffset
+
+      if (
+        isOnlyTurn &&
+        latestTurnId !== null &&
+        (isActiveTurnInProgress ||
+          overflowPinnedTurnIdRef.current === latestTurnId)
+      ) {
+        overflowPinnedTurnIdRef.current = latestTurnId
+        return targetScrollTop
+      }
 
       if (isActiveTurnInProgress && latestTurnNearPrompt && latestTurnId) {
         overflowPinnedTurnIdRef.current = latestTurnId

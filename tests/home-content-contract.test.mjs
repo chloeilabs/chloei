@@ -52,26 +52,51 @@ test("prompt submissions queue while the submit lock is still active", async () 
   )
 })
 
-test("follow-up questions are requested once after streaming completes", async () => {
+test("first active conversation turn stays bottom-pinned during streaming", async () => {
+  const source = await readFile(homeContentPath, "utf8")
+
+  assert.match(
+    source,
+    /const isOnlyTurn = latestTurnGroups\.length === 1/,
+    "Expected the scroll target logic to detect the first conversation turn."
+  )
+  assert.match(
+    source,
+    /isOnlyTurn[\s\S]*isActiveTurnInProgress[\s\S]*return targetScrollTop/,
+    "Expected the first active turn to follow the true bottom target while the first response streams."
+  )
+})
+
+test("follow-up questions are prefetched while the assistant is streaming", async () => {
   const source = await readFile(
     path.join(cwd, "src/components/agent/home/use-agent-session.ts"),
     "utf8"
   )
 
-  assert.doesNotMatch(
+  assert.match(
     source,
-    /requestKind:\s*"parallel"/,
-    "Expected follow-up generation to avoid partial-stream requests."
-  )
-  assert.doesNotMatch(
-    source,
-    /shouldStartParallelFollowUpQuestions|PARALLEL_FOLLOW_UP_MIN_CHARS|pendingFollowUpQuestionsRef/,
-    "Expected no parallel follow-up state that can visibly replace chips after completion."
+    /const PARALLEL_FOLLOW_UP_MIN_CHARS = 80/,
+    "Expected follow-up generation to start early enough to hide network latency behind long streams."
   )
   assert.match(
     source,
-    /upsertAssistantMessage\(accumulator,\s*\{[\s\S]*isStreaming:\s*false[\s\S]*\}\)[\s\S]*const shouldRequestFinalFollowUpQuestions =[\s\S]*shouldRequestFollowUpQuestions\(accumulator\)[\s\S]*requestKind:\s*"final"/,
-    "Expected final follow-up generation to start only after the assistant stream is finalized."
+    /shouldStartParallelFollowUpQuestions|PARALLEL_FOLLOW_UP_MIN_CHARS|pendingFollowUpQuestionsRef/,
+    "Expected parallel follow-up state for caching questions before the completed render."
+  )
+  assert.match(
+    source,
+    /startParallelFollowUpQuestions[\s\S]*requestKind:\s*"parallel"/,
+    "Expected follow-up generation to start from the streaming assistant response."
+  )
+  assert.match(
+    source,
+    /const parallelFollowUpQuestions =[\s\S]*pendingFollowUpQuestionsRef\.current\.get\(assistantId\)[\s\S]*upsertAssistantMessage\(\s*accumulator,[\s\S]*followUpQuestions:\s*hasParallelFollowUpQuestions[\s\S]*parallelFollowUpQuestions[\s\S]*followUpQuestionsPending:\s*shouldShowPendingFollowUpQuestions/,
+    "Expected prefetched questions or the pending state to be included in the same render that completes streaming."
+  )
+  assert.match(
+    source,
+    /if \(shouldRequestFinalFollowUpQuestions\) \{[\s\S]*requestKind:\s*"final"/,
+    "Expected the final follow-up request to remain as a fallback when the parallel result is not ready."
   )
 })
 

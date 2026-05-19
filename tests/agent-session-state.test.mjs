@@ -16,6 +16,7 @@ const {
   getThreadAttachmentPayloads,
   hasVisibleStructuredOutput,
   pruneThreadAttachmentPayloads,
+  setFollowUpQuestionsPendingForMessage,
   upsertAgentMessage,
 } = await import(moduleUrl)
 
@@ -143,6 +144,38 @@ test("assistant session state attaches follow-up questions without changing cont
     { id: "follow-up-1", text: "Can you give an example?" },
     { id: "follow-up-2", text: "What should I do next?" },
   ])
+  assert.equal(updatedMessages[0]?.metadata?.followUpQuestionsPending, undefined)
+})
+
+test("assistant session state tracks pending follow-up questions", () => {
+  const assistantMessage = createAssistantMessageFromAccumulator({
+    id: "assistant-1",
+    createdAt: "2026-04-30T12:00:00.000Z",
+    accumulator: createAccumulator({ content: "Final answer." }),
+    model: "moonshotai/kimi-k2.6",
+    runMode: "chat",
+    isStreaming: false,
+  })
+
+  const pendingMessages = setFollowUpQuestionsPendingForMessage(
+    [assistantMessage],
+    "assistant-1",
+    true
+  )
+  assert.equal(
+    pendingMessages[0]?.metadata?.followUpQuestionsPending,
+    true
+  )
+
+  const clearedMessages = setFollowUpQuestionsPendingForMessage(
+    pendingMessages,
+    "assistant-1",
+    false
+  )
+  assert.equal(
+    clearedMessages[0]?.metadata?.followUpQuestionsPending,
+    undefined
+  )
 })
 
 test("assistant session state prunes stale raw attachment payloads by thread", () => {

@@ -6,6 +6,7 @@ import { memo, useMemo } from "react"
 import {
   type AgentRunMode,
   isAssistantMessage,
+  isModelType,
   isUserMessage,
   type Message,
   type ModelType,
@@ -85,6 +86,8 @@ function MessagesComponent({
       {messageGroups.map((messageGroup, groupIndex) => {
         const isLastGroup = groupIndex === messageGroups.length - 1
         const firstMessage = messageGroup[0]
+        const userMessage =
+          firstMessage && isUserMessage(firstMessage) ? firstMessage : null
         const lastAssistantMessage = [...messageGroup]
           .reverse()
           .find((message) => isAssistantMessage(message))
@@ -127,11 +130,36 @@ function MessagesComponent({
               }
 
               if (isAssistantMessage(message)) {
+                const regenerateModel = isModelType(message.llmModel)
+                  ? message.llmModel
+                  : userMessage?.metadata?.selectedModel
+                const regenerateRunMode =
+                  message.metadata?.runMode ??
+                  userMessage?.metadata?.runMode ??
+                  "chat"
+                const canRegenerate =
+                  !disableEditing &&
+                  Boolean(userMessage) &&
+                  Boolean(onEditMessage) &&
+                  isModelType(regenerateModel)
+                const handleRegenerate =
+                  canRegenerate && userMessage && isModelType(regenerateModel)
+                    ? () => {
+                        void onEditMessage?.({
+                          messageId: userMessage.id,
+                          newContent: userMessage.content,
+                          newModel: regenerateModel,
+                          newRunMode: regenerateRunMode,
+                        })
+                      }
+                    : undefined
+
                 return (
                   <AssistantMessage
                     key={message.id}
                     message={message}
                     onFollowUpQuestionClick={onFollowUpQuestionClick}
+                    onRegenerate={handleRegenerate}
                   />
                 )
               }
