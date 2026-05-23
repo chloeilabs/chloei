@@ -169,3 +169,7 @@ By default, Chloei enforces safe built-in agent limits even if you leave all opt
 `pnpm test:smoke:mock` runs a CI-safe authenticated chat flow with `E2E_MOCK_AUTH=1`, in-memory thread storage, and a deterministic mock agent response against the standalone production server. It requires `.next/standalone/server.js`, so run `pnpm build:standalone` first or use `pnpm test:smoke:mock:build`. It does not require Better Auth credentials, PostgreSQL, or AI provider API keys.
 
 `pnpm mem0:smoke` requires `MEMORY_PROVIDER=mem0`, `MEM0_API_URL`, and `MEM0_API_KEY`; it writes a disposable marker, retries search for up to 45 seconds to allow Mem0 extraction/indexing to settle, and deletes the marker. `pnpm test:smoke:memory` requires `SMOKE_EMAIL` and `SMOKE_PASSWORD`; use `SMOKE_BASE_URL=<preview-or-production-url>` for preview and production verification. `pnpm mem0:cleanup-smoke` removes authenticated memory smoke threads and Mem0 memories for the configured smoke user while keeping the account available for recurring checks.
+
+## Cloud Agent Smoke Test
+
+The production control plane can create Cursor cloud agent runs.
