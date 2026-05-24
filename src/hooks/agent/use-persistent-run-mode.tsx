@@ -15,15 +15,25 @@ type RunModeUpdater =
   | AgentRunMode
   | ((currentRunMode: AgentRunMode) => AgentRunMode)
 
+let memoryRunMode: AgentRunMode | null = null
+
 function readStoredRunMode(fallbackRunMode: AgentRunMode): AgentRunMode {
   if (typeof window === "undefined") {
     return fallbackRunMode
   }
 
+  let storedValue: string | null = null
+  try {
+    storedValue = window.localStorage.getItem(RUN_MODE_STORAGE_KEY)
+  } catch {
+    return resolvePersistedRunMode({
+      storedRunMode: memoryRunMode,
+      fallbackRunMode,
+    })
+  }
+
   return resolvePersistedRunMode({
-    storedRunMode: parseStoredRunMode(
-      window.localStorage.getItem(RUN_MODE_STORAGE_KEY)
-    ),
+    storedRunMode: parseStoredRunMode(storedValue) ?? memoryRunMode,
     fallbackRunMode,
   })
 }
@@ -33,11 +43,22 @@ function writeStoredRunMode(runMode: AgentRunMode) {
     return
   }
 
-  window.localStorage.setItem(
-    RUN_MODE_STORAGE_KEY,
-    JSON.stringify(serializeStoredRunMode(runMode))
-  )
-  window.dispatchEvent(new CustomEvent(RUN_MODE_UPDATED_EVENT))
+  memoryRunMode = runMode
+
+  try {
+    window.localStorage.setItem(
+      RUN_MODE_STORAGE_KEY,
+      JSON.stringify(serializeStoredRunMode(runMode))
+    )
+  } catch {
+    // Keep the in-memory mode so restricted storage environments still update.
+  }
+
+  try {
+    window.dispatchEvent(new CustomEvent(RUN_MODE_UPDATED_EVENT))
+  } catch {
+    // Storage events are best-effort; callers still have the in-memory value.
+  }
 }
 
 function subscribeToRunMode(onStoreChange: () => void) {
