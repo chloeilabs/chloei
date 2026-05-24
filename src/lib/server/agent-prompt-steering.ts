@@ -7,7 +7,7 @@ import {
   type PromptTextMessage,
 } from "./prompt-message-utils"
 
-export type PromptProvider = "google" | "moonshotai" | "xiaomi"
+export type PromptProvider = "alibaba" | "google" | "moonshotai" | "xiaomi"
 
 export type PromptTaskMode =
   | "general"
@@ -85,6 +85,14 @@ const USER_EXPERTISE_PATTERNS: Record<UserExpertiseHint, RegExp> = {
 }
 
 const PROVIDER_OVERLAYS: Record<PromptProvider, string> = {
+  alibaba: `
+Use Qwen reasoning mode efficiently.
+- Take advantage of the long context window: skim and cite earlier turns and retrieved memory before re-asking the user for information already present.
+- Prefer direct execution and verification over speculative narration.
+- On format-sensitive tasks, do a literal final-format check before finishing.
+- Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
+- After tool use, synthesize the result and stop. Do not replay raw tool traces.
+`.trim(),
   google: `
 Use Gemini reasoning mode efficiently.
 - Spend the thinking budget on the parts of the task that are actually uncertain; do not narrate planning that adds no information.
@@ -192,6 +200,10 @@ This request is high-stakes.
 }
 
 export function resolvePromptProvider(model: ModelType): PromptProvider {
+  if (model.startsWith("alibaba/")) {
+    return "alibaba"
+  }
+
   if (model.startsWith("google/")) {
     return "google"
   }

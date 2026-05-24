@@ -18,6 +18,12 @@ test("shared model registry includes the curated gateway models", async () => {
 
   assert.match(
     source,
+    /ALIBABA_QWEN3_7_MAX:\s*"alibaba\/qwen3\.7-max"/,
+    "Expected AvailableModels to include ALIBABA_QWEN3_7_MAX."
+  )
+
+  assert.match(
+    source,
     /GOOGLE_GEMINI_3_1_PRO_PREVIEW:\s*"google\/gemini-3\.1-pro-preview"/,
     "Expected AvailableModels to include GOOGLE_GEMINI_3_1_PRO_PREVIEW."
   )
@@ -42,8 +48,8 @@ test("shared model registry includes the curated gateway models", async () => {
 
   assert.match(
     source.replace(/\s+/g, " "),
-    /SUPPORTED_MODELS = \[ AvailableModels\.GOOGLE_GEMINI_3_1_PRO_PREVIEW, AvailableModels\.GOOGLE_GEMINI_3_5_FLASH, AvailableModels\.MOONSHOTAI_KIMI_K2_6, AvailableModels\.XIAOMI_MIMO_V2_5_PRO, \] as const/,
-    "Expected SUPPORTED_MODELS to list Gemini 3.1 Pro Preview, Gemini 3.5 Flash, Kimi K2.6, and MiMo V2.5 Pro."
+    /SUPPORTED_MODELS = \[ AvailableModels\.ALIBABA_QWEN3_7_MAX, AvailableModels\.GOOGLE_GEMINI_3_1_PRO_PREVIEW, AvailableModels\.GOOGLE_GEMINI_3_5_FLASH, AvailableModels\.MOONSHOTAI_KIMI_K2_6, AvailableModels\.XIAOMI_MIMO_V2_5_PRO, \] as const/,
+    "Expected SUPPORTED_MODELS to list Qwen 3.7 Max, Gemini 3.1 Pro Preview, Gemini 3.5 Flash, Kimi K2.6, and MiMo V2.5 Pro."
   )
 
   assert.match(
@@ -54,8 +60,14 @@ test("shared model registry includes the curated gateway models", async () => {
 
   assert.match(
     source.replace(/\s+/g, " "),
-    /MODEL_SELECTOR_MODELS = \[ AvailableModels\.GOOGLE_GEMINI_3_5_FLASH, AvailableModels\.MOONSHOTAI_KIMI_K2_6, AvailableModels\.XIAOMI_MIMO_V2_5_PRO, \] as const/,
-    "Expected the chat model selector to default to Gemini 3.5 Flash before Kimi K2.6 and MiMo V2.5 Pro."
+    /MODEL_SELECTOR_MODELS = \[ AvailableModels\.ALIBABA_QWEN3_7_MAX, AvailableModels\.GOOGLE_GEMINI_3_5_FLASH, AvailableModels\.MOONSHOTAI_KIMI_K2_6, AvailableModels\.XIAOMI_MIMO_V2_5_PRO, \] as const/,
+    "Expected the chat model selector to default to Qwen 3.7 Max before Gemini 3.5 Flash, Kimi K2.6, and MiMo V2.5 Pro."
+  )
+
+  assert.match(
+    source,
+    /\[AvailableModels\.ALIBABA_QWEN3_7_MAX\]:\s*\{[\s\S]*name:\s*"Qwen 3\.7 Max"/,
+    "Expected ModelInfos to define display metadata for ALIBABA_QWEN3_7_MAX."
   )
 
   assert.match(
@@ -83,6 +95,7 @@ test("shared model registry includes the curated gateway models", async () => {
   )
 
   for (const modelKey of [
+    "ALIBABA_QWEN3_7_MAX",
     "MOONSHOTAI_KIMI_K2_6",
     "GOOGLE_GEMINI_3_1_PRO_PREVIEW",
     "GOOGLE_GEMINI_3_5_FLASH",
@@ -98,6 +111,7 @@ test("shared model registry includes the curated gateway models", async () => {
   }
 
   for (const modelKey of [
+    "ALIBABA_QWEN3_7_MAX",
     "GOOGLE_GEMINI_3_1_PRO_PREVIEW",
     "GOOGLE_GEMINI_3_5_FLASH",
     "MOONSHOTAI_KIMI_K2_6",

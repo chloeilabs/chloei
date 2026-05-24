@@ -98,7 +98,7 @@ test("Gemini falls back to default thinking for general/writing", () => {
   }
 })
 
-test("Moonshot Kimi receives no explicit provider options (natively reasons)", () => {
+test("non-Gemini reasoning models receive no explicit provider options", () => {
   for (const taskMode of [
     "finance_analysis",
     "research",
@@ -106,32 +106,15 @@ test("Moonshot Kimi receives no explicit provider options (natively reasons)", (
     "debugging",
     "general",
   ]) {
-    assert.deepEqual(
-      getAiSdkGatewayProviderOptionsForTaskMode({
-        provider: "moonshotai",
-        taskMode,
-      }),
-      {},
-      `expected empty provider options for moonshotai+${taskMode}`
-    )
-  }
-})
-
-test("Xiaomi MiMo receives no explicit provider options (natively reasons)", () => {
-  for (const taskMode of [
-    "finance_analysis",
-    "research",
-    "coding",
-    "debugging",
-    "general",
-  ]) {
-    assert.deepEqual(
-      getAiSdkGatewayProviderOptionsForTaskMode({
-        provider: "xiaomi",
-        taskMode,
-      }),
-      {},
-      `expected empty provider options for xiaomi+${taskMode}`
-    )
+    for (const provider of ["alibaba", "moonshotai", "xiaomi"]) {
+      assert.deepEqual(
+        getAiSdkGatewayProviderOptionsForTaskMode({
+          provider,
+          taskMode,
+        }),
+        {},
+        `expected empty provider options for ${provider}+${taskMode}`
+      )
+    }
   }
 })

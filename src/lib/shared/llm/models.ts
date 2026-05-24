@@ -1,4 +1,5 @@
 export const AvailableModels = {
+  ALIBABA_QWEN3_7_MAX: "alibaba/qwen3.7-max",
   GOOGLE_GEMINI_3_1_PRO_PREVIEW: "google/gemini-3.1-pro-preview",
   GOOGLE_GEMINI_3_5_FLASH: "google/gemini-3.5-flash",
   MOONSHOTAI_KIMI_K2_6: "moonshotai/kimi-k2.6",
@@ -20,6 +21,7 @@ export interface ModelInfo {
 }
 
 export const SUPPORTED_MODELS = [
+  AvailableModels.ALIBABA_QWEN3_7_MAX,
   AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW,
   AvailableModels.GOOGLE_GEMINI_3_5_FLASH,
   AvailableModels.MOONSHOTAI_KIMI_K2_6,
@@ -31,6 +33,7 @@ export const ALL_MODELS = [...SUPPORTED_MODELS] as const
 export const RESEARCH_MODEL = AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW
 
 export const MODEL_SELECTOR_MODELS = [
+  AvailableModels.ALIBABA_QWEN3_7_MAX,
   AvailableModels.GOOGLE_GEMINI_3_5_FLASH,
   AvailableModels.MOONSHOTAI_KIMI_K2_6,
   AvailableModels.XIAOMI_MIMO_V2_5_PRO,
@@ -64,6 +67,10 @@ export function resolveDefaultModelSelectorModel(
 }
 
 export const ModelInfos: Record<ModelType, ModelInfo> = {
+  [AvailableModels.ALIBABA_QWEN3_7_MAX]: {
+    id: AvailableModels.ALIBABA_QWEN3_7_MAX,
+    name: "Qwen 3.7 Max",
+  },
   [AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW]: {
     id: AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW,
     name: "Gemini 3.1 Pro Preview",
@@ -83,6 +90,7 @@ export const ModelInfos: Record<ModelType, ModelInfo> = {
 }
 
 const VISION_CAPABLE_MODEL_SET: ReadonlySet<ModelType> = new Set([
+  AvailableModels.ALIBABA_QWEN3_7_MAX,
   AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW,
   AvailableModels.GOOGLE_GEMINI_3_5_FLASH,
   AvailableModels.MOONSHOTAI_KIMI_K2_6,
@@ -94,6 +102,7 @@ export function modelSupportsImageInput(model: ModelType): boolean {
 }
 
 const FILE_INPUT_CAPABLE_MODEL_SET: ReadonlySet<ModelType> = new Set([
+  AvailableModels.ALIBABA_QWEN3_7_MAX,
   AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW,
   AvailableModels.GOOGLE_GEMINI_3_5_FLASH,
   AvailableModels.MOONSHOTAI_KIMI_K2_6,

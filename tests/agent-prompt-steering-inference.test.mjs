@@ -273,10 +273,17 @@ test("provider overlays are differentiated across providers", () => {
   })
     .map((block) => block.body)
     .join("\n\n")
+  const alibaba = createPromptSteeringBlocks({
+    provider: "alibaba",
+    taskMode: "research",
+  })
+    .map((block) => block.body)
+    .join("\n\n")
 
   assert.match(google, /thinking budget/i)
   assert.match(moonshot, /long context/i)
   assert.match(xiaomi, /streaming latency/i)
+  assert.match(alibaba, /Qwen reasoning mode/i)
   assert.notEqual(
     google.split("Use Gemini")[1],
     moonshot.split("Use Kimi")[1],

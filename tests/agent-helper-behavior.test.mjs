@@ -166,7 +166,7 @@ test("agent helper validates total size, last-message role, and default model su
   assert.equal(defaultModeResult.parsedRequest.runMode, "chat")
   assert.equal(defaultModeResult.selectedModel, "moonshotai/kimi-k2.6")
 
-  const defaultModeWithGeminiResult = parseAgentStreamRequest({
+  const defaultModeWithQwenResult = parseAgentStreamRequest({
     body: {
       messages: [
         {
@@ -176,18 +176,16 @@ test("agent helper validates total size, last-message role, and default model su
       ],
     },
     availableModels: [
+      { id: "alibaba/qwen3.7-max" },
       { id: "moonshotai/kimi-k2.6" },
       { id: "google/gemini-3.5-flash" },
       { id: "xiaomi/mimo-v2.5-pro" },
     ],
-    requestId: "request-default-mode-gemini",
+    requestId: "request-default-mode-qwen",
   })
 
-  assert(!(defaultModeWithGeminiResult instanceof Response))
-  assert.equal(
-    defaultModeWithGeminiResult.selectedModel,
-    "google/gemini-3.5-flash"
-  )
+  assert(!(defaultModeWithQwenResult instanceof Response))
+  assert.equal(defaultModeWithQwenResult.selectedModel, "alibaba/qwen3.7-max")
 
   const researchModeResult = parseAgentStreamRequest({
     body: {

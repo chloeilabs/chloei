@@ -82,7 +82,7 @@ test("inline citation instructions avoid separate sources sections", async () =>
   )
 })
 
-test("stale and fallback-only model ids fall back to Gemini 3.5 Flash", () => {
+test("stale and fallback-only model ids fall back to Qwen 3.7 Max", () => {
   assert.equal(parseStoredSelectedModel("qwen/qwen3.6-plus"), null)
   assert.equal(
     parseStoredSelectedModel(
@@ -98,6 +98,10 @@ test("stale and fallback-only model ids fall back to Gemini 3.5 Flash", () => {
       initialSelectedModel: null,
       availableModels: [
         {
+          id: "alibaba/qwen3.7-max",
+          name: "Qwen 3.7 Max",
+        },
+        {
           id: "google/gemini-3.1-pro-preview",
           name: "Gemini 3.1 Pro Preview",
         },
@@ -111,6 +115,6 @@ test("stale and fallback-only model ids fall back to Gemini 3.5 Flash", () => {
         },
       ],
     }),
-    "google/gemini-3.5-flash"
+    "alibaba/qwen3.7-max"
   )
 })

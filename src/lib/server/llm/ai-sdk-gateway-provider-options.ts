@@ -22,10 +22,10 @@ const GEMINI_HIGH_THINKING_PROVIDER_OPTIONS = buildGeminiThinkingOptions("high")
  * Map a (provider, taskMode) pair to AI SDK provider options.
  *
  * Today only Gemini exposes an explicit reasoning knob through AI Gateway
- * (`thinkingConfig.thinkingLevel`); Kimi K2.6 and MiMo V2.5 Pro reason
- * natively without a per-call provider option. Returning `{}` for those
- * providers is the correct no-op — once AI Gateway surfaces reasoning options
- * for them, just extend this map.
+ * (`thinkingConfig.thinkingLevel`); Kimi K2.6, MiMo V2.5 Pro, and Qwen 3.7
+ * Max reason natively without a per-call provider option. Returning `{}` for
+ * those providers is the correct no-op — once AI Gateway surfaces reasoning
+ * options for them, just extend this map.
  */
 export function getAiSdkGatewayProviderOptionsForTaskMode(params: {
   provider: PromptProvider
