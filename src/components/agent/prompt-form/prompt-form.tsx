@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/popover"
 import { Textarea } from "@/components/ui/textarea"
 import { useModels } from "@/hooks/agent/use-models"
+import { usePersistentRunMode } from "@/hooks/agent/use-persistent-run-mode"
 import { usePersistentSelectedModel } from "@/hooks/agent/use-persistent-selected-model"
 import {
   AGENT_ATTACHMENT_MAX_FILE_BYTES,
@@ -130,7 +131,7 @@ export function PromptForm({
   const [isReadingAttachments, setIsReadingAttachments] = useState(false)
   const [isDragActive, setIsDragActive] = useState(false)
   const [isToolsOpen, setIsToolsOpen] = useState(false)
-  const [runMode, setRunMode] = useState<AgentRunMode>("chat")
+  const { runMode, setRunMode } = usePersistentRunMode()
   const trimmedMessage = useMemo(() => message.trim(), [message])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -201,7 +202,7 @@ export function PromptForm({
       textarea.setSelectionRange(cursorPosition, cursorPosition)
       textarea.scrollTop = textarea.scrollHeight
     })
-  }, [onClearQueuedMessage, queuedSubmission, setSelectedModel])
+  }, [onClearQueuedMessage, queuedSubmission, setRunMode, setSelectedModel])
 
   const removeAttachment = useCallback((attachmentId: string) => {
     setPendingAttachments((current) =>
@@ -237,7 +238,7 @@ export function PromptForm({
       )
       setIsToolsOpen(false)
     },
-    [isFormPending]
+    [isFormPending, setRunMode]
   )
 
   const submitPrompt = useCallback(
@@ -277,9 +278,6 @@ export function PromptForm({
       setMessage("")
       setPendingAttachments([])
       clearFileInput()
-      if (activeRunMode !== "chat") {
-        setRunMode("chat")
-      }
 
       return true
     },
@@ -508,7 +506,7 @@ export function PromptForm({
     return () => {
       window.removeEventListener("keydown", handleResearchShortcut)
     }
-  }, [isFormPending])
+  }, [isFormPending, setRunMode])
 
   const isSubmitButtonDisabled =
     isFormPending ||

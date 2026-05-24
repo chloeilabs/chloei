@@ -660,7 +660,7 @@ export function parseAgentStreamRequest(
   ) {
     return createJsonErrorResponse({
       requestId: params.requestId,
-      error: "Research mode requires Gemini 3.1 Pro Preview model access.",
+      error: "Research mode requires Qwen 3.7 Max model access.",
       errorCode: "AGENT_RESEARCH_MODEL_UNAVAILABLE",
       status: 400,
       rateLimitDecision: params.rateLimitDecision,

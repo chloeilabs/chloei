@@ -43,7 +43,7 @@ test("tavily search tool results derive source links", async () => {
   )
 })
 
-test("gateway provider options use Gemini high thinking for research", () => {
+test("legacy deep-research provider options preserve Gemini high thinking", () => {
   assert.deepEqual(getAiSdkGatewayProviderOptions(), {})
   assert.deepEqual(
     getAiSdkGatewayProviderOptionsForMode({ deepResearch: false }),
@@ -104,10 +104,6 @@ test("stale and fallback-only model ids fall back to Qwen 3.7 Max", () => {
         {
           id: "google/gemini-3.1-pro-preview",
           name: "Gemini 3.1 Pro Preview",
-        },
-        {
-          id: "google/gemini-3.5-flash",
-          name: "Gemini 3.5 Flash",
         },
         {
           id: "moonshotai/kimi-k2.6",

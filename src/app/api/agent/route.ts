@@ -248,6 +248,9 @@ export async function POST(request: NextRequest) {
         userTimeZone,
         provider: promptProvider,
         taskMode: promptTaskMode,
+        ...(parsedRequest.runMode === "research"
+          ? { deepResearchMode: true }
+          : {}),
         ...(financialServicesWorkflow ? { financialServicesWorkflow } : {}),
         ...(longTermMemoryEnabled ? { longTermMemoryEnabled } : {}),
         ...(longTermMemoryContext ? { longTermMemoryContext } : {}),
