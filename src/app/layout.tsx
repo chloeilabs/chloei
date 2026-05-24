@@ -7,7 +7,7 @@ import { Geist } from "next/font/google"
 import localFont from "next/font/local"
 import Script from "next/script"
 
-import { sidebarBackgroundColor } from "@/lib/brand/colors"
+import { appBackgroundColor } from "@/lib/brand/colors"
 import { cn } from "@/lib/utils"
 
 const isProduction = process.env.NODE_ENV === "production"
@@ -104,7 +104,7 @@ const departureMono = localFont({
 
 export const viewport: Viewport = {
   colorScheme: "dark",
-  themeColor: sidebarBackgroundColor,
+  themeColor: appBackgroundColor,
 }
 
 export const metadata: Metadata = {
