@@ -202,6 +202,7 @@ function Sidebar({
           data-slot="sidebar"
           data-mobile="true"
           className="w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+          overlayClassName="bg-sidebar! backdrop-blur-none! supports-backdrop-filter:backdrop-blur-none!"
           style={
             {
               "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
