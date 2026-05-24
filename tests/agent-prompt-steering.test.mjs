@@ -22,6 +22,10 @@ const {
 
 test("prompt steering resolves supported model providers", () => {
   assert.equal(
+    resolvePromptProvider(AvailableModels.ALIBABA_QWEN3_7_MAX),
+    "alibaba"
+  )
+  assert.equal(
     resolvePromptProvider(AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW),
     "google"
   )
