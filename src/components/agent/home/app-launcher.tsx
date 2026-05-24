@@ -30,25 +30,25 @@ function isFamilyApp(app: FamilyApp | undefined): app is FamilyApp {
 // Add future Chloei apps here as they come online.
 const CHLOEI_FAMILY_APPS: FamilyApp[] = [
   {
-    name: "Space",
-    shortName: "SP",
-    href: "https://space.chloei.ai",
+    name: "Alexandria",
+    shortName: "AL",
+    href: "https://alexandria.chloei.ai",
     badgeClassName:
-      "border-stone-950/10 bg-linear-to-br from-violet-200 via-fuchsia-100 to-pink-100 text-stone-950",
+      "border-stone-950/10 bg-linear-to-br from-violet-200 via-sky-100 to-cyan-100 text-stone-950",
     external: true,
   },
   {
-    name: "Markets",
-    shortName: "MK",
-    href: "https://markets.chloei.ai",
+    name: "Finance",
+    shortName: "FI",
+    href: "https://finance.chloei.ai",
     badgeClassName:
       "border-stone-950/10 bg-linear-to-br from-emerald-200 via-lime-100 to-yellow-100 text-stone-950",
     external: true,
   },
   {
-    name: "Cloud",
-    shortName: "CL",
-    href: "https://cloud.chloei.ai",
+    name: "Code",
+    shortName: "CO",
+    href: "https://chloeicode.vercel.app",
     badgeClassName:
       "border-stone-950/10 bg-linear-to-br from-cyan-200 via-sky-100 to-indigo-100 text-stone-950",
     external: true,
