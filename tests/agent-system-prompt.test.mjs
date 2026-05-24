@@ -50,15 +50,19 @@ test("agent system prompt composes trusted blocks in priority order", () => {
     {
       now: new Date("2026-05-03T12:34:56.000Z"),
       userTimeZone: "America/Chicago",
-      provider: "google",
+      deepResearchMode: true,
+      provider: "alibaba",
       taskMode: "research",
     }
   )
 
   const operatingIndex = prompt.indexOf("--- BEGIN OPERATING INSTRUCTIONS ---")
   const dateIndex = prompt.indexOf("--- BEGIN RUNTIME DATE CONTEXT ---")
-  const providerIndex = prompt.indexOf("--- BEGIN PROVIDER OVERLAY: GOOGLE ---")
+  const providerIndex = prompt.indexOf(
+    "--- BEGIN PROVIDER OVERLAY: ALIBABA ---"
+  )
   const taskIndex = prompt.indexOf("--- BEGIN TASK MODE OVERLAY: RESEARCH ---")
+  const deepResearchIndex = prompt.indexOf("--- BEGIN DEEP RESEARCH MODE ---")
   const identityIndex = prompt.indexOf(
     "--- BEGIN IDENTITY AND TONE CONTEXT ---"
   )
@@ -68,6 +72,7 @@ test("agent system prompt composes trusted blocks in priority order", () => {
   assert(dateIndex >= 0, "RUNTIME DATE CONTEXT block not found")
   assert(providerIndex >= 0, "PROVIDER OVERLAY block not found")
   assert(taskIndex >= 0, "TASK MODE OVERLAY block not found")
+  assert(deepResearchIndex >= 0, "Deep Research block not found")
   assert(identityIndex >= 0, "Identity and tone block not found")
   assert(authIndex >= 0, "AUTH USER CONTEXT block not found")
 
@@ -84,8 +89,12 @@ test("agent system prompt composes trusted blocks in priority order", () => {
     "Task mode overlay should follow provider overlay"
   )
   assert(
-    identityIndex > taskIndex,
-    "Identity and tone should follow task mode overlay"
+    deepResearchIndex > taskIndex,
+    "Deep Research mode should follow the task mode overlay"
+  )
+  assert(
+    identityIndex > deepResearchIndex,
+    "Identity and tone should follow Deep Research mode"
   )
   assert(
     authIndex > identityIndex,
@@ -94,11 +103,34 @@ test("agent system prompt composes trusted blocks in priority order", () => {
 
   assert.match(prompt, /Current UTC timestamp: 2026-05-03T12:34:56.000Z/)
   assert.match(prompt, /User time zone: America\/Chicago/)
-  assert.match(prompt, /Use Gemini reasoning mode efficiently/)
+  assert.match(prompt, /Use Qwen reasoning mode efficiently/)
   assert.match(prompt, /This request needs deep research/)
+  assert.match(
+    prompt,
+    /produce a long, detailed, comprehensive response unless the user explicitly asks/
+  )
+  assert.match(prompt, /report-grade answer/)
   assert.match(prompt, /Email: user@example.com/)
   assert(prompt.includes(DEFAULT_SOUL_FALLBACK_INSTRUCTION))
   assert.equal(prompt.includes("SOUL.md"), false)
+})
+
+test("agent system prompt only adds the Deep Research block for Research mode", () => {
+  const prompt = buildAgentSystemInstruction(
+    {
+      id: "user-1",
+      name: "Chloei",
+      email: "user@example.com",
+    },
+    {
+      now: new Date("2026-05-03T12:34:56.000Z"),
+      provider: "alibaba",
+      taskMode: "research",
+    }
+  )
+
+  assert.match(prompt, /--- BEGIN TASK MODE OVERLAY: RESEARCH ---/)
+  assert.equal(prompt.includes("--- BEGIN DEEP RESEARCH MODE ---"), false)
 })
 
 test("agent system prompt advertises long-term memory only when enabled", () => {

@@ -178,7 +178,6 @@ test("agent helper validates total size, last-message role, and default model su
     availableModels: [
       { id: "alibaba/qwen3.7-max" },
       { id: "moonshotai/kimi-k2.6" },
-      { id: "google/gemini-3.5-flash" },
       { id: "xiaomi/mimo-v2.5-pro" },
     ],
     requestId: "request-default-mode-qwen",
@@ -199,6 +198,7 @@ test("agent helper validates total size, last-message role, and default model su
       ],
     },
     availableModels: [
+      { id: "alibaba/qwen3.7-max" },
       { id: "moonshotai/kimi-k2.6" },
       { id: "google/gemini-3.1-pro-preview" },
     ],
@@ -207,10 +207,7 @@ test("agent helper validates total size, last-message role, and default model su
 
   assert(!(researchModeResult instanceof Response))
   assert.equal(researchModeResult.parsedRequest.runMode, "research")
-  assert.equal(
-    researchModeResult.selectedModel,
-    "google/gemini-3.1-pro-preview"
-  )
+  assert.equal(researchModeResult.selectedModel, "alibaba/qwen3.7-max")
 
   const unavailableResearchModelResult = parseAgentStreamRequest({
     body: {
@@ -229,7 +226,7 @@ test("agent helper validates total size, last-message role, and default model su
   assert(unavailableResearchModelResult instanceof Response)
   assert.equal(unavailableResearchModelResult.status, 400)
   assert.deepEqual(await unavailableResearchModelResult.json(), {
-    error: "Research mode requires Gemini 3.1 Pro Preview model access.",
+    error: "Research mode requires Qwen 3.7 Max model access.",
     errorCode: "AGENT_RESEARCH_MODEL_UNAVAILABLE",
     requestId: "request-research-unavailable",
   })
@@ -240,7 +237,7 @@ test("agent helper validates total size, last-message role, and default model su
       messages: [
         {
           role: "user",
-          content: "Use Gemini Research as a normal chat model.",
+          content: "Use Gemini as a normal chat model.",
         },
       ],
     },
@@ -1201,7 +1198,7 @@ test("agent helper forwards the deep research runtime profile", async () => {
     request: createRequest(),
     requestId: "request-research",
     timeoutMs: 30_000,
-    selectedModel: "google/gemini-3.1-pro-preview",
+    selectedModel: "alibaba/qwen3.7-max",
     runMode: "research",
     aiGatewayApiKey: "ai-gateway-key",
     runtimeProfile: "deep_research",
@@ -1213,9 +1210,9 @@ test("agent helper forwards the deep research runtime profile", async () => {
 
   assert.equal(
     response.headers.get("X-Agent-Effective-Model"),
-    "google/gemini-3.1-pro-preview"
+    "alibaba/qwen3.7-max"
   )
-  assert.equal(recorded.streamParams[0]?.model, "google/gemini-3.1-pro-preview")
+  assert.equal(recorded.streamParams[0]?.model, "alibaba/qwen3.7-max")
   assert.equal(recorded.streamParams[0]?.runtimeProfile, "deep_research")
 })
 
