@@ -196,7 +196,7 @@ pnpm test
 pnpm lint
 pnpm typecheck
 pnpm build
-pnpm test:smoke:mock
+pnpm test:smoke:mock:build
 pnpm eval:finance
 pnpm eval:finance:grade
 ```

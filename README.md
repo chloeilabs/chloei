@@ -6,19 +6,22 @@ Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently expose
 
 - Node.js 24.x
 - pnpm 10.32.1
+- PostgreSQL 16 for local auth, sessions, thread storage, and rate limiting
 
 ## Getting started
 
 ```bash
 pnpm install
 cp .env.example .env.local
+# Fill DATABASE_URL, BETTER_AUTH_SECRET, BETTER_AUTH_URL, and AI_GATEWAY_API_KEY.
+# Cursor Cloud sets up native PostgreSQL; local machines must start PostgreSQL first.
 pnpm migrate
 pnpm dev
 ```
 
 Add `AI_GATEWAY_API_KEY` to `.env.local` before starting the app. Add `TAVILY_API_KEY` if you want Tavily search and extract tools. Add `FMP_API_KEY` if you want the curated finance tools. Add the Mem0 memory variables documented below if you want long-term memory. The app runs on [http://localhost:3000](http://localhost:3000).
 
-To enable auth locally, provision PostgreSQL and add:
+To enable auth locally, provision PostgreSQL before running `pnpm migrate` and add:
 
 - `DATABASE_URL`
 - `AUTH_DATABASE_URL` if Better Auth should use a different database from app data
@@ -26,7 +29,14 @@ To enable auth locally, provision PostgreSQL and add:
 - `BETTER_AUTH_URL=http://localhost:3000`
 - `BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000` when you need multiple allowed origins
 - `BETTER_AUTH_COOKIE_DOMAIN=chloei.ai` when you need shared sessions across trusted subdomains
-- `vercel env pull .env.local` if you want local development to mirror the Vercel Development environment
+
+To mirror Vercel Development locally, install the Vercel CLI, run `vercel login`, approve the device-login URL, verify the project link in `.vercel/project.json`, then run `vercel env pull .env.local --yes`. The pull overwrites `.env.local`, so preserve any local database/auth overrides you need.
+
+For browser smoke tests on a fresh machine, install Playwright's browser dependencies once:
+
+```bash
+pnpm exec playwright install --with-deps chromium
+```
 
 ## Scripts
 

@@ -45,6 +45,12 @@ node --test tests/agent-route-contract.test.mjs  # Single test file
 
 ESLint is configured with `--max-warnings=0`, so any warning is a build failure. Run `pnpm lint` before committing.
 
+## Local / Cursor Cloud setup
+
+Use `README.md` for generic local setup. Cursor Cloud-specific setup lives in `AGENTS.md` and `.cursor/setup.sh`; Cloud agents use native PostgreSQL 16 by default, not a Docker Postgres container.
+
+For Vercel-backed local envs, run `vercel login` first, approve the device-login URL in a browser, confirm `.vercel/project.json` links to the Chloei Labs `chloei` project, then run `vercel env pull .env.local --yes`.
+
 ## Architecture
 
 ### Request Flow
