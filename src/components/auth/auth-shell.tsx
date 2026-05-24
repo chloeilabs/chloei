@@ -16,7 +16,7 @@ export function AuthShell({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex min-h-full w-full items-center justify-center px-4 py-10 sm:px-6">
+    <div className="flex min-h-full w-full items-center justify-center bg-background px-4 py-10 sm:px-6">
       <div className="relative isolate flex w-full max-w-md items-center justify-center">
         <RefreshGlow className="pointer-events-none top-16 left-1/2 z-0 h-[calc(100svh-14rem)] w-screen max-w-5xl -translate-x-1/2" />
 
