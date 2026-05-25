@@ -95,10 +95,7 @@ test("shared model registry includes the curated gateway models", async () => {
     )
   }
 
-  for (const modelKey of [
-    "ALIBABA_QWEN3_7_MAX",
-    "XIAOMI_MIMO_V2_5_PRO",
-  ]) {
+  for (const modelKey of ["ALIBABA_QWEN3_7_MAX", "XIAOMI_MIMO_V2_5_PRO"]) {
     assert.doesNotMatch(
       visionSetSource,
       new RegExp(`AvailableModels\\.${modelKey}`),
@@ -119,10 +116,7 @@ test("shared model registry includes the curated gateway models", async () => {
     )
   }
 
-  for (const modelKey of [
-    "ALIBABA_QWEN3_7_MAX",
-    "XIAOMI_MIMO_V2_5_PRO",
-  ]) {
+  for (const modelKey of ["ALIBABA_QWEN3_7_MAX", "XIAOMI_MIMO_V2_5_PRO"]) {
     assert.doesNotMatch(
       fileInputSetSource,
       new RegExp(`AvailableModels\\.${modelKey}`),
