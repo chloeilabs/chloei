@@ -102,6 +102,10 @@ test("vision preprocessor escapes attachment filenames for prompt wrappers", () 
 
 test("registered multimodal chat models use native image input", () => {
   assert.equal(
+    modelSupportsImageInput(AvailableModels.ALIBABA_QWEN3_7_MAX),
+    false
+  )
+  assert.equal(
     modelSupportsImageInput(AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW),
     true
   )
@@ -111,11 +115,15 @@ test("registered multimodal chat models use native image input", () => {
   )
   assert.equal(
     modelSupportsImageInput(AvailableModels.XIAOMI_MIMO_V2_5_PRO),
-    true
+    false
   )
 })
 
 test("PDF file-input capability matches runtime-compatible Gateway models", () => {
+  assert.equal(
+    modelSupportsFileInput(AvailableModels.ALIBABA_QWEN3_7_MAX),
+    false
+  )
   assert.equal(
     modelSupportsFileInput(AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW),
     true
@@ -126,7 +134,7 @@ test("PDF file-input capability matches runtime-compatible Gateway models", () =
   )
   assert.equal(
     modelSupportsFileInput(AvailableModels.XIAOMI_MIMO_V2_5_PRO),
-    true
+    false
   )
 })
 
