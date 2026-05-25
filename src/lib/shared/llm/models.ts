@@ -82,11 +82,11 @@ export const ModelInfos: Record<ModelType, ModelInfo> = {
   },
 }
 
+// Native AI SDK attachment parts require Gateway endpoints that accept those
+// part types at runtime; some model tags can appear before that support works.
 const VISION_CAPABLE_MODEL_SET: ReadonlySet<ModelType> = new Set([
-  AvailableModels.ALIBABA_QWEN3_7_MAX,
   AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW,
   AvailableModels.MOONSHOTAI_KIMI_K2_6,
-  AvailableModels.XIAOMI_MIMO_V2_5_PRO,
 ])
 
 export function modelSupportsImageInput(model: ModelType): boolean {
@@ -94,10 +94,8 @@ export function modelSupportsImageInput(model: ModelType): boolean {
 }
 
 const FILE_INPUT_CAPABLE_MODEL_SET: ReadonlySet<ModelType> = new Set([
-  AvailableModels.ALIBABA_QWEN3_7_MAX,
   AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW,
   AvailableModels.MOONSHOTAI_KIMI_K2_6,
-  AvailableModels.XIAOMI_MIMO_V2_5_PRO,
 ])
 
 export function modelSupportsFileInput(model: ModelType): boolean {
