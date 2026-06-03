@@ -51,11 +51,14 @@ DEFAULT_PROVIDER = os.environ.get("TRADINGAGENTS_LLM_PROVIDER", "openrouter").st
 DEFAULT_BACKEND_URL = os.environ.get(
     "TRADINGAGENTS_LLM_BACKEND_URL", "https://ai-gateway.vercel.sh/v1"
 ).strip()
+# Default to the gpt-5.x family: some gateway models (e.g. qwen3.7-max in
+# thinking mode) reject the tool_choice the structured-output agents send, so a
+# fresh deploy that sets only AI_GATEWAY_API_KEY still works out of the box.
 DEFAULT_DEEP_MODEL = os.environ.get(
-    "TRADINGAGENTS_DEEP_THINK_LLM", "alibaba/qwen3.7-max"
+    "TRADINGAGENTS_DEEP_THINK_LLM", "openai/gpt-5.5"
 ).strip()
 DEFAULT_QUICK_MODEL = os.environ.get(
-    "TRADINGAGENTS_QUICK_THINK_LLM", "alibaba/qwen3.7-max"
+    "TRADINGAGENTS_QUICK_THINK_LLM", "openai/gpt-5.4-mini"
 ).strip()
 
 # Map of provider -> API-key env var, mirroring TradingAgents'
