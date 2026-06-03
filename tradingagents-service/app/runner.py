@@ -133,6 +133,14 @@ def run_analysis(req: AnalyzeRequest) -> Iterator[Dict[str, Any]]:
         mock=False,
     )
 
+    # Upstream v0.2.5 binds + prompts get_verified_market_snapshot for the market
+    # analyst but omits it from that analyst's tool executor, so the call errors
+    # ("not a valid tool") and the agent hedges. Register it before construction.
+    # Best-effort + idempotent.
+    from .patches import apply_tradingagents_patches
+
+    apply_tradingagents_patches()
+
     stats_handler = StatsCallbackHandler()
     graph = TradingAgentsGraph(
         selected_analysts=list(req.analysts),
