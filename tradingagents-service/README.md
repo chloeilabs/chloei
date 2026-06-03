@@ -145,6 +145,9 @@ curl -N -X POST localhost:8000/analyze \
 ## Security
 
 Set `TRADINGAGENTS_SERVICE_TOKEN` and the matching value in the Chloei app
-(`TRADINGAGENTS_SERVICE_TOKEN`); `/analyze` then requires the `X-Service-Token`
-header. Keep this service on a private network in production — it makes
-authenticated LLM calls on your gateway key.
+(`TRADINGAGENTS_SERVICE_TOKEN`); `/analyze` then requires a matching
+`X-Service-Token` header. The hosted deploys above expose a **public** endpoint,
+so this token — not network isolation — is the security boundary: only callers
+that send the matching header can spend your gateway key, so always set it in
+production. Private networking, where your platform supports it, is a fine extra
+layer but not a substitute.
