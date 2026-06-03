@@ -24,6 +24,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v5
@@ -78,6 +80,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v5
@@ -98,9 +102,6 @@ jobs:
         env:
           E2E_MOCK_AUTH: "1"
           E2E_MOCK_AUTH_ALLOW_NEXT_START: "1"
-
-      - name: Verify Playwright browser is present (no download in the image)
-        run: pnpm exec playwright install chromium
 
       - name: Mock smoke test
         run: pnpm test:smoke:mock

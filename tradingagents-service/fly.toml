@@ -13,6 +13,8 @@
 # this file. The service token is REQUIRED in production so the public sidecar
 # only answers calls from Chloei (it makes authenticated LLM calls on your key).
 
+# `fly launch --name <your-app>` (above) overrides this. Change it before a bare
+# `fly deploy`, since Fly app names are globally unique.
 app = "chloei-tradingagents"
 primary_region = "iad"
 
