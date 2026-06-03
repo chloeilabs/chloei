@@ -60,6 +60,36 @@ cp .env.example .env       # set AI_GATEWAY_API_KEY (+ TRADINGAGENTS_SERVICE_TOK
 docker compose up --build  # serves on http://localhost:8000
 ```
 
+## Deploy to production (so the Trading Desk works on Vercel)
+
+The Chloei web app can't run this service inside its Vercel serverless functions
+(Python + LangGraph, minutes-long runs). Host it as a standalone container and
+point Chloei at it. The image is portable — it binds to the platform's `$PORT`.
+
+**1. Host the container.** It builds from this directory's `Dockerfile`.
+
+- **Fly.io** (config included): `cd tradingagents-service && fly launch --no-deploy --copy-config --name <app>`, then `fly secrets set AI_GATEWAY_API_KEY=... TRADINGAGENTS_SERVICE_TOKEN=<secret>`, then `fly deploy`. URL: `https://<app>.fly.dev`.
+- **Render / Railway**: create a web service from this repo with **root directory `tradingagents-service`** and the Docker runtime; set the env vars below in the dashboard. Health check path: `/health`.
+
+**2. Set these on the host** (secrets via the platform's secret store, never committed):
+
+| Variable                       | Value                                                 |
+| ------------------------------ | ----------------------------------------------------- |
+| `AI_GATEWAY_API_KEY`           | your Vercel AI Gateway key (the same one Chloei uses) |
+| `TRADINGAGENTS_SERVICE_TOKEN`  | a strong shared secret you generate                   |
+| `TRADINGAGENTS_DEEP_THINK_LLM` | e.g. `openai/gpt-5.5`                                 |
+
+**3. Point Chloei at it** — in the Vercel project env (Preview/Production):
+
+```
+TRADINGAGENTS_SERVICE_URL=https://<your-host>      # e.g. https://<app>.fly.dev
+TRADINGAGENTS_SERVICE_TOKEN=<same shared secret>   # must match the sidecar
+```
+
+Redeploy Chloei. **Always set `TRADINGAGENTS_SERVICE_TOKEN`** in production: the
+sidecar is public and makes authenticated LLM calls on your gateway key, so
+`/analyze` must require the `X-Service-Token` header that Chloei sends.
+
 ## Run locally without Docker
 
 ```bash

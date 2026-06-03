@@ -36,6 +36,9 @@ USER appuser
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD curl -fsS http://localhost:8000/health || exit 1
+    CMD curl -fsS "http://localhost:${PORT:-8000}/health" || exit 1
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Bind to the platform-assigned $PORT (Render/Railway/Fly inject it); default to
+# 8000 for local docker-compose. `exec` makes uvicorn PID 1 so it receives
+# shutdown signals.
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
