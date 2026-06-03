@@ -129,7 +129,7 @@ docker compose up --build     # serves http://localhost:8000
 
 The Trading Desk is reachable from the chat sidebar ("Trading desk") or directly at `/trading-desk`. Set `TRADINGAGENTS_ENABLED=false` to hide it. Service wiring is documented in `.env.example` (`TRADINGAGENTS_*`); the server client lives in `src/lib/server/trading-agents/`, the routes in `src/app/api/trading-desk/`, and the UI in `src/components/trading-desk/`.
 
-TradingAgents is exposed through three surfaces, all backed by the same sidecar:
+TradingAgents is exposed through two surfaces, all backed by the same sidecar:
 
 - **Trading Desk page** (`/trading-desk`) — every run posts to `POST /api/trading-desk/jobs` and executes as a background job through Chloei's async-jobs system (the shared `agent_job` table + Inngest, with an inline fallback when Inngest is unconfigured), polled via `GET /api/jobs/{jobId}`. This survives a dropped connection — ideal for long deep-mode runs. **Requires `DATABASE_URL` (and `pnpm migrate`)**; Inngest is optional. The page also still has a live-streaming endpoint (`POST /api/trading-desk/analyze`) available via the `start()` hook method if you want a no-database streaming mode.
 - **Chat tool** — the chat agent can call a `trading_analysis` tool mid-conversation (e.g. "should I buy NVDA?") and fold a compact decision summary into the thread. Registered in `src/lib/server/llm/ai-sdk-trading-agents-tools.ts`.

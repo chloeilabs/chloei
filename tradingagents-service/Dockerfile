@@ -26,6 +26,13 @@ COPY app ./app
 
 RUN mkdir -p /data/logs /data/cache
 
+# Run as an unprivileged user that owns the writable data dirs, so a compromise
+# of the sidecar (it holds the gateway key) doesn't inherit root in the
+# container.
+RUN useradd --system --uid 10001 --create-home appuser \
+    && chown -R appuser:appuser /data /srv
+USER appuser
+
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \

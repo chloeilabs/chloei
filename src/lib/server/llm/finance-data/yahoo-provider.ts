@@ -100,7 +100,8 @@ function toIso(value: unknown): string | null {
     return Number.isNaN(value.getTime()) ? null : value.toISOString()
   }
   if (typeof value === "number" && Number.isFinite(value)) {
-    // Yahoo epochs are seconds; values that look like ms are passed through.
+    // Yahoo epochs are seconds (~1e9–1e10 for recent dates). Treat anything
+    // past 1e12 as already in milliseconds and pass it through; scale the rest.
     const ms = value > 1e12 ? value : value * 1000
     const date = new Date(ms)
     return Number.isNaN(date.getTime()) ? null : date.toISOString()
@@ -157,6 +158,15 @@ type YahooSourceKind =
   | "options"
   | "lookup"
 
+const YAHOO_PAGE_SUFFIX: Record<Exclude<YahooSourceKind, "lookup">, string> = {
+  quote: "",
+  history: "/history",
+  profile: "/profile",
+  financials: "/financials",
+  analysis: "/analysis",
+  options: "/options",
+}
+
 export function buildYahooSourceUrl(
   kind: YahooSourceKind,
   symbolOrQuery: string
@@ -169,19 +179,7 @@ export function buildYahooSourceUrl(
   const base = `https://finance.yahoo.com/quote/${encodeURIComponent(
     normalizeSymbol(symbolOrQuery)
   )}`
-  const suffix =
-    kind === "quote"
-      ? ""
-      : kind === "history"
-        ? "/history"
-        : kind === "profile"
-          ? "/profile"
-          : kind === "financials"
-            ? "/financials"
-            : kind === "analysis"
-              ? "/analysis"
-              : "/options"
-  return new URL(`${base}${suffix}`)
+  return new URL(`${base}${YAHOO_PAGE_SUFFIX[kind]}`)
 }
 
 function yahooSource(

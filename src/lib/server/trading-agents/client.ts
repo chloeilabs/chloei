@@ -14,6 +14,7 @@ import type {
 } from "@/lib/shared/trading-agents/types"
 
 import {
+  TRADINGAGENTS_REQUEST_TIMEOUT_MS,
   TRADINGAGENTS_SERVICE_URL,
   tradingAgentsServiceHeaders,
 } from "./config"
@@ -28,6 +29,16 @@ export class TradingAgentsServiceError extends Error {
   }
 }
 
+/**
+ * Combine an optional caller signal with a request-timeout deadline so a stuck
+ * sidecar can never hang the call indefinitely. Without a caller signal the
+ * timeout alone bounds the request.
+ */
+function requestSignal(signal?: AbortSignal): AbortSignal {
+  const timeout = AbortSignal.timeout(TRADINGAGENTS_REQUEST_TIMEOUT_MS)
+  return signal ? AbortSignal.any([signal, timeout]) : timeout
+}
+
 /** Fetch the service `/config` (roster, analysts, depth presets, defaults). */
 export async function fetchTradingDeskConfig(
   signal?: AbortSignal
@@ -37,7 +48,7 @@ export async function fetchTradingDeskConfig(
     response = await fetch(`${TRADINGAGENTS_SERVICE_URL}/config`, {
       method: "GET",
       headers: tradingAgentsServiceHeaders(),
-      signal,
+      signal: requestSignal(signal),
       cache: "no-store",
     })
   } catch (error) {
@@ -129,7 +140,9 @@ export async function fetchTradingDeskResult(
   request: TradingDeskRequest,
   signal?: AbortSignal
 ): Promise<TaRunCompletedEvent> {
-  const effectiveSignal = signal ?? new AbortController().signal
+  // Bound the run with a timeout (combined with the caller signal if any) so a
+  // stalled deep run can't stream/hang forever with no cancellation path.
+  const effectiveSignal = requestSignal(signal)
 
   const ndjson = await streamTradingDeskAnalysis(request, effectiveSignal)
   const reader = ndjson.getReader()

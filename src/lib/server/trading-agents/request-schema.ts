@@ -17,10 +17,7 @@ export const tradingDeskRequestSchema = z.object({
     .min(1)
     .max(15)
     .regex(/^[A-Za-z0-9.\-^=]+$/, "Invalid ticker symbol."),
-  tradeDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/u, "tradeDate must be YYYY-MM-DD.")
-    .nullish(),
+  tradeDate: z.iso.date("tradeDate must be YYYY-MM-DD.").nullish(),
   analysts: z
     .array(z.enum(TRADING_DESK_ANALYST_KEYS))
     .min(1, "Select at least one analyst.")

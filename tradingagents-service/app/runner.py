@@ -397,8 +397,8 @@ def run_analysis(req: AnalyzeRequest) -> Iterator[Dict[str, Any]]:
                     trade_date=trade_date,
                     final_trade_decision=final_decision,
                 )
-            except Exception:  # noqa: BLE001
-                pass
+            except Exception as exc:  # noqa: BLE001 - persistence is non-critical
+                yield events.activity("memory", f"Decision store skipped: {exc}")
 
         invest_final = final_state.get("investment_debate_state") or {}
         risk_final = final_state.get("risk_debate_state") or {}

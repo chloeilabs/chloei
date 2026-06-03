@@ -7,6 +7,9 @@ fastapi>=0.115,<1.0
 uvicorn[standard]>=0.30,<1.0
 pydantic>=2.7,<3.0
 python-dotenv>=1.0,<2.0
+# Pin the transitive HTTP/1.1 parser away from GHSA-vqfr-h8mv-ghfj (request
+# smuggling via chunked encoding); first patched release is 0.16.0.
+h11>=0.16.0
 
 # Upstream multi-agent framework, pinned to the commit this integration was
 # verified against (v0.2.5). The service relies on version-specific behavior and

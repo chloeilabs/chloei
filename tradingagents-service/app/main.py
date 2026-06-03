@@ -13,6 +13,7 @@ in a threadpool and the event loop stays responsive.
 
 from __future__ import annotations
 
+import hmac
 from typing import Iterator
 
 from fastapi import FastAPI, Header, HTTPException, Request
@@ -41,9 +42,13 @@ from .schemas import AnalyzeRequest
 
 app = FastAPI(title="Chloei TradingAgents Service", version=__version__)
 
+# Never fall back to the "*" wildcard while credentials are allowed (browsers
+# reject that pairing). ALLOWED_ORIGINS carries explicit localhost defaults from
+# config.py; the Chloei app proxies the service server-side, so an empty list
+# simply blocks direct browser access rather than breaking anything.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS or ["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -59,7 +64,7 @@ def _on_startup() -> None:
 
 def _check_token(provided: str | None) -> None:
     """Enforce the shared service token when one is configured."""
-    if SERVICE_TOKEN and (provided or "") != SERVICE_TOKEN:
+    if SERVICE_TOKEN and not hmac.compare_digest(provided or "", SERVICE_TOKEN):
         raise HTTPException(status_code=401, detail="Invalid service token.")
 
 

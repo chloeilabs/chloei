@@ -112,7 +112,10 @@ export function ReportPanel({
   ]
   const hasAnalysts = analystKeys.some((a) => sections[a.key]?.content)
   const hasResearch = Boolean(
-    research.bull || research.bear || research.judge || sections.investment_plan
+    research.bull ||
+    research.bear ||
+    research.judge ||
+    sections.investment_plan?.content
   )
   const trader = sections.trader_investment_plan?.content
   const hasRisk = Boolean(
@@ -120,7 +123,7 @@ export function ReportPanel({
     risk.conservative ||
     risk.neutral ||
     risk.judge ||
-    sections.final_trade_decision
+    sections.final_trade_decision?.content
   )
 
   return (

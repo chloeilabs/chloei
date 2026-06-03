@@ -21,6 +21,10 @@ import {
   tryAcquireConcurrencySlot,
 } from "@/lib/server/rate-limit"
 import {
+  createRouteObservation,
+  observeRouteResponse,
+} from "@/lib/server/route-observability"
+import {
   streamTradingDeskAnalysis,
   TradingAgentsServiceError,
 } from "@/lib/server/trading-agents/client"
@@ -76,28 +80,46 @@ function withCleanup(
 export async function POST(request: NextRequest) {
   const requestId = resolveRequestId(request)
   const logger = createLogger(`trading-desk:${requestId}`)
+  const observation = createRouteObservation({
+    logger,
+    method: "POST",
+    requestId,
+    route: "/api/trading-desk/analyze",
+  })
 
   if (!isAuthConfigured()) {
-    return createAuthUnavailableResponse({ "X-Request-Id": requestId })
+    return observeRouteResponse(
+      observation,
+      createAuthUnavailableResponse({ "X-Request-Id": requestId }),
+      { errorCode: "AUTH_UNAVAILABLE", outcome: "auth_unavailable" }
+    )
   }
 
   const session = await getRequestSession(request.headers)
   if (!session) {
-    return createJsonErrorResponse({
-      requestId,
-      error: "Unauthorized.",
-      errorCode: "TRADING_DESK_UNAUTHORIZED",
-      status: 401,
-    })
+    return observeRouteResponse(
+      observation,
+      createJsonErrorResponse({
+        requestId,
+        error: "Unauthorized.",
+        errorCode: "TRADING_DESK_UNAUTHORIZED",
+        status: 401,
+      }),
+      { errorCode: "TRADING_DESK_UNAUTHORIZED", outcome: "unauthorized" }
+    )
   }
 
   if (!TRADINGAGENTS_ENABLED) {
-    return createJsonErrorResponse({
-      requestId,
-      error: "Trading Desk is disabled.",
-      errorCode: "TRADING_DESK_DISABLED",
-      status: 503,
-    })
+    return observeRouteResponse(
+      observation,
+      createJsonErrorResponse({
+        requestId,
+        error: "Trading Desk is disabled.",
+        errorCode: "TRADING_DESK_DISABLED",
+        status: 503,
+      }),
+      { errorCode: "TRADING_DESK_DISABLED", outcome: "disabled" }
+    )
   }
 
   const clientIdentifier = resolveRateLimitIdentifier(session.user.id)
@@ -109,36 +131,48 @@ export async function POST(request: NextRequest) {
       })
     : null
   if (rateLimitDecision && !rateLimitDecision.allowed) {
-    return createJsonErrorResponse({
-      requestId,
-      error: "Too many requests. Please retry shortly.",
-      errorCode: "TRADING_DESK_RATE_LIMITED",
-      status: 429,
-      retryAfterSeconds: rateLimitDecision.retryAfterSeconds,
-      rateLimitDecision,
-    })
+    return observeRouteResponse(
+      observation,
+      createJsonErrorResponse({
+        requestId,
+        error: "Too many requests. Please retry shortly.",
+        errorCode: "TRADING_DESK_RATE_LIMITED",
+        status: 429,
+        retryAfterSeconds: rateLimitDecision.retryAfterSeconds,
+        rateLimitDecision,
+      }),
+      { errorCode: "TRADING_DESK_RATE_LIMITED", outcome: "rate_limited" }
+    )
   }
 
   let body: unknown
   try {
     body = await request.json()
   } catch {
-    return createJsonErrorResponse({
-      requestId,
-      error: "Invalid JSON payload.",
-      errorCode: "TRADING_DESK_INVALID_JSON",
-      status: 400,
-    })
+    return observeRouteResponse(
+      observation,
+      createJsonErrorResponse({
+        requestId,
+        error: "Invalid JSON payload.",
+        errorCode: "TRADING_DESK_INVALID_JSON",
+        status: 400,
+      }),
+      { errorCode: "TRADING_DESK_INVALID_JSON", outcome: "invalid_json" }
+    )
   }
 
   const parsed = tradingDeskRequestSchema.safeParse(body)
   if (!parsed.success) {
-    return createJsonErrorResponse({
-      requestId,
-      error: parsed.error.issues[0]?.message ?? "Invalid request.",
-      errorCode: "TRADING_DESK_INVALID_REQUEST",
-      status: 400,
-    })
+    return observeRouteResponse(
+      observation,
+      createJsonErrorResponse({
+        requestId,
+        error: parsed.error.issues[0]?.message ?? "Invalid request.",
+        errorCode: "TRADING_DESK_INVALID_REQUEST",
+        status: 400,
+      }),
+      { errorCode: "TRADING_DESK_INVALID_REQUEST", outcome: "invalid_request" }
+    )
   }
 
   // Acquire a concurrency slot only once the request is valid; release it
@@ -151,12 +185,19 @@ export async function POST(request: NextRequest) {
       })
     : null
   if (concurrencySlot && !concurrencySlot.allowed) {
-    return createJsonErrorResponse({
-      requestId,
-      error: "An analysis is already running. Please wait for it to finish.",
-      errorCode: "TRADING_DESK_CONCURRENCY_LIMITED",
-      status: 429,
-    })
+    return observeRouteResponse(
+      observation,
+      createJsonErrorResponse({
+        requestId,
+        error: "An analysis is already running. Please wait for it to finish.",
+        errorCode: "TRADING_DESK_CONCURRENCY_LIMITED",
+        status: 429,
+      }),
+      {
+        errorCode: "TRADING_DESK_CONCURRENCY_LIMITED",
+        outcome: "concurrency_limited",
+      }
+    )
   }
 
   try {
@@ -177,27 +218,35 @@ export async function POST(request: NextRequest) {
       void concurrencySlot?.release()
     })
 
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "application/x-ndjson; charset=utf-8",
-        "Cache-Control": "no-store, no-transform",
-        "X-Accel-Buffering": "no",
-        "X-Request-Id": requestId,
-      },
-    })
+    return observeRouteResponse(
+      observation,
+      new Response(stream, {
+        headers: {
+          "Content-Type": "application/x-ndjson; charset=utf-8",
+          "Cache-Control": "no-store, no-transform",
+          "X-Accel-Buffering": "no",
+          "X-Request-Id": requestId,
+        },
+      }),
+      { outcome: "stream_started" }
+    )
   } catch (error) {
     void concurrencySlot?.release()
     const status =
       error instanceof TradingAgentsServiceError ? error.status : 502
     logger.error("Trading Desk analyze failed", { error })
-    return createJsonErrorResponse({
-      requestId,
-      error:
-        error instanceof Error
-          ? error.message
-          : "Failed to start the analysis.",
-      errorCode: "TRADING_DESK_SERVICE_ERROR",
-      status,
-    })
+    return observeRouteResponse(
+      observation,
+      createJsonErrorResponse({
+        requestId,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to start the analysis.",
+        errorCode: "TRADING_DESK_SERVICE_ERROR",
+        status,
+      }),
+      { errorCode: "TRADING_DESK_SERVICE_ERROR", outcome: "error" }
+    )
   }
 }

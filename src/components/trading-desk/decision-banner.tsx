@@ -75,6 +75,8 @@ export function DecisionBanner({
 
   return (
     <div
+      role="status"
+      aria-live="polite"
       className={cn(
         "border p-4 sm:p-5",
         isError

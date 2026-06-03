@@ -66,6 +66,9 @@ const EMPTY_DEBATES: TradingDeskDebates = {
 }
 
 const MAX_ACTIVITY = 8
+// Stop polling a background job after this long, so a job stuck in a
+// non-terminal state never polls forever when the tab is left open.
+const JOB_POLL_TIMEOUT_MS = 15 * 60 * 1000
 
 function seedAgentStatus(
   teams: TradingDeskTeam[],
@@ -376,8 +379,13 @@ export function useTradingDeskRun() {
         return
       }
 
+      const pollDeadline = Date.now() + JOB_POLL_TIMEOUT_MS
       for (;;) {
         if (isAborted()) {
+          return
+        }
+        if (Date.now() > pollDeadline) {
+          fail("The analysis timed out.")
           return
         }
         await sleep(2500)

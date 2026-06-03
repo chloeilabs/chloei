@@ -11,8 +11,10 @@ from .roster import ANALYST_KEYS, DEFAULT_DEPTH, DEPTH_PRESETS
 
 # Tickers are used as path components by the framework's on-disk logging, which
 # already hardens against traversal; we additionally constrain the shape here.
-# Allows symbols like AAPL, BRK.B, 7203.T, BTC-USD.
-_TICKER_RE = re.compile(r"^[A-Za-z0-9.\-^=]{1,15}$")
+# Allows symbols like AAPL, BRK.B, 7203.T, BTC-USD. The leading look-ahead
+# requires at least one alphanumeric so punctuation-only inputs (".", "..") are
+# rejected before they can reach any filesystem path.
+_TICKER_RE = re.compile(r"^(?=.*[A-Za-z0-9])[A-Za-z0-9.\-^=]{1,15}$")
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
