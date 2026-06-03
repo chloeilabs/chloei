@@ -2,6 +2,8 @@ import { z } from "zod"
 
 import { completeReportPlaceholderJob } from "@/lib/server/agent-report-jobs"
 import { indexUploadedDocument } from "@/lib/server/knowledge-indexing"
+import { runTradingAnalysisJob } from "@/lib/server/trading-agents/jobs"
+import { tradingDeskRequestSchema } from "@/lib/server/trading-agents/request-schema"
 
 import { inngest } from "./client"
 
@@ -30,6 +32,12 @@ const reportRequestedSchema = z.object({
 const watchlistRefreshSchema = z.object({
   userId: z.string().trim().min(1),
   watchlistId: z.string().trim().min(1),
+})
+
+const tradingAnalysisRequestedSchema = z.object({
+  userId: z.string().trim().min(1),
+  jobId: z.string().trim().min(1),
+  request: tradingDeskRequestSchema,
 })
 
 export const documentUploaded = inngest.createFunction(
@@ -83,8 +91,23 @@ export const watchlistRefreshRequested = inngest.createFunction(
   }
 )
 
+export const tradingAnalysisRequested = inngest.createFunction(
+  {
+    id: "trading-analysis-requested",
+    idempotency: "event.data.userId + ':' + event.data.jobId",
+    triggers: [{ event: "trading/analysis.requested" }],
+  },
+  async ({ event, step }) => {
+    const data = tradingAnalysisRequestedSchema.parse(event.data)
+    return step.run("run-trading-analysis", () =>
+      runTradingAnalysisJob({ jobId: data.jobId, request: data.request })
+    )
+  }
+)
+
 export const inngestFunctions = [
   documentUploaded,
   reportRequested,
   watchlistRefreshRequested,
+  tradingAnalysisRequested,
 ]

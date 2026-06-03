@@ -83,6 +83,11 @@ import {
   isAiSdkTavilyToolName,
 } from "./ai-sdk-tavily-tools"
 import {
+  createAiSdkTradingAgentsTools,
+  getAiSdkTradingAgentsToolCallMetadata,
+  getAiSdkTradingAgentsToolResultMetadata,
+} from "./ai-sdk-trading-agents-tools"
+import {
   type CodeExecutionBackend,
   createAiSdkCodeExecutionTools,
   getAiSdkCodeExecutionToolCallMetadata,
@@ -539,6 +544,7 @@ export async function* startAgentRuntimeStream(
             fmpApiKey: normalizedFmpApiKey,
             fredApiKey: params.fredApiKey ?? process.env.FRED_API_KEY,
             secUserAgent: params.secUserAgent ?? process.env.SEC_API_USER_AGENT,
+            yahooEnabled: process.env.AGENT_FINANCE_YAHOO_ENABLED !== "false",
           })
         : {}),
       ...(runtimeProfile.secFilingsEnabled
@@ -546,6 +552,7 @@ export async function* startAgentRuntimeStream(
             secUserAgent: params.secUserAgent ?? process.env.SEC_API_USER_AGENT,
           })
         : {}),
+      ...createAiSdkTradingAgentsTools(),
       ...(fmpToolsContext?.tools ?? {}),
     } as ToolSet
     const toolNames = Object.keys(tools)
@@ -694,6 +701,7 @@ export async function* startAgentRuntimeStream(
           getAiSdkKnowledgeSearchToolCallMetadata(part) ??
           getAiSdkFinanceDataToolCallMetadata(part) ??
           getAiSdkSecFilingsToolCallMetadata(part) ??
+          getAiSdkTradingAgentsToolCallMetadata(part) ??
           fmpToolsContext?.getToolCallMetadata(part)
         if (!metadata || seenToolCalls.has(metadata.callId)) {
           continue
@@ -733,6 +741,7 @@ export async function* startAgentRuntimeStream(
           getAiSdkKnowledgeSearchToolResultMetadata(part) ??
           getAiSdkFinanceDataToolResultMetadata(part) ??
           getAiSdkSecFilingsToolResultMetadata(part) ??
+          getAiSdkTradingAgentsToolResultMetadata(part) ??
           fmpToolsContext?.getToolResultMetadata(part)
         if (!metadata || finalizedToolCalls.has(metadata.callId)) {
           continue

@@ -8,5 +8,7 @@ pnpm-lock.yaml
 .pnpm-store/
 .agents/
 __pycache__/
+.venv/
+tradingagents-service/.venv/
 evals/finance/cache/
 evals/finance/results/

@@ -5,10 +5,12 @@ interface FinanceProviderUrlInput {
   from?: string
   limit?: number
   operation:
+    | "analyst_recommendations"
     | "company_profile"
     | "financial_statements"
     | "fred_series"
     | "historical_prices"
+    | "options_chain"
     | "provider_status"
     | "quote"
     | "sec_company_facts"

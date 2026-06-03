@@ -24,6 +24,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v5
@@ -63,14 +65,43 @@ jobs:
       - name: Report bundle headroom
         run: pnpm bundle:report
 
+  # The mock smoke test runs inside Playwright's official image, which ships
+  # Chromium and its OS deps pre-installed — so there is no cdn.playwright.dev
+  # download to hang on (the previous "Install Playwright browser" step routinely
+  # timed out the job). Keep the image tag in sync with the @playwright/test
+  # version in package.json.
+  smoke:
+    name: Mock smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: mcr.microsoft.com/playwright:v1.59.1-noble
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: 10.32.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Build standalone server for smoke tests
         run: pnpm build:standalone
         env:
           E2E_MOCK_AUTH: "1"
           E2E_MOCK_AUTH_ALLOW_NEXT_START: "1"
-
-      - name: Install Playwright browser
-        run: pnpm exec playwright install --with-deps chromium
 
       - name: Mock smoke test
         run: pnpm test:smoke:mock
@@ -78,7 +109,7 @@ jobs:
   vercel-status:
     name: Vercel status
     runs-on: ubuntu-latest
-    needs: checks
+    needs: [checks, smoke]
     if: always()
     permissions:
       contents: read
@@ -88,27 +119,34 @@ jobs:
       - name: Report Vercel-compatible build status
         env:
           CHECKS_RESULT: ${{ needs.checks.result }}
+          SMOKE_RESULT: ${{ needs.smoke.result }}
           COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          case "$CHECKS_RESULT" in
+          # Collapse the checks + smoke job results into one Vercel-compatible status.
+          if [ "$CHECKS_RESULT" = "success" ] && [ "$SMOKE_RESULT" = "success" ]; then
+            result="success"
+          elif [ "$CHECKS_RESULT" = "failure" ] || [ "$CHECKS_RESULT" = "timed_out" ] \
+            || [ "$SMOKE_RESULT" = "failure" ] || [ "$SMOKE_RESULT" = "timed_out" ]; then
+            result="failure"
+          else
+            result="cancelled"
+          fi
+
+          case "$result" in
             success)
               state="success"
               description="Vercel-compatible build passed"
               ;;
-            failure|timed_out)
+            failure)
               state="failure"
               description="CI checks failed"
               ;;
-            cancelled|skipped)
-              state="error"
-              description="CI run was cancelled or skipped"
-              ;;
             *)
               state="error"
-              description="CI result was inconclusive: $CHECKS_RESULT"
+              description="CI run was cancelled or skipped"
               ;;
           esac
 
