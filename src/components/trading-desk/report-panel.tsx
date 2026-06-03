@@ -117,10 +117,10 @@ export function ReportPanel({
   const trader = sections.trader_investment_plan?.content
   const hasRisk = Boolean(
     risk.aggressive ||
-      risk.conservative ||
-      risk.neutral ||
-      risk.judge ||
-      sections.final_trade_decision
+    risk.conservative ||
+    risk.neutral ||
+    risk.judge ||
+    sections.final_trade_decision
   )
 
   return (
@@ -208,7 +208,10 @@ export function ReportPanel({
 
         {active === "risk" &&
           (hasRisk ? (
-            risk.aggressive || risk.conservative || risk.neutral || risk.judge ? (
+            risk.aggressive ||
+            risk.conservative ||
+            risk.neutral ||
+            risk.judge ? (
               <>
                 <DebateBlock
                   label="Aggressive Analyst"

@@ -429,9 +429,7 @@ export function useTradingDeskRun() {
       if (isAborted()) {
         return
       }
-      fail(
-        error instanceof Error ? error.message : "The analysis job failed."
-      )
+      fail(error instanceof Error ? error.message : "The analysis job failed.")
     } finally {
       if (abortRef.current === controller) {
         abortRef.current = null

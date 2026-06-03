@@ -84,19 +84,25 @@ export const TRADING_DESK_DEFAULT_TEAMS: TradingDeskTeam[] = [
     id: "portfolio",
     label: "Portfolio Management",
     agents: [
-      { key: "portfolio_manager", name: "Portfolio Manager", selectable: false },
+      {
+        key: "portfolio_manager",
+        name: "Portfolio Manager",
+        selectable: false,
+      },
     ],
   },
 ]
 
 /** Friendly labels for the analyst keys, for the selection form. */
-export const TRADING_DESK_ANALYST_LABELS: Record<TradingDeskAnalystKey, string> =
-  {
-    market: "Market",
-    social: "Social",
-    news: "News",
-    fundamentals: "Fundamentals",
-  }
+export const TRADING_DESK_ANALYST_LABELS: Record<
+  TradingDeskAnalystKey,
+  string
+> = {
+  market: "Market",
+  social: "Social",
+  news: "News",
+  fundamentals: "Fundamentals",
+}
 
 /** Report sections, in render order, with display titles and owning team. */
 export const TRADING_DESK_REPORT_SECTIONS = [
@@ -106,7 +112,11 @@ export const TRADING_DESK_REPORT_SECTIONS = [
   { key: "fundamentals_report", title: "Fundamentals", team: "analysts" },
   { key: "investment_plan", title: "Research Team Decision", team: "research" },
   { key: "trader_investment_plan", title: "Trading Plan", team: "trading" },
-  { key: "final_trade_decision", title: "Portfolio Decision", team: "portfolio" },
+  {
+    key: "final_trade_decision",
+    title: "Portfolio Decision",
+    team: "portfolio",
+  },
 ] as const
 export type TradingDeskReportSectionKey =
   (typeof TRADING_DESK_REPORT_SECTIONS)[number]["key"]
@@ -127,10 +137,19 @@ export interface TradingDeskRequest {
 export interface TradingDeskConfig {
   teams: TradingDeskTeam[]
   analysts: TradingDeskAnalystKey[]
-  depths: { id: TradingDeskDepth; label: string; max_debate_rounds: number; max_risk_discuss_rounds: number }[]
+  depths: {
+    id: TradingDeskDepth
+    label: string
+    max_debate_rounds: number
+    max_risk_discuss_rounds: number
+  }[]
   default_depth: TradingDeskDepth
   signals: TradingDeskSignal[]
-  defaults: { provider: string; deep_think_llm: string; quick_think_llm: string }
+  defaults: {
+    provider: string
+    deep_think_llm: string
+    quick_think_llm: string
+  }
   llm_ready: boolean
   mock_default: boolean
 }

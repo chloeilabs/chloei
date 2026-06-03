@@ -19,11 +19,11 @@ Chloei app calls this service server-side and re-streams events to the browser.
 
 ## Endpoints
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/health` | Liveness + whether LLM credentials are present |
-| `GET` | `/config` | Agent roster, analyst keys, depth presets, defaults |
-| `POST` | `/analyze` | SSE stream of a multi-agent analysis |
+| Method | Path       | Purpose                                             |
+| ------ | ---------- | --------------------------------------------------- |
+| `GET`  | `/health`  | Liveness + whether LLM credentials are present      |
+| `GET`  | `/config`  | Agent roster, analyst keys, depth presets, defaults |
+| `POST` | `/analyze` | SSE stream of a multi-agent analysis                |
 
 `POST /analyze` body:
 

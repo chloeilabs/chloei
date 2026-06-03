@@ -129,14 +129,21 @@ def build_trading_config(
     # removed upstream, so we deliberately leave the framework default in place
     # rather than set a key the graph ignores.
 
-    # Keep the framework's per-run on-disk artifacts inside a service-local
-    # directory so containers stay self-contained and writable.
+    # Keep the framework's per-run on-disk artifacts and the cross-run memory
+    # log inside a service-local directory so containers stay self-contained and
+    # writable, and the memory log lands on the persisted volume the compose/env
+    # files point at. Applied explicitly (rather than relying on DEFAULT_CONFIG
+    # reading these at import time) so the configured paths win regardless of
+    # import ordering.
     results_dir = os.environ.get("TRADINGAGENTS_RESULTS_DIR")
     if results_dir:
         config["results_dir"] = results_dir
     cache_dir = os.environ.get("TRADINGAGENTS_CACHE_DIR")
     if cache_dir:
         config["data_cache_dir"] = cache_dir
+    memory_log_path = os.environ.get("TRADINGAGENTS_MEMORY_LOG_PATH")
+    if memory_log_path:
+        config["memory_log_path"] = memory_log_path
 
     # Hard kill-switch for the cross-run memory loop: with no log path every
     # TradingMemoryLog operation no-ops, so disabling memory is bulletproof

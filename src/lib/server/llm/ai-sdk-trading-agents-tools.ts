@@ -14,7 +14,10 @@ import {
 } from "@/lib/shared/trading-agents/types"
 
 const TRADING_ANALYSIS_TOOL_NAME = "trading_analysis" as const
-type TradingAnalysisToolName = Extract<ToolName, typeof TRADING_ANALYSIS_TOOL_NAME>
+type TradingAnalysisToolName = Extract<
+  ToolName,
+  typeof TRADING_ANALYSIS_TOOL_NAME
+>
 
 const MAX_DECISION_CHARS = 1500
 const MAX_SECTION_CHARS = 600

@@ -29,7 +29,8 @@ const DEPTH_HINTS: Record<TradingDeskDepth, string> = {
 
 const TICKER_RE = /^[A-Za-z0-9.\-^=]{1,15}$/
 
-const microLabel = "font-departureMono text-[10px] tracking-wide text-muted-foreground uppercase"
+const microLabel =
+  "font-departureMono text-[10px] tracking-wide text-muted-foreground uppercase"
 
 export function AnalysisForm({
   isRunning,

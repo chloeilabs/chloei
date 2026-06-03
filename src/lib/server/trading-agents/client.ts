@@ -138,7 +138,9 @@ export async function fetchTradingDeskResult(
   let completed: TaRunCompletedEvent | null = null
   let errorMessage: string | null = null
 
-  const parseLine = (line: string): { type?: unknown; message?: unknown } | null => {
+  const parseLine = (
+    line: string
+  ): { type?: unknown; message?: unknown } | null => {
     const trimmed = line.trim()
     if (!trimmed) {
       return null

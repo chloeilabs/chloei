@@ -1,6 +1,12 @@
 "use client"
 
-import { Loader2, Minus, OctagonX, TrendingDown, TrendingUp } from "lucide-react"
+import {
+  Loader2,
+  Minus,
+  OctagonX,
+  TrendingDown,
+  TrendingUp,
+} from "lucide-react"
 
 import { tradingDeskSignalTone } from "@/lib/shared/trading-agents/types"
 import { cn } from "@/lib/utils"
