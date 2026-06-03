@@ -69,7 +69,8 @@ point Chloei at it. The image is portable — it binds to the platform's `$PORT`
 **1. Host the container.** It builds from this directory's `Dockerfile`.
 
 - **Fly.io** (config included): `cd tradingagents-service && fly launch --no-deploy --copy-config --name <app>`, then `fly secrets set AI_GATEWAY_API_KEY=... TRADINGAGENTS_SERVICE_TOKEN=<secret>`, then `fly deploy`. URL: `https://<app>.fly.dev`.
-- **Render / Railway**: create a web service from this repo with **root directory `tradingagents-service`** and the Docker runtime; set the env vars below in the dashboard. Health check path: `/health`.
+- **Railway** (config included): create a service from this repo and set its **root directory to `tradingagents-service`** — Railway reads `railway.json` + the `Dockerfile`, injects `$PORT`, and gives you a public URL. Add the env vars below in the Variables tab. CLI alternative: `cd tradingagents-service && railway up`.
+- **Render**: New → Web Service from this repo, **root directory `tradingagents-service`**, Docker runtime, health-check path `/health`; set the env vars below in the dashboard.
 
 **2. Set these on the host** (secrets via the platform's secret store, never committed):
 
