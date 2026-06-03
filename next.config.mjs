@@ -108,7 +108,10 @@ const nextConfig = {
         },
       }
     : {}),
-  serverExternalPackages: ["@napi-rs/canvas"],
+  // yahoo-finance2 (used lazily by the finance_data Yahoo provider) ships Deno
+  // shims and a large schema tree; bundling it balloons the server build, so
+  // require it at runtime from node_modules instead.
+  serverExternalPackages: ["@napi-rs/canvas", "yahoo-finance2"],
   experimental: {
     serverActions: {
       bodySizeLimit: serverActionsBodySizeLimit,
