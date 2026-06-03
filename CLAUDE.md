@@ -168,7 +168,7 @@ Multiple tool categories, each only active when the respective API key is config
 | `tavily_search`  | `TAVILY_API_KEY`       | Live web search (advanced depth, up to 8 results)   |
 | `tavily_extract` | `TAVILY_API_KEY`       | Extract content from specific URLs (up to 5 URLs)   |
 | `code_execution` | always on              | Run sandboxed JS or Python for arithmetic/logic     |
-| `finance_data`   | optional provider keys | Normalized finance data via FMP, SEC, and FRED      |
+| `finance_data`   | optional provider keys | Normalized finance data via FMP, SEC, FRED, Yahoo   |
 | `sec_filings`    | public SEC endpoints   | SEC/EDGAR filing lookup, fetch, sections, tables    |
 | FMP MCP tools    | `FMP_API_KEY`          | Legacy finance data via Financial Modeling Prep MCP |
 
@@ -183,8 +183,9 @@ Multiple tool categories, each only active when the respective API key is config
 
 **Finance data** (`src/lib/server/llm/ai-sdk-finance-data-tools.ts`):
 
-- `finance_data` exposes typed operations for provider status, symbol search, quotes, company profiles, historical prices, financial statements, SEC company facts, and FRED series observations.
+- `finance_data` exposes typed operations for provider status, symbol search, quotes, company profiles, historical prices, financial statements, SEC company facts, FRED series observations, analyst recommendations/price targets, and options chains.
 - Provider calls return sanitized source URLs and structured error payloads with retryability metadata.
+- Yahoo Finance (via `yahoo-finance2`, no API key; `finance-data/yahoo-provider.ts`) is the default for quotes, historical prices, analyst targets, and options, and the non-US fundamentals fallback when a symbol has no SEC CIK. It is imported lazily, normalizes Yahoo payloads defensively (`validateResult: false`), and is supplementary—SEC/FRED/FMP stay citation-grade. Disable with `AGENT_FINANCE_YAHOO_ENABLED=false` (quotes/prices then fall back to Stooq).
 - Finance-analysis runs prefer `finance_data`; chat-default runs keep FMP MCP enabled for migration compatibility.
 
 **SEC filings** (`src/lib/server/llm/ai-sdk-sec-filings-tools.ts`):
@@ -383,6 +384,7 @@ All other variables are optional — the code has safe defaults. See `.env.examp
 | `FMP_API_KEY`                              | Enables Financial Modeling Prep MCP finance tools                                                       |
 | `FRED_API_KEY`                             | Enables FRED macro/rates lookups through `finance_data`                                                 |
 | `SEC_API_USER_AGENT`                       | User agent for SEC public company-facts requests                                                        |
+| `AGENT_FINANCE_YAHOO_ENABLED`              | Enable Yahoo Finance (no key) in `finance_data` (default: true)                                         |
 | `MEMORY_PROVIDER`                          | `disabled` or `mem0` (default: `disabled`)                                                              |
 | `MEM0_API_URL`                             | Mem0 REST API origin (default: `http://localhost:8888`; use `https://api.mem0.ai` for Mem0 Platform)    |
 | `MEM0_API_KEY`                             | Mem0 key; self-hosted OSS uses `X-API-Key`, Mem0 Platform uses `Authorization: Token ...`               |

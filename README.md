@@ -109,6 +109,31 @@ Use the same key/value format as `.env.local`. The Electron shell always overrid
 
 Desktop release builds are configured in `.github/workflows/desktop-release.yml`. CI builds separate macOS Apple Silicon and macOS Intel artifacts, each with its own auto-update channel so split macOS builds do not overwrite each other's update metadata. Local macOS desktop builds skip signing by default because this repo often lives in a cloud-synced workspace; set `CHLOEI_DESKTOP_SIGN=1` to opt into local certificate signing from a normal local checkout. CI macOS signing/notarization uses `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_API_KEY_P8`, `APPLE_API_KEY_ID`, and `APPLE_API_ISSUER`. Draft GitHub release publishing is available through the workflow's `publish` input.
 
+## Trading Desk
+
+The **Trading Desk** (`/trading-desk`) runs a full multi-agent equity analysis powered by the [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents) framework: market / sentiment / news / fundamentals analysts, a bull-vs-bear research debate, a trader, a three-way risk committee, and a portfolio manager that returns a `Buy / Overweight / Hold / Underweight / Sell` decision. The page streams each agent's status, every report section, the debates, and the final call live.
+
+TradingAgents is Python + LangGraph and a run takes ~1–3 minutes, so it cannot run inside Next.js/Vercel functions. It runs as a separate FastAPI sidecar under [`tradingagents-service/`](tradingagents-service/). Chloei calls that service server-side from `/api/trading-desk/analyze` (auth + rate limited), transforms its SSE into NDJSON, and streams it to the browser. By default the service routes every agent's LLM calls through the same Vercel AI Gateway key the chat app uses.
+
+Run it locally:
+
+```bash
+# 1. Start the sidecar (see tradingagents-service/README.md for details)
+cd tradingagents-service
+cp .env.example .env          # set AI_GATEWAY_API_KEY; or TRADINGAGENTS_MOCK=1 to try it keyless
+docker compose up --build     # serves http://localhost:8000
+
+# 2. Point Chloei at it (in the app's .env.local), then `pnpm dev`
+#    TRADINGAGENTS_SERVICE_URL=http://localhost:8000
+```
+
+The Trading Desk is reachable from the chat sidebar ("Trading desk") or directly at `/trading-desk`. Set `TRADINGAGENTS_ENABLED=false` to hide it. Service wiring is documented in `.env.example` (`TRADINGAGENTS_*`); the server client lives in `src/lib/server/trading-agents/`, the routes in `src/app/api/trading-desk/`, and the UI in `src/components/trading-desk/`.
+
+TradingAgents is exposed through three surfaces, all backed by the same sidecar:
+
+- **Trading Desk page** (`/trading-desk`) — every run posts to `POST /api/trading-desk/jobs` and executes as a background job through Chloei's async-jobs system (the shared `agent_job` table + Inngest, with an inline fallback when Inngest is unconfigured), polled via `GET /api/jobs/{jobId}`. This survives a dropped connection — ideal for long deep-mode runs. **Requires `DATABASE_URL` (and `pnpm migrate`)**; Inngest is optional. The page also still has a live-streaming endpoint (`POST /api/trading-desk/analyze`) available via the `start()` hook method if you want a no-database streaming mode.
+- **Chat tool** — the chat agent can call a `trading_analysis` tool mid-conversation (e.g. "should I buy NVDA?") and fold a compact decision summary into the thread. Registered in `src/lib/server/llm/ai-sdk-trading-agents-tools.ts`.
+
 ## Environment
 
 `.env.example` documents the supported environment variables. Required variables are:

@@ -1,0 +1,14 @@
+# TradingAgents sidecar service dependencies.
+#
+# The service wraps the upstream TauricResearch/TradingAgents framework and
+# exposes it over HTTP/SSE for the Chloei frontend. TradingAgents itself pulls
+# in langchain, langgraph, yfinance, etc. via its own project metadata.
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.30,<1.0
+pydantic>=2.7,<3.0
+python-dotenv>=1.0,<2.0
+
+# Upstream multi-agent framework. Pin to a commit for reproducible builds in
+# production; HEAD is fine for local development. To develop against a local
+# checkout instead, comment this out and `pip install -e ../path/to/TradingAgents`.
+tradingagents @ git+https://github.com/TauricResearch/TradingAgents.git

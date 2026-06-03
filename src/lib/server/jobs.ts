@@ -8,6 +8,7 @@ export const AGENT_JOB_TYPES = [
   "agent/report.requested",
   "knowledge/document.uploaded",
   "market/watchlist.refresh.requested",
+  "trading/analysis.requested",
 ] as const
 
 export const AGENT_JOB_STATUSES = [
