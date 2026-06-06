@@ -3,16 +3,11 @@
 import { execFileSync } from "node:child_process"
 
 const explicitSkipFiles = new Set([
-  ".github/workflows/desktop-release.yml",
-  "electron-builder.config.js",
   "README.md",
   "AGENTS.md",
   "CLAUDE.md",
   "THIRD_PARTY_NOTICES.md",
   "skills-lock.json",
-  "scripts/check-desktop-shell.mjs",
-  "scripts/generate-desktop-icons.mjs",
-  "scripts/prepare-desktop-bundle.mjs",
 ])
 
 const skipPrefixes = [
@@ -20,10 +15,8 @@ const skipPrefixes = [
   ".claude/",
   ".cursor/",
   ".github/",
-  "desktop-build/",
   "dist/",
   "docs/",
-  "electron/",
   "evals/",
   "test-results/",
   "tests/",
@@ -73,6 +66,6 @@ if (webRelevantFiles.length > 0) {
 }
 
 console.log(
-  "Skipping Vercel build because only desktop, docs, eval, test, or tooling files changed."
+  "Skipping Vercel build because only docs, eval, test, or tooling files changed."
 )
 process.exit(0)

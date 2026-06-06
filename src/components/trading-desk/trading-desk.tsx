@@ -33,17 +33,6 @@ const AppLauncher = dynamic(
   }
 )
 
-const DesktopUpdateButton = dynamic(
-  () =>
-    import("@/components/desktop/desktop-update-button").then(
-      (mod) => mod.DesktopUpdateButton
-    ),
-  {
-    ssr: false,
-    loading: () => null,
-  }
-)
-
 function StatsFooter({
   stats,
 }: {
@@ -156,7 +145,6 @@ export function TradingDesk({ viewer }: { viewer: AuthViewer }) {
             <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
           </div>
           <div className="flex items-center gap-1">
-            <DesktopUpdateButton />
             <AppLauncher className="size-7 text-muted-foreground hover:text-foreground" />
           </div>
         </div>

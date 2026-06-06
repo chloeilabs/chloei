@@ -17,10 +17,6 @@ const scriptFiles = ["auth.ts"]
 const typeCheckedFiles = [...sourceFiles, ...scriptFiles]
 const nodeConfigFiles = [
   "agent-worker.mjs",
-  "electron/**/*.cjs",
-  "electron-builder.config.js",
-  "scripts/prepare-desktop-bundle.mjs",
-  "scripts/start-standalone-server.mjs",
   "src/lib/server/**/*.mjs",
   "tests/**/*.mjs",
   "eslint.config.mjs",
@@ -44,7 +40,6 @@ export default [
     ignores: [
       "node_modules/**",
       ".next/**",
-      "desktop-build/**",
       "dist/**",
       "coverage/**",
       "next-env.d.ts",

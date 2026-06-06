@@ -97,8 +97,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build standalone server for smoke tests
-        run: pnpm build:standalone
+      - name: Build production app for smoke tests
+        run: pnpm build
         env:
           E2E_MOCK_AUTH: "1"
           E2E_MOCK_AUTH_ALLOW_NEXT_START: "1"

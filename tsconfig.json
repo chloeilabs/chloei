@@ -33,5 +33,5 @@
     ".next/dev/types/**/*.ts",
     ".next/types/**/*.ts"
   ],
-  "exclude": ["desktop-build", "dist", "node_modules"]
+  "exclude": ["dist", "node_modules"]
 }

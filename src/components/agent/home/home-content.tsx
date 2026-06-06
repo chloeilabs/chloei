@@ -61,17 +61,6 @@ const AppLauncher = dynamic(
   }
 )
 
-const DesktopUpdateButton = dynamic(
-  () =>
-    import("@/components/desktop/desktop-update-button").then(
-      (mod) => mod.DesktopUpdateButton
-    ),
-  {
-    ssr: false,
-    loading: () => null,
-  }
-)
-
 const Messages = dynamic(
   () => import("../messages/messages").then((mod) => mod.Messages),
   {
@@ -393,8 +382,6 @@ export function HomePageContent({
                 </TooltipContent>
               </Tooltip>
             ) : null}
-
-            <DesktopUpdateButton />
 
             <AppLauncher className="size-7 text-muted-foreground hover:text-foreground" />
           </div>

@@ -34,7 +34,6 @@ next-env.d.ts
 out/
 build
 dist
-desktop-build/
 
 
 # Debug
