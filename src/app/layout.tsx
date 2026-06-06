@@ -76,22 +76,6 @@ const localhostDevCacheResetScript = `
 })();
 `.trim()
 
-const desktopShellClassScript = `
-(() => {
-  const desktop = window.chloeiDesktop;
-
-  if (!desktop?.isDesktop) {
-    return;
-  }
-
-  document.documentElement.classList.add("chloei-desktop");
-
-  if (typeof desktop.platform === "string") {
-    document.documentElement.dataset.chloeiDesktopPlatform = desktop.platform;
-  }
-})();
-`.trim()
-
 const geistSans = Geist({
   variable: "--font-sans",
   subsets: ["latin"],
@@ -154,9 +138,6 @@ export default function RootLayout({
       <body
         className={cn(departureMono.variable, "overscroll-none antialiased")}
       >
-        <Script id="desktop-shell-class" strategy="beforeInteractive">
-          {desktopShellClassScript}
-        </Script>
         {isProduction ? null : (
           <Script id="localhost-dev-cache-reset" strategy="beforeInteractive">
             {localhostDevCacheResetScript}

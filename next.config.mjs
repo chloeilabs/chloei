@@ -3,7 +3,6 @@ import { withSentryConfig } from "@sentry/nextjs"
 const isProduction =
   process.env.VERCEL_ENV === "production" ||
   process.env.NODE_ENV === "production"
-const isDesktopBuild = process.env.CHLOEI_DESKTOP_BUILD === "1"
 
 function parseSizeLimitFromEnv(value, fallback) {
   if (!value) {
@@ -72,42 +71,9 @@ const securityHeaders = [
       ]
     : []),
 ]
-const generatedOutputFileTracingExcludes = [
-  "./desktop-build/**/*",
-  "./dist/**/*",
-  "./test-results/**/*",
-]
-const desktopOutputFileTracingIncludes = [
-  "./node_modules/next/dist/compiled/next-server/*runtime.prod.js",
-  "./node_modules/next/dist/compiled/next-server/*runtime.prod.js.map",
-]
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
-  ...(isDesktopBuild
-    ? {
-        output: "standalone",
-        outputFileTracingIncludes: {
-          "/*": desktopOutputFileTracingIncludes,
-        },
-        outputFileTracingExcludes: {
-          "**": generatedOutputFileTracingExcludes,
-          "/api/agent": [
-            ...generatedOutputFileTracingExcludes,
-            "./CLAUDE.md",
-            "./README.md",
-            "./app-migrate.mjs",
-            "./auth.ts",
-            "./components.json",
-            "./eslint.config.mjs",
-            "./evals/**/*",
-            "./next.config.mjs",
-            "./tests/**/*",
-          ],
-        },
-      }
-    : {}),
   // yahoo-finance2 (used lazily by the finance_data Yahoo provider) ships Deno
   // shims and a large schema tree; bundling it balloons the server build, so
   // require it at runtime from node_modules instead.
