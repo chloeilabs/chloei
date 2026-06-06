@@ -1,6 +1,7 @@
 import { z } from "zod"
 
 import { completeReportPlaceholderJob } from "@/lib/server/agent-report-jobs"
+import { updateAgentJobStatus } from "@/lib/server/jobs"
 import { indexUploadedDocument } from "@/lib/server/knowledge-indexing"
 import { runTradingAnalysisJob } from "@/lib/server/trading-agents/jobs"
 import { tradingDeskRequestSchema } from "@/lib/server/trading-agents/request-schema"
@@ -95,6 +96,37 @@ export const tradingAnalysisRequested = inngest.createFunction(
   {
     id: "trading-analysis-requested",
     idempotency: "event.data.userId + ':' + event.data.jobId",
+    // The whole analysis runs in one long synchronous step, so cap retries: a
+    // hard platform-kill (e.g. exceeding maxDuration) must not re-run the whole
+    // expensive multi-agent analysis several times over.
+    retries: 1,
+    // Safety net. runTradingAnalysisJob records its own failures, but if the
+    // invocation is hard-killed before its catch can run, the job row would sit
+    // in "running" until the client's 15-min poll cap. Mark it failed so the UI
+    // surfaces the error promptly. The original event is nested under
+    // `event.data.event` on the function.failed payload.
+    onFailure: async ({ event }) => {
+      const failure = event.data as {
+        event?: { data?: { jobId?: unknown } }
+        error?: { message?: unknown }
+      }
+      const jobId =
+        typeof failure.event?.data?.jobId === "string"
+          ? failure.event.data.jobId
+          : null
+      if (!jobId) {
+        return
+      }
+      const message =
+        typeof failure.error?.message === "string"
+          ? failure.error.message
+          : "The analysis did not complete."
+      await updateAgentJobStatus({
+        jobId,
+        status: "failed",
+        error: message,
+      }).catch(() => undefined)
+    },
     triggers: [{ event: "trading/analysis.requested" }],
   },
   async ({ event, step }) => {
