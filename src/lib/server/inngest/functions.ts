@@ -44,6 +44,12 @@ const tradingAnalysisRequestedSchema = z.object({
   request: tradingDeskRequestSchema,
 })
 
+const opsInngestSmokeSchema = z.object({
+  smokeId: z.string().trim().min(1),
+  sentAt: z.string().trim().min(1),
+  source: z.literal("chloei_inngest_smoke").optional(),
+})
+
 export const documentUploaded = inngest.createFunction(
   {
     id: "knowledge-document-uploaded",
@@ -149,9 +155,27 @@ export const tradingAnalysisRequested = inngest.createFunction(
   }
 )
 
+export const opsInngestSmoke = inngest.createFunction(
+  {
+    id: "ops-inngest-smoke",
+    idempotency: "event.data.smokeId",
+    triggers: [{ event: "ops/inngest.smoke" }],
+  },
+  async ({ event, step }) => {
+    const data = opsInngestSmokeSchema.parse(event.data)
+    return step.run("record-smoke", () => ({
+      ok: true,
+      sentAt: data.sentAt,
+      smokeId: data.smokeId,
+      source: data.source ?? "chloei_inngest_smoke",
+    }))
+  }
+)
+
 export const inngestFunctions = [
   documentUploaded,
   reportRequested,
   watchlistRefreshRequested,
   tradingAnalysisRequested,
+  opsInngestSmoke,
 ]

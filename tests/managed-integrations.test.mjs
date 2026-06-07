@@ -50,6 +50,10 @@ const postHogScrubbingUrl = pathToFileURL(
 const inngestEnvironmentUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/inngest/environment.ts")
 ).href
+const inngestFunctionsPath = path.join(
+  cwd,
+  "src/lib/server/inngest/functions.ts"
+)
 
 const {
   buildAuthenticatedPrivateBlobDownloadUrl,
@@ -1073,5 +1077,18 @@ test("Inngest event sender requires a key and known environment", () => {
       INNGEST_DEV: "true",
     }),
     true
+  )
+})
+
+test("Inngest registers a side-effect-free ops smoke function", () => {
+  const source = readFileSync(inngestFunctionsPath, "utf8")
+
+  assert.match(source, /export const opsInngestSmoke = inngest\.createFunction/)
+  assert.match(source, /id: "ops-inngest-smoke"/)
+  assert.match(source, /event: "ops\/inngest\.smoke"/)
+  assert.match(source, /step\.run\("record-smoke"/)
+  assert.match(
+    source,
+    /export const inngestFunctions = \[[\s\S]*opsInngestSmoke[\s\S]*\]/
   )
 })

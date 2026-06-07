@@ -59,6 +59,7 @@ pnpm exec playwright install --with-deps chromium
 - `pnpm eval:finance:grade`: grade finance benchmark outputs
 - `pnpm mem0:cleanup-smoke`: delete authenticated memory smoke artifacts for `SMOKE_EMAIL`
 - `pnpm mem0:smoke`: run a direct add/search/delete Mem0 REST smoke test
+- `pnpm inngest:smoke`: send one no-op `ops/inngest.smoke` event to Inngest
 - `pnpm lint`: run blocking ESLint checks
 - `pnpm lint:fix`: apply autofixable ESLint changes
 - `pnpm format`: write Prettier formatting changes
@@ -74,7 +75,7 @@ pnpm exec playwright install --with-deps chromium
 5. Merge to `main` after the preview passes, then confirm production is aliased to [chloei.ai](https://chloei.ai).
 6. Run one authenticated production smoke test: sign in, load models, send a prompt, verify an existing thread still reopens cleanly, and run the memory smoke against `https://chloei.ai`.
 
-Managed integration rollout, rollback, and smoke-test steps live in [docs/managed-integrations-rollout.md](docs/managed-integrations-rollout.md). Public-markets finance answer quality checks live in [docs/finance-research-quality.md](docs/finance-research-quality.md).
+Managed integration rollout, rollback, duplicate-cleanup, and smoke-test steps live in [docs/managed-integrations-rollout.md](docs/managed-integrations-rollout.md). Public-markets finance answer quality checks live in [docs/finance-research-quality.md](docs/finance-research-quality.md).
 
 ## Trading Desk
 
@@ -171,3 +172,5 @@ By default, Chloei enforces safe built-in agent limits even if you leave all opt
 `pnpm test:smoke:mock` runs a CI-safe authenticated chat flow with `E2E_MOCK_AUTH=1`, in-memory thread storage, and a deterministic mock agent response against the production Next.js server. Run `pnpm build` first or use `pnpm test:smoke:mock:build`. It does not require Better Auth credentials, PostgreSQL, or AI provider API keys.
 
 `pnpm mem0:smoke` requires `MEMORY_PROVIDER=mem0`, `MEM0_API_URL`, and `MEM0_API_KEY`; it writes a disposable marker, retries search for up to 45 seconds to allow Mem0 extraction/indexing to settle, and deletes the marker. `pnpm test:smoke:memory` requires `SMOKE_EMAIL` and `SMOKE_PASSWORD`; use `SMOKE_BASE_URL=<preview-or-production-url>` for preview and production verification. `pnpm mem0:cleanup-smoke` removes authenticated memory smoke threads and Mem0 memories for the configured smoke user while keeping the account available for recurring checks.
+
+`pnpm inngest:smoke` requires `INNGEST_EVENT_KEY`; it sends a disposable `ops/inngest.smoke` event and prints the smoke ID plus Inngest event ID without printing the key. For production, pull env vars into a temporary file and pass it with `--env-file`; see [docs/managed-integrations-rollout.md](docs/managed-integrations-rollout.md).

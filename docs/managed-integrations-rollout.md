@@ -1,6 +1,6 @@
 # Managed Integrations Rollout
 
-Last verified: May 16, 2026.
+Last verified: June 7, 2026.
 
 This runbook covers the Chloei managed integration stack for financial-services
 agent capabilities. The default posture is privacy-first: all new production
@@ -21,10 +21,10 @@ each managed capability, all connected to the `chloei` project:
 | `chloei-workflows`        | Inngest        | Durable agent workflows and jobs        |
 | `chloei-db`               | Neon           | Primary PostgreSQL system of record     |
 
-There should be no duplicate project-level Sentry or PostHog resources. If the
-Vercel integrations console shows an extra product tile that is not connected to
-`chloei`, confirm no other project uses it before removing it from the
-integration console.
+There should be no duplicate project-level Sentry, PostHog, or Inngest
+resources. If the Vercel integrations console shows an extra product tile that
+is not connected to `chloei`, confirm no project resource is attached before
+removing it from the integration console.
 
 The current production deployment should be `Ready`, aliased to `chloei.ai`,
 and expose `/api/inngest` with `x-inngest-sdk-handled: true`. An unsigned
@@ -174,6 +174,24 @@ Expected results:
 - `/api/inngest` returns `401` with `x-inngest-sdk-handled: true` when unsigned.
 - No unexpected production errors appear in Vercel logs.
 
+Inngest production registration and event smoke:
+
+```bash
+curl -sS -X PUT https://chloei.ai/api/inngest
+
+tmp_env="$(mktemp -t chloei-inngest-prod.XXXXXX)"
+vercel env pull "$tmp_env" --environment=production --yes --scope chloei
+pnpm inngest:smoke --env-file "$tmp_env"
+rm -f "$tmp_env"
+```
+
+Expected results:
+
+- The sync response includes `"Successfully registered"`.
+- Inngest `Events` shows `ops/inngest.smoke`.
+- Inngest `Runs` shows `ops-inngest-smoke` with `Completed` status.
+- The script prints an Inngest event ID and never prints `INNGEST_EVENT_KEY`.
+
 Authenticated rollout smoke after internal production flags are enabled:
 
 1. Sign in as an internal user.
@@ -218,6 +236,30 @@ printf '%s' false | vercel env add POSTHOG_ANALYTICS_ENABLED production --force 
 vercel edge-config update chloei-flags --scope chloei --patch '{"items":[{"operation":"update","key":"agent_flags","value":{"agent.knowledge_search.enabled":false,"agent.async_reports.enabled":false,"agent.telemetry.record_io":false,"agent.finance_workflows.enabled":false}},{"operation":"update","key":"flags","value":{"agent-knowledge-search-enabled":false,"agent-async-reports-enabled":false,"agent-telemetry-record-io":false,"agent-finance-workflows-enabled":false,"analytics-posthog-enabled":false}},{"operation":"update","key":"analytics_flags","value":{"analytics.posthog.enabled":false}}]}'
 vercel redeploy https://chloei.ai
 ```
+
+## Duplicate Inngest Cleanup
+
+Duplicate Vercel Inngest installs usually show up as multiple `Inngest` rows on
+`/chloei/chloei/settings/integrations`. Keep the billed install connected to the
+`chloei-workflows` resource. As of June 7, 2026, the active install is
+`icfg_pviKCAeMuk9dmdjEIdALlPZK`.
+
+Before removing any duplicate:
+
+1. Run `vercel integration list --format=json` and confirm the only Inngest
+   project resource is `chloei-workflows`.
+2. Open the duplicate install's Vercel Settings page.
+3. Click `Remove Inngest` only if the confirmation dialog says
+   `No Installed Inngest Resources` and `You don't have any connected projects`.
+4. Do not remove the billed install that owns `chloei-workflows`.
+5. Re-run `vercel integration list --format=json` and
+   `curl -sS -X PUT https://chloei.ai/api/inngest`.
+6. Run the Inngest smoke command above.
+
+Inngest `Unattached syncs` are historical failed automatic sync records. Treat
+old `account_mismatch` entries as audit history once the current app syncs and
+the smoke run completes. A new unattached sync after cleanup is actionable and
+should be investigated from its failure details.
 
 If code rollback is required, pick the last known good production deployment and
 run:
