@@ -1,7 +1,12 @@
 import { Inngest } from "inngest"
 
-import { resolveInngestEnvironmentName } from "./environment"
+import {
+  applyInngestEnvironmentInferenceOverrides,
+  resolveInngestEnvironmentName,
+} from "./environment"
 
+const inngestEnvironmentInferenceOverrides =
+  applyInngestEnvironmentInferenceOverrides()
 const inngestEnvironmentName = resolveInngestEnvironmentName()
 
 export const inngest = new Inngest({
@@ -11,3 +16,7 @@ export const inngest = new Inngest({
   ...(inngestEnvironmentName ? { env: inngestEnvironmentName } : {}),
   isDev: process.env.INNGEST_DEV === "1" || process.env.INNGEST_DEV === "true",
 })
+
+if (inngestEnvironmentInferenceOverrides) {
+  inngest.setEnvVars(inngestEnvironmentInferenceOverrides)
+}

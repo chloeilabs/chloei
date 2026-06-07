@@ -92,6 +92,8 @@ const { scrubPostHogEvent, scrubPostHogProperties } = await import(
   postHogScrubbingUrl
 )
 const {
+  applyInngestEnvironmentInferenceOverrides,
+  resolveInngestEnvironmentInferenceOverrides,
   resolveInngestEnvironmentName,
   shouldRunInngestInlineFallback,
   shouldSendInngestEvents,
@@ -924,6 +926,20 @@ test("Inngest environment resolver uses explicit and branch names", () => {
   )
   assert.equal(
     resolveInngestEnvironmentName({
+      VERCEL_GIT_COMMIT_REF: "main",
+      VERCEL_GIT_PRODUCTION_BRANCH: "main",
+    }),
+    undefined
+  )
+  assert.equal(
+    resolveInngestEnvironmentName({
+      BRANCH_NAME: "main",
+      VERCEL_GIT_PRODUCTION_BRANCH: "main",
+    }),
+    undefined
+  )
+  assert.equal(
+    resolveInngestEnvironmentName({
       VERCEL_ENV: "preview",
       VERCEL_GIT_COMMIT_REF: "main",
       VERCEL_GIT_PRODUCTION_BRANCH: "main",
@@ -963,6 +979,70 @@ test("Inngest environment resolver uses explicit and branch names", () => {
   )
   assert.equal(resolveInngestEnvironmentName({}), undefined)
   assert.equal(resolveInngestEnvironmentName({ VERCEL: "1" }), undefined)
+})
+
+test("Inngest environment overrides disable SDK production branch inference", () => {
+  assert.deepEqual(
+    resolveInngestEnvironmentInferenceOverrides({
+      VERCEL_GIT_COMMIT_REF: "main",
+      VERCEL_GIT_PRODUCTION_BRANCH: "main",
+    }),
+    {
+      BRANCH_NAME: undefined,
+      INNGEST_ENV: undefined,
+      VERCEL_GIT_COMMIT_REF: undefined,
+    }
+  )
+  assert.deepEqual(
+    resolveInngestEnvironmentInferenceOverrides({
+      BRANCH_NAME: "main",
+      VERCEL_GIT_PRODUCTION_BRANCH: "main",
+    }),
+    {
+      BRANCH_NAME: undefined,
+      INNGEST_ENV: undefined,
+      VERCEL_GIT_COMMIT_REF: undefined,
+    }
+  )
+  assert.equal(
+    resolveInngestEnvironmentInferenceOverrides({
+      VERCEL_GIT_COMMIT_REF: "feature/chloei",
+      VERCEL_GIT_PRODUCTION_BRANCH: "main",
+    }),
+    undefined
+  )
+  assert.deepEqual(resolveInngestEnvironmentInferenceOverrides({}), {
+    BRANCH_NAME: undefined,
+    INNGEST_ENV: undefined,
+    VERCEL_GIT_COMMIT_REF: undefined,
+  })
+})
+
+test("Inngest environment override application clears production branch vars", () => {
+  const productionEnv = {
+    BRANCH_NAME: "main",
+    VERCEL_ENV: "production",
+    VERCEL_GIT_COMMIT_REF: "main",
+    VERCEL_GIT_PRODUCTION_BRANCH: "main",
+  }
+
+  assert.deepEqual(applyInngestEnvironmentInferenceOverrides(productionEnv), {
+    BRANCH_NAME: undefined,
+    INNGEST_ENV: undefined,
+    VERCEL_GIT_COMMIT_REF: undefined,
+  })
+  assert.equal(productionEnv.BRANCH_NAME, undefined)
+  assert.equal(productionEnv.VERCEL_GIT_COMMIT_REF, undefined)
+  assert.equal(productionEnv.VERCEL_ENV, "production")
+  assert.equal(productionEnv.VERCEL_GIT_PRODUCTION_BRANCH, "main")
+
+  const branchEnv = {
+    VERCEL_ENV: "preview",
+    VERCEL_GIT_COMMIT_REF: "feature/chloei",
+    VERCEL_GIT_PRODUCTION_BRANCH: "main",
+  }
+  assert.equal(applyInngestEnvironmentInferenceOverrides(branchEnv), undefined)
+  assert.equal(branchEnv.VERCEL_GIT_COMMIT_REF, "feature/chloei")
 })
 
 test("Inngest event sender requires a key and known environment", () => {
