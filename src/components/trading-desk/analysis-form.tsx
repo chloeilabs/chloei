@@ -159,7 +159,7 @@ export function AnalysisForm({
                     transform: `translateX(${String(depthIndex * 100)}%)`,
                   }}
                 />
-                {TRADING_DESK_DEPTHS.map((value) => {
+                {TRADING_DESK_DEPTHS.map((value, index) => {
                   const active = depth === value
                   return (
                     <ToggleGroupItem
@@ -167,7 +167,9 @@ export function AnalysisForm({
                       value={value}
                       aria-label={DEPTH_LABELS[value]}
                       className={cn(
-                        "relative h-full min-w-0 bg-transparent px-1.5 font-departureMono text-[10px] transition-colors before:absolute before:inset-y-1 before:left-0 before:w-px before:bg-border first:before:hidden hover:bg-muted/55 aria-pressed:bg-transparent data-[state=on]:bg-transparent",
+                        "relative h-full min-w-0 bg-transparent px-1.5 font-departureMono text-[10px] transition-colors hover:bg-muted/55 aria-pressed:bg-transparent data-[state=on]:bg-transparent",
+                        index > 0 &&
+                          "before:absolute before:inset-y-1 before:left-0 before:w-px before:bg-border",
                         active
                           ? "text-foreground"
                           : "text-muted-foreground hover:text-foreground"
