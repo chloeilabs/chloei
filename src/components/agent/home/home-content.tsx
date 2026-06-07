@@ -50,17 +50,6 @@ const STREAMING_SCROLL_EARLY_TRIGGER_PX = 72
 const STREAMING_SCROLL_PROMPT_BUFFER_PX = 24
 const conversationWidthClass = "max-w-[50rem]"
 
-const AppLauncher = dynamic(
-  () =>
-    import("@/components/agent/home/app-launcher").then(
-      (mod) => mod.AppLauncher
-    ),
-  {
-    ssr: false,
-    loading: () => <div className="size-7" />,
-  }
-)
-
 const Messages = dynamic(
   () => import("../messages/messages").then((mod) => mod.Messages),
   {
@@ -382,7 +371,6 @@ export function HomePageContent({
             ) : null}
 
             <TradingDeskNavButton />
-            <AppLauncher className="size-7 text-muted-foreground hover:text-foreground" />
           </div>
         </div>
 
