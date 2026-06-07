@@ -22,14 +22,44 @@ export function resolveInngestEnvironmentName(
   const branchEnvironment =
     trimmed(env.BRANCH_NAME) ?? trimmed(env.VERCEL_GIT_COMMIT_REF)
   const productionBranch = trimmed(env.VERCEL_GIT_PRODUCTION_BRANCH) ?? "main"
-  if (
-    branchEnvironment &&
-    (vercelEnvironment !== "preview" || branchEnvironment !== productionBranch)
-  ) {
+  if (branchEnvironment) {
+    if (branchEnvironment === productionBranch) {
+      return undefined
+    }
+
     return branchEnvironment
   }
 
   return undefined
+}
+
+export function resolveInngestEnvironmentInferenceOverrides(
+  env: Environment = process.env
+): Environment | undefined {
+  if (resolveInngestEnvironmentName(env)) {
+    return undefined
+  }
+
+  return {
+    BRANCH_NAME: undefined,
+    INNGEST_ENV: undefined,
+    VERCEL_GIT_COMMIT_REF: undefined,
+  }
+}
+
+export function applyInngestEnvironmentInferenceOverrides(
+  env: Environment = process.env
+): Environment | undefined {
+  const overrides = resolveInngestEnvironmentInferenceOverrides(env)
+  if (!overrides) {
+    return undefined
+  }
+
+  delete env.BRANCH_NAME
+  delete env.INNGEST_ENV
+  delete env.VERCEL_GIT_COMMIT_REF
+
+  return overrides
 }
 
 export function shouldSendInngestEvents(
