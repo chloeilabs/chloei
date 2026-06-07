@@ -1,15 +1,26 @@
 "use client"
 
-import { Play, Square } from "lucide-react"
+import { CalendarIcon, Play, Square } from "lucide-react"
 import { useState } from "react"
 
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
+import { Calendar } from "@/components/ui/calendar"
+import { Card, CardContent } from "@/components/ui/card"
+import { Field, FieldGroup } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@/components/ui/toggle-group"
+import {
   TRADING_DESK_ANALYST_KEYS,
-  TRADING_DESK_ANALYST_LABELS,
   TRADING_DESK_DEPTHS,
-  type TradingDeskAnalystKey,
   type TradingDeskConfig,
   type TradingDeskDepth,
   type TradingDeskRequest,
@@ -21,16 +32,39 @@ const DEPTH_LABELS: Record<TradingDeskDepth, string> = {
   medium: "Medium",
   deep: "Deep",
 }
-const DEPTH_HINTS: Record<TradingDeskDepth, string> = {
-  shallow: "1 round · fastest",
-  medium: "2 rounds · balanced",
-  deep: "3 rounds · thorough",
-}
 
 const TICKER_RE = /^[A-Za-z0-9.\-^=]{1,15}$/
 
-const microLabel =
-  "font-departureMono text-[10px] tracking-wide text-muted-foreground uppercase"
+function parseTradeDate(value: string): Date | undefined {
+  const [year, month, day] = value.split("-").map(Number)
+  if (!year || !month || !day) {
+    return undefined
+  }
+  return new Date(year, month - 1, day)
+}
+
+function formatTradeDate(date: Date): string {
+  const year = String(date.getFullYear())
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+function formatReadableDate(value: string): string {
+  const date = parseTradeDate(value)
+  if (!date) {
+    return "mm/dd/yyyy"
+  }
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  }).format(date)
+}
+
+function isTradingDeskDepth(value: string): value is TradingDeskDepth {
+  return (TRADING_DESK_DEPTHS as readonly string[]).includes(value)
+}
 
 export function AnalysisForm({
   isRunning,
@@ -45,19 +79,12 @@ export function AnalysisForm({
 }) {
   const [ticker, setTicker] = useState("")
   const [tradeDate, setTradeDate] = useState("")
-  const [analysts, setAnalysts] = useState<TradingDeskAnalystKey[]>([
-    ...TRADING_DESK_ANALYST_KEYS,
-  ])
   const [depth, setDepth] = useState<TradingDeskDepth>("shallow")
+  const [dateOpen, setDateOpen] = useState(false)
 
   const tickerValid = TICKER_RE.test(ticker.trim())
-  const canRun = tickerValid && analysts.length > 0 && !isRunning
-
-  function toggleAnalyst(key: TradingDeskAnalystKey) {
-    setAnalysts((prev) =>
-      prev.includes(key) ? prev.filter((a) => a !== key) : [...prev, key]
-    )
-  }
+  const canRun = tickerValid && !isRunning
+  const depthIndex = TRADING_DESK_DEPTHS.indexOf(depth)
 
   function submit() {
     if (!canRun) {
@@ -66,7 +93,7 @@ export function AnalysisForm({
     onRun({
       ticker: ticker.trim().toUpperCase(),
       tradeDate: tradeDate.trim() || null,
-      analysts,
+      analysts: [...TRADING_DESK_ANALYST_KEYS],
       depth,
       assetType: "stock",
       online: true,
@@ -86,24 +113,24 @@ export function AnalysisForm({
     }
     return null
   })()
+  const selectedDate = parseTradeDate(tradeDate)
 
   return (
-    <div className="border border-border bg-card/40 p-4">
+    <Card size="sm" className="bg-card/40">
+      <CardContent>
       <form
         onSubmit={(event) => {
           event.preventDefault()
           submit()
         }}
-        className="space-y-4"
+        className="flex flex-col gap-4"
       >
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
-          <div className="space-y-1.5">
-            <label htmlFor="td-ticker" className={microLabel}>
-              Ticker
-            </label>
+        <FieldGroup className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(8rem,1fr)_11rem_10rem_auto]">
+          <Field>
             <Input
               id="td-ticker"
-              placeholder="NVDA"
+              aria-label="Ticker"
+              placeholder="TICKER"
               autoComplete="off"
               autoCapitalize="characters"
               spellCheck={false}
@@ -113,102 +140,115 @@ export function AnalysisForm({
               }}
               className="font-departureMono tracking-tight uppercase"
             />
-          </div>
-          <div className="space-y-1.5">
-            <label htmlFor="td-date" className={microLabel}>
-              As-of date
-            </label>
-            <Input
-              id="td-date"
-              type="date"
-              value={tradeDate}
-              onChange={(event) => {
-                setTradeDate(event.target.value)
+          </Field>
+          <Field>
+            <ToggleGroup
+              value={[depth]}
+              onValueChange={(values) => {
+                const next = values[0]
+                if (next && isTradingDeskDepth(next)) {
+                  setDepth(next)
+                }
               }}
-              className="w-full sm:w-[10.5rem]"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <span className={microLabel}>Analysts</span>
-          <div className="flex flex-wrap gap-2">
-            {TRADING_DESK_ANALYST_KEYS.map((key) => {
-              const active = analysts.includes(key)
-              return (
-                <button
-                  key={key}
+              spacing={0}
+              aria-label="Research depth"
+              className="relative grid h-10 w-full grid-cols-3 overflow-hidden border border-border bg-background p-1"
+            >
+              <div
+                aria-hidden="true"
+                className="absolute inset-y-1 left-1 bg-primary/20 shadow-[inset_0_0_0_1px_var(--primary)] transition-transform"
+                style={{
+                  width: "calc((100% - 0.5rem) / 3)",
+                  transform: `translateX(${String(depthIndex * 100)}%)`,
+                }}
+              />
+              {TRADING_DESK_DEPTHS.map((value) => {
+                const active = depth === value
+                return (
+                  <ToggleGroupItem
+                    key={value}
+                    value={value}
+                    aria-label={DEPTH_LABELS[value]}
+                    className={cn(
+                      "relative h-full min-w-0 bg-transparent px-1.5 font-departureMono text-[10px] transition-colors before:absolute before:inset-y-1 before:left-0 before:w-px before:bg-border first:before:hidden hover:bg-muted/55 aria-pressed:bg-transparent data-[state=on]:bg-transparent",
+                      active
+                        ? "text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <span>{DEPTH_LABELS[value]}</span>
+                  </ToggleGroupItem>
+                )
+              })}
+            </ToggleGroup>
+          </Field>
+          <Field>
+            <Popover open={dateOpen} onOpenChange={setDateOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  id="td-date"
                   type="button"
-                  aria-pressed={active}
-                  onClick={() => {
-                    toggleAnalyst(key)
-                  }}
+                  aria-label="As-of date"
+                  variant="outline"
+                  size="lg"
                   className={cn(
-                    "cursor-pointer border px-3 py-1 text-sm transition-colors",
-                    active
-                      ? "border-primary/50 bg-primary/10 text-foreground"
-                      : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+                    "h-10 w-full min-w-[10rem] justify-between font-departureMono tracking-tight",
+                    !tradeDate && "text-muted-foreground"
                   )}
                 >
-                  {TRADING_DESK_ANALYST_LABELS[key]}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <span className={microLabel}>Research depth</span>
-          <div className="grid grid-cols-3 gap-2">
-            {TRADING_DESK_DEPTHS.map((value) => {
-              const active = depth === value
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => {
-                    setDepth(value)
+                  <span>{formatReadableDate(tradeDate)}</span>
+                  <CalendarIcon data-icon="inline-end" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-auto p-0">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => {
+                    if (!date) {
+                      setTradeDate("")
+                      return
+                    }
+                    setTradeDate(formatTradeDate(date))
+                    setDateOpen(false)
                   }}
-                  className={cn(
-                    "cursor-pointer border px-2 py-2 text-left transition-colors",
-                    active
-                      ? "border-primary/60 font-medium text-foreground ring-2 ring-primary/70"
-                      : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
-                  )}
-                >
-                  <div className="text-sm font-medium">
-                    {DEPTH_LABELS[value]}
-                  </div>
-                  <div className="text-[11px] text-muted-foreground">
-                    {DEPTH_HINTS[value]}
-                  </div>
-                </button>
-              )
-            })}
+                />
+              </PopoverContent>
+            </Popover>
+          </Field>
+          <div className="flex items-end">
+            {isRunning ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                className="h-10 w-full sm:w-auto"
+                onClick={onStop}
+              >
+                <Square data-icon="inline-start" />
+                Stop
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                size="lg"
+                className="h-10 w-full sm:w-auto"
+                disabled={!canRun}
+              >
+                <Play data-icon="inline-start" />
+                Run analysis
+              </Button>
+            )}
           </div>
-        </div>
-
-        <div className="flex items-center justify-end pt-1">
-          {isRunning ? (
-            <Button type="button" variant="outline" size="lg" onClick={onStop}>
-              <Square className="size-3.5" />
-              Stop
-            </Button>
-          ) : (
-            <Button type="submit" size="lg" disabled={!canRun}>
-              <Play className="size-3.5" />
-              Run analysis
-            </Button>
-          )}
-        </div>
+        </FieldGroup>
 
         {serviceHint ? (
-          <p className="border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-            {serviceHint}
-          </p>
+          <Alert>
+            <AlertDescription>{serviceHint}</AlertDescription>
+          </Alert>
         ) : null}
       </form>
-    </div>
+      </CardContent>
+    </Card>
   )
 }
