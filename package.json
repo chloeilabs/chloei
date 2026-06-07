@@ -11,6 +11,7 @@
     "build": "next build",
     "bundle:budget": "node scripts/check-bundle-budget.mjs",
     "bundle:report": "node scripts/report-bundle-headroom.mjs",
+    "inngest:smoke": "node scripts/inngest-smoke.mjs",
     "migrate": "pnpm auth:migrate && pnpm app:migrate",
     "start": "next start",
     "threads:migrate": "pnpm app:migrate",
@@ -24,8 +25,8 @@
     "test:smoke:memory": "playwright test tests/smoke/memory-authenticated-chat.spec.mjs",
     "test:smoke:mock": "E2E_MOCK_AUTH=1 E2E_MOCK_AUTH_ALLOW_NEXT_START=1 E2E_MOCK_AGENT_RESPONSE=SMOKE_OK SMOKE_EXPECTED_TEXT=SMOKE_OK SMOKE_PORT=3101 playwright test tests/smoke/mock-authenticated-chat.spec.mjs",
     "test:smoke:mock:build": "pnpm build && pnpm test:smoke:mock",
-    "lint": "eslint src tests auth.ts app-migrate.mjs eslint.config.mjs next.config.mjs playwright.config.mjs postcss.config.mjs scripts/vercel-ignore-build.mjs --max-warnings=0",
-    "lint:fix": "eslint src tests auth.ts app-migrate.mjs eslint.config.mjs next.config.mjs playwright.config.mjs postcss.config.mjs scripts/vercel-ignore-build.mjs --fix --max-warnings=0",
+    "lint": "eslint src tests auth.ts app-migrate.mjs eslint.config.mjs next.config.mjs playwright.config.mjs postcss.config.mjs scripts/inngest-smoke.mjs scripts/vercel-ignore-build.mjs --max-warnings=0",
+    "lint:fix": "eslint src tests auth.ts app-migrate.mjs eslint.config.mjs next.config.mjs playwright.config.mjs postcss.config.mjs scripts/inngest-smoke.mjs scripts/vercel-ignore-build.mjs --fix --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "next typegen && tsc --noEmit"
