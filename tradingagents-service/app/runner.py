@@ -96,6 +96,20 @@ class _StatusTracker:
         return events.agent_status(name, status)
 
 
+def warm_imports() -> None:
+    """Eagerly import the heavy TradingAgents/langchain stack.
+
+    ``run_analysis`` imports these lazily on first call, which costs several
+    seconds of pydantic schema building. Doing it at service startup instead
+    keeps the first ``/analyze`` from sitting silent during that import — a
+    silent gap that was long enough for the upstream streaming connection to be
+    dropped before the first event ever left the service. Best-effort: callers
+    guard against import errors (e.g. mock-only deployments).
+    """
+    from cli.stats_handler import StatsCallbackHandler  # noqa: F401
+    from tradingagents.graph.trading_graph import TradingAgentsGraph  # noqa: F401
+
+
 def run_analysis(req: AnalyzeRequest) -> Iterator[Dict[str, Any]]:
     """Run a real analysis, yielding service event dicts."""
     from cli.stats_handler import StatsCallbackHandler
