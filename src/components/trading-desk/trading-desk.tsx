@@ -1,7 +1,6 @@
 "use client"
 
 import { CandlestickChart } from "lucide-react"
-import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 
@@ -22,17 +21,6 @@ import { AnalyzingState } from "./analyzing-state"
 import { DecisionBanner } from "./decision-banner"
 import { ReportPanel } from "./report-panel"
 import { useTradingDeskRun } from "./use-trading-desk-run"
-
-const AppLauncher = dynamic(
-  () =>
-    import("@/components/agent/home/app-launcher").then(
-      (mod) => mod.AppLauncher
-    ),
-  {
-    ssr: false,
-    loading: () => <div className="size-7" />,
-  }
-)
 
 function StatsFooter({
   stats,
@@ -147,7 +135,6 @@ export function TradingDesk({ viewer }: { viewer: AuthViewer }) {
           </div>
           <div className="flex items-center gap-1">
             <TradingDeskNavButton />
-            <AppLauncher className="size-7 text-muted-foreground hover:text-foreground" />
           </div>
         </div>
 
