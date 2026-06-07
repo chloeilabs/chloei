@@ -22,7 +22,9 @@ export function useThreadStoreContext() {
   const threadStore = useContext(ThreadStoreContext)
 
   if (!threadStore) {
-    throw new Error("useThreadStoreContext must be used within ThreadStoreProvider.")
+    throw new Error(
+      "useThreadStoreContext must be used within ThreadStoreProvider."
+    )
   }
 
   return threadStore
