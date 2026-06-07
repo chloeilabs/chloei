@@ -1,5 +1,6 @@
 import { z } from "zod"
 
+import { createLogger } from "@/lib/logger"
 import { completeReportPlaceholderJob } from "@/lib/server/agent-report-jobs"
 import { updateAgentJobStatus } from "@/lib/server/jobs"
 import { indexUploadedDocument } from "@/lib/server/knowledge-indexing"
@@ -7,6 +8,8 @@ import { runTradingAnalysisJob } from "@/lib/server/trading-agents/jobs"
 import { tradingDeskRequestSchema } from "@/lib/server/trading-agents/request-schema"
 
 import { inngest } from "./client"
+
+const logger = createLogger("inngest-functions")
 
 const documentUploadedSchema = z.object({
   userId: z.string().trim().min(1),
@@ -125,7 +128,12 @@ export const tradingAnalysisRequested = inngest.createFunction(
         jobId,
         status: "failed",
         error: message,
-      }).catch(() => undefined)
+      }).catch((updateError: unknown) => {
+        logger.error(
+          "Failed to mark trading analysis job as failed in onFailure handler",
+          { jobId, error: updateError }
+        )
+      })
     },
     triggers: [{ event: "trading/analysis.requested" }],
   },
