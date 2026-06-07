@@ -173,7 +173,7 @@ export function AnalysisForm({
                   className={cn(
                     "cursor-pointer border px-2 py-2 text-left transition-colors",
                     active
-                      ? "border-primary bg-primary/15 text-foreground ring-1 ring-primary/30"
+                      ? "border-primary/60 font-medium text-foreground ring-2 ring-primary/70"
                       : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                 >
