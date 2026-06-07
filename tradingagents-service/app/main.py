@@ -14,6 +14,7 @@ in a threadpool and the event loop stays responsive.
 from __future__ import annotations
 
 import hmac
+import logging
 from typing import Iterator
 
 from fastapi import FastAPI, Header, HTTPException, Request
@@ -60,6 +61,19 @@ def _on_startup() -> None:
     # Copy AI_GATEWAY_API_KEY into the active provider's key env var so the
     # framework's LLM client finds it without extra operator setup.
     seed_provider_api_key()
+    # Warm the heavy analysis import at boot so the first /analyze doesn't spend
+    # several seconds importing the TradingAgents stack before its first byte —
+    # that silent gap was getting the streaming connection dropped. Best-effort:
+    # mock-only deployments may not have the stack installed.
+    if not MOCK_ALWAYS:
+        try:
+            from .runner import warm_imports
+
+            warm_imports()
+        except Exception as exc:  # noqa: BLE001 - warming is best-effort
+            logging.getLogger("uvicorn.error").warning(
+                "TradingAgents warm-import skipped: %s", exc
+            )
 
 
 def _check_token(provided: str | None) -> None:
@@ -122,8 +136,16 @@ def analyze(
     use_mock = _should_mock(req)
 
     def event_stream() -> Iterator[str]:
+        # Flush a byte immediately so the streaming response is never silent
+        # while the run spins up. An initial silent gap (the lazy import below,
+        # then graph construction) was long enough that the upstream connection
+        # got dropped before the first event — surfacing to the caller as a
+        # "terminated" stream. SSE comment lines are ignored by the client.
+        yield ": ready\n\n"
         # Import the heavy real runner lazily so mock mode and /health never
-        # require the TradingAgents stack to be importable.
+        # require the TradingAgents stack to be importable (it is warmed at
+        # startup, so this is normally a cache hit).
+        generator = None
         try:
             if use_mock:
                 from .mock import mock_analysis
@@ -135,9 +157,23 @@ def analyze(
                 generator = run_analysis(req)
             for event in generator:
                 yield events.sse(event)
+            yield events.sse({"type": "done"})
+        except GeneratorExit:
+            # The caller disconnected. Stop the upstream run so it doesn't keep
+            # making LLM calls for a result nobody will read, and do NOT yield
+            # (yielding while the generator is closing raises "generator ignored
+            # GeneratorExit").
+            if generator is not None:
+                try:
+                    generator.close()
+                except Exception as close_exc:  # noqa: BLE001 - best-effort
+                    logging.getLogger("uvicorn.error").warning(
+                        "Failed to close analyze generator after disconnect: %s",
+                        close_exc,
+                    )
+            raise
         except Exception as exc:  # noqa: BLE001 - always close the stream cleanly
             yield events.sse(events.error(str(exc), where="analyze"))
-        finally:
             yield events.sse({"type": "done"})
 
     return StreamingResponse(

@@ -129,27 +129,35 @@ export async function streamTradingDeskAnalysis(
 }
 
 /**
- * Run an analysis to completion and return the final result.
- *
- * Consumes the NDJSON stream server-side and resolves with the
- * `run_completed` payload — used by the chat agent tool, which needs a single
- * aggregated result rather than a live stream. Throws on a service error event
- * or if the stream ends without completing.
+ * Signals that the `/analyze` stream dropped before emitting any event — the
+ * one failure that is safe to retry (no analysis work has streamed yet).
  */
-export async function fetchTradingDeskResult(
-  request: TradingDeskRequest,
-  signal?: AbortSignal
-): Promise<TaRunCompletedEvent> {
-  // Bound the run with a timeout (combined with the caller signal if any) so a
-  // stalled deep run can't stream/hang forever with no cancellation path.
-  const effectiveSignal = requestSignal(signal)
+class EarlyAnalysisDropError extends Error {
+  readonly reason: unknown
 
-  const ndjson = await streamTradingDeskAnalysis(request, effectiveSignal)
+  constructor(reason: unknown) {
+    super("The analysis stream ended before any event was received.")
+    this.name = "EarlyAnalysisDropError"
+    this.reason = reason
+  }
+}
+
+/**
+ * Consume one `/analyze` attempt and resolve with the `run_completed` payload.
+ * Throws `EarlyAnalysisDropError` if the connection drops before any event
+ * arrives; rethrows the underlying error on a mid-stream drop.
+ */
+async function consumeTradingDeskStream(
+  request: TradingDeskRequest,
+  signal: AbortSignal
+): Promise<TaRunCompletedEvent> {
+  const ndjson = await streamTradingDeskAnalysis(request, signal)
   const reader = ndjson.getReader()
   const decoder = new TextDecoder()
   let buffer = ""
   let completed: TaRunCompletedEvent | null = null
   let errorMessage: string | null = null
+  let receivedEvent = false
 
   const parseLine = (
     line: string
@@ -165,40 +173,109 @@ export async function fetchTradingDeskResult(
     }
   }
 
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) {
-      break
-    }
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split("\n")
-    buffer = lines.pop() ?? ""
-    for (const line of lines) {
-      const event = parseLine(line)
-      if (!event) {
-        continue
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) {
+        break
       }
-      if (event.type === "run_completed") {
-        completed = event as TaRunCompletedEvent
-      } else if (event.type === "error") {
-        errorMessage =
-          typeof event.message === "string" ? event.message : "Analysis failed."
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split("\n")
+      buffer = lines.pop() ?? ""
+      for (const line of lines) {
+        const event = parseLine(line)
+        if (!event) {
+          continue
+        }
+        // Count only a parsed event as progress — a bare keepalive/partial
+        // chunk must not disable the early-drop retry below.
+        receivedEvent = true
+        if (event.type === "run_completed") {
+          completed = event as TaRunCompletedEvent
+        } else if (event.type === "error") {
+          errorMessage =
+            typeof event.message === "string"
+              ? event.message
+              : "Analysis failed."
+        }
       }
     }
+  } catch (error) {
+    // A drop before any event streamed is safe to retry; a mid-stream drop is
+    // not (work has happened and re-running a deep analysis is expensive).
+    if (!receivedEvent && !signal.aborted) {
+      throw new EarlyAnalysisDropError(error)
+    }
+    throw error
   }
+
   const tail = parseLine(buffer)
-  if (tail?.type === "run_completed") {
-    completed = tail as TaRunCompletedEvent
-  } else if (tail?.type === "error") {
-    errorMessage =
-      typeof tail.message === "string" ? tail.message : "Analysis failed."
+  if (tail) {
+    receivedEvent = true
+    if (tail.type === "run_completed") {
+      completed = tail as TaRunCompletedEvent
+    } else if (tail.type === "error") {
+      errorMessage =
+        typeof tail.message === "string" ? tail.message : "Analysis failed."
+    }
   }
 
   if (completed !== null) {
     return completed
   }
+  // A stream that ended without ever producing an event (even a clean close) is
+  // an early drop — safe to retry. Only treat it as a hard failure once at
+  // least one event has streamed.
+  if (!receivedEvent && !signal.aborted) {
+    throw new EarlyAnalysisDropError(
+      new TradingAgentsServiceError(
+        errorMessage ?? "The analysis stream ended before any event.",
+        502
+      )
+    )
+  }
   throw new TradingAgentsServiceError(
     errorMessage ?? "The analysis did not complete.",
+    502
+  )
+}
+
+/**
+ * Run an analysis to completion and return the final result.
+ *
+ * Consumes the NDJSON stream server-side and resolves with the
+ * `run_completed` payload — used by the chat agent tool, which needs a single
+ * aggregated result rather than a live stream. Throws on a service error event
+ * or if the stream ends without completing.
+ *
+ * Retries once if the sidecar drops the connection before its first event
+ * (e.g. a cold spin-up): no analysis has streamed at that point, so the retry
+ * is safe and cheap. A mid-stream failure is surfaced immediately.
+ */
+export async function fetchTradingDeskResult(
+  request: TradingDeskRequest,
+  signal?: AbortSignal
+): Promise<TaRunCompletedEvent> {
+  // Bound the run with a timeout (combined with the caller signal if any) so a
+  // stalled deep run can't stream/hang forever with no cancellation path.
+  const effectiveSignal = requestSignal(signal)
+
+  let lastReason: unknown = null
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await consumeTradingDeskStream(request, effectiveSignal)
+    } catch (error) {
+      if (!(error instanceof EarlyAnalysisDropError)) {
+        throw error
+      }
+      lastReason = error.reason
+      // First early drop: loop to retry. Second: fall through and surface it.
+    }
+  }
+
+  const detail = lastReason instanceof Error ? `: ${lastReason.message}` : ""
+  throw new TradingAgentsServiceError(
+    `TradingAgents service /analyze stream terminated before any event${detail}`.trim(),
     502
   )
 }
