@@ -62,7 +62,7 @@ export function SourceTrigger({
         target="_blank"
         rel="noopener noreferrer"
         className={cn(
-          "inline-flex h-5 max-w-32 items-center gap-1 overflow-hidden rounded-none bg-muted py-0 text-xs text-muted-foreground no-underline transition-colors duration-150 hover:bg-muted-foreground/30 hover:text-primary",
+          "inline-flex h-5 max-w-32 cursor-pointer items-center gap-1 overflow-hidden rounded-none bg-muted py-0 text-xs text-muted-foreground no-underline transition-colors duration-150 hover:bg-muted-foreground/30 hover:text-primary",
           showFavicon ? "pr-2 pl-1" : "px-1",
           className
         )}
@@ -106,7 +106,7 @@ export function SourceContent({
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex flex-col gap-2 p-3"
+        className="flex cursor-pointer flex-col gap-2 p-3"
       >
         <div className="flex items-center gap-1.5">
           {showFavicon && faviconUrl && (

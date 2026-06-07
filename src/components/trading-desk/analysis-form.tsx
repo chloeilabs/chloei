@@ -144,7 +144,7 @@ export function AnalysisForm({
                     toggleAnalyst(key)
                   }}
                   className={cn(
-                    "border px-3 py-1 text-sm transition-colors",
+                    "cursor-pointer border px-3 py-1 text-sm transition-colors",
                     active
                       ? "border-primary/50 bg-primary/10 text-foreground"
                       : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -171,7 +171,7 @@ export function AnalysisForm({
                     setDepth(value)
                   }}
                   className={cn(
-                    "border px-2 py-2 text-left transition-colors",
+                    "cursor-pointer border px-2 py-2 text-left transition-colors",
                     active
                       ? "border-primary/50 bg-primary/10"
                       : "border-border hover:bg-muted"

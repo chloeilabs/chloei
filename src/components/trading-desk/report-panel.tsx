@@ -138,7 +138,7 @@ export function ReportPanel({
             }}
             aria-pressed={active === tab.id}
             className={cn(
-              "-mb-px border-b-2 px-3 py-2.5 font-departureMono text-[11px] tracking-wide whitespace-nowrap uppercase transition-colors",
+              "-mb-px cursor-pointer border-b-2 px-3 py-2.5 font-departureMono text-[11px] tracking-wide whitespace-nowrap uppercase transition-colors",
               active === tab.id
                 ? "border-primary text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
