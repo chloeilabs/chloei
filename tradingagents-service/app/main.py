@@ -166,8 +166,11 @@ def analyze(
             if generator is not None:
                 try:
                     generator.close()
-                except Exception:  # noqa: BLE001 - best-effort cancellation
-                    pass
+                except Exception as close_exc:  # noqa: BLE001 - best-effort
+                    logging.getLogger("uvicorn.error").warning(
+                        "Failed to close analyze generator after disconnect: %s",
+                        close_exc,
+                    )
             raise
         except Exception as exc:  # noqa: BLE001 - always close the stream cleanly
             yield events.sse(events.error(str(exc), where="analyze"))

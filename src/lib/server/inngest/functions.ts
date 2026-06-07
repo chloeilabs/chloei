@@ -118,6 +118,10 @@ export const tradingAnalysisRequested = inngest.createFunction(
           ? failure.event.data.jobId
           : null
       if (!jobId) {
+        logger.warn(
+          "Trading analysis onFailure could not extract a jobId from the failure payload.",
+          { eventData: failure.event?.data }
+        )
         return
       }
       const message =

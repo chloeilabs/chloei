@@ -157,7 +157,7 @@ async function consumeTradingDeskStream(
   let buffer = ""
   let completed: TaRunCompletedEvent | null = null
   let errorMessage: string | null = null
-  let receivedAny = false
+  let receivedEvent = false
 
   const parseLine = (
     line: string
@@ -179,7 +179,6 @@ async function consumeTradingDeskStream(
       if (done) {
         break
       }
-      receivedAny = true
       buffer += decoder.decode(value, { stream: true })
       const lines = buffer.split("\n")
       buffer = lines.pop() ?? ""
@@ -188,6 +187,9 @@ async function consumeTradingDeskStream(
         if (!event) {
           continue
         }
+        // Count only a parsed event as progress — a bare keepalive/partial
+        // chunk must not disable the early-drop retry below.
+        receivedEvent = true
         if (event.type === "run_completed") {
           completed = event as TaRunCompletedEvent
         } else if (event.type === "error") {
@@ -201,22 +203,36 @@ async function consumeTradingDeskStream(
   } catch (error) {
     // A drop before any event streamed is safe to retry; a mid-stream drop is
     // not (work has happened and re-running a deep analysis is expensive).
-    if (!receivedAny && !signal.aborted) {
+    if (!receivedEvent && !signal.aborted) {
       throw new EarlyAnalysisDropError(error)
     }
     throw error
   }
 
   const tail = parseLine(buffer)
-  if (tail?.type === "run_completed") {
-    completed = tail as TaRunCompletedEvent
-  } else if (tail?.type === "error") {
-    errorMessage =
-      typeof tail.message === "string" ? tail.message : "Analysis failed."
+  if (tail) {
+    receivedEvent = true
+    if (tail.type === "run_completed") {
+      completed = tail as TaRunCompletedEvent
+    } else if (tail.type === "error") {
+      errorMessage =
+        typeof tail.message === "string" ? tail.message : "Analysis failed."
+    }
   }
 
   if (completed !== null) {
     return completed
+  }
+  // A stream that ended without ever producing an event (even a clean close) is
+  // an early drop — safe to retry. Only treat it as a hard failure once at
+  // least one event has streamed.
+  if (!receivedEvent && !signal.aborted) {
+    throw new EarlyAnalysisDropError(
+      new TradingAgentsServiceError(
+        errorMessage ?? "The analysis stream ended before any event.",
+        502
+      )
+    )
   }
   throw new TradingAgentsServiceError(
     errorMessage ?? "The analysis did not complete.",
