@@ -7,7 +7,12 @@
  */
 
 const DEFAULT_SERVICE_URL = "http://localhost:8000"
-const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000 // a deep run can take a few minutes
+// Bound a single run just below the executing function's Vercel maxDuration (the
+// /api/inngest route that runs the job is capped at 800s) so the request aborts
+// and the job is recorded as failed *before* the platform hard-kills the
+// invocation. A hard-kill leaves the job stuck "running" and triggers expensive
+// Inngest retries. ~20s of headroom under 800s covers abort + DB cleanup.
+const DEFAULT_TIMEOUT_MS = 780 * 1000 // 13 min, just under the 800s function cap
 
 /** Base URL of the sidecar, no trailing slash. */
 const configuredServiceUrl = process.env.TRADINGAGENTS_SERVICE_URL?.trim()
