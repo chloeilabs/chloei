@@ -37,14 +37,18 @@ export function parseDotEnv(content) {
   return parsed
 }
 
-export function loadEnvFile(filePath, env = process.env) {
+export function loadEnvFile(
+  filePath,
+  env = process.env,
+  { override = false } = {}
+) {
   if (!existsSync(filePath)) {
     return false
   }
 
   const parsed = parseDotEnv(readFileSync(filePath, "utf8"))
   for (const [key, value] of Object.entries(parsed)) {
-    if (!env[key]) {
+    if (override || !env[key]) {
       env[key] = value
     }
   }
@@ -192,7 +196,7 @@ async function main() {
   loadEnvFile(".env")
   loadEnvFile(".env.local")
   if (options.envFile) {
-    loadEnvFile(options.envFile)
+    loadEnvFile(options.envFile, process.env, { override: true })
   }
 
   const result = await sendSmokeEvent({

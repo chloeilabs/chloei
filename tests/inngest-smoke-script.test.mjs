@@ -1,4 +1,6 @@
 import assert from "node:assert/strict"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
 import test from "node:test"
 import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
@@ -12,6 +14,7 @@ const {
   DEFAULT_INNGEST_SMOKE_EVENT_NAME,
   buildEventApiUrl,
   buildSmokeEventPayload,
+  loadEnvFile,
   parseArgs,
   parseDotEnv,
   sendSmokeEvent,
@@ -81,4 +84,20 @@ test("Inngest smoke script parses dotenv and CLI options", () => {
     buildEventApiUrl("https://inn.gs/e/", "abc/123"),
     "https://inn.gs/e/abc%2F123"
   )
+})
+
+test("Inngest smoke script lets explicit env files override local defaults", () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "chloei-inngest-smoke-"))
+  const envPath = path.join(directory, ".env.production")
+  try {
+    writeFileSync(envPath, "INNGEST_EVENT_KEY=production-key\n", "utf8")
+    const env = { INNGEST_EVENT_KEY: "local-key" }
+
+    assert.equal(loadEnvFile(envPath, env), true)
+    assert.equal(env.INNGEST_EVENT_KEY, "local-key")
+    assert.equal(loadEnvFile(envPath, env, { override: true }), true)
+    assert.equal(env.INNGEST_EVENT_KEY, "production-key")
+  } finally {
+    rmSync(directory, { force: true, recursive: true })
+  }
 })
