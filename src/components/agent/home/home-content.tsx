@@ -33,14 +33,14 @@ import {
   type AgentRunMode,
   type AuthViewer,
   type ModelType,
-  type ThreadSummary,
 } from "@/lib/shared"
 import { cn } from "@/lib/utils"
 
 import { ScrollToBottom } from "../../task/scroll-to-bottom"
+import { TradingDeskNavButton } from "../../trading-desk-nav-button"
 import { PromptForm } from "../prompt-form/prompt-form"
+import { useThreadStoreContext } from "./thread-store-context"
 import { useAgentSession } from "./use-agent-session"
-import { useThreadStore } from "./use-thread-store"
 
 type ViewTransitionStarter = (updateCallback: () => void) => unknown
 
@@ -70,11 +70,9 @@ const Messages = dynamic(
 
 export function HomePageContent({
   initialSelectedModel,
-  initialThreadSummaries = [],
   viewer,
 }: {
   initialSelectedModel?: ModelType | null
-  initialThreadSummaries?: ThreadSummary[]
   viewer: AuthViewer
 }) {
   const [isPending, startTransition] = useTransition()
@@ -87,7 +85,7 @@ export function HomePageContent({
   const overflowPinnedTurnIdRef = useRef<string | null>(null)
   const headerActionsRef = useRef<HTMLDivElement | null>(null)
   const isMobile = useIsMobile()
-  const threadStore = useThreadStore(initialThreadSummaries)
+  const threadStore = useThreadStoreContext()
   const {
     state,
     queuedSubmission,
@@ -383,6 +381,7 @@ export function HomePageContent({
               </Tooltip>
             ) : null}
 
+            <TradingDeskNavButton />
             <AppLauncher className="size-7 text-muted-foreground hover:text-foreground" />
           </div>
         </div>

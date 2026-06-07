@@ -2,7 +2,7 @@
 
 import "@/components/graphics/logo/logo-animation.css"
 
-import { CandlestickChartIcon, SearchIcon, SquarePenIcon } from "lucide-react"
+import { SearchIcon, SquarePenIcon } from "lucide-react"
 import dynamic from "next/dynamic"
 import Link from "next/link"
 import * as React from "react"
@@ -109,7 +109,7 @@ export function AppSidebar({
     isThreadSummariesLoading && threadSummaries.length === 0
 
   return (
-    <Sidebar variant="inset" {...props}>
+    <Sidebar {...props}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
@@ -146,16 +146,6 @@ export function AppSidebar({
               >
                 <SquarePenIcon />
                 <span>New chat</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                tooltip="Trading desk"
-                render={<Link href="/trading-desk" />}
-                className="gap-2"
-              >
-                <CandlestickChartIcon />
-                <span>Trading desk</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>

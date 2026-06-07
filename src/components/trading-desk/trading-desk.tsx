@@ -5,8 +5,9 @@ import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 
-import { useThreadStore } from "@/components/agent/home/use-thread-store"
+import { useThreadStoreContext } from "@/components/agent/home/thread-store-context"
 import { AppSidebar } from "@/components/app-sidebar"
+import { TradingDeskNavButton } from "@/components/trading-desk-nav-button"
 import {
   SidebarInset,
   SidebarProvider,
@@ -86,7 +87,7 @@ function EmptyState() {
 
 export function TradingDesk({ viewer }: { viewer: AuthViewer }) {
   const router = useRouter()
-  const threadStore = useThreadStore()
+  const threadStore = useThreadStoreContext()
   const { state, startJob, stop, isRunning } = useTradingDeskRun()
   const [config, setConfig] = useState<TradingDeskConfig | null>(null)
   const [serviceError, setServiceError] = useState<string | null>(null)
@@ -145,6 +146,7 @@ export function TradingDesk({ viewer }: { viewer: AuthViewer }) {
             <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
           </div>
           <div className="flex items-center gap-1">
+            <TradingDeskNavButton />
             <AppLauncher className="size-7 text-muted-foreground hover:text-foreground" />
           </div>
         </div>
