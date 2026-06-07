@@ -14,10 +14,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@/components/ui/toggle-group"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import {
   TRADING_DESK_ANALYST_KEYS,
   TRADING_DESK_DEPTHS,
@@ -118,136 +115,136 @@ export function AnalysisForm({
   return (
     <Card size="sm" className="bg-card/40">
       <CardContent>
-      <form
-        onSubmit={(event) => {
-          event.preventDefault()
-          submit()
-        }}
-        className="flex flex-col gap-4"
-      >
-        <FieldGroup className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(8rem,1fr)_11rem_10rem_auto]">
-          <Field>
-            <Input
-              id="td-ticker"
-              aria-label="Ticker"
-              placeholder="TICKER"
-              autoComplete="off"
-              autoCapitalize="characters"
-              spellCheck={false}
-              value={ticker}
-              onChange={(event) => {
-                setTicker(event.target.value.toUpperCase().slice(0, 15))
-              }}
-              className="font-departureMono tracking-tight uppercase"
-            />
-          </Field>
-          <Field>
-            <ToggleGroup
-              value={[depth]}
-              onValueChange={(values) => {
-                const next = values[0]
-                if (next && isTradingDeskDepth(next)) {
-                  setDepth(next)
-                }
-              }}
-              spacing={0}
-              aria-label="Research depth"
-              className="relative grid h-10 w-full grid-cols-3 overflow-hidden border border-border bg-background p-1"
-            >
-              <div
-                aria-hidden="true"
-                className="absolute inset-y-1 left-1 bg-primary/20 shadow-[inset_0_0_0_1px_var(--primary)] transition-transform"
-                style={{
-                  width: "calc((100% - 0.5rem) / 3)",
-                  transform: `translateX(${String(depthIndex * 100)}%)`,
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            submit()
+          }}
+          className="flex flex-col gap-4"
+        >
+          <FieldGroup className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(8rem,1fr)_11rem_10rem_auto]">
+            <Field>
+              <Input
+                id="td-ticker"
+                aria-label="Ticker"
+                placeholder="TICKER"
+                autoComplete="off"
+                autoCapitalize="characters"
+                spellCheck={false}
+                value={ticker}
+                onChange={(event) => {
+                  setTicker(event.target.value.toUpperCase().slice(0, 15))
                 }}
+                className="font-departureMono tracking-tight uppercase"
               />
-              {TRADING_DESK_DEPTHS.map((value) => {
-                const active = depth === value
-                return (
-                  <ToggleGroupItem
-                    key={value}
-                    value={value}
-                    aria-label={DEPTH_LABELS[value]}
-                    className={cn(
-                      "relative h-full min-w-0 bg-transparent px-1.5 font-departureMono text-[10px] transition-colors before:absolute before:inset-y-1 before:left-0 before:w-px before:bg-border first:before:hidden hover:bg-muted/55 aria-pressed:bg-transparent data-[state=on]:bg-transparent",
-                      active
-                        ? "text-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    <span>{DEPTH_LABELS[value]}</span>
-                  </ToggleGroupItem>
-                )
-              })}
-            </ToggleGroup>
-          </Field>
-          <Field>
-            <Popover open={dateOpen} onOpenChange={setDateOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  id="td-date"
-                  type="button"
-                  aria-label="As-of date"
-                  variant="outline"
-                  size="lg"
-                  className={cn(
-                    "h-10 w-full min-w-[10rem] justify-between font-departureMono tracking-tight",
-                    !tradeDate && "text-muted-foreground"
-                  )}
-                >
-                  <span>{formatReadableDate(tradeDate)}</span>
-                  <CalendarIcon data-icon="inline-end" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="start" className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={(date) => {
-                    if (!date) {
-                      setTradeDate("")
-                      return
-                    }
-                    setTradeDate(formatTradeDate(date))
-                    setDateOpen(false)
+            </Field>
+            <Field>
+              <ToggleGroup
+                value={[depth]}
+                onValueChange={(values) => {
+                  const next = values[0]
+                  if (next && isTradingDeskDepth(next)) {
+                    setDepth(next)
+                  }
+                }}
+                spacing={0}
+                aria-label="Research depth"
+                className="relative grid h-10 w-full grid-cols-3 overflow-hidden border border-border bg-background p-1"
+              >
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-y-1 left-1 bg-primary/20 shadow-[inset_0_0_0_1px_var(--primary)] transition-transform"
+                  style={{
+                    width: "calc((100% - 0.5rem) / 3)",
+                    transform: `translateX(${String(depthIndex * 100)}%)`,
                   }}
                 />
-              </PopoverContent>
-            </Popover>
-          </Field>
-          <div className="flex items-end">
-            {isRunning ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="lg"
-                className="h-10 w-full sm:w-auto"
-                onClick={onStop}
-              >
-                <Square data-icon="inline-start" />
-                Stop
-              </Button>
-            ) : (
-              <Button
-                type="submit"
-                size="lg"
-                className="h-10 w-full sm:w-auto"
-                disabled={!canRun}
-              >
-                <Play data-icon="inline-start" />
-                Run analysis
-              </Button>
-            )}
-          </div>
-        </FieldGroup>
+                {TRADING_DESK_DEPTHS.map((value) => {
+                  const active = depth === value
+                  return (
+                    <ToggleGroupItem
+                      key={value}
+                      value={value}
+                      aria-label={DEPTH_LABELS[value]}
+                      className={cn(
+                        "relative h-full min-w-0 bg-transparent px-1.5 font-departureMono text-[10px] transition-colors before:absolute before:inset-y-1 before:left-0 before:w-px before:bg-border first:before:hidden hover:bg-muted/55 aria-pressed:bg-transparent data-[state=on]:bg-transparent",
+                        active
+                          ? "text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <span>{DEPTH_LABELS[value]}</span>
+                    </ToggleGroupItem>
+                  )
+                })}
+              </ToggleGroup>
+            </Field>
+            <Field>
+              <Popover open={dateOpen} onOpenChange={setDateOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="td-date"
+                    type="button"
+                    aria-label="As-of date"
+                    variant="outline"
+                    size="lg"
+                    className={cn(
+                      "h-10 w-full min-w-[10rem] justify-between font-departureMono tracking-tight",
+                      !tradeDate && "text-muted-foreground"
+                    )}
+                  >
+                    <span>{formatReadableDate(tradeDate)}</span>
+                    <CalendarIcon data-icon="inline-end" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={(date) => {
+                      if (!date) {
+                        setTradeDate("")
+                        return
+                      }
+                      setTradeDate(formatTradeDate(date))
+                      setDateOpen(false)
+                    }}
+                  />
+                </PopoverContent>
+              </Popover>
+            </Field>
+            <div className="flex items-end">
+              {isRunning ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  className="h-10 w-full sm:w-auto"
+                  onClick={onStop}
+                >
+                  <Square data-icon="inline-start" />
+                  Stop
+                </Button>
+              ) : (
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="h-10 w-full sm:w-auto"
+                  disabled={!canRun}
+                >
+                  <Play data-icon="inline-start" />
+                  Run analysis
+                </Button>
+              )}
+            </div>
+          </FieldGroup>
 
-        {serviceHint ? (
-          <Alert>
-            <AlertDescription>{serviceHint}</AlertDescription>
-          </Alert>
-        ) : null}
-      </form>
+          {serviceHint ? (
+            <Alert>
+              <AlertDescription>{serviceHint}</AlertDescription>
+            </Alert>
+          ) : null}
+        </form>
       </CardContent>
     </Card>
   )

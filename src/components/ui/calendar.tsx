@@ -1,6 +1,10 @@
 "use client"
 
-import { ChevronDownIcon,ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
+import {
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+} from "lucide-react"
 import * as React from "react"
 import {
   type DayButton,
@@ -152,7 +156,10 @@ function Calendar({
 
           if (orientation === "right") {
             return (
-              <ChevronRightIcon className={cn("size-4", className)} {...props} />
+              <ChevronRightIcon
+                className={cn("size-4", className)}
+                {...props}
+              />
             )
           }
 
