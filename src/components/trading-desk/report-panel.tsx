@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { type KeyboardEvent, useRef, useState } from "react"
 
 import type { TradingDeskDebates } from "@/lib/shared/trading-agents/types"
 import { cn } from "@/lib/utils"
@@ -101,6 +101,9 @@ export function ReportPanel({
   debates: TradingDeskDebates
 }) {
   const [active, setActive] = useState<TabId>("analysts")
+  const tabButtonRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const rawActiveIndex = TABS.findIndex((tab) => tab.id === active)
+  const activeIndex = Math.min(Math.max(rawActiveIndex, 0), TABS.length - 1)
 
   const research = debates.research
   const risk = debates.risk
@@ -125,31 +128,92 @@ export function ReportPanel({
     risk.judge ||
     sections.final_trade_decision?.content
   )
+  const selectTabAtIndex = (index: number) => {
+    const nextIndex = Math.min(Math.max(index, 0), TABS.length - 1)
+    const nextTab = TABS[nextIndex]
+    if (!nextTab) {
+      return
+    }
+    setActive(nextTab.id)
+    tabButtonRefs.current[nextIndex]?.focus()
+  }
+  const handleTabKeyDown = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    index: number
+  ) => {
+    if (event.key === "ArrowLeft") {
+      event.preventDefault()
+      selectTabAtIndex(index === 0 ? TABS.length - 1 : index - 1)
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault()
+      selectTabAtIndex(index === TABS.length - 1 ? 0 : index + 1)
+    } else if (event.key === "Home") {
+      event.preventDefault()
+      selectTabAtIndex(0)
+    } else if (event.key === "End") {
+      event.preventDefault()
+      selectTabAtIndex(TABS.length - 1)
+    }
+  }
 
   return (
-    <div className="border border-border bg-card/40">
-      <div className="flex items-center gap-1 overflow-x-auto border-b border-border px-2">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => {
-              setActive(tab.id)
+    <div className="space-y-4">
+      <div className="overflow-x-auto">
+        <div
+          role="tablist"
+          aria-label="Trading desk report sections"
+          className="relative grid h-10 min-w-[25rem] grid-cols-4 overflow-hidden border border-border bg-background p-1 sm:w-fit"
+        >
+          <div
+            aria-hidden="true"
+            className="absolute inset-y-1 left-1 bg-primary/20 shadow-[inset_0_0_0_1px_var(--primary)] transition-transform"
+            style={{
+              width: "calc((100% - 0.5rem) / 4)",
+              transform: `translateX(${String(activeIndex * 100)}%)`,
             }}
-            aria-pressed={active === tab.id}
-            className={cn(
-              "-mb-px cursor-pointer border-b-2 px-3 py-2.5 font-departureMono text-[11px] tracking-wide whitespace-nowrap uppercase transition-colors",
-              active === tab.id
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
+          />
+          {TABS.map((tab, index) => {
+            const isActive = active === tab.id
+            return (
+              <button
+                key={tab.id}
+                id={`tab-${tab.id}`}
+                ref={(button) => {
+                  tabButtonRefs.current[index] = button
+                }}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                aria-controls={`tabpanel-${tab.id}`}
+                tabIndex={isActive ? 0 : -1}
+                onClick={() => {
+                  setActive(tab.id)
+                }}
+                onKeyDown={(event) => {
+                  handleTabKeyDown(event, index)
+                }}
+                className={cn(
+                  "relative h-full min-w-0 cursor-pointer bg-transparent px-3 font-departureMono text-[11px] tracking-wide whitespace-nowrap uppercase transition-colors hover:bg-muted/55",
+                  index > 0 &&
+                    "before:absolute before:inset-y-1 before:left-0 before:w-px before:bg-border",
+                  isActive
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {tab.label}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
-      <div className="space-y-6 px-4 py-4 sm:px-5">
+      <div
+        id={`tabpanel-${active}`}
+        role="tabpanel"
+        aria-labelledby={`tab-${active}`}
+        className="space-y-6"
+      >
         {active === "analysts" &&
           (hasAnalysts ? (
             analystKeys.map((a) => (
