@@ -18,7 +18,10 @@ import {
 } from "@/lib/server/auth"
 import { getRequestSession } from "@/lib/server/auth-session"
 import { inngest } from "@/lib/server/inngest/client"
-import { shouldRunInngestInlineFallback } from "@/lib/server/inngest/environment"
+import {
+  shouldRunInngestInlineFallback,
+  shouldSendInngestEvents,
+} from "@/lib/server/inngest/environment"
 import { createAgentJob, updateAgentJobStatus } from "@/lib/server/jobs"
 import { evaluateAndConsumeSlidingWindowRateLimit } from "@/lib/server/rate-limit"
 import {
@@ -159,8 +162,12 @@ export async function POST(request: NextRequest) {
       idempotencyKey: ["trading", session.user.id, runId].join(":"),
     })
 
-    if (shouldRunInngestInlineFallback()) {
+    const shouldRunInlineFallback =
+      shouldRunInngestInlineFallback() || !shouldSendInngestEvents()
+
+    if (shouldRunInlineFallback) {
       logger.warn("Running trading analysis through inline fallback.", {
+        errorCode: "TRADING_DESK_JOB_INLINE_FALLBACK",
         jobId: job.id,
         requestId,
       })

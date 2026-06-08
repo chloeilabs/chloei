@@ -35,7 +35,7 @@ export function AnalyzingState({
   }, [])
 
   return (
-    <div className="flex flex-col items-center border border-border bg-card/40 px-6 py-12 text-center">
+    <div className="flex flex-col items-center border-y border-border/70 py-12 text-center">
       <Loader2 className="size-6 animate-spin text-primary" />
       <div className="mt-4 flex items-center gap-2">
         <span className="font-departureMono text-sm tracking-tight text-muted-foreground">
@@ -45,7 +45,7 @@ export function AnalyzingState({
           {ticker ?? "—"}
         </span>
         {mock ? (
-          <span className="border border-border bg-muted px-1.5 py-0.5 font-departureMono text-[10px] tracking-wide text-muted-foreground uppercase">
+          <span className="font-departureMono text-[10px] tracking-wide text-muted-foreground uppercase">
             Mock
           </span>
         ) : null}

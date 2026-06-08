@@ -22,55 +22,16 @@ import {
 } from "@/components/ui/sidebar"
 import type { AuthViewer } from "@/lib/shared/auth"
 import type { TradingDeskConfig } from "@/lib/shared/trading-agents/types"
-import { cn } from "@/lib/utils"
 
-import { AgentPipeline } from "./agent-pipeline"
 import { AnalysisForm } from "./analysis-form"
 import { AnalyzingState } from "./analyzing-state"
 import { DecisionBanner } from "./decision-banner"
 import { ReportPanel } from "./report-panel"
 import { useTradingDeskRun } from "./use-trading-desk-run"
 
-function StatsFooter({
-  stats,
-}: {
-  stats: {
-    llm_calls: number
-    tool_calls: number
-    tokens_in: number
-    tokens_out: number
-    elapsed_seconds?: number
-  } | null
-}) {
-  if (!stats) {
-    return null
-  }
-  const items: [string, string][] = [
-    ["LLM calls", String(stats.llm_calls)],
-    ["Tool calls", String(stats.tool_calls)],
-    ["Tokens in", stats.tokens_in.toLocaleString()],
-    ["Tokens out", stats.tokens_out.toLocaleString()],
-  ]
-  if (typeof stats.elapsed_seconds === "number") {
-    items.push(["Elapsed", `${stats.elapsed_seconds.toFixed(1)}s`])
-  }
-  return (
-    <dl className="flex flex-wrap gap-x-5 gap-y-1.5 border border-border bg-card/40 px-3 py-2.5">
-      {items.map(([label, value]) => (
-        <div key={label} className="flex items-baseline gap-1.5">
-          <dt className="font-departureMono text-[10px] tracking-wide text-muted-foreground uppercase">
-            {label}
-          </dt>
-          <dd className="text-xs text-foreground/80">{value}</dd>
-        </div>
-      ))}
-    </dl>
-  )
-}
-
 function EmptyState() {
   return (
-    <Empty className="min-h-[13rem] border border-dashed border-border bg-card/30">
+    <Empty className="min-h-[13rem] border-y border-dashed border-border/70 bg-transparent">
       <EmptyHeader>
         <EmptyMedia variant="icon">
           <CandlestickChart />
@@ -125,7 +86,6 @@ export function TradingDesk({ viewer }: { viewer: AuthViewer }) {
   const decision = state?.decision ?? ""
   const judgeCall = state?.debates.risk.judge ?? ""
   const decisionText = decision.length > 0 ? decision : judgeCall
-  const isIdle = !state
 
   return (
     <SidebarProvider className="min-h-0 flex-1">
@@ -153,77 +113,58 @@ export function TradingDesk({ viewer }: { viewer: AuthViewer }) {
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <div
-            className={cn(
-              "mx-auto w-full px-4 py-5 sm:px-6",
-              isIdle ? "max-w-4xl" : "max-w-6xl"
-            )}
-          >
-            <div
-              className={cn(
-                "grid grid-cols-1 gap-5",
-                !isIdle && "lg:grid-cols-[36rem_minmax(0,1fr)]"
-              )}
-            >
-              {/* Controls */}
-              <div className="flex flex-col gap-4 lg:sticky lg:top-4 lg:self-start">
-                <AnalysisForm
-                  isRunning={isRunning}
-                  config={config}
-                  onRun={(request) => {
-                    void startJob(request)
-                  }}
-                  onStop={stop}
-                />
-                {!state ? <EmptyState /> : null}
-                {serviceError ? (
-                  <Alert>
-                    <AlertTitle>TradingAgents unavailable</AlertTitle>
-                    <AlertDescription>{serviceError}</AlertDescription>
-                  </Alert>
-                ) : null}
-                <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  Research output from automated agents. Not financial advice.
-                </p>
-              </div>
+          <div className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6">
+            <div className="flex flex-col gap-5">
+              <AnalysisForm
+                isRunning={isRunning}
+                config={config}
+                onRun={(request) => {
+                  void startJob(request)
+                }}
+                onStop={stop}
+              />
 
-              {state ? (
-                <div className="flex min-w-0 flex-col gap-4">
-                  {state.status === "running" ? (
-                    <AnalyzingState
-                      ticker={state.ticker}
-                      startedAt={state.startedAt}
-                      agentCount={Object.keys(state.agentStatus).length}
-                      mock={state.mock}
-                    />
-                  ) : (
-                    <>
-                      <DecisionBanner
-                        ticker={state.ticker}
-                        tradeDate={state.tradeDate}
-                        signal={state.signal}
-                        status={state.status}
-                        mock={state.mock}
-                        decisionText={decisionText}
-                      />
-                      {state.error ? (
-                        <p className="border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                          {state.error}
-                        </p>
-                      ) : null}
-                      <StatsFooter stats={state.stats} />
-                      <AgentPipeline
-                        teams={state.teams}
-                        agentStatus={state.agentStatus}
-                      />
-                      <ReportPanel
-                        sections={state.sections}
-                        debates={state.debates}
-                      />
-                    </>
-                  )}
-                </div>
+              {serviceError ? (
+                <Alert>
+                  <AlertTitle>TradingAgents unavailable</AlertTitle>
+                  <AlertDescription>{serviceError}</AlertDescription>
+                </Alert>
               ) : null}
+
+              {!state ? (
+                <EmptyState />
+              ) : state.status === "running" ? (
+                <AnalyzingState
+                  ticker={state.ticker}
+                  startedAt={state.startedAt}
+                  agentCount={Object.keys(state.agentStatus).length}
+                  mock={state.mock}
+                />
+              ) : (
+                <div className="flex min-w-0 flex-col gap-4">
+                  <DecisionBanner
+                    ticker={state.ticker}
+                    tradeDate={state.tradeDate}
+                    signal={state.signal}
+                    status={state.status}
+                    mock={state.mock}
+                    decisionText={decisionText}
+                  />
+                  {state.error ? (
+                    <p className="border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                      {state.error}
+                    </p>
+                  ) : null}
+                  <ReportPanel
+                    sections={state.sections}
+                    debates={state.debates}
+                  />
+                </div>
+              )}
+
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                Research output from automated agents. Not financial advice.
+              </p>
             </div>
           </div>
         </div>

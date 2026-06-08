@@ -657,7 +657,7 @@ test("async report enqueue failure isolates status update failures", () => {
   )
 })
 
-test("Inngest inline fallback is explicit and covers report/upload routes", () => {
+test("Inngest inline fallback covers report/trading/upload routes", () => {
   assert.equal(shouldRunInngestInlineFallback({}), false)
   assert.equal(
     shouldRunInngestInlineFallback({ INNGEST_INLINE_FALLBACK: "true" }),
@@ -674,6 +674,18 @@ test("Inngest inline fallback is explicit and covers report/upload routes", () =
     /const shouldRunInlineFallback = shouldRunInngestInlineFallback\(\)/
   )
   assert.match(reportRouteSource, /} else {\n\s+let enqueueError: unknown/)
+
+  const tradingJobRouteSource = readFileSync(
+    path.join(cwd, "src/app/api/trading-desk/jobs/route.ts"),
+    "utf8"
+  )
+  assert.match(tradingJobRouteSource, /TRADING_DESK_JOB_INLINE_FALLBACK/)
+  assert.match(tradingJobRouteSource, /shouldSendInngestEvents/)
+  assert.match(
+    tradingJobRouteSource,
+    /shouldRunInngestInlineFallback\(\) \|\| !shouldSendInngestEvents\(\)/
+  )
+
   assert.match(
     readFileSync(path.join(cwd, "src/app/api/uploads/route.ts"), "utf8"),
     /UPLOAD_INLINE_INDEX_FAILED/

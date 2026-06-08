@@ -54,9 +54,9 @@ export function AgentPipeline({
   return (
     <Collapsible
       defaultOpen={defaultOpen}
-      className="border border-border bg-card/40"
+      className="border-y border-border/70"
     >
-      <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 px-4 py-3 text-left">
+      <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 py-3 text-left">
         <span className="flex items-center gap-2">
           {allDone ? (
             <Check className="size-3.5 text-vesper-teal" strokeWidth={2.5} />
@@ -73,7 +73,7 @@ export function AgentPipeline({
         <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="grid grid-cols-1 gap-px border-t border-border bg-border sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-x-6 gap-y-4 border-t border-border/70 py-4 sm:grid-cols-2 lg:grid-cols-5">
           {teams.map((team) => {
             const agents = team.agents.filter(
               (agent) => agentStatus[agent.name] !== undefined
@@ -82,7 +82,7 @@ export function AgentPipeline({
               return null
             }
             return (
-              <div key={team.id} className="bg-card/40 p-3">
+              <div key={team.id}>
                 <div className="mb-2 font-departureMono text-[10px] tracking-wide text-muted-foreground uppercase">
                   {team.label}
                 </div>

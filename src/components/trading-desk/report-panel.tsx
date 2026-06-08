@@ -101,6 +101,7 @@ export function ReportPanel({
   debates: TradingDeskDebates
 }) {
   const [active, setActive] = useState<TabId>("analysts")
+  const activeIndex = TABS.findIndex((tab) => tab.id === active)
 
   const research = debates.research
   const risk = debates.risk
@@ -127,29 +128,49 @@ export function ReportPanel({
   )
 
   return (
-    <div className="border border-border bg-card/40">
-      <div className="flex items-center gap-1 overflow-x-auto border-b border-border px-2">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => {
-              setActive(tab.id)
+    <div className="space-y-4">
+      <div className="overflow-x-auto">
+        <div
+          role="tablist"
+          aria-label="Trading desk report sections"
+          className="relative grid h-10 min-w-[25rem] grid-cols-4 overflow-hidden border border-border bg-background p-1 sm:w-fit"
+        >
+          <div
+            aria-hidden="true"
+            className="absolute inset-y-1 left-1 bg-primary/20 shadow-[inset_0_0_0_1px_var(--primary)] transition-transform"
+            style={{
+              width: "calc((100% - 0.5rem) / 4)",
+              transform: `translateX(${String(activeIndex * 100)}%)`,
             }}
-            aria-pressed={active === tab.id}
-            className={cn(
-              "-mb-px cursor-pointer border-b-2 px-3 py-2.5 font-departureMono text-[11px] tracking-wide whitespace-nowrap uppercase transition-colors",
-              active === tab.id
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
+          />
+          {TABS.map((tab, index) => {
+            const isActive = active === tab.id
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => {
+                  setActive(tab.id)
+                }}
+                className={cn(
+                  "relative h-full min-w-0 cursor-pointer bg-transparent px-3 font-departureMono text-[11px] tracking-wide whitespace-nowrap uppercase transition-colors hover:bg-muted/55",
+                  index > 0 &&
+                    "before:absolute before:inset-y-1 before:left-0 before:w-px before:bg-border",
+                  isActive
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {tab.label}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
-      <div className="space-y-6 px-4 py-4 sm:px-5">
+      <div className="space-y-6">
         {active === "analysts" &&
           (hasAnalysts ? (
             analystKeys.map((a) => (
