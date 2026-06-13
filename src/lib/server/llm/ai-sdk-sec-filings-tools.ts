@@ -1,19 +1,28 @@
 import { tool } from "ai"
 import { z } from "zod"
 
-import { asRecord, asString } from "@/lib/cast"
+import { asRecord, toOptionalString } from "@/lib/cast"
 import type { MessageSource, ToolName } from "@/lib/shared"
 
+import {
+  normalizeTickerSymbol,
+  requireField,
+} from "./finance-data/normalizers"
 import {
   classifyFinanceDataRetry,
   fetchJsonWithRetry,
   fetchTextWithRetry,
 } from "./finance-data/retry"
+import {
+  buildSecCompanyTickersUrl,
+  buildSecFilingUrl,
+  buildSecSubmissionsContinuationUrl,
+  buildSecSubmissionsUrl,
+  normalizeCik,
+} from "./finance-data/sec"
 
 const SEC_FILINGS_TOOL_NAME = "sec_filings" as const
 const SEC_FILINGS_LABEL = "Searching SEC filings"
-const SEC_COMPANY_SUBMISSIONS_BASE_URL = "https://data.sec.gov/submissions"
-const SEC_COMPANY_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 const SEC_ARCHIVE_HOSTNAMES = new Set(["sec.gov", "www.sec.gov"])
 const SEC_SUBMISSIONS_CONTINUATION_FILE_PATTERN =
   /^CIK\d{10}-submissions-\d+\.json$/i
@@ -194,11 +203,6 @@ const secFilingsInputSchema = z.object({
 
 type SecFilingsToolInput = z.infer<typeof secFilingsInputSchema>
 
-function toOptionalString(value: unknown): string | undefined {
-  const normalized = asString(value)?.trim()
-  return normalized && normalized.length > 0 ? normalized : undefined
-}
-
 function getConfiguredSecUserAgent(value: string | undefined): string {
   const normalized = value?.trim()
   return normalized && normalized.length > 0
@@ -217,22 +221,6 @@ function normalizeMaxChars(input: SecFilingsToolInput): number {
   )
 }
 
-function normalizeCik(cik: string): string {
-  const digits = cik.replace(/\D/g, "")
-  if (!digits) {
-    throw Object.assign(new Error("A numeric CIK is required."), {
-      code: "INVALID_INPUT",
-      retryable: false,
-    })
-  }
-
-  return digits.padStart(10, "0")
-}
-
-function normalizeTickerSymbol(symbol: string): string {
-  return symbol.replace(/\s+/g, "").trim().toUpperCase()
-}
-
 function normalizeAccessionNumber(accessionNumber: string): string {
   return accessionNumber.trim().replace(/\s+/g, "")
 }
@@ -247,32 +235,6 @@ function deriveCikFromAccession(accessionNumber: string): string | undefined {
     /^(\d{10})-\d{2}-\d{6}$/.exec(normalized) ??
     /^(\d{10})\d{8}$/.exec(normalized)
   return match?.[1] ? normalizeCik(match[1]) : undefined
-}
-
-function buildSecCompanyTickersUrl(): URL {
-  return new URL(SEC_COMPANY_TICKERS_URL)
-}
-
-function buildSecSubmissionsUrl(cik: string): URL {
-  return new URL(
-    `${SEC_COMPANY_SUBMISSIONS_BASE_URL}/CIK${normalizeCik(cik)}.json`
-  )
-}
-
-function buildSecSubmissionsContinuationUrl(fileName: string): URL {
-  return new URL(`${SEC_COMPANY_SUBMISSIONS_BASE_URL}/${fileName}`)
-}
-
-function buildSecFilingUrl(params: {
-  cik: string
-  accessionNumber: string
-  primaryDocument: string
-}): string {
-  const cikNumber = Number(normalizeCik(params.cik))
-  const accessionDirectory = params.accessionNumber.replaceAll("-", "")
-  const primaryDocument = params.primaryDocument.trim().replace(/^\/+/, "")
-
-  return `https://www.sec.gov/Archives/edgar/data/${String(cikNumber)}/${accessionDirectory}/${primaryDocument}`
 }
 
 function parseSecArchiveUrl(value: string): ParsedSecArchiveUrl | null {
@@ -335,24 +297,6 @@ function createSecSource(
     url,
     title,
   } satisfies MessageSource
-}
-
-function requireField(
-  input: SecFilingsToolInput,
-  field: keyof SecFilingsToolInput
-): string {
-  const value = input[field]
-  if (typeof value !== "string" || !value.trim()) {
-    throw Object.assign(
-      new Error(`${input.operation} requires \`${field}\`.`),
-      {
-        code: "INVALID_INPUT",
-        retryable: false,
-      }
-    )
-  }
-
-  return value.trim()
 }
 
 function decodeHtmlEntities(value: string): string {

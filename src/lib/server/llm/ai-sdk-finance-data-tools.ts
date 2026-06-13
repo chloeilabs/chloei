@@ -1,14 +1,25 @@
 import { tool } from "ai"
 import { z } from "zod"
 
-import { asRecord, asString } from "@/lib/cast"
+import { asRecord, toOptionalString } from "@/lib/cast"
 import type { MessageSource, ToolName } from "@/lib/shared"
 
+import {
+  normalizeTickerSymbol,
+  requireField,
+} from "./finance-data/normalizers"
 import {
   classifyFinanceDataRetry,
   fetchJsonWithRetry,
   fetchTextWithRetry,
 } from "./finance-data/retry"
+import {
+  buildSecCompanyFactsUrl,
+  buildSecCompanyTickersUrl,
+  buildSecFilingUrl,
+  buildSecSubmissionsUrl,
+  normalizeCik,
+} from "./finance-data/sec"
 import {
   type SecFilingSummary,
   summarizeSecCompanyFacts,
@@ -26,9 +37,6 @@ import {
 } from "./finance-data/stooq-provider"
 
 const FINANCE_DATA_TOOL_NAME = "finance_data" as const
-const SEC_COMPANY_FACTS_BASE_URL = "https://data.sec.gov/api/xbrl/companyfacts"
-const SEC_COMPANY_SUBMISSIONS_BASE_URL = "https://data.sec.gov/submissions"
-const SEC_COMPANY_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 
 export { classifyFinanceDataRetry } from "./finance-data/retry"
 
@@ -146,11 +154,6 @@ const financeDataInputSchema = z.object({
 
 type FinanceDataToolInput = z.infer<typeof financeDataInputSchema>
 
-function toOptionalString(value: unknown): string | undefined {
-  const normalized = asString(value)?.trim()
-  return normalized && normalized.length > 0 ? normalized : undefined
-}
-
 function getOperationLabel(operation: FinanceDataOperation): string {
   return operation
     .split("_")
@@ -172,33 +175,8 @@ function getConfiguredSecUserAgent(value: string | undefined): string {
     : "Chloei finance_data research contact@example.com"
 }
 
-function requireField(
-  input: FinanceDataToolInput,
-  field: keyof FinanceDataToolInput
-): string {
-  const value = input[field]
-  if (typeof value !== "string" || !value.trim()) {
-    throw new Error(`${input.operation} requires \`${field}\`.`)
-  }
-
-  return value.trim()
-}
-
 function normalizeLimit(input: FinanceDataToolInput, fallback: number): number {
   return Math.max(1, Math.min(250, input.limit ?? fallback))
-}
-
-function normalizeCik(cik: string): string {
-  const digits = cik.replace(/\D/g, "")
-  if (!digits) {
-    throw new Error("sec_company_facts requires a numeric CIK.")
-  }
-
-  return digits.padStart(10, "0")
-}
-
-function normalizeTickerSymbol(symbol: string): string {
-  return symbol.replace(/\s+/g, "").trim().toUpperCase()
 }
 
 function normalizeProvider(value: unknown): FinanceDataProvider {
@@ -246,34 +224,8 @@ function isProviderOperationSupported(
   )
 }
 
-function buildSecCompanyFactsUrl(cik: string): URL {
-  return new URL(`${SEC_COMPANY_FACTS_BASE_URL}/CIK${normalizeCik(cik)}.json`)
-}
-
 function buildSecUrl(input: FinanceDataToolInput): URL {
   return buildSecCompanyFactsUrl(requireField(input, "cik"))
-}
-
-function buildSecSubmissionsUrl(cik: string): URL {
-  return new URL(
-    `${SEC_COMPANY_SUBMISSIONS_BASE_URL}/CIK${normalizeCik(cik)}.json`
-  )
-}
-
-function buildSecFilingUrl(params: {
-  cik: string
-  accessionNumber: string
-  primaryDocument: string
-}): string {
-  const cikNumber = Number(normalizeCik(params.cik))
-  const accessionDirectory = params.accessionNumber.replaceAll("-", "")
-  const primaryDocument = params.primaryDocument.trim()
-
-  return `https://www.sec.gov/Archives/edgar/data/${String(cikNumber)}/${accessionDirectory}/${primaryDocument}`
-}
-
-function buildSecCompanyTickersUrl(): URL {
-  return new URL(SEC_COMPANY_TICKERS_URL)
 }
 
 async function checkTextProviderStatus(params: {

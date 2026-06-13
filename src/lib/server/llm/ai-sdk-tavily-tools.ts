@@ -9,7 +9,7 @@ import {
 import { tool } from "ai"
 import { z } from "zod"
 
-import { asRecord, asString } from "@/lib/cast"
+import { asRecord, asString, toOptionalString } from "@/lib/cast"
 import type { MessageSource, ToolName } from "@/lib/shared"
 
 const TAVILY_SEARCH_TOOL_NAME = "tavily_search" as const
@@ -124,15 +124,6 @@ function getToolLabel(toolName: AiSdkTavilyToolName): string {
   return toolName === TAVILY_SEARCH_TOOL_NAME
     ? AI_SDK_TAVILY_SEARCH_LABEL
     : AI_SDK_TAVILY_EXTRACT_LABEL
-}
-
-function toOptionalString(value: unknown): string | undefined {
-  const normalized = asString(value)?.trim()
-  if (!normalized) {
-    return undefined
-  }
-
-  return normalized
 }
 
 const MULTIPART_PUBLIC_SUFFIX_PREFIXES = new Set([
