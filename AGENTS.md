@@ -14,7 +14,7 @@ The Cursor Cloud image runs `.cursor/setup.sh` during installation and `.cursor/
 ### Environment
 
 - `.env.local` must contain at minimum: `DATABASE_URL=postgresql://chloei:chloei_dev@127.0.0.1:5432/chloei`, `BETTER_AUTH_SECRET=<any-string>`, `BETTER_AUTH_URL=http://localhost:3000`.
-- `AI_GATEWAY_API_KEY`, `TAVILY_API_KEY`, `FRED_API_KEY`, and `SEC_API_USER_AGENT` are configured as Cloud Agent secrets when available and should be written into `.env.local` before starting the dev server so Next.js picks them up.
+- `AI_GATEWAY_API_KEY`, `TAVILY_API_KEY`, and `SEC_API_USER_AGENT` are configured as Cloud Agent secrets when available and should be written into `.env.local` before starting the dev server so Next.js picks them up.
 - Without `AI_GATEWAY_API_KEY` the app starts and auth works, but `/api/models` returns an empty list and `/api/agent` cannot stream responses.
 - Run `pnpm migrate` after provisioning the database and before the first request.
 

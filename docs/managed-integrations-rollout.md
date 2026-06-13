@@ -255,8 +255,7 @@ Also restore the `chloei-flags` Edge Config values to false.
 
 - Keep Neon as the only PostgreSQL system of record.
 - Use Upstash Search only for governed static/internal material. Live financial
-  facts stay routed through `finance_data`, SEC, FRED, Tavily, and AI
-  Gateway web search.
+  facts stay routed through `finance_data`, SEC, and Tavily.
 - `browser_research` is retired as a live tool; the shared tool name remains
   only for historical thread payload compatibility.
 - Private Blob downloads must go through authenticated app routes, never direct

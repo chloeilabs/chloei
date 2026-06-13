@@ -28,9 +28,6 @@ pnpm bundle:budget        # Check built static JS chunk budgets
 pnpm test                                        # All tests
 pnpm test:smoke:mock                            # Credential-free Playwright smoke
 pnpm test:smoke:mock:build                      # Build production app, then run mock smoke
-pnpm test:smoke:memory                          # Authenticated Mem0 memory smoke
-pnpm mem0:smoke                                 # Direct Mem0 add/search/delete smoke
-pnpm mem0:cleanup-smoke                         # Remove authenticated memory smoke artifacts
 pnpm eval:finance                               # Fixture finance eval baseline
 pnpm eval:finance:live                          # Live public-markets finance acceptance suite
 node --test tests/agent-route-contract.test.mjs  # Single test file
@@ -133,14 +130,10 @@ CREATE TABLE thread (
 3. Provider overlay (`PROVIDER OVERLAY: <PROVIDER>`) — provider-specific reasoning guidance for Gemini, Qwen, Kimi, or MiMo
 4. Task mode overlay (`TASK MODE OVERLAY: <MODE>`) — mode-specific guidance (see below)
 5. `DEEP RESEARCH MODE` — only for explicit Research mode, adding the dedicated comprehensive-answer instruction template
-6. `LONG-TERM MEMORY CAPABILITY` — optional block shown only when Mem0 is fully configured, instructing the model that memory writes are available
-7. `LONG-TERM MEMORY CONTEXT` — optional Mem0-retrieved user memory, treated as context rather than instructions
-8. `IDENTITY AND TONE CONTEXT` — from `DEFAULT_SOUL_FALLBACK_INSTRUCTION` in `src/lib/shared`
-9. `AUTH USER CONTEXT` — authenticated user id, name, email
+6. `IDENTITY AND TONE CONTEXT` — from `DEFAULT_SOUL_FALLBACK_INSTRUCTION` in `src/lib/shared`
+7. `AUTH USER CONTEXT` — authenticated user id, name, email
 
 After assembly, `withAiSdkInlineCitationInstruction` appends inline citation rules and finance tool rules.
-
-Long-term memory is opt-in through `src/lib/server/long-term-memory.ts`. Chloei calls Mem0 REST before agent runs and commits only the latest text-only user/assistant turn after meaningful completed or incomplete streams. OSS uses `/memories` and `/search`; Platform stores durable memories under `user_id`, keeps Chloei's agent/thread scope in metadata for reliable cross-thread retrieval and cleanup, and has a temporary legacy `app_id` fallback for old memories.
 
 **Task modes** (auto-inferred by `inferPromptTaskMode` from message content patterns):
 
@@ -155,14 +148,13 @@ Long-term memory is opt-in through `src/lib/server/long-term-memory.ts`. Chloei 
 
 Multiple tool categories, each only active when the respective API key is configured:
 
-| Tool             | Key                    | Description                                         |
-| ---------------- | ---------------------- | --------------------------------------------------- |
-| `web_search`     | `AI_GATEWAY_API_KEY`   | Anthropic native web search through AI Gateway      |
-| `tavily_search`  | `TAVILY_API_KEY`       | Live web search (advanced depth, up to 8 results)   |
-| `tavily_extract` | `TAVILY_API_KEY`       | Extract content from specific URLs (up to 5 URLs)   |
-| `code_execution` | always on              | Run sandboxed JS or Python for arithmetic/logic     |
-| `finance_data`   | optional provider keys | Normalized finance data via SEC, FRED, Yahoo, Stooq |
-| `sec_filings`    | public SEC endpoints   | SEC/EDGAR filing lookup, fetch, sections, tables    |
+| Tool             | Key                  | Description                                       |
+| ---------------- | -------------------- | ------------------------------------------------- |
+| `tavily_search`  | `TAVILY_API_KEY`     | Live web search (advanced depth, up to 8 results) |
+| `tavily_extract` | `TAVILY_API_KEY`     | Extract content from specific URLs (up to 5 URLs) |
+| `code_execution` | always on            | Run sandboxed JS or Python for arithmetic/logic   |
+| `finance_data`   | public Stooq/SEC     | Normalized finance data via Stooq and SEC/EDGAR   |
+| `sec_filings`    | public SEC endpoints | SEC/EDGAR filing lookup, fetch, sections, tables  |
 
 **Code execution** (`src/lib/server/llm/code-execution-tools.ts`):
 
@@ -175,9 +167,9 @@ Multiple tool categories, each only active when the respective API key is config
 
 **Finance data** (`src/lib/server/llm/ai-sdk-finance-data-tools.ts`):
 
-- `finance_data` exposes typed operations for provider status, symbol search, quotes, company profiles, historical prices, financial statements, SEC company facts, FRED series observations, analyst recommendations/price targets, and options chains.
+- `finance_data` exposes typed operations for provider status, symbol search, quotes, company profiles, historical prices, financial statements, and SEC company facts.
+- Quotes and historical prices come from Stooq (keyless); company profiles, financial statements, SEC company facts, and symbol search come from SEC/EDGAR.
 - Provider calls return sanitized source URLs and structured error payloads with retryability metadata.
-- Yahoo Finance (via `yahoo-finance2`, no API key; `finance-data/yahoo-provider.ts`) is the default for quotes, historical prices, analyst targets, and options, and the non-US fundamentals fallback when a symbol has no SEC CIK. It is imported lazily, normalizes Yahoo payloads defensively (`validateResult: false`), and is supplementary—SEC/FRED stay citation-grade. Disable with `AGENT_FINANCE_YAHOO_ENABLED=false` (quotes/prices then fall back to Stooq).
 - All chat, research, and finance-analysis runs use `finance_data` for normalized finance facts.
 
 **SEC filings** (`src/lib/server/llm/ai-sdk-sec-filings-tools.ts`):
@@ -276,13 +268,12 @@ src/
       llm/
         agent-runtime.ts          # Core agent runtime orchestration
         agent-runtime-messages.ts # Agent message preparation and formatting
-        ai-sdk-finance-data-tools.ts  # Normalized finance_data tool (SEC, FRED, Yahoo)
+        ai-sdk-finance-data-tools.ts  # Normalized finance_data tool (Stooq, SEC)
         ai-sdk-sec-filings-tools.ts   # SEC/EDGAR filing retrieval and extraction
         ai-sdk-gateway-provider-options.ts # AI Gateway provider options
         ai-sdk-tavily-tools.ts    # Tavily search/extract tools
         code-execution-tools.ts   # Sandboxed JS/Python execution
         finance-data/             # Finance data provider internals
-          provider-urls.ts        # FRED URL builders
           retry.ts                # Fetch with retry + classification
           sec-company-facts.ts    # SEC EDGAR company facts summarizer
           sources.ts              # Source URL/ID generators
@@ -366,17 +357,7 @@ All other variables are optional — the code has safe defaults. See `.env.examp
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
 | `AUTH_DATABASE_URL`                        | Separate DB for Better Auth (falls back to `DATABASE_URL`)                                              |
 | `TAVILY_API_KEY`                           | Enables Tavily web search + extract tools                                                               |
-| `FRED_API_KEY`                             | Enables FRED macro/rates lookups through `finance_data`                                                 |
 | `SEC_API_USER_AGENT`                       | User agent for SEC public company-facts requests                                                        |
-| `AGENT_FINANCE_YAHOO_ENABLED`              | Enable Yahoo Finance (no key) in `finance_data` (default: true)                                         |
-| `MEMORY_PROVIDER`                          | `disabled` or `mem0` (default: `disabled`)                                                              |
-| `MEM0_API_URL`                             | Mem0 REST API origin (default: `http://localhost:8888`; use `https://api.mem0.ai` for Mem0 Platform)    |
-| `MEM0_API_KEY`                             | Mem0 key; self-hosted OSS uses `X-API-Key`, Mem0 Platform uses `Authorization: Token ...`               |
-| `MEMORY_AGENT_ID`                          | Mem0 agent scope (default: `chloei`; use distinct values per environment)                               |
-| `MEMORY_TOP_K`                             | Number of Mem0 memories to retrieve (default: 6)                                                        |
-| `MEMORY_THRESHOLD`                         | Minimum memory similarity threshold (default: 0.1)                                                      |
-| `MEMORY_CONTEXT_MAX_CHARS`                 | Max retrieved memory prompt chars (default: 3,000)                                                      |
-| `MEMORY_COMMIT_MAX_CHARS`                  | Max assistant chars eligible for memory commit (default: 12,000)                                        |
 | `PYTHON3_PATH`                             | Override `python3` binary for code execution                                                            |
 | `AGENT_MAX_MESSAGES`                       | Max messages per request (default: 50)                                                                  |
 | `AGENT_MAX_MESSAGE_CHARS`                  | Max chars per message (default: 12,000)                                                                 |
