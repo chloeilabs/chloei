@@ -133,62 +133,6 @@ test("agent system prompt only adds the Deep Research block for Research mode", 
   assert.equal(prompt.includes("--- BEGIN DEEP RESEARCH MODE ---"), false)
 })
 
-test("agent system prompt advertises long-term memory only when enabled", () => {
-  const disabledPrompt = buildAgentSystemInstruction(
-    {
-      id: "user-1",
-      name: "Chloei",
-      email: "user@example.com",
-    },
-    {
-      now: new Date("2026-05-03T12:34:56.000Z"),
-    }
-  )
-  const enabledPrompt = buildAgentSystemInstruction(
-    {
-      id: "user-1",
-      name: "Chloei",
-      email: "user@example.com",
-    },
-    {
-      longTermMemoryContext: "User prefers concise finance answers.",
-      longTermMemoryEnabled: true,
-      now: new Date("2026-05-03T12:34:56.000Z"),
-    }
-  )
-
-  assert.equal(
-    disabledPrompt.includes("--- BEGIN LONG-TERM MEMORY CAPABILITY ---"),
-    false
-  )
-  assert.match(
-    enabledPrompt,
-    /If the user asks you to remember, save, retain, or use a stable preference\/fact/
-  )
-  assert.match(enabledPrompt, /Do not claim that you lack persistent memory/)
-  assert.match(enabledPrompt, /User prefers concise finance answers/)
-
-  const capabilityIndex = enabledPrompt.indexOf(
-    "--- BEGIN LONG-TERM MEMORY CAPABILITY ---"
-  )
-  const contextIndex = enabledPrompt.indexOf(
-    "--- BEGIN LONG-TERM MEMORY CONTEXT ---"
-  )
-  const identityIndex = enabledPrompt.indexOf(
-    "--- BEGIN IDENTITY AND TONE CONTEXT ---"
-  )
-
-  assert(capabilityIndex >= 0, "Memory capability block not found")
-  assert(
-    contextIndex > capabilityIndex,
-    "Memory context should follow capability"
-  )
-  assert(
-    identityIndex > contextIndex,
-    "Identity and tone should follow memory context"
-  )
-})
-
 test("agent system prompt injects financial services workflow after task steering", () => {
   const prompt = buildAgentSystemInstruction(
     {

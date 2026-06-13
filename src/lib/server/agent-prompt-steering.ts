@@ -70,20 +70,6 @@ const CLOSED_ANSWER_PATTERN =
 const STRICT_OUTPUT_PATTERN =
   /\b(return only|exactly|exact format|valid json|minified json|last line|single word|one word|single line|one line|two sentences|one sentence|one paragraph|no more than|under \d+ words|no surrounding prose|only one ```|schema|yaml|xml|csv)\b/i
 
-// Long-term memory often surfaces user-expertise tags the model has previously
-// committed about the user. We extract a coarse hint here to bias borderline
-// task-mode classifications.
-const USER_EXPERTISE_PATTERNS: Record<UserExpertiseHint, RegExp> = {
-  finance:
-    /\b(finance|financial)\s+(analyst|engineer|professional|background)|\b(portfolio manager|fund manager|trader|investment banker|cfa|equity research|sell-?side|buy-?side|fp&a)\b/i,
-  engineering:
-    /\b(software|backend|frontend|full-?stack|systems?|platform|infrastructure|devops|sre|data)\s+engineer|\b(developer|programmer|engineer at|technical lead|cto)\b/i,
-  writing:
-    /\b(writer|editor|journalist|copywriter|content strategist|technical writer|author)\b/i,
-  research:
-    /\b(researcher|research scientist|phd candidate|academic|professor)\b/i,
-}
-
 const PROVIDER_OVERLAYS: Record<PromptProvider, string> = {
   alibaba: `
 Use Qwen reasoning mode efficiently.
@@ -217,25 +203,6 @@ export function resolvePromptProvider(model: ModelType): PromptProvider {
   }
 
   throw new Error(`Unsupported model provider for model: ${model}`)
-}
-
-export function inferUserExpertiseFromMemory(
-  memoryContext: string | undefined | null
-): UserExpertiseHint | undefined {
-  if (!memoryContext) {
-    return undefined
-  }
-
-  for (const [hint, pattern] of Object.entries(USER_EXPERTISE_PATTERNS) as [
-    UserExpertiseHint,
-    RegExp,
-  ][]) {
-    if (pattern.test(memoryContext)) {
-      return hint
-    }
-  }
-
-  return undefined
 }
 
 function detectFinanceAnalysis(text: string): boolean {

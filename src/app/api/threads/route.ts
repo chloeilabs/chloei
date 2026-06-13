@@ -12,7 +12,6 @@ import {
   isAuthConfigured,
 } from "@/lib/server/auth"
 import { getRequestSession } from "@/lib/server/auth-session"
-import { deleteLongTermMemoriesForThread } from "@/lib/server/long-term-memory"
 import {
   createRouteObservation,
   observeRouteResponse,
@@ -320,20 +319,6 @@ export async function DELETE(request: NextRequest) {
     const { id } = deleteThreadSchema.parse(payload)
 
     await deleteThreadForUser(session.user.id, id)
-    try {
-      await deleteLongTermMemoriesForThread({
-        requestId,
-        signal: request.signal,
-        threadId: id,
-        userId: session.user.id,
-      })
-    } catch (error) {
-      logger.warn("Failed to clean up long-term memories for deleted thread.", {
-        error,
-        errorCode: "THREAD_MEMORY_DELETE_FAILED",
-        requestId,
-      })
-    }
 
     return observeRouteResponse(
       observation,
