@@ -18,7 +18,6 @@ export const TOOL_NAMES = [
   "tavily_search",
   "tavily_extract",
   "knowledge_search",
-  "browser_research",
   "finance_data",
   "sec_filings",
   "trading_analysis",

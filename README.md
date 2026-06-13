@@ -140,7 +140,6 @@ By default, Chloei enforces safe built-in agent limits even if you leave all opt
 - The current model list is defined in `src/lib/shared/llm/models.ts`.
 - `/`, `/api/agent`, and `/api/models` require an authenticated Better Auth session.
 - `knowledge_search` is for governed static/internal material only. Live financial facts stay routed through `finance_data`, SEC, and Tavily.
-- `browser_research` is a retired live tool name retained only so historical thread records continue to parse.
 - `POST /api/jobs/report` accepts an optional client-generated `reportId` UUID for retry idempotency. Idempotency keys must use report/thread identifiers, not prompt text or document contents.
 - `finance_data` normalizes finance operations across SEC public company facts and Stooq, with quotes and historical prices from Stooq and company profiles, financial statements, SEC company facts, and symbol search from SEC/EDGAR.
 - `sec_filings` is available when a normal chat or Research request is inferred as finance-analysis work, covering SEC/EDGAR company lookup, filing search, full filing fetches, section extraction, table extraction, and targeted retrieval over filing text.
