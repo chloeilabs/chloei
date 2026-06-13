@@ -14,12 +14,6 @@ import {
   isAuthConfigured,
 } from "@/lib/server/auth"
 import { getRequestSession } from "@/lib/server/auth-session"
-import { inngest } from "@/lib/server/inngest/client"
-import {
-  shouldRunInngestInlineFallback,
-  shouldSendInngestEvents,
-} from "@/lib/server/inngest/environment"
-import { indexUploadedDocument } from "@/lib/server/knowledge-indexing"
 import {
   buildPrivateBlobAttachmentPathname,
   isPrivateBlobConfigured,
@@ -188,57 +182,6 @@ export async function POST(request: NextRequest) {
       .split("/")
       .map((segment) => encodeURIComponent(segment))
       .join("/")}`
-
-    if (shouldSendInngestEvents()) {
-      await inngest
-        .send({
-          id: `knowledge/document.uploaded:${session.user.id}:${attachmentId}`,
-          name: "knowledge/document.uploaded",
-          data: {
-            userId: session.user.id,
-            documentId: attachmentId,
-            pathname: uploaded.pathname,
-            filename: file.name || "attachment",
-            contentType: mediaType,
-            sizeBytes: uploaded.sizeBytes,
-            sha256: uploaded.sha256,
-          },
-        })
-        .catch((error: unknown) => {
-          logger.warn("Document upload event enqueue failed.", {
-            error,
-            errorCode: "UPLOAD_INNGEST_EVENT_FAILED",
-            requestId,
-          })
-        })
-    }
-
-    if (shouldRunInngestInlineFallback()) {
-      const fallbackResult = await indexUploadedDocument({
-        userId: session.user.id,
-        documentId: attachmentId,
-        pathname: uploaded.pathname,
-        filename: file.name || "attachment",
-        contentType: mediaType,
-        sizeBytes: uploaded.sizeBytes,
-        sha256: uploaded.sha256,
-        buffer: fileBuffer,
-      }).catch((error: unknown) => {
-        logger.warn("Inline document indexing fallback failed.", {
-          error,
-          errorCode: "UPLOAD_INLINE_INDEX_FAILED",
-          requestId,
-        })
-        return null
-      })
-      if (fallbackResult && !fallbackResult.indexed) {
-        logger.warn("Inline document indexing fallback skipped.", {
-          errorCode: "UPLOAD_INLINE_INDEX_SKIPPED",
-          reason: fallbackResult.reason,
-          requestId,
-        })
-      }
-    }
 
     return observeRouteResponse(
       observation,

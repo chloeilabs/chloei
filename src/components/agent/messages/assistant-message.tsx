@@ -20,7 +20,6 @@ import {
   isModelType,
   type Message,
   type ModelType,
-  type SearchToolName,
   type ToolInvocationStatus,
 } from "@/lib/shared"
 
@@ -64,11 +63,7 @@ function getAssistantContent(message: Message): string {
 const activityLabelClassName =
   "inline-flex items-center bg-transparent p-0 font-departureMono text-[11px] font-medium tracking-wide text-muted-foreground/80"
 
-function getSearchToolLabel(toolName: SearchToolName): string {
-  if (toolName === "knowledge_search") {
-    return "Knowledge"
-  }
-
+function getSearchToolLabel(): string {
   return "Tavily"
 }
 
@@ -403,7 +398,7 @@ export function AssistantMessage({
                     >
                       <ToolStatusIcon status={entry.status} />
                       <span className="font-medium text-foreground">
-                        {getSearchToolLabel(entry.toolName)}
+                        {getSearchToolLabel()}
                       </span>
                       <span className="text-muted-foreground/60">·</span>
                       <span className="truncate">{entry.query}</span>

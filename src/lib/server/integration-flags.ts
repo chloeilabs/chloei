@@ -3,7 +3,6 @@ import { createLogger } from "@/lib/logger"
 const logger = createLogger("integration-flags")
 
 export const AGENT_FLAG_KEYS = [
-  "agent.knowledge_search.enabled",
   "agent.async_reports.enabled",
   "agent.telemetry.record_io",
   "agent.finance_workflows.enabled",
@@ -13,7 +12,6 @@ export type AgentFlagKey = (typeof AGENT_FLAG_KEYS)[number]
 export type IntegrationFlagKey = AgentFlagKey
 
 export interface AgentFeatureFlags {
-  knowledgeSearchEnabled: boolean
   asyncReportsEnabled: boolean
   telemetryRecordIo: boolean
   financeWorkflowsEnabled: boolean
@@ -24,21 +22,18 @@ interface ResolveAgentFeatureFlagsParams {
 }
 
 const DEFAULT_FLAGS: AgentFeatureFlags = {
-  knowledgeSearchEnabled: false,
   asyncReportsEnabled: false,
   telemetryRecordIo: false,
   financeWorkflowsEnabled: false,
 }
 
 const ENV_FLAG_NAMES: Record<keyof AgentFeatureFlags, string> = {
-  knowledgeSearchEnabled: "AGENT_KNOWLEDGE_SEARCH_ENABLED",
   asyncReportsEnabled: "AGENT_ASYNC_REPORTS_ENABLED",
   telemetryRecordIo: "AGENT_TELEMETRY_RECORD_IO",
   financeWorkflowsEnabled: "AGENT_FINANCE_WORKFLOWS_ENABLED",
 }
 
 const EDGE_FLAG_KEYS: Record<keyof AgentFeatureFlags, IntegrationFlagKey> = {
-  knowledgeSearchEnabled: "agent.knowledge_search.enabled",
   asyncReportsEnabled: "agent.async_reports.enabled",
   telemetryRecordIo: "agent.telemetry.record_io",
   financeWorkflowsEnabled: "agent.finance_workflows.enabled",
@@ -142,7 +137,6 @@ function getInternalDefaultFlags(
 
   return {
     ...DEFAULT_FLAGS,
-    knowledgeSearchEnabled: true,
     asyncReportsEnabled: true,
     financeWorkflowsEnabled: true,
   }

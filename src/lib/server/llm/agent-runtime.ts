@@ -56,12 +56,6 @@ import {
   getAiSdkGatewayProviderOptionsForTaskMode,
 } from "./ai-sdk-gateway-provider-options"
 import {
-  createAiSdkKnowledgeSearchTools,
-  getAiSdkKnowledgeSearchToolCallMetadata,
-  getAiSdkKnowledgeSearchToolResultMetadata,
-  isAiSdkKnowledgeSearchToolName,
-} from "./ai-sdk-knowledge-search-tools"
-import {
   createAiSdkSecFilingsTools,
   getAiSdkSecFilingsToolCallMetadata,
   getAiSdkSecFilingsToolResultMetadata,
@@ -422,10 +416,6 @@ export async function* startAgentRuntimeStream(
           : undefined,
     }),
     ...createAiSdkTavilyTools(normalizedTavilyApiKey),
-    ...createAiSdkKnowledgeSearchTools({
-      enabled: featureFlags.knowledgeSearchEnabled,
-      userId,
-    }),
     ...(runtimeProfile.financeDataEnabled
       ? createAiSdkFinanceDataTools({
           secUserAgent: params.secUserAgent ?? process.env.SEC_API_USER_AGENT,
@@ -573,7 +563,6 @@ export async function* startAgentRuntimeStream(
       const metadata =
         getAiSdkCodeExecutionToolCallMetadata(part) ??
         getAiSdkTavilyToolCallMetadata(part) ??
-        getAiSdkKnowledgeSearchToolCallMetadata(part) ??
         getAiSdkFinanceDataToolCallMetadata(part) ??
         getAiSdkSecFilingsToolCallMetadata(part) ??
         getAiSdkTradingAgentsToolCallMetadata(part)
@@ -611,7 +600,6 @@ export async function* startAgentRuntimeStream(
       const metadata =
         getAiSdkCodeExecutionToolResultMetadata(part) ??
         getAiSdkTavilyToolResultMetadata(part) ??
-        getAiSdkKnowledgeSearchToolResultMetadata(part) ??
         getAiSdkFinanceDataToolResultMetadata(part) ??
         getAiSdkSecFilingsToolResultMetadata(part) ??
         getAiSdkTradingAgentsToolResultMetadata(part)
@@ -666,7 +654,6 @@ export async function* startAgentRuntimeStream(
       part.type === "tool-error" &&
       (isAiSdkCodeExecutionToolName(part.toolName) ||
         isAiSdkTavilyToolName(part.toolName) ||
-        isAiSdkKnowledgeSearchToolName(part.toolName) ||
         isAiSdkFinanceDataToolName(part.toolName) ||
         isAiSdkSecFilingsToolName(part.toolName)) &&
       !finalizedToolCalls.has(part.toolCallId)

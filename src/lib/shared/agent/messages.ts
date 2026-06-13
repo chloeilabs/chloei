@@ -17,7 +17,6 @@ export const TOOL_NAMES = [
   "code_execution",
   "tavily_search",
   "tavily_extract",
-  "knowledge_search",
   "finance_data",
   "sec_filings",
   "trading_analysis",
@@ -26,7 +25,6 @@ export type ToolName = (typeof TOOL_NAMES)[number]
 
 export const SEARCH_TOOL_NAMES = [
   "tavily_search",
-  "knowledge_search",
 ] as const satisfies readonly ToolName[]
 export type SearchToolName = (typeof SEARCH_TOOL_NAMES)[number]
 export type ToolInvocationStatus = "running" | "success" | "error"

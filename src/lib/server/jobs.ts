@@ -6,7 +6,6 @@ import { getDatabase } from "./postgres"
 
 export const AGENT_JOB_TYPES = [
   "agent/report.requested",
-  "knowledge/document.uploaded",
   "market/watchlist.refresh.requested",
   "trading/analysis.requested",
 ] as const
