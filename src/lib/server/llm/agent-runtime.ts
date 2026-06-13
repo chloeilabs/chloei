@@ -62,12 +62,6 @@ import {
   isAiSdkKnowledgeSearchToolName,
 } from "./ai-sdk-knowledge-search-tools"
 import {
-  createAiSdkManagedSearchTools,
-  getAiSdkManagedSearchToolCallMetadata,
-  getAiSdkManagedSearchToolResultMetadata,
-  isAiSdkManagedSearchToolName,
-} from "./ai-sdk-managed-search-tools"
-import {
   createAiSdkSecFilingsTools,
   getAiSdkSecFilingsToolCallMetadata,
   getAiSdkSecFilingsToolResultMetadata,
@@ -429,7 +423,6 @@ export async function* startAgentRuntimeStream(
           : undefined,
     }),
     ...createAiSdkTavilyTools(normalizedTavilyApiKey),
-    ...createAiSdkManagedSearchTools(),
     ...createAiSdkKnowledgeSearchTools({
       enabled: featureFlags.knowledgeSearchEnabled,
       userId,
@@ -583,7 +576,6 @@ export async function* startAgentRuntimeStream(
       const metadata =
         getAiSdkCodeExecutionToolCallMetadata(part) ??
         getAiSdkTavilyToolCallMetadata(part) ??
-        getAiSdkManagedSearchToolCallMetadata(part) ??
         getAiSdkKnowledgeSearchToolCallMetadata(part) ??
         getAiSdkFinanceDataToolCallMetadata(part) ??
         getAiSdkSecFilingsToolCallMetadata(part) ??
@@ -622,7 +614,6 @@ export async function* startAgentRuntimeStream(
       const metadata =
         getAiSdkCodeExecutionToolResultMetadata(part) ??
         getAiSdkTavilyToolResultMetadata(part) ??
-        getAiSdkManagedSearchToolResultMetadata(part) ??
         getAiSdkKnowledgeSearchToolResultMetadata(part) ??
         getAiSdkFinanceDataToolResultMetadata(part) ??
         getAiSdkSecFilingsToolResultMetadata(part) ??
@@ -678,7 +669,6 @@ export async function* startAgentRuntimeStream(
       part.type === "tool-error" &&
       (isAiSdkCodeExecutionToolName(part.toolName) ||
         isAiSdkTavilyToolName(part.toolName) ||
-        isAiSdkManagedSearchToolName(part.toolName) ||
         isAiSdkKnowledgeSearchToolName(part.toolName) ||
         isAiSdkFinanceDataToolName(part.toolName) ||
         isAiSdkSecFilingsToolName(part.toolName)) &&

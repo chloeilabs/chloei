@@ -175,7 +175,7 @@ This request is finance-analysis work.
 - Stay on the finance task. Do not narrate unrelated wording, country-name, or language-usage considerations.
 - Mirror the user's exact terminology in your final answer. If they asked about "operating margin", "CET1", "net interest income", "cash flow from operations", or "capital and exploration expenditures", use those exact phrases — do not paraphrase to synonyms a grader or screen-reader would miss.
 - For multi-period comparisons ("compare X across the last N fiscal years", "show the 3-year trend"), call \`finance_data\` with \`sec_company_facts\` once — it returns the full multi-period timeseries — then compute the comparison in \`code_execution\`. Do not make N separate \`financial_statements\` calls for the same metric across N periods.
-- Do not re-search the web (Tavily, gateway_web_search) for data you already have from \`sec_filings\` or \`finance_data\`. Pick one structured source per metric; web search is for narrative or non-structured context only.
+- Do not re-search the web (Tavily) for data you already have from \`sec_filings\` or \`finance_data\`. Pick one structured source per metric; web search is for narrative or non-structured context only.
 - Never finish your turn with no text. After gathering evidence, you must write the synthesis: numbers, terminology, citations, and a brief takeaway. If evidence is partial or contradictory, name what you found and what is missing — silence is a worse failure than an incomplete answer.
 `.trim(),
   research: `

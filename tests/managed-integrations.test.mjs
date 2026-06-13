@@ -27,9 +27,6 @@ const agentAttachmentBlobsUrl = pathToFileURL(
 const knowledgeSearchUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/llm/ai-sdk-knowledge-search-tools.ts")
 ).href
-const managedSearchUrl = pathToFileURL(
-  path.join(cwd, "src/lib/server/llm/ai-sdk-managed-search-tools.ts")
-).href
 const knowledgeIndexingUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/knowledge-indexing.ts")
 ).href
@@ -55,11 +52,6 @@ const {
   buildKnowledgeSearchUserScopeFilter,
   getAiSdkKnowledgeSearchToolResultMetadata,
 } = await import(knowledgeSearchUrl)
-const {
-  createAiSdkManagedSearchTools,
-  getAiSdkManagedSearchToolCallMetadata,
-  getAiSdkManagedSearchToolResultMetadata,
-} = await import(managedSearchUrl)
 const {
   buildUploadedDocumentSearchRecords,
   chunkKnowledgeText,
@@ -556,114 +548,6 @@ test("knowledge search tool result metadata rejects invalid successful output", 
       provider: "upstash_search",
       errorCode: "INVALID_TOOL_OUTPUT",
       retryable: false,
-    }
-  )
-})
-
-test("managed search tools always expose Gateway search", () => {
-  assert.deepEqual(Object.keys(createAiSdkManagedSearchTools()), [
-    "gateway_web_search",
-  ])
-})
-
-test("managed search metadata labels Gateway search sources", () => {
-  assert.deepEqual(
-    getAiSdkManagedSearchToolCallMetadata({
-      toolCallId: "call-gateway",
-      toolName: "gateway_web_search",
-      input: {
-        objective: "Find current AI funding news",
-        search_queries: ["AI funding"],
-      },
-    }),
-    {
-      callId: "call-gateway",
-      toolName: "gateway_web_search",
-      label: "Searching with AI Gateway",
-      query: "Find current AI funding news",
-      operation: "search",
-      provider: "vercel_ai_gateway",
-    }
-  )
-
-  assert.deepEqual(
-    getAiSdkManagedSearchToolResultMetadata({
-      toolCallId: "call-gateway",
-      toolName: "gateway_web_search",
-      output: {
-        searchId: "gateway-1",
-        results: [
-          {
-            title: "Gateway Result",
-            url: "https://example.com/gateway",
-            excerpt: "Current result",
-          },
-        ],
-      },
-    }),
-    {
-      callId: "call-gateway",
-      toolName: "gateway_web_search",
-      status: "success",
-      sources: [
-        {
-          id: "gateway_web_search-gateway-1-0",
-          url: "https://example.com/gateway",
-          title: "Gateway Result",
-        },
-      ],
-      operation: "search",
-      provider: "vercel_ai_gateway",
-      retryable: false,
-    }
-  )
-})
-
-test("managed search metadata marks provider errors retryable", () => {
-  assert.deepEqual(
-    getAiSdkManagedSearchToolResultMetadata({
-      toolCallId: "call-gateway",
-      toolName: "gateway_web_search",
-      output: {
-        error: "rate_limit",
-        message: "AI Gateway rate limit exceeded.",
-      },
-    }),
-    {
-      callId: "call-gateway",
-      toolName: "gateway_web_search",
-      status: "error",
-      sources: [],
-      operation: "search",
-      provider: "vercel_ai_gateway",
-      errorCode: "rate_limit",
-      retryable: true,
-    }
-  )
-})
-
-test("managed search metadata treats explicit errors as failures with empty results", () => {
-  assert.deepEqual(
-    getAiSdkManagedSearchToolResultMetadata({
-      toolCallId: "call-gateway",
-      toolName: "gateway_web_search",
-      output: {
-        error: {
-          code: "quota_exceeded",
-          message: "Gateway search quota exceeded.",
-        },
-        results: [],
-      },
-    }),
-    {
-      callId: "call-gateway",
-      toolName: "gateway_web_search",
-      status: "error",
-      sources: [],
-      operation: "search",
-      provider: "vercel_ai_gateway",
-      errorCode: "quota_exceeded",
-      retryable: true,
     }
   )
 })

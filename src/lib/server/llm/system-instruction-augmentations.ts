@@ -25,7 +25,6 @@ function buildAiSdkFinanceToolingInstruction(options: {
       : null,
     "- For benchmark-style public-company tasks, gather the filing evidence first, then use `code_execution` for arithmetic that affects the answer.",
     "- Prefer Tavily for fresh web discovery, controlled retrieval, extraction, and clickable inline citations.",
-    "- If Tavily is unavailable, quota-limited, rate-limited, or returns a provider error, use `gateway_web_search` for live web discovery.",
     "- Use code execution only for calculation or validation.",
     "- Use the minimum mix of tools needed, then synthesize the answer around the evidence.",
     "</ai_sdk_finance_tool_rules>",
