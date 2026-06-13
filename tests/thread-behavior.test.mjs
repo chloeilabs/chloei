@@ -111,7 +111,7 @@ test("parseThreadPayload sanitizes invalid metadata and converts legacy activity
             {
               id: "tool-1",
               callId: "call-1",
-              toolName: "web_search",
+              toolName: "tavily_search",
               label: " Search ",
               status: "success",
             },
@@ -186,7 +186,7 @@ test("parseThreadPayload sanitizes invalid metadata and converts legacy activity
     {
       id: "tool-1",
       callId: "call-1",
-      toolName: "web_search",
+      toolName: "tavily_search",
       label: "Search",
       status: "success",
     },

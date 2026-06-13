@@ -65,16 +65,8 @@ const activityLabelClassName =
   "inline-flex items-center bg-transparent p-0 font-departureMono text-[11px] font-medium tracking-wide text-muted-foreground/80"
 
 function getSearchToolLabel(toolName: SearchToolName): string {
-  if (toolName === "web_search") {
-    return "Web"
-  }
-
-  if (toolName === "x_search") {
-    return "X"
-  }
-
-  if (toolName === "gateway_web_search") {
-    return "AI Gateway"
+  if (toolName === "knowledge_search") {
+    return "Knowledge"
   }
 
   return "Tavily"
@@ -404,21 +396,16 @@ export function AssistantMessage({
                 }
 
                 if (entry.kind === "search") {
-                  const showSearchToolLabel = entry.toolName !== "web_search"
                   return (
                     <div
                       key={entry.id}
                       className="flex items-center gap-1.5 rounded-md border bg-muted/40 px-2.5 py-1.5 text-xs text-muted-foreground"
                     >
                       <ToolStatusIcon status={entry.status} />
-                      {showSearchToolLabel && (
-                        <>
-                          <span className="font-medium text-foreground">
-                            {getSearchToolLabel(entry.toolName)}
-                          </span>
-                          <span className="text-muted-foreground/60">·</span>
-                        </>
-                      )}
+                      <span className="font-medium text-foreground">
+                        {getSearchToolLabel(entry.toolName)}
+                      </span>
+                      <span className="text-muted-foreground/60">·</span>
                       <span className="truncate">{entry.query}</span>
                     </div>
                   )
