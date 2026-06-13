@@ -473,7 +473,6 @@ async function runTaskOnce(task, attempt) {
       }
     )}\n\n--- BEGIN GDPVAL WORKSPACE EVAL INSTRUCTIONS ---\nYou are running in a benchmark workspace. Complete the user's requested deliverable as fully as the available tools allow. Prefer code_execution for deterministic calculations, tables, spreadsheets, charts, and file artifacts. Do not ask clarifying questions. If a requirement cannot be completed because the sandbox lacks a needed library or file type, state that limitation in the final answer and provide the best fallback deliverable content.\n--- END GDPVAL WORKSPACE EVAL INSTRUCTIONS ---`,
     {
-      fmpEnabled: Boolean(process.env.FMP_API_KEY?.trim()),
       secFilingsEnabled: true,
     }
   )
@@ -490,7 +489,6 @@ async function runTaskOnce(task, attempt) {
       model,
       aiGatewayApiKey: process.env.AI_GATEWAY_API_KEY,
       tavilyApiKey: process.env.TAVILY_API_KEY,
-      fmpApiKey: process.env.FMP_API_KEY,
       fredApiKey: process.env.FRED_API_KEY,
       secUserAgent: process.env.SEC_API_USER_AGENT,
       userTimeZone,

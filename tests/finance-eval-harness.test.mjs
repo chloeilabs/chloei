@@ -27,7 +27,7 @@ test("finance eval grader scores required tools, citations, terms, numbers, and 
       requiredArtifacts: [{ extension: ".xlsx", nameIncludes: "finance" }],
     },
     {
-      text: "The gross margin calculation is complete. [FMP](https://example.com)",
+      text: "The gross margin calculation is complete. [SEC](https://example.com)",
       toolCalls: [{ toolName: "finance_data" }, { toolName: "code_execution" }],
       values: { grossMargin: 0.431 },
       artifacts: [{ path: "finance_model.xlsx", sizeBytes: 1024 }],

@@ -5,7 +5,7 @@
  * undocumented Yahoo endpoints as Python's yfinance, with crumb/cookie + rate
  * limit handling built in). This is a no-API-key breadth/fallback provider:
  * it covers rich quotes, non-US fundamentals, analyst targets, and options that
- * the SEC/Stooq/FMP stack cannot, but Yahoo data is unofficial, so SEC/FRED/FMP
+ * the SEC/Stooq stack cannot, but Yahoo data is unofficial, so SEC/FRED
  * remain the citation-grade primaries for high-stakes answers.
  *
  * Every call passes `validateResult: false` so the library does not throw when

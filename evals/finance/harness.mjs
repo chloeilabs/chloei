@@ -401,7 +401,6 @@ export async function runLiveEval(params) {
       messages,
       taskMode: "finance_analysis",
       tools: {
-        fmpEnabled: Boolean(process.env.FMP_API_KEY?.trim()),
         tavilyEnabled: Boolean(process.env.TAVILY_API_KEY?.trim()),
         fredEnabled: Boolean(process.env.FRED_API_KEY?.trim()),
         secUserAgentConfigured: Boolean(process.env.SEC_API_USER_AGENT?.trim()),
@@ -423,7 +422,6 @@ export async function runLiveEval(params) {
         }
       ),
       {
-        fmpEnabled: Boolean(process.env.FMP_API_KEY?.trim()),
         secFilingsEnabled: true,
       }
     )
@@ -440,7 +438,6 @@ export async function runLiveEval(params) {
         model,
         aiGatewayApiKey: apiKey,
         tavilyApiKey: process.env.TAVILY_API_KEY,
-        fmpApiKey: process.env.FMP_API_KEY,
         fredApiKey: process.env.FRED_API_KEY,
         secUserAgent: process.env.SEC_API_USER_AGENT,
         userTimeZone: params.userTimeZone,

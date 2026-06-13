@@ -36,47 +36,48 @@ test("finance data retry classification marks transient failures", () => {
 test("finance data operation returns sanitized provider sources", async () => {
   const result = await runFinanceDataOperation(
     {
-      operation: "quote",
-      provider: "fmp",
-      symbol: "AAPL",
+      operation: "fred_series",
+      provider: "fred",
+      seriesId: "FEDFUNDS",
     },
     {
-      fmpApiKey: "secret-key",
+      fredApiKey: "secret-key",
       fetchImpl: async (url) => {
-        assert.match(String(url), /apikey=secret-key/)
-        return new Response(JSON.stringify([{ symbol: "AAPL", price: 200 }]), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        })
+        assert.match(String(url), /api_key=secret-key/)
+        return new Response(
+          JSON.stringify({
+            observations: [{ date: "2024-01-01", value: "5.33" }],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
       },
     }
   )
 
   assert.equal(result.error, undefined)
-  assert.equal(result.output?.provider, "fmp")
+  assert.equal(result.output?.provider, "fred")
   assert.equal(result.output?.requestUrl.includes("secret-key"), false)
-  assert.equal(result.output?.sources[0]?.title, "Financial Modeling Prep")
+  assert.equal(result.output?.sources[0]?.title, "FRED")
 })
 
 test("finance evidence context prefetches quote and profile data", async () => {
   const result = await createAiSdkFinanceDataEvidenceContext({
     query: "What is Apple's current stock price and market cap? Cite sources.",
-    fmpApiKey: "secret-key",
+    yahooEnabled: false,
     fetchImpl: async (url) => {
       const requestUrl = String(url)
-      if (requestUrl.includes("financialmodelingprep.com")) {
-        assert.match(requestUrl, /apikey=secret-key/)
+      if (requestUrl.includes("stooq.com")) {
         return new Response(
-          JSON.stringify([
-            {
-              symbol: "AAPL",
-              price: 280.14,
-              marketCap: 4200000000000,
-            },
-          ]),
+          [
+            "Symbol,Date,Time,Open,High,Low,Close,Volume,Name",
+            "AAPL.US,2026-04-24,22:00:19,272.755,273.06,269.65,280.14,38157110,APPLE INC",
+          ].join("\n"),
           {
             status: 200,
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "text/csv" },
           }
         )
       }
@@ -130,10 +131,10 @@ test("finance evidence context prefetches quote and profile data", async () => {
   assert.equal(result.outputs.length, 2)
   assert.equal(result.supplements.length, 1)
   assert.match(result.context, /Resolved symbols: AAPL/)
-  assert.match(result.context, /"marketCap": 4200000000000/)
+  assert.match(result.context, /"close": 280.14/)
   assert.match(result.context, /\$4\.112 Trillion USD/)
   assert.equal(
-    result.sources.some((source) => source.title === "Financial Modeling Prep"),
+    result.sources.some((source) => source.title === "Stooq"),
     true
   )
   assert.equal(
@@ -157,22 +158,21 @@ test("finance evidence context resolves and fetches multiple symbols", async () 
 
   const result = await createAiSdkFinanceDataEvidenceContext({
     query: "Compare Apple and Microsoft stock price and market cap.",
-    fmpApiKey: "secret-key",
+    yahooEnabled: false,
     fetchImpl: async (url) => {
       const requestUrl = String(url)
-      if (requestUrl.includes("financialmodelingprep.com")) {
-        const symbol = requestUrl.includes("MSFT") ? "MSFT" : "AAPL"
+      if (requestUrl.includes("stooq.com")) {
+        const isMsft = requestUrl.includes("msft")
+        const symbol = isMsft ? "MSFT.US" : "AAPL.US"
+        const close = isMsft ? 510.1 : 280.14
         return new Response(
-          JSON.stringify([
-            {
-              symbol,
-              price: symbol === "MSFT" ? 510.1 : 280.14,
-              marketCap: symbol === "MSFT" ? 3800000000000 : 4200000000000,
-            },
-          ]),
+          [
+            "Symbol,Date,Time,Open,High,Low,Close,Volume,Name",
+            `${symbol},2026-04-24,22:00:19,500,512,498,${String(close)},38157110,TEST`,
+          ].join("\n"),
           {
             status: 200,
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "text/csv" },
           }
         )
       }
@@ -267,16 +267,9 @@ test("finance provider status validates configured provider availability", async
       provider: "auto",
     },
     {
-      fmpApiKey: "bad-key",
+      yahooEnabled: false,
       fetchImpl: async (url) => {
         const requestUrl = String(url)
-        if (requestUrl.includes("quote-short/AAPL")) {
-          return new Response(JSON.stringify({ error: "unauthorized" }), {
-            status: 401,
-            headers: { "Content-Type": "application/json" },
-          })
-        }
-
         if (requestUrl.includes("stooq.com")) {
           return new Response(
             [
@@ -296,19 +289,6 @@ test("finance provider status validates configured provider availability", async
   )
 
   assert.equal(result.error, undefined)
-  assert.deepEqual(result.output?.data.fmp, {
-    configured: true,
-    available: false,
-    operations: [
-      "symbol_search",
-      "quote",
-      "company_profile",
-      "historical_prices",
-      "financial_statements",
-    ],
-    errorCode: "HTTP_401",
-    message: "fmp returned HTTP 401.",
-  })
   assert.equal(result.output?.data.sec.available, true)
   assert.deepEqual(result.output?.data.sec.operations, [
     "symbol_search",
@@ -574,28 +554,18 @@ test("finance income statement auto provider uses SEC company facts fallback", a
   assert.equal(result.output?.sources.length, 2)
 })
 
-test("finance income statement falls back from unavailable FMP to SEC facts", async () => {
-  const requestedUrls = []
+test("finance income statement auto provider uses SEC facts for Revenues concept", async () => {
   const result = await runFinanceDataOperation(
     {
       operation: "financial_statements",
-      provider: "fmp",
+      provider: "auto",
       symbol: "MSFT",
       statementType: "income",
       period: "annual",
     },
     {
-      fmpApiKey: "bad-key",
       fetchImpl: async (url) => {
         const requestUrl = String(url)
-        requestedUrls.push(requestUrl)
-        if (requestUrl.includes("income-statement/MSFT")) {
-          return new Response(JSON.stringify({ error: "forbidden" }), {
-            status: 403,
-            headers: { "Content-Type": "application/json" },
-          })
-        }
-
         if (requestUrl.includes("company_tickers.json")) {
           return new Response(
             JSON.stringify({
@@ -674,10 +644,6 @@ test("finance income statement falls back from unavailable FMP to SEC facts", as
   assert.equal(result.output?.provider, "sec")
   assert.equal(result.output?.data.computedValues.grossMargin, 0.6)
   assert.match(result.output?.data.filing.url, /msft-20250630\.htm/)
-  assert.equal(
-    requestedUrls.some((url) => url.includes("income-statement/MSFT")),
-    true
-  )
 })
 
 test("finance balance sheet auto provider uses SEC company facts fallback", async () => {
@@ -947,7 +913,7 @@ test("finance data metadata includes operation and provider", () => {
       toolName: "finance_data",
       input: {
         operation: "financial_statements",
-        provider: "fmp",
+        provider: "sec",
         symbol: "MSFT",
       },
     }),
@@ -957,7 +923,7 @@ test("finance data metadata includes operation and provider", () => {
       label: "Finance: Financial Statements",
       query: "MSFT",
       operation: "financial_statements",
-      provider: "fmp",
+      provider: "sec",
       attempt: 1,
     }
   )
@@ -969,7 +935,7 @@ test("finance data metadata includes operation and provider", () => {
       output: {
         error: {
           operation: "quote",
-          provider: "fmp",
+          provider: "yahoo",
           code: "HTTP_429",
           message: "Rate limited.",
           attempts: 2,
@@ -984,7 +950,7 @@ test("finance data metadata includes operation and provider", () => {
       status: "error",
       sources: [],
       operation: "quote",
-      provider: "fmp",
+      provider: "yahoo",
       attempt: 2,
       durationMs: 25,
       errorCode: "HTTP_429",

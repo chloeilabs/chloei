@@ -1,18 +1,14 @@
-import { createSearchTool } from "@parallel-web/ai-sdk-tools"
 import { gateway, type ToolSet } from "ai"
 
 import { asRecord, asString } from "@/lib/cast"
 import type { MessageSource, ToolName } from "@/lib/shared"
 
-const PARALLEL_SEARCH_TOOL_NAME = "parallel_search" as const
 const GATEWAY_WEB_SEARCH_TOOL_NAME = "gateway_web_search" as const
 const MANAGED_SEARCH_MAX_RESULTS = 8
-const PARALLEL_SEARCH_DESCRIPTION =
-  "Search the live web with Parallel for fresh, LLM-optimized excerpts. Use this after Tavily is unavailable, quota-limited, rate-limited, or returns a provider error."
 
 type ManagedSearchToolName = Extract<
   ToolName,
-  typeof PARALLEL_SEARCH_TOOL_NAME | typeof GATEWAY_WEB_SEARCH_TOOL_NAME
+  typeof GATEWAY_WEB_SEARCH_TOOL_NAME
 >
 
 interface ManagedSearchToolCallMetadata {
@@ -21,7 +17,7 @@ interface ManagedSearchToolCallMetadata {
   label: string
   query?: string
   operation: "search"
-  provider: "parallel" | "vercel_ai_gateway"
+  provider: "vercel_ai_gateway"
 }
 
 interface ManagedSearchToolResultMetadata {
@@ -30,40 +26,19 @@ interface ManagedSearchToolResultMetadata {
   status: "success" | "error"
   sources: MessageSource[]
   operation: "search"
-  provider: "parallel" | "vercel_ai_gateway"
+  provider: "vercel_ai_gateway"
   errorCode?: string
   retryable: boolean
 }
 
 function getToolName(value: string | undefined): ManagedSearchToolName | null {
-  if (
-    value === PARALLEL_SEARCH_TOOL_NAME ||
-    value === GATEWAY_WEB_SEARCH_TOOL_NAME
-  ) {
-    return value
-  }
-
-  return null
+  return value === GATEWAY_WEB_SEARCH_TOOL_NAME ? value : null
 }
 
 export function isAiSdkManagedSearchToolName(
   value: unknown
 ): value is ManagedSearchToolName {
   return getToolName(typeof value === "string" ? value : undefined) !== null
-}
-
-function getProvider(
-  toolName: ManagedSearchToolName
-): ManagedSearchToolCallMetadata["provider"] {
-  return toolName === PARALLEL_SEARCH_TOOL_NAME
-    ? "parallel"
-    : "vercel_ai_gateway"
-}
-
-function getToolLabel(toolName: ManagedSearchToolName): string {
-  return toolName === PARALLEL_SEARCH_TOOL_NAME
-    ? "Searching with Parallel"
-    : "Searching with AI Gateway"
 }
 
 function toOptionalString(value: unknown): string | undefined {
@@ -105,42 +80,6 @@ function isErrorOutput(output: Record<string, unknown>): boolean {
   return Boolean(getErrorCode(output))
 }
 
-function getErrorMessage(error: unknown): string {
-  const record = asRecord(error)
-  const nestedError = asRecord(record?.error)
-  const message =
-    toOptionalString(record?.message) ??
-    toOptionalString(nestedError?.message) ??
-    (error instanceof Error ? error.message.trim() : undefined)
-
-  return message && message.length > 0
-    ? message
-    : "Parallel search request failed."
-}
-
-function getThrownErrorCode(error: unknown): string {
-  const record = asRecord(error)
-  const nestedError = asRecord(record?.error)
-  const status =
-    typeof record?.status === "number"
-      ? record.status
-      : typeof record?.statusCode === "number"
-        ? record.statusCode
-        : typeof nestedError?.status === "number"
-          ? nestedError.status
-          : typeof nestedError?.statusCode === "number"
-            ? nestedError.statusCode
-            : undefined
-
-  return (
-    toOptionalString(record?.code) ??
-    toOptionalString(record?.error) ??
-    toOptionalString(nestedError?.code) ??
-    toOptionalString(nestedError?.error) ??
-    (status ? `HTTP_${String(status)}` : "PARALLEL_SEARCH_ERROR")
-  )
-}
-
 function toSourcesFromOutput(
   toolName: ManagedSearchToolName,
   output: Record<string, unknown>
@@ -169,11 +108,8 @@ function toSourcesFromOutput(
     .filter((source): source is MessageSource => source !== null)
 }
 
-export function createAiSdkManagedSearchTools(params: {
-  parallelApiKey?: string
-}): ToolSet {
-  const normalizedParallelApiKey = params.parallelApiKey?.trim()
-  const tools: ToolSet = {
+export function createAiSdkManagedSearchTools(): ToolSet {
+  return {
     gateway_web_search: gateway.tools.parallelSearch({
       mode: "one-shot",
       maxResults: MANAGED_SEARCH_MAX_RESULTS,
@@ -182,48 +118,6 @@ export function createAiSdkManagedSearchTools(params: {
       },
     }),
   }
-
-  if (normalizedParallelApiKey) {
-    const parallelSearchTool = createSearchTool({
-      apiKey: normalizedParallelApiKey,
-      mode: "agentic",
-      max_results: MANAGED_SEARCH_MAX_RESULTS,
-      excerpts: {
-        max_chars_per_result: 2500,
-      },
-    })
-    type ParallelSearchExecute = NonNullable<typeof parallelSearchTool.execute>
-    type ParallelSearchInput = Parameters<ParallelSearchExecute>[0]
-    type ParallelSearchOptions = Parameters<ParallelSearchExecute>[1]
-    const execute = parallelSearchTool.execute
-
-    tools.parallel_search = {
-      ...parallelSearchTool,
-      description: PARALLEL_SEARCH_DESCRIPTION,
-      execute: async (
-        input: ParallelSearchInput,
-        options: ParallelSearchOptions
-      ) => {
-        if (!execute) {
-          return {
-            error: "configuration_error",
-            message: "Parallel search is not executable in this runtime.",
-          }
-        }
-
-        try {
-          return await execute(input, options)
-        } catch (error) {
-          return {
-            error: getThrownErrorCode(error),
-            message: getErrorMessage(error),
-          }
-        }
-      },
-    }
-  }
-
-  return tools
 }
 
 export function getAiSdkManagedSearchToolCallMetadata(
@@ -253,10 +147,10 @@ export function getAiSdkManagedSearchToolCallMetadata(
   return {
     callId: part.toolCallId,
     toolName,
-    label: getToolLabel(toolName),
+    label: "Searching with AI Gateway",
     ...(query ? { query } : {}),
     operation: "search",
-    provider: getProvider(toolName),
+    provider: "vercel_ai_gateway",
   }
 }
 
@@ -282,7 +176,7 @@ export function getAiSdkManagedSearchToolResultMetadata(
       status: "error",
       sources: [],
       operation: "search",
-      provider: getProvider(toolName),
+      provider: "vercel_ai_gateway",
       errorCode: "INVALID_TOOL_OUTPUT",
       retryable: false,
     }
@@ -296,7 +190,7 @@ export function getAiSdkManagedSearchToolResultMetadata(
       status: "error",
       sources: [],
       operation: "search",
-      provider: getProvider(toolName),
+      provider: "vercel_ai_gateway",
       ...(errorCode ? { errorCode } : {}),
       retryable: true,
     }
@@ -308,7 +202,7 @@ export function getAiSdkManagedSearchToolResultMetadata(
     status: "success",
     sources: toSourcesFromOutput(toolName, output),
     operation: "search",
-    provider: getProvider(toolName),
+    provider: "vercel_ai_gateway",
     retryable: false,
   }
 }

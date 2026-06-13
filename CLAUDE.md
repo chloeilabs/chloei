@@ -138,7 +138,7 @@ CREATE TABLE thread (
 8. `IDENTITY AND TONE CONTEXT` — from `DEFAULT_SOUL_FALLBACK_INSTRUCTION` in `src/lib/shared`
 9. `AUTH USER CONTEXT` — authenticated user id, name, email
 
-After assembly, `withAiSdkInlineCitationInstruction` appends inline citation rules and optionally FMP tool rules when `FMP_API_KEY` is set.
+After assembly, `withAiSdkInlineCitationInstruction` appends inline citation rules and finance tool rules.
 
 Long-term memory is opt-in through `src/lib/server/long-term-memory.ts`. Chloei calls Mem0 REST before agent runs and commits only the latest text-only user/assistant turn after meaningful completed or incomplete streams. OSS uses `/memories` and `/search`; Platform stores durable memories under `user_id`, keeps Chloei's agent/thread scope in metadata for reliable cross-thread retrieval and cleanup, and has a temporary legacy `app_id` fallback for old memories.
 
@@ -161,9 +161,8 @@ Multiple tool categories, each only active when the respective API key is config
 | `tavily_search`  | `TAVILY_API_KEY`       | Live web search (advanced depth, up to 8 results)   |
 | `tavily_extract` | `TAVILY_API_KEY`       | Extract content from specific URLs (up to 5 URLs)   |
 | `code_execution` | always on              | Run sandboxed JS or Python for arithmetic/logic     |
-| `finance_data`   | optional provider keys | Normalized finance data via FMP, SEC, FRED, Yahoo   |
+| `finance_data`   | optional provider keys | Normalized finance data via SEC, FRED, Yahoo, Stooq |
 | `sec_filings`    | public SEC endpoints   | SEC/EDGAR filing lookup, fetch, sections, tables    |
-| FMP MCP tools    | `FMP_API_KEY`          | Legacy finance data via Financial Modeling Prep MCP |
 
 **Code execution** (`src/lib/server/llm/code-execution-tools.ts`):
 
@@ -178,20 +177,14 @@ Multiple tool categories, each only active when the respective API key is config
 
 - `finance_data` exposes typed operations for provider status, symbol search, quotes, company profiles, historical prices, financial statements, SEC company facts, FRED series observations, analyst recommendations/price targets, and options chains.
 - Provider calls return sanitized source URLs and structured error payloads with retryability metadata.
-- Yahoo Finance (via `yahoo-finance2`, no API key; `finance-data/yahoo-provider.ts`) is the default for quotes, historical prices, analyst targets, and options, and the non-US fundamentals fallback when a symbol has no SEC CIK. It is imported lazily, normalizes Yahoo payloads defensively (`validateResult: false`), and is supplementary—SEC/FRED/FMP stay citation-grade. Disable with `AGENT_FINANCE_YAHOO_ENABLED=false` (quotes/prices then fall back to Stooq).
-- Finance-analysis runs prefer `finance_data`; chat-default runs keep FMP MCP enabled for migration compatibility.
+- Yahoo Finance (via `yahoo-finance2`, no API key; `finance-data/yahoo-provider.ts`) is the default for quotes, historical prices, analyst targets, and options, and the non-US fundamentals fallback when a symbol has no SEC CIK. It is imported lazily, normalizes Yahoo payloads defensively (`validateResult: false`), and is supplementary—SEC/FRED stay citation-grade. Disable with `AGENT_FINANCE_YAHOO_ENABLED=false` (quotes/prices then fall back to Stooq).
+- All chat, research, and finance-analysis runs use `finance_data` for normalized finance facts.
 
 **SEC filings** (`src/lib/server/llm/ai-sdk-sec-filings-tools.ts`):
 
 - `sec_filings` exposes EDGAR company search, filing search, document fetch, section extraction, table extraction, and targeted retrieval over filing text.
 - Finance-analysis runs use `sec_filings` for Vals-style public-company filing tasks and keep `finance_data` for normalized facts/statements.
 - Finance answer quality expectations are documented in `docs/finance-research-quality.md`; the live public-markets acceptance tasks are in `evals/finance/tasks/live-public-markets.jsonl`.
-
-**FMP MCP tools** (`src/lib/server/llm/ai-sdk-fmp-mcp-tools.ts`):
-
-- Connects to `https://financialmodelingprep.com/mcp` per request
-- Curated subset: `search`, `quote`, `company`, `chart`, `statements`
-- Tool definitions are cached in-memory after first discovery
 
 **Max tool steps** per agent run: 12 (overridable via `AGENT_TOOL_MAX_STEPS`). Finance-analysis runs use `AGENT_FINANCE_TOOL_MAX_STEPS` (default: 20); research runs use `AGENT_RESEARCH_TOOL_MAX_STEPS` (default: 20).
 
@@ -283,21 +276,20 @@ src/
       llm/
         agent-runtime.ts          # Core agent runtime orchestration
         agent-runtime-messages.ts # Agent message preparation and formatting
-        ai-sdk-finance-data-tools.ts  # Normalized finance_data tool (FMP, SEC, FRED)
+        ai-sdk-finance-data-tools.ts  # Normalized finance_data tool (SEC, FRED, Yahoo)
         ai-sdk-sec-filings-tools.ts   # SEC/EDGAR filing retrieval and extraction
-        ai-sdk-fmp-mcp-tools.ts   # FMP MCP client + curated tool wrappers
         ai-sdk-gateway-provider-options.ts # AI Gateway provider options
         ai-sdk-tavily-tools.ts    # Tavily search/extract tools
         code-execution-tools.ts   # Sandboxed JS/Python execution
         finance-data/             # Finance data provider internals
-          provider-urls.ts        # FMP/FRED URL builders
+          provider-urls.ts        # FRED URL builders
           retry.ts                # Fetch with retry + classification
           sec-company-facts.ts    # SEC EDGAR company facts summarizer
           sources.ts              # Source URL/ID generators
           stooq-provider.ts       # Stooq historical price provider
         gateway-responses.ts      # startGatewayResponseStream generator
         initial-reasoning-chunk-sanitizer.ts  # Filters redacted reasoning placeholders
-        system-instruction-augmentations.ts  # Citation + FMP rules appended to prompt
+        system-instruction-augmentations.ts  # Citation rules appended to prompt
       postgres.ts               # getDatabase() Kysely instance
       postgres-url.mjs          # normalizePostgresConnectionString
       rate-limit.ts             # Sliding window + concurrency slot
@@ -374,7 +366,6 @@ All other variables are optional — the code has safe defaults. See `.env.examp
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
 | `AUTH_DATABASE_URL`                        | Separate DB for Better Auth (falls back to `DATABASE_URL`)                                              |
 | `TAVILY_API_KEY`                           | Enables Tavily web search + extract tools                                                               |
-| `FMP_API_KEY`                              | Enables Financial Modeling Prep MCP finance tools                                                       |
 | `FRED_API_KEY`                             | Enables FRED macro/rates lookups through `finance_data`                                                 |
 | `SEC_API_USER_AGENT`                       | User agent for SEC public company-facts requests                                                        |
 | `AGENT_FINANCE_YAHOO_ENABLED`              | Enable Yahoo Finance (no key) in `finance_data` (default: true)                                         |

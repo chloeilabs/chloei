@@ -1,5 +1,3 @@
-import { withSentryConfig } from "@sentry/nextjs"
-
 const isProduction =
   process.env.VERCEL_ENV === "production" ||
   process.env.NODE_ENV === "production"
@@ -36,7 +34,7 @@ function buildContentSecurityPolicy() {
     "font-src 'self' data:",
     "img-src 'self' blob: data: https://www.google.com https://t0.gstatic.com https://t1.gstatic.com https://t2.gstatic.com https://t3.gstatic.com",
     "media-src 'self' blob: data:",
-    "connect-src 'self' https://va.vercel-scripts.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io",
+    "connect-src 'self' https://va.vercel-scripts.com",
     "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com",
     "style-src 'self' 'unsafe-inline'",
     "worker-src 'self' blob:",
@@ -123,10 +121,4 @@ const nextConfig = {
   },
 }
 
-export default withSentryConfig(nextConfig, {
-  authToken: process.env.SENTRY_AUTH_TOKEN,
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
-  silent: !process.env.CI,
-  disableLogger: true,
-})
+export default nextConfig

@@ -38,9 +38,6 @@ const knowledgeIndexingUrl = pathToFileURL(
 const integrationFlagsUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/integration-flags.ts")
 ).href
-const sentryScrubbingUrl = pathToFileURL(
-  path.join(cwd, "src/lib/shared/sentry-scrubbing.ts")
-).href
 const postHogAnalyticsUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/posthog-analytics.ts")
 ).href
@@ -86,7 +83,6 @@ const {
   toEdgeConfigFlagKey,
   toVercelFlagSlug,
 } = await import(integrationFlagsUrl)
-const { scrubSentryEvent } = await import(sentryScrubbingUrl)
 const {
   capturePostHogProductEvent,
   isPostHogAnalyticsEnabled,
@@ -449,37 +445,6 @@ test("integration boolean flags can read analytics Edge Config shape", async () 
   }
 })
 
-test("Sentry scrubbing removes sensitive fields without dropping safe metadata", () => {
-  const scrubbed = scrubSentryEvent({
-    requestId: "request-1",
-    user: {
-      email: "person@example.com",
-      sessionToken: "secret",
-    },
-    extra: {
-      prompt: "raw prompt",
-      modelId: "google/gemini-3.1-pro-preview",
-    },
-  })
-
-  assert.equal(scrubbed.user.sessionToken, "[Filtered]")
-  assert.equal(scrubbed.user.email, "[Filtered]")
-  assert.equal(scrubbed.extra.prompt, "[Filtered]")
-  assert.equal(scrubbed.extra.modelId, "google/gemini-3.1-pro-preview")
-})
-
-test("Sentry scrubbing handles every array element", () => {
-  const scrubbed = scrubSentryEvent({
-    values: Array.from({ length: 60 }, (_, index) => ({
-      index,
-      sessionToken: `secret-${String(index)}`,
-    })),
-  })
-
-  assert.equal(scrubbed.values.length, 60)
-  assert.equal(scrubbed.values[59].sessionToken, "[Filtered]")
-})
-
 test("PostHog scrubbing removes sensitive product analytics fields", () => {
   const scrubbed = scrubPostHogProperties({
     attachment_count: 1,
@@ -764,35 +729,29 @@ test("knowledge search tool result metadata rejects invalid successful output", 
   )
 })
 
-test("managed search tools expose Parallel only when configured and always expose Gateway search", () => {
-  assert.deepEqual(Object.keys(createAiSdkManagedSearchTools({})).sort(), [
+test("managed search tools always expose Gateway search", () => {
+  assert.deepEqual(Object.keys(createAiSdkManagedSearchTools()), [
     "gateway_web_search",
   ])
-  assert.deepEqual(
-    Object.keys(
-      createAiSdkManagedSearchTools({ parallelApiKey: "parallel-key" })
-    ).sort(),
-    ["gateway_web_search", "parallel_search"]
-  )
 })
 
-test("managed search metadata labels Parallel and Gateway search sources", () => {
+test("managed search metadata labels Gateway search sources", () => {
   assert.deepEqual(
     getAiSdkManagedSearchToolCallMetadata({
-      toolCallId: "call-parallel",
-      toolName: "parallel_search",
+      toolCallId: "call-gateway",
+      toolName: "gateway_web_search",
       input: {
         objective: "Find current AI funding news",
         search_queries: ["AI funding"],
       },
     }),
     {
-      callId: "call-parallel",
-      toolName: "parallel_search",
-      label: "Searching with Parallel",
+      callId: "call-gateway",
+      toolName: "gateway_web_search",
+      label: "Searching with AI Gateway",
       query: "Find current AI funding news",
       operation: "search",
-      provider: "parallel",
+      provider: "vercel_ai_gateway",
     }
   )
 
@@ -832,20 +791,20 @@ test("managed search metadata labels Parallel and Gateway search sources", () =>
 test("managed search metadata marks provider errors retryable", () => {
   assert.deepEqual(
     getAiSdkManagedSearchToolResultMetadata({
-      toolCallId: "call-parallel",
-      toolName: "parallel_search",
+      toolCallId: "call-gateway",
+      toolName: "gateway_web_search",
       output: {
         error: "rate_limit",
-        message: "Parallel rate limit exceeded.",
+        message: "AI Gateway rate limit exceeded.",
       },
     }),
     {
-      callId: "call-parallel",
-      toolName: "parallel_search",
+      callId: "call-gateway",
+      toolName: "gateway_web_search",
       status: "error",
       sources: [],
       operation: "search",
-      provider: "parallel",
+      provider: "vercel_ai_gateway",
       errorCode: "rate_limit",
       retryable: true,
     }

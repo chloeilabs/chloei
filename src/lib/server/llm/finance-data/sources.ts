@@ -1,6 +1,6 @@
 import type { MessageSource } from "@/lib/shared"
 
-type FinanceDataSourceProvider = "fmp" | "sec" | "fred" | "stooq" | "yahoo"
+type FinanceDataSourceProvider = "sec" | "fred" | "stooq" | "yahoo"
 type FinanceDataSourceOperation =
   | "provider_status"
   | "symbol_search"
@@ -43,18 +43,16 @@ export function createFinanceDataProviderSource(
 ): MessageSource {
   const sourceUrl = sanitizeSourceUrl(url)
   const title =
-    provider === "fmp"
-      ? "Financial Modeling Prep"
-      : provider === "stooq"
-        ? "Stooq"
-        : provider === "yahoo"
-          ? "Yahoo Finance"
-          : provider === "fred"
-            ? "FRED"
-            : operation === "sec_company_facts" ||
-                operation === "financial_statements"
-              ? "SEC company facts"
-              : "SEC company submissions"
+    provider === "stooq"
+      ? "Stooq"
+      : provider === "yahoo"
+        ? "Yahoo Finance"
+        : provider === "fred"
+          ? "FRED"
+          : operation === "sec_company_facts" ||
+              operation === "financial_statements"
+            ? "SEC company facts"
+            : "SEC company submissions"
 
   return {
     id: createFinanceDataSourceId([provider, operation], sourceUrl),

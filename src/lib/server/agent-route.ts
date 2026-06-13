@@ -153,8 +153,6 @@ interface CreateAgentStreamResponseParams {
   selectedModel: ModelType
   aiGatewayApiKey: string
   tavilyApiKey?: string
-  parallelApiKey?: string
-  fmpApiKey?: string
   userTimeZone?: string
   runtimeProfile?: AgentRuntimeProfileId
   taskMode?: PromptTaskMode
@@ -856,8 +854,6 @@ export function createAgentStreamResponse(
           model: params.selectedModel,
           aiGatewayApiKey: params.aiGatewayApiKey,
           tavilyApiKey: params.tavilyApiKey,
-          parallelApiKey: params.parallelApiKey,
-          fmpApiKey: params.fmpApiKey,
           userTimeZone: params.userTimeZone,
           runtimeProfile: params.runtimeProfile,
           ...(params.taskMode ? { taskMode: params.taskMode } : {}),
@@ -872,7 +868,6 @@ export function createAgentStreamResponse(
                 params.selectedModel,
                 params.runtimeProfile
               ),
-              fmpEnabled: Boolean(params.fmpApiKey?.trim()),
               secFilingsEnabled: shouldIncludeSecFilingsToolingInstruction(
                 params.runtimeProfile
               ),

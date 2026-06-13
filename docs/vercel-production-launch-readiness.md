@@ -130,8 +130,6 @@ Current Log Drain:
 
 Handled:
 
-- OpenTelemetry is registered through `@vercel/otel`.
-- Sentry server and edge configs are installed with PII scrubbing.
 - Runtime logs are structured in production.
 - Route-level logging records request id, route, method, status, duration, and outcome.
 - Latest production deployment is aliased to `chloei.ai`.
