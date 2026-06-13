@@ -130,16 +130,20 @@ CREATE TABLE thread (
 3. Provider overlay (`PROVIDER OVERLAY: <PROVIDER>`) — provider-specific reasoning guidance for Gemini, Qwen, Kimi, or MiMo
 4. Task mode overlay (`TASK MODE OVERLAY: <MODE>`) — mode-specific guidance (see below)
 5. `DEEP RESEARCH MODE` — only for explicit Research mode, adding the dedicated comprehensive-answer instruction template
-6. `IDENTITY AND TONE CONTEXT` — from `DEFAULT_SOUL_FALLBACK_INSTRUCTION` in `src/lib/shared`
-7. `AUTH USER CONTEXT` — authenticated user id, name, email
+6. `FINANCIAL SERVICES WORKFLOW` — only when a financial-services workflow resolves (`financeWorkflowsEnabled` flag), injecting workflow-specific guidance
+7. `IDENTITY AND TONE CONTEXT` — from `DEFAULT_SOUL_FALLBACK_INSTRUCTION` in `src/lib/shared`
+8. `AUTH USER CONTEXT` — authenticated user id, name, email
 
 After assembly, `withAiSdkInlineCitationInstruction` appends inline citation rules and finance tool rules.
 
 **Task modes** (auto-inferred by `inferPromptTaskMode` from message content patterns):
 
 - `general` — default
-- `coding` — code/function/script/debug patterns
+- `coding` — code/function/script patterns
+- `debugging` — stack traces, errors, "why does X fail" triage patterns
+- `writing` — draft/edit/proofread/tone patterns
 - `research` — latest/sources/cite/verify/news patterns
+- `finance_analysis` — markets/tickers/statements/filings patterns (also forced when a financial-services workflow resolves)
 - `high_stakes` — medical/security/legal/financial-safety patterns
 - `closed_answer` — multiple-choice/exact-answer patterns
 - `instruction_following` — strict output format patterns
@@ -148,13 +152,14 @@ After assembly, `withAiSdkInlineCitationInstruction` appends inline citation rul
 
 Multiple tool categories, each only active when the respective API key is configured:
 
-| Tool             | Key                  | Description                                       |
-| ---------------- | -------------------- | ------------------------------------------------- |
-| `tavily_search`  | `TAVILY_API_KEY`     | Live web search (advanced depth, up to 8 results) |
-| `tavily_extract` | `TAVILY_API_KEY`     | Extract content from specific URLs (up to 5 URLs) |
-| `code_execution` | always on            | Run sandboxed JS or Python for arithmetic/logic   |
-| `finance_data`   | public Stooq/SEC     | Normalized finance data via Stooq and SEC/EDGAR   |
-| `sec_filings`    | public SEC endpoints | SEC/EDGAR filing lookup, fetch, sections, tables  |
+| Tool               | Key                         | Description                                                      |
+| ------------------ | --------------------------- | ---------------------------------------------------------------- |
+| `tavily_search`    | `TAVILY_API_KEY`            | Live web search (advanced depth, up to 8 results)                |
+| `tavily_extract`   | `TAVILY_API_KEY`            | Extract content from specific URLs (up to 5 URLs)                |
+| `code_execution`   | always on                   | Run sandboxed JS or Python for arithmetic/logic                  |
+| `finance_data`     | public Stooq/SEC            | Normalized finance data via Stooq and SEC/EDGAR                  |
+| `sec_filings`      | public SEC endpoints        | SEC/EDGAR filing lookup, fetch, sections, tables                 |
+| `trading_analysis` | `TRADINGAGENTS_*` (sidecar) | Multi-agent equity analysis via the Trading Desk sidecar service |
 
 **Code execution** (`src/lib/server/llm/code-execution-tools.ts`):
 
@@ -228,6 +233,15 @@ In development, falls back to human-readable `[scope] message` format.
 
 All API routes use `createRouteObservation` / `observeRouteResponse` (`src/lib/server/route-observability.ts`) to log every request with duration, outcome, and error codes.
 
+### Integrations (beyond core chat)
+
+These run alongside the core agent and are gated by env vars / feature flags:
+
+- **Trading Desk** (`/trading-desk`; `src/components/trading-desk/`, `src/app/api/trading-desk/`, `src/lib/server/trading-agents/`) — proxies an external Python "TradingAgents" FastAPI sidecar (`TRADINGAGENTS_SERVICE_URL`; enabled by default via `TRADINGAGENTS_ENABLED`) for multi-agent equity analysis. Runs as an async job and is also exposed to chat via the `trading_analysis` tool. Independent of the in-app `finance_data`/`sec_filings` tools.
+- **Async jobs (Inngest)** — `src/lib/server/inngest/` + `src/lib/server/jobs.ts` (the `agent_job` table). Backs Trading Desk runs and async report generation. Gated by `INNGEST_*`; falls back to an inline runner when Inngest is unconfigured. Served at `/api/inngest`; job status via `/api/jobs/[jobId]`, report enqueue via `/api/jobs/report`.
+- **File attachments (Vercel Blob)** — `/api/uploads` + `src/lib/server/private-blob-storage.ts` + `agent-attachment-blobs.ts`. Private per-user Blob storage (`BLOB_READ_WRITE_TOKEN`). Image and PDF attachments are summarized for the model in `src/lib/server/llm/image-vision-preprocessor.ts` and `pdf-attachment-preprocessor.ts` (PDF text extraction lives in `src/lib/server/pdf-text-extraction.ts`).
+- **Feature flags** — `src/lib/server/integration-flags.ts`. Default-off flags (`asyncReportsEnabled`, `telemetryRecordIo`, `financeWorkflowsEnabled`) resolved from `AGENT_*` env vars or Vercel Edge Config (`EDGE_CONFIG`), with opt-in internal-user defaults.
+
 ## File Structure
 
 ```
@@ -236,10 +250,17 @@ src/
     (auth)/             # Sign-in and sign-up pages (route group, no shared layout nav)
     (home)/             # Main app page (route group)
     api/
-      agent/route.ts    # POST /api/agent — streaming agent endpoint
-      auth/[...all]/    # Better Auth catch-all
-      models/route.ts   # GET /api/models — available models for configured keys
-      threads/route.ts  # GET/PUT/DELETE /api/threads — thread CRUD
+      agent/route.ts       # POST /api/agent — streaming agent endpoint
+      agent/follow-ups/    # Follow-up question suggestions
+      agent/artifacts/     # Authenticated code-execution artifact downloads
+      auth/[...all]/       # Better Auth catch-all
+      inngest/route.ts     # Inngest function endpoint (async jobs)
+      jobs/[jobId]/        # Async job status
+      jobs/report/         # Async report enqueue
+      models/route.ts      # GET /api/models — available models for configured keys
+      threads/route.ts     # GET/PUT/DELETE /api/threads — thread CRUD
+      trading-desk/        # analyze (stream), jobs (async), config
+      uploads/             # Private Blob attachment upload + download
     layout.tsx          # Root layout with fonts, theme, providers
   components/
     agent/home/         # Core chat UI: use-agent-session, stream state, events
@@ -265,6 +286,14 @@ src/
       auth-session.ts           # getRequestSession
       auth.ts                   # isAuthConfigured, createAuthUnavailableResponse
       e2e-test-mode.ts          # E2E test mode detection for mock auth/agent
+      integration-flags.ts      # Default-off feature flags (env + Edge Config)
+      jobs.ts                   # agent_job table helpers (async jobs)
+      financial-services-workflows.ts # Finance workflow resolution + prompt block
+      agent-report-jobs.ts      # Async report job completion
+      private-blob-storage.ts   # Private per-user Vercel Blob storage
+      pdf-text-extraction.ts    # PDF attachment text extraction (pdf-parse + canvas)
+      inngest/                  # Inngest client + functions (async jobs)
+      trading-agents/           # Trading Desk sidecar client, config, jobs
       llm/
         agent-runtime.ts          # Core agent runtime orchestration
         agent-runtime-messages.ts # Agent message preparation and formatting
@@ -272,6 +301,10 @@ src/
         ai-sdk-sec-filings-tools.ts   # SEC/EDGAR filing retrieval and extraction
         ai-sdk-gateway-provider-options.ts # AI Gateway provider options
         ai-sdk-tavily-tools.ts    # Tavily search/extract tools
+        ai-sdk-trading-agents-tools.ts # trading_analysis chat tool (sidecar)
+        image-vision-preprocessor.ts   # Image attachment → text via Gateway vision
+        pdf-attachment-preprocessor.ts # PDF attachment → text for the model
+        gateway-client.ts         # undici dispatcher for AI Gateway
         code-execution-tools.ts   # Sandboxed JS/Python execution
         finance-data/             # Finance data provider internals
           retry.ts                # Fetch with retry + classification
@@ -353,30 +386,39 @@ AI_GATEWAY_API_KEY=
 
 All other variables are optional — the code has safe defaults. See `.env.example` for the full list with inline documentation.
 
-| Variable                                   | Purpose                                                                                                 |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| `AUTH_DATABASE_URL`                        | Separate DB for Better Auth (falls back to `DATABASE_URL`)                                              |
-| `TAVILY_API_KEY`                           | Enables Tavily web search + extract tools                                                               |
-| `SEC_API_USER_AGENT`                       | User agent for SEC public company-facts requests                                                        |
-| `PYTHON3_PATH`                             | Override `python3` binary for code execution                                                            |
-| `AGENT_MAX_MESSAGES`                       | Max messages per request (default: 50)                                                                  |
-| `AGENT_MAX_MESSAGE_CHARS`                  | Max chars per message (default: 12,000)                                                                 |
-| `AGENT_MAX_TOTAL_CHARS`                    | Max total conversation chars (default: 48,000)                                                          |
-| `AGENT_STREAM_TIMEOUT_MS`                  | Stream timeout (default: 800,000 ms)                                                                    |
-| `AGENT_TOOL_MAX_STEPS`                     | Max tool use steps per run (default: 12)                                                                |
-| `AGENT_RESEARCH_TOOL_MAX_STEPS`            | Max tool steps for research runs (default: 20)                                                          |
-| `AGENT_FINANCE_TOOL_MAX_STEPS`             | Max tool steps for finance-analysis runs (default: 20)                                                  |
-| `AI_GATEWAY_CLIENT_TIMEOUT_MS`             | AI Gateway HTTP client timeout (default: 3,600,000 ms)                                                  |
-| `AGENT_CODE_EXECUTION_BACKEND`             | `restricted` or `finance`                                                                               |
-| `AGENT_CODE_EXECUTION_PYTHON_VENV_PATH`    | Optional venv/python path for curated finance execution                                                 |
-| `AGENT_EVAL_RESULTS_DIR`                   | Output directory for finance eval results/artifacts                                                     |
-| `AGENT_RATE_LIMIT_ENABLED`                 | Enable/disable rate limiting (default: true)                                                            |
-| `AGENT_RATE_LIMIT_WINDOW_MS`               | Rate limit window (default: 60,000 ms)                                                                  |
-| `AGENT_RATE_LIMIT_MAX_REQUESTS`            | Max requests per window (default: 60)                                                                   |
-| `AGENT_RATE_LIMIT_STORE`                   | `auto`, `memory`, or `postgres` (default: `auto` — uses postgres if `DATABASE_URL` is set, else memory) |
-| `AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT` | Concurrency limit (default: 4)                                                                          |
-| `LOG_FORMAT`                               | Set to `json` to force structured JSON logs                                                             |
-| `BETTER_AUTH_COOKIE_DOMAIN`                | Shared cookie domain for cross-subdomain auth                                                           |
-| `BETTER_AUTH_TRUSTED_ORIGINS`              | Comma-separated list of additional trusted origins                                                      |
+| Variable                                    | Purpose                                                                                                 |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `AUTH_DATABASE_URL`                         | Separate DB for Better Auth (falls back to `DATABASE_URL`)                                              |
+| `TAVILY_API_KEY`                            | Enables Tavily web search + extract tools                                                               |
+| `SEC_API_USER_AGENT`                        | User agent for SEC public company-facts requests                                                        |
+| `BLOB_READ_WRITE_TOKEN`                     | Private Vercel Blob store for attachment uploads + artifacts                                            |
+| `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY` | Enable Inngest async jobs (Trading Desk runs, async reports)                                            |
+| `EDGE_CONFIG`                               | Vercel Edge Config connection for remote feature flags                                                  |
+| `TRADINGAGENTS_SERVICE_URL`                 | Trading Desk sidecar base URL (default `http://localhost:8000`)                                         |
+| `TRADINGAGENTS_SERVICE_TOKEN`               | Shared secret sent to the Trading Desk sidecar                                                          |
+| `TRADINGAGENTS_ENABLED`                     | Enable/disable the Trading Desk (default: true)                                                         |
+| `AGENT_ASYNC_REPORTS_ENABLED`               | Feature flag: async report jobs (default: off)                                                          |
+| `AGENT_FINANCE_WORKFLOWS_ENABLED`           | Feature flag: financial-services workflows (default: off)                                               |
+| `AGENT_TELEMETRY_RECORD_IO`                 | Feature flag: record prompt/output IO in telemetry (default: off)                                       |
+| `PYTHON3_PATH`                              | Override `python3` binary for code execution                                                            |
+| `AGENT_MAX_MESSAGES`                        | Max messages per request (default: 50)                                                                  |
+| `AGENT_MAX_MESSAGE_CHARS`                   | Max chars per message (default: 12,000)                                                                 |
+| `AGENT_MAX_TOTAL_CHARS`                     | Max total conversation chars (default: 48,000)                                                          |
+| `AGENT_STREAM_TIMEOUT_MS`                   | Stream timeout (default: 800,000 ms)                                                                    |
+| `AGENT_TOOL_MAX_STEPS`                      | Max tool use steps per run (default: 12)                                                                |
+| `AGENT_RESEARCH_TOOL_MAX_STEPS`             | Max tool steps for research runs (default: 20)                                                          |
+| `AGENT_FINANCE_TOOL_MAX_STEPS`              | Max tool steps for finance-analysis runs (default: 20)                                                  |
+| `AI_GATEWAY_CLIENT_TIMEOUT_MS`              | AI Gateway HTTP client timeout (default: 3,600,000 ms)                                                  |
+| `AGENT_CODE_EXECUTION_BACKEND`              | `restricted` or `finance`                                                                               |
+| `AGENT_CODE_EXECUTION_PYTHON_VENV_PATH`     | Optional venv/python path for curated finance execution                                                 |
+| `AGENT_EVAL_RESULTS_DIR`                    | Output directory for finance eval results/artifacts                                                     |
+| `AGENT_RATE_LIMIT_ENABLED`                  | Enable/disable rate limiting (default: true)                                                            |
+| `AGENT_RATE_LIMIT_WINDOW_MS`                | Rate limit window (default: 60,000 ms)                                                                  |
+| `AGENT_RATE_LIMIT_MAX_REQUESTS`             | Max requests per window (default: 60)                                                                   |
+| `AGENT_RATE_LIMIT_STORE`                    | `auto`, `memory`, or `postgres` (default: `auto` — uses postgres if `DATABASE_URL` is set, else memory) |
+| `AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT`  | Concurrency limit (default: 4)                                                                          |
+| `LOG_FORMAT`                                | Set to `json` to force structured JSON logs                                                             |
+| `BETTER_AUTH_COOKIE_DOMAIN`                 | Shared cookie domain for cross-subdomain auth                                                           |
+| `BETTER_AUTH_TRUSTED_ORIGINS`               | Comma-separated list of additional trusted origins                                                      |
 
 Vercel tip: `vercel env pull .env.local` is the quickest way to hydrate local development from Vercel project settings.
