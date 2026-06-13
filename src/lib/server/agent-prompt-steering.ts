@@ -73,7 +73,7 @@ const STRICT_OUTPUT_PATTERN =
 const PROVIDER_OVERLAYS: Record<PromptProvider, string> = {
   alibaba: `
 Use Qwen reasoning mode efficiently.
-- Take advantage of the long context window: skim and cite earlier turns and retrieved memory before re-asking the user for information already present.
+- Take advantage of the long context window: skim and cite earlier turns before re-asking the user for information already present.
 - Prefer direct execution and verification over speculative narration.
 - On format-sensitive tasks, do a literal final-format check before finishing.
 - Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
@@ -89,7 +89,7 @@ Use Gemini reasoning mode efficiently.
 `.trim(),
   moonshotai: `
 Use Kimi reasoning mode efficiently.
-- Take advantage of the long context window: skim and cite earlier turns and retrieved memory before re-asking the user for information already present.
+- Take advantage of the long context window: skim and cite earlier turns before re-asking the user for information already present.
 - Prefer direct execution and verification over speculative narration.
 - On format-sensitive tasks, do a literal final-format check before finishing.
 - Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.

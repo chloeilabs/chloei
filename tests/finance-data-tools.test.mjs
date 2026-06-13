@@ -300,6 +300,33 @@ test("finance quote auto provider uses Stooq structured fallback", async () => {
   assert.equal(result.output?.sources[0]?.title, "Stooq")
 })
 
+test("finance data rejects explicit provider/operation mismatches", async () => {
+  const quoteOnSec = await runFinanceDataOperation({
+    operation: "quote",
+    provider: "sec",
+    symbol: "AAPL",
+  })
+  assert.equal(quoteOnSec.output, undefined)
+  assert.equal(quoteOnSec.error?.code, "OPERATION_UNSUPPORTED")
+  assert.equal(quoteOnSec.error?.provider, "sec")
+
+  const historicalOnSec = await runFinanceDataOperation({
+    operation: "historical_prices",
+    provider: "sec",
+    symbol: "AAPL",
+  })
+  assert.equal(historicalOnSec.output, undefined)
+  assert.equal(historicalOnSec.error?.code, "OPERATION_UNSUPPORTED")
+
+  const factsOnStooq = await runFinanceDataOperation({
+    operation: "sec_company_facts",
+    provider: "stooq",
+    cik: "320193",
+  })
+  assert.equal(factsOnStooq.output, undefined)
+  assert.equal(factsOnStooq.error?.code, "OPERATION_UNSUPPORTED")
+})
+
 test("finance sources use unique ids for repeated operations", async () => {
   const fetchImpl = async (url) => {
     const requestUrl = String(url)

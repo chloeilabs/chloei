@@ -226,6 +226,26 @@ function resolveProvider(
   return "sec"
 }
 
+function isProviderOperationSupported(
+  provider: ResolvedFinanceDataProvider | "local",
+  operation: FinanceDataOperation
+): boolean {
+  if (provider === "local") {
+    return operation === "provider_status"
+  }
+
+  if (provider === "stooq") {
+    return operation === "quote" || operation === "historical_prices"
+  }
+
+  return (
+    operation === "symbol_search" ||
+    operation === "company_profile" ||
+    operation === "financial_statements" ||
+    operation === "sec_company_facts"
+  )
+}
+
 function buildSecCompanyFactsUrl(cik: string): URL {
   return new URL(`${SEC_COMPANY_FACTS_BASE_URL}/CIK${normalizeCik(cik)}.json`)
 }
@@ -578,6 +598,20 @@ export async function runFinanceDataOperation(
   const startedAt = Date.now()
   const fetchImpl = config.fetchImpl ?? fetch
   const provider = resolveProvider(input)
+
+  if (!isProviderOperationSupported(provider, input.operation)) {
+    return {
+      error: {
+        message: `${input.operation} is not supported by the ${provider} provider.`,
+        code: "OPERATION_UNSUPPORTED",
+        operation: input.operation,
+        provider,
+        retryable: false,
+        attempts: 0,
+        durationMs: Date.now() - startedAt,
+      },
+    }
+  }
 
   if (provider === "local") {
     const status = await getFinanceProviderStatus(config, fetchImpl)
