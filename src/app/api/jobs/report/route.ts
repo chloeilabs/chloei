@@ -19,7 +19,6 @@ import { inngest } from "@/lib/server/inngest/client"
 import { shouldRunInngestInlineFallback } from "@/lib/server/inngest/environment"
 import { resolveAgentFeatureFlags } from "@/lib/server/integration-flags"
 import { createAgentJob, updateAgentJobStatus } from "@/lib/server/jobs"
-import { capturePostHogProductEvent } from "@/lib/server/posthog-analytics"
 import {
   createRouteObservation,
   observeRouteResponse,
@@ -195,18 +194,6 @@ export async function POST(request: NextRequest) {
         }
       }
     }
-
-    void capturePostHogProductEvent({
-      event: "async_report_requested",
-      featureFlags: flags,
-      requestId,
-      userEmail: session.user.email,
-      userId: session.user.id,
-      properties: {
-        has_thread: Boolean(parsed.data.threadId),
-        title_present: Boolean(parsed.data.title),
-      },
-    })
 
     return observeRouteResponse(
       observation,

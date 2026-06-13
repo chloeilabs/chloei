@@ -21,10 +21,6 @@ import {
 } from "@/lib/server/inngest/environment"
 import { indexUploadedDocument } from "@/lib/server/knowledge-indexing"
 import {
-  capturePostHogProductEvent,
-  toPostHogSizeBucket,
-} from "@/lib/server/posthog-analytics"
-import {
   buildPrivateBlobAttachmentPathname,
   isPrivateBlobConfigured,
   uploadPrivateBlob,
@@ -243,18 +239,6 @@ export async function POST(request: NextRequest) {
         })
       }
     }
-
-    void capturePostHogProductEvent({
-      event: "document_uploaded",
-      requestId,
-      userEmail: session.user.email,
-      userId: session.user.id,
-      properties: {
-        attachment_kind: getAgentAttachmentKind(mediaType),
-        content_type: mediaType,
-        size_bucket: toPostHogSizeBucket(uploaded.sizeBytes),
-      },
-    })
 
     return observeRouteResponse(
       observation,

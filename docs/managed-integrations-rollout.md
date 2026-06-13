@@ -15,16 +15,15 @@ each managed capability, all connected to the `chloei` project:
 
 | Resource                  | Product        | Purpose                                 |
 | ------------------------- | -------------- | --------------------------------------- |
-| `chloei-posthog`          | PostHog        | Product analytics and rollout flags     |
 | `chloei-sentry`           | Sentry         | Errors, performance traces, source maps |
 | `chloei-knowledge-search` | Upstash Search | Governed static knowledge retrieval     |
 | `chloei-workflows`        | Inngest        | Durable agent workflows and jobs        |
 | `chloei-db`               | Neon           | Primary PostgreSQL system of record     |
 
-There should be no duplicate project-level Sentry, PostHog, or Inngest
-resources. If the Vercel integrations console shows an extra product tile that
-is not connected to `chloei`, confirm no project resource is attached before
-removing it from the integration console.
+There should be no duplicate project-level Sentry or Inngest resources. If the
+Vercel integrations console shows an extra product tile that is not connected to
+`chloei`, confirm no project resource is attached before removing it from the
+integration console.
 
 The current production deployment should be `Ready`, aliased to `chloei.ai`,
 and expose `/api/inngest` with `x-inngest-sdk-handled: true`. An unsigned
@@ -42,9 +41,6 @@ AGENT_KNOWLEDGE_SEARCH_ENABLED=<unset>
 AGENT_ASYNC_REPORTS_ENABLED=<unset>
 AGENT_TELEMETRY_RECORD_IO=false
 AGENT_FINANCE_WORKFLOWS_ENABLED=<unset>
-POSTHOG_ANALYTICS_ENABLED=true
-NEXT_PUBLIC_POSTHOG_ANALYTICS_ENABLED=false
-POSTHOG_ANALYTICS_INTERNAL_USERS_ONLY=true
 INNGEST_INLINE_FALLBACK=<unset>
 UPSTASH_DISABLE_TELEMETRY=1
 ```
@@ -56,23 +52,19 @@ AGENT_KNOWLEDGE_SEARCH_ENABLED=true
 AGENT_ASYNC_REPORTS_ENABLED=true
 AGENT_FINANCE_WORKFLOWS_ENABLED=true
 AGENT_TELEMETRY_RECORD_IO=false
-POSTHOG_ANALYTICS_ENABLED=true
-NEXT_PUBLIC_POSTHOG_ANALYTICS_ENABLED=true
-POSTHOG_ANALYTICS_INTERNAL_USERS_ONLY=true
 INNGEST_INLINE_FALLBACK=1
 UPSTASH_DISABLE_TELEMETRY=1
 ```
 
 Development mirrors the locked-down defaults, with `INNGEST_INLINE_FALLBACK=1`
-for local work. `POSTHOG_ANALYTICS_ENABLED` was normalized to a clean `false`
-value in Production and Development on May 9, 2026.
+for local work.
 
 ## Flag Sources
 
 Runtime flag resolution is implemented in
 `src/lib/server/integration-flags.ts`. Effective precedence is:
 
-1. Explicit `AGENT_*` or `POSTHOG_*` environment variables.
+1. Explicit `AGENT_*` environment variables.
 2. Edge Config values from `agent_flags`, `analytics_flags`, or `flags`.
 3. Internal-user defaults when
    `AGENT_ENABLE_NEW_CAPABILITIES_FOR_INTERNAL_USERS=true`.
@@ -92,18 +84,13 @@ Edge Config store `chloei-flags` should contain:
     "agent.telemetry.record_io": false
   },
   "flags": {
-    "agent-telemetry-record-io": false,
-    "analytics-posthog-enabled": false
-  },
-  "analytics_flags": {
-    "analytics.posthog.enabled": false
+    "agent-telemetry-record-io": false
   }
 }
 ```
 
-PostHog project `posthog-chloei-labs` has matching inactive feature flags with
-zero rollout. The app does not directly evaluate PostHog flags at runtime; Edge
-Config and environment variables remain the enforcement layer.
+Edge Config and environment variables remain the enforcement layer for runtime
+flag evaluation.
 
 ## Production Rollout
 
@@ -116,7 +103,7 @@ fully locked-down state:
    internally enabled:
 
    ```bash
-   vercel edge-config update chloei-flags --scope chloei --patch '{"items":[{"operation":"update","key":"agent_flags","value":{"agent.telemetry.record_io":false}},{"operation":"update","key":"flags","value":{"agent-telemetry-record-io":false,"analytics-posthog-enabled":false}},{"operation":"update","key":"analytics_flags","value":{"analytics.posthog.enabled":false}}]}'
+   vercel edge-config update chloei-flags --scope chloei --patch '{"items":[{"operation":"update","key":"agent_flags","value":{"agent.telemetry.record_io":false}},{"operation":"update","key":"flags","value":{"agent-telemetry-record-io":false}}]}'
    ```
 
 3. Remove the explicit production env overrides for the capabilities being
@@ -128,12 +115,10 @@ fully locked-down state:
    vercel env rm AGENT_FINANCE_WORKFLOWS_ENABLED production --yes
    ```
 
-4. Enable internal defaults and internal-only server-side analytics:
+4. Enable internal defaults:
 
    ```bash
    printf '%s' true | vercel env add AGENT_ENABLE_NEW_CAPABILITIES_FOR_INTERNAL_USERS production --force --yes
-   printf '%s' true | vercel env add POSTHOG_ANALYTICS_ENABLED production --force --yes
-   printf '%s' true | vercel env add POSTHOG_ANALYTICS_INTERNAL_USERS_ONLY production --force --yes
    ```
 
 5. Redeploy production so the runtime sees the new env set:
@@ -152,9 +137,6 @@ fully locked-down state:
 
 Keep `AGENT_TELEMETRY_RECORD_IO=false` unless a separate privacy review approves
 raw prompt/output capture for a controlled non-production eval cohort.
-
-Leave `NEXT_PUBLIC_POSTHOG_ANALYTICS_ENABLED=false` for production unless client
-analytics receives a separate privacy review.
 
 ## Smoke Tests
 
@@ -200,8 +182,7 @@ Authenticated rollout smoke after internal production flags are enabled:
 3. Search for the document through `knowledge_search` and verify citations,
    source type, as-of date, and owner scoping.
 4. Enqueue a report through `POST /api/jobs/report` and poll `GET /api/jobs/:id`.
-5. Verify Sentry receives errors/traces without PII and that PostHog receives
-   only scrubbed internal-user product events if analytics is enabled.
+5. Verify Sentry receives errors/traces without PII.
 6. Confirm an external test user still receives `JOB_REPORT_DISABLED` for async
    reports.
 
@@ -232,8 +213,7 @@ printf '%s' false | vercel env add AGENT_KNOWLEDGE_SEARCH_ENABLED production --f
 printf '%s' false | vercel env add AGENT_ASYNC_REPORTS_ENABLED production --force --yes
 printf '%s' false | vercel env add AGENT_TELEMETRY_RECORD_IO production --force --yes
 printf '%s' false | vercel env add AGENT_FINANCE_WORKFLOWS_ENABLED production --force --yes
-printf '%s' false | vercel env add POSTHOG_ANALYTICS_ENABLED production --force --yes
-vercel edge-config update chloei-flags --scope chloei --patch '{"items":[{"operation":"update","key":"agent_flags","value":{"agent.knowledge_search.enabled":false,"agent.async_reports.enabled":false,"agent.telemetry.record_io":false,"agent.finance_workflows.enabled":false}},{"operation":"update","key":"flags","value":{"agent-knowledge-search-enabled":false,"agent-async-reports-enabled":false,"agent-telemetry-record-io":false,"agent-finance-workflows-enabled":false,"analytics-posthog-enabled":false}},{"operation":"update","key":"analytics_flags","value":{"analytics.posthog.enabled":false}}]}'
+vercel edge-config update chloei-flags --scope chloei --patch '{"items":[{"operation":"update","key":"agent_flags","value":{"agent.knowledge_search.enabled":false,"agent.async_reports.enabled":false,"agent.telemetry.record_io":false,"agent.finance_workflows.enabled":false}},{"operation":"update","key":"flags","value":{"agent-knowledge-search-enabled":false,"agent-async-reports-enabled":false,"agent-telemetry-record-io":false,"agent-finance-workflows-enabled":false}}]}'
 vercel redeploy https://chloei.ai
 ```
 
@@ -269,8 +249,7 @@ vercel rollback <deployment-id-or-url>
 vercel rollback status --timeout 30s
 ```
 
-Also deactivate the matching PostHog flags and restore the `chloei-flags` Edge
-Config values to false.
+Also restore the `chloei-flags` Edge Config values to false.
 
 ## Operating Rules
 
@@ -284,10 +263,7 @@ Config values to false.
   public URLs.
 - Inngest events must use idempotency keys derived from user, document, report,
   or thread identifiers, not prompt text or document contents.
-- Sentry replay stays disabled and Sentry/PostHog scrubbing must remain in place.
-- Do not commit personal PostHog MCP API keys. Install local MCP per user with
-  `npx @posthog/wizard mcp add --region us --project-id 416704` when a local
-  editor needs direct PostHog access.
+- Sentry replay stays disabled and Sentry scrubbing must remain in place.
 
 ## Verification Commands
 

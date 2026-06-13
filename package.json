@@ -59,8 +59,6 @@
     "next": "16.2.6",
     "pdf-parse": "^2.4.5",
     "pg": "^8.20.0",
-    "posthog-js": "^1.372.10",
-    "posthog-node": "^5.33.4",
     "radix-ui": "^1.4.3",
     "react": "^19.2.6",
     "react-day-picker": "^10.0.1",

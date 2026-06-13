@@ -41,7 +41,6 @@ import {
   getLongTermMemoryContext,
   isLongTermMemoryEnabled,
 } from "@/lib/server/long-term-memory"
-import { capturePostHogProductEvent } from "@/lib/server/posthog-analytics"
 import {
   evaluateAndConsumeSlidingWindowRateLimit,
   tryAcquireConcurrencySlot,
@@ -312,34 +311,6 @@ export async function POST(request: NextRequest) {
     }
 
     const threadId = parsedRequest.threadId
-    const attachmentCount = parsedRequest.messages.reduce(
-      (count, message) => count + (message.attachments?.length ?? 0),
-      0
-    )
-
-    void capturePostHogProductEvent({
-      event: "agent_request_started",
-      featureFlags,
-      requestId,
-      userEmail: session.user.email,
-      userId: session.user.id,
-      properties: {
-        attachment_count: attachmentCount,
-        financial_services_workflow:
-          financialServicesWorkflow?.workflow ?? "none",
-        message_count: parsedRequest.messages.length,
-        model_id: selectedModel,
-        prompt_task_mode: promptTaskMode,
-        provider: promptProvider,
-        run_mode: parsedRequest.runMode,
-        runtime_profile: resolveRuntimeProfile(
-          promptTaskMode,
-          parsedRequest.runMode,
-          financialServicesWorkflow?.workflow
-        ),
-        user_expertise: userExpertise ?? "none",
-      },
-    })
 
     return observeRouteResponse(
       observation,
