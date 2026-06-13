@@ -19,7 +19,7 @@ pnpm migrate
 pnpm dev
 ```
 
-Add `AI_GATEWAY_API_KEY` to `.env.local` before starting the app. Add `TAVILY_API_KEY` if you want Tavily search and extract tools. Add `FMP_API_KEY` if you want the curated finance tools. Add the Mem0 memory variables documented below if you want long-term memory. The app runs on [http://localhost:3000](http://localhost:3000).
+Add `AI_GATEWAY_API_KEY` to `.env.local` before starting the app. Add `TAVILY_API_KEY` if you want Tavily search and extract tools. Add the Mem0 memory variables documented below if you want long-term memory. The app runs on [http://localhost:3000](http://localhost:3000).
 
 To enable auth locally, provision PostgreSQL before running `pnpm migrate` and add:
 
