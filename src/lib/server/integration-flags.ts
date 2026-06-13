@@ -10,7 +10,7 @@ export const AGENT_FLAG_KEYS = [
 ] as const
 
 export type AgentFlagKey = (typeof AGENT_FLAG_KEYS)[number]
-export type IntegrationFlagKey = AgentFlagKey | "analytics.posthog.enabled"
+export type IntegrationFlagKey = AgentFlagKey
 
 export interface AgentFeatureFlags {
   knowledgeSearchEnabled: boolean

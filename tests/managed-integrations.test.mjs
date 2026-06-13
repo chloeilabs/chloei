@@ -14,11 +14,9 @@ const cwd = fileURLToPath(new URL("..", import.meta.url))
 setTestModuleStubs({
   ai: toProjectFileUrl("tests/stubs/ai.mjs"),
   "@vercel/edge-config": toProjectFileUrl("tests/stubs/edge-config.mjs"),
-  "posthog-node": toProjectFileUrl("tests/stubs/posthog-node.mjs"),
 })
 
 const edgeConfigStoreKey = Symbol.for("chloei.tests.edge-config-store")
-const postHogCapturesKey = Symbol.for("chloei.tests.posthog-captures")
 
 const privateBlobStorageUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/private-blob-storage.ts")
@@ -37,12 +35,6 @@ const knowledgeIndexingUrl = pathToFileURL(
 ).href
 const integrationFlagsUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/integration-flags.ts")
-).href
-const postHogAnalyticsUrl = pathToFileURL(
-  path.join(cwd, "src/lib/server/posthog-analytics.ts")
-).href
-const postHogScrubbingUrl = pathToFileURL(
-  path.join(cwd, "src/lib/shared/posthog-scrubbing.ts")
 ).href
 const inngestEnvironmentUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/inngest/environment.ts")
@@ -83,14 +75,6 @@ const {
   toEdgeConfigFlagKey,
   toVercelFlagSlug,
 } = await import(integrationFlagsUrl)
-const {
-  capturePostHogProductEvent,
-  isPostHogAnalyticsEnabled,
-  toPostHogSizeBucket,
-} = await import(postHogAnalyticsUrl)
-const { scrubPostHogEvent, scrubPostHogProperties } = await import(
-  postHogScrubbingUrl
-)
 const {
   applyInngestEnvironmentInferenceOverrides,
   resolveInngestEnvironmentInferenceOverrides,
@@ -419,19 +403,19 @@ test("agent feature flags can read Vercel/Flags-SDK Edge Config shape", async ()
   }
 })
 
-test("integration boolean flags can read analytics Edge Config shape", async () => {
+test("integration boolean flags can read Edge Config map shape", async () => {
   const originalEdgeConfig = process.env.EDGE_CONFIG
   try {
     process.env.EDGE_CONFIG = "test-edge-config-connection"
     globalThis[edgeConfigStoreKey] = {
-      analytics_flags: {
-        "analytics.posthog.enabled": true,
+      agent_flags: {
+        "agent.async_reports.enabled": true,
       },
     }
 
     assert.equal(
       await resolveIntegrationBooleanFlag({
-        key: "analytics.posthog.enabled",
+        key: "agent.async_reports.enabled",
       }),
       true
     )
@@ -441,159 +425,6 @@ test("integration boolean flags can read analytics Edge Config shape", async () 
       delete process.env.EDGE_CONFIG
     } else {
       process.env.EDGE_CONFIG = originalEdgeConfig
-    }
-  }
-})
-
-test("PostHog scrubbing removes sensitive product analytics fields", () => {
-  const scrubbed = scrubPostHogProperties({
-    attachment_count: 1,
-    filename: "statement.pdf",
-    prompt: "raw prompt",
-    business_unit: "wealth",
-    "$feature/agent-knowledge-search-enabled": true,
-  })
-
-  assert.equal(scrubbed.attachment_count, 1)
-  assert.equal(scrubbed.filename, "[Filtered]")
-  assert.equal(scrubbed.prompt, "[Filtered]")
-  assert.equal("business_unit" in scrubbed, false)
-  assert.equal(scrubbed["$feature/agent-knowledge-search-enabled"], true)
-})
-
-test("PostHog before-send scrubbing applies the property allowlist", () => {
-  const scrubbed = scrubPostHogEvent({
-    event: "agent_request_started",
-    properties: {
-      model_id: "google/gemini-3.1-pro-preview",
-      customer_segment: "private-bank",
-      email: "person@example.com",
-    },
-  })
-
-  assert.equal(scrubbed.properties.model_id, "google/gemini-3.1-pro-preview")
-  assert.equal("customer_segment" in scrubbed.properties, false)
-  assert.equal(scrubbed.properties.email, "[Filtered]")
-})
-
-test("PostHog product analytics is gated and emits privacy-safe events", async () => {
-  const originalEnabled = process.env.POSTHOG_ANALYTICS_ENABLED
-  const originalEdgeConfig = process.env.EDGE_CONFIG
-  const originalInternalEmails = process.env.AGENT_INTERNAL_USER_EMAILS
-  const originalInternalDomains = process.env.AGENT_INTERNAL_USER_EMAIL_DOMAINS
-  const originalInternalOnly = process.env.POSTHOG_ANALYTICS_INTERNAL_USERS_ONLY
-  const originalToken = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN
-  const originalHost = process.env.NEXT_PUBLIC_POSTHOG_HOST
-  try {
-    delete globalThis[postHogCapturesKey]
-    delete process.env.AGENT_INTERNAL_USER_EMAILS
-    delete process.env.AGENT_INTERNAL_USER_EMAIL_DOMAINS
-    delete process.env.POSTHOG_ANALYTICS_ENABLED
-    delete process.env.POSTHOG_ANALYTICS_INTERNAL_USERS_ONLY
-    delete process.env.EDGE_CONFIG
-    process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN = "ph_test"
-    process.env.NEXT_PUBLIC_POSTHOG_HOST = "https://us.i.posthog.com"
-
-    assert.equal(await isPostHogAnalyticsEnabled(), false)
-    await capturePostHogProductEvent({
-      event: "document_uploaded",
-      userId: "user-1",
-      properties: {
-        filename: "private.pdf",
-        size_bucket: toPostHogSizeBucket(120_000),
-      },
-    })
-    assert.equal(globalThis[postHogCapturesKey], undefined)
-
-    process.env.POSTHOG_ANALYTICS_ENABLED = "true"
-    assert.equal(
-      await isPostHogAnalyticsEnabled({ userEmail: "external@example.com" }),
-      false
-    )
-    await capturePostHogProductEvent({
-      event: "agent_request_started",
-      userEmail: "external@example.com",
-      userId: "user-1",
-      properties: {
-        model_id: "google/gemini-3.1-pro-preview",
-      },
-    })
-    assert.equal(globalThis[postHogCapturesKey], undefined)
-
-    process.env.AGENT_INTERNAL_USER_EMAILS = "agent@example.com"
-    assert.equal(
-      await isPostHogAnalyticsEnabled({ userEmail: "agent@example.com" }),
-      true
-    )
-    await capturePostHogProductEvent({
-      event: "agent_request_started",
-      userEmail: "agent@example.com",
-      userId: "user-1",
-      featureFlags: {
-        knowledgeSearchEnabled: true,
-        asyncReportsEnabled: false,
-        telemetryRecordIo: false,
-        financeWorkflowsEnabled: true,
-      },
-      properties: {
-        model_id: "google/gemini-3.1-pro-preview",
-        prompt: "raw prompt",
-      },
-    })
-
-    const captures = globalThis[postHogCapturesKey]
-    assert.equal(captures.length, 1)
-    assert.equal(captures[0].token, "ph_test")
-    assert.equal(captures[0].options.flushAt, 1)
-    assert.equal(captures[0].event.disableGeoip, true)
-    assert.equal(captures[0].event.distinctId.startsWith("user:"), true)
-    assert.equal(captures[0].event.properties.prompt, "[Filtered]")
-    assert.equal(captures[0].event.properties.$process_person_profile, false)
-    assert.equal(
-      captures[0].event.properties["$feature/agent-knowledge-search-enabled"],
-      true
-    )
-    assert.deepEqual(captures[0].event.properties.$active_feature_flags, [
-      "agent-knowledge-search-enabled",
-      "agent-finance-workflows-enabled",
-      "analytics-posthog-enabled",
-    ])
-  } finally {
-    delete globalThis[postHogCapturesKey]
-    if (originalEnabled === undefined) {
-      delete process.env.POSTHOG_ANALYTICS_ENABLED
-    } else {
-      process.env.POSTHOG_ANALYTICS_ENABLED = originalEnabled
-    }
-    if (originalEdgeConfig === undefined) {
-      delete process.env.EDGE_CONFIG
-    } else {
-      process.env.EDGE_CONFIG = originalEdgeConfig
-    }
-    if (originalInternalEmails === undefined) {
-      delete process.env.AGENT_INTERNAL_USER_EMAILS
-    } else {
-      process.env.AGENT_INTERNAL_USER_EMAILS = originalInternalEmails
-    }
-    if (originalInternalDomains === undefined) {
-      delete process.env.AGENT_INTERNAL_USER_EMAIL_DOMAINS
-    } else {
-      process.env.AGENT_INTERNAL_USER_EMAIL_DOMAINS = originalInternalDomains
-    }
-    if (originalInternalOnly === undefined) {
-      delete process.env.POSTHOG_ANALYTICS_INTERNAL_USERS_ONLY
-    } else {
-      process.env.POSTHOG_ANALYTICS_INTERNAL_USERS_ONLY = originalInternalOnly
-    }
-    if (originalToken === undefined) {
-      delete process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN
-    } else {
-      process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN = originalToken
-    }
-    if (originalHost === undefined) {
-      delete process.env.NEXT_PUBLIC_POSTHOG_HOST
-    } else {
-      process.env.NEXT_PUBLIC_POSTHOG_HOST = originalHost
     }
   }
 })
@@ -871,16 +702,6 @@ test("private blob uploads return authenticated app download URLs", () => {
     /buildAuthenticatedPrivateBlobDownloadUrl\(result\.pathname\)/
   )
   assert.doesNotMatch(source, /downloadUrl: result\.downloadUrl/)
-})
-
-test("PostHog capture uses public shutdown API", () => {
-  const source = readFileSync(
-    path.join(cwd, "src/lib/server/posthog-analytics.ts"),
-    "utf8"
-  )
-
-  assert.match(source, /client\.shutdown\(POSTHOG_CAPTURE_TIMEOUT_MS\)/)
-  assert.doesNotMatch(source, /client\._shutdown/)
 })
 
 test("Inngest environment resolver uses explicit and branch names", () => {

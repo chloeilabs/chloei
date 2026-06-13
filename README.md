@@ -121,7 +121,6 @@ Optional variables let you override the built-in safe defaults for message limit
 - `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY`, `INNGEST_DEV`: enable `/api/inngest` and async job orchestration
 - `BLOB_READ_WRITE_TOKEN`: enables private Blob upload/download and private agent artifact URLs
 - `AGENT_KNOWLEDGE_SEARCH_ENABLED`, `AGENT_ASYNC_REPORTS_ENABLED`, `AGENT_TELEMETRY_RECORD_IO`, `AGENT_FINANCE_WORKFLOWS_ENABLED`: feature gates; defaults are off unless explicitly set or synced through Edge Config
-- `POSTHOG_ANALYTICS_ENABLED`, `POSTHOG_ANALYTICS_INTERNAL_USERS_ONLY`, `NEXT_PUBLIC_POSTHOG_ANALYTICS_ENABLED`, `NEXT_PUBLIC_POSTHOG_HOST`, `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN`: enable privacy-safe PostHog product analytics. Browser autocapture, pageviews, surveys, heatmaps, feature-flag requests, and replay are disabled; server events use hashed user ids, no GeoIP, and no PostHog person profiles. Server-side capture is restricted to `AGENT_INTERNAL_USER_EMAILS`/`AGENT_INTERNAL_USER_EMAIL_DOMAINS` unless `POSTHOG_ANALYTICS_INTERNAL_USERS_ONLY=false`.
 - `FRED_API_KEY`: enables macro/rates series through the normalized `finance_data` tool
 - `SEC_API_USER_AGENT`: identifies Chloei for SEC public company-facts requests
 - `AGENT_FINANCE_TOOL_MAX_STEPS`: max tool steps for finance-analysis runs, defaulting to 20
@@ -152,7 +151,6 @@ By default, Chloei enforces safe built-in agent limits even if you leave all opt
 - Native `web_search` is available through AI Gateway alongside Tavily and local code execution.
 - `knowledge_search` is for governed static/internal material only. Live financial facts stay routed through `finance_data`, SEC/FRED, Tavily, and AI Gateway web search.
 - `browser_research` is a retired live tool name retained only so historical thread records continue to parse.
-- PostHog is used for coarse product analytics and rollout analysis only when `analytics.posthog.enabled` or `POSTHOG_ANALYTICS_ENABLED` is on, and server-side capture remains internal-user gated by default. Do not capture prompt text, model output, uploaded filenames, blob paths, document hashes, emails, account data, or credentials in PostHog events.
 - `POST /api/jobs/report` accepts an optional client-generated `reportId` UUID for retry idempotency. Idempotency keys must use report/thread identifiers, not prompt text or document contents.
 - `finance_data` normalizes finance operations across SEC public company facts, Yahoo Finance, Stooq, and optional FRED macro/rates data.
 - `sec_filings` is available when a normal chat or Research request is inferred as finance-analysis work, covering SEC/EDGAR company lookup, filing search, full filing fetches, section extraction, table extraction, and targeted retrieval over filing text.
