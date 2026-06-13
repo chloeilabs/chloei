@@ -114,7 +114,6 @@ export interface StartAgentRuntimeStreamParams {
   model: ModelType
   aiGatewayApiKey: string
   tavilyApiKey?: string
-  fredApiKey?: string
   secUserAgent?: string
   userTimeZone?: string
   messages: AgentInputMessage[]
@@ -429,9 +428,7 @@ export async function* startAgentRuntimeStream(
     }),
     ...(runtimeProfile.financeDataEnabled
       ? createAiSdkFinanceDataTools({
-          fredApiKey: params.fredApiKey ?? process.env.FRED_API_KEY,
           secUserAgent: params.secUserAgent ?? process.env.SEC_API_USER_AGENT,
-          yahooEnabled: process.env.AGENT_FINANCE_YAHOO_ENABLED !== "false",
         })
       : {}),
     ...(runtimeProfile.secFilingsEnabled

@@ -58,7 +58,7 @@ test("finance fixture eval suite establishes a passing internal baseline", async
     inputPath: path.join(cwd, "evals/finance/tasks/internal.jsonl"),
   })
 
-  assert.equal(result.summary.tasks, 3)
+  assert.equal(result.summary.tasks, 2)
   assert.equal(result.summary.failed, 0)
   assert.equal(result.summary.passRate, 1)
 })

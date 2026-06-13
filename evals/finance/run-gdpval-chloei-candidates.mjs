@@ -489,7 +489,6 @@ async function runTaskOnce(task, attempt) {
       model,
       aiGatewayApiKey: process.env.AI_GATEWAY_API_KEY,
       tavilyApiKey: process.env.TAVILY_API_KEY,
-      fredApiKey: process.env.FRED_API_KEY,
       secUserAgent: process.env.SEC_API_USER_AGENT,
       userTimeZone,
       runtimeProfile: "gdpval_workspace",

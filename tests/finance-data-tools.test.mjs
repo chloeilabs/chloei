@@ -33,40 +33,9 @@ test("finance data retry classification marks transient failures", () => {
   assert.equal(classifyFinanceDataRetry({ code: "ETIMEDOUT" }), true)
 })
 
-test("finance data operation returns sanitized provider sources", async () => {
-  const result = await runFinanceDataOperation(
-    {
-      operation: "fred_series",
-      provider: "fred",
-      seriesId: "FEDFUNDS",
-    },
-    {
-      fredApiKey: "secret-key",
-      fetchImpl: async (url) => {
-        assert.match(String(url), /api_key=secret-key/)
-        return new Response(
-          JSON.stringify({
-            observations: [{ date: "2024-01-01", value: "5.33" }],
-          }),
-          {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          }
-        )
-      },
-    }
-  )
-
-  assert.equal(result.error, undefined)
-  assert.equal(result.output?.provider, "fred")
-  assert.equal(result.output?.requestUrl.includes("secret-key"), false)
-  assert.equal(result.output?.sources[0]?.title, "FRED")
-})
-
 test("finance evidence context prefetches quote and profile data", async () => {
   const result = await createAiSdkFinanceDataEvidenceContext({
     query: "What is Apple's current stock price and market cap? Cite sources.",
-    yahooEnabled: false,
     fetchImpl: async (url) => {
       const requestUrl = String(url)
       if (requestUrl.includes("stooq.com")) {
@@ -158,7 +127,6 @@ test("finance evidence context resolves and fetches multiple symbols", async () 
 
   const result = await createAiSdkFinanceDataEvidenceContext({
     query: "Compare Apple and Microsoft stock price and market cap.",
-    yahooEnabled: false,
     fetchImpl: async (url) => {
       const requestUrl = String(url)
       if (requestUrl.includes("stooq.com")) {
@@ -267,7 +235,6 @@ test("finance provider status validates configured provider availability", async
       provider: "auto",
     },
     {
-      yahooEnabled: false,
       fetchImpl: async (url) => {
         const requestUrl = String(url)
         if (requestUrl.includes("stooq.com")) {
@@ -296,9 +263,11 @@ test("finance provider status validates configured provider availability", async
     "financial_statements",
     "sec_company_facts",
   ])
-  assert.equal(result.output?.data.fred.configured, false)
   assert.equal(result.output?.data.stooq.available, true)
-  assert.deepEqual(result.output?.data.stooq.operations, ["quote"])
+  assert.deepEqual(result.output?.data.stooq.operations, [
+    "quote",
+    "historical_prices",
+  ])
 })
 
 test("finance quote auto provider uses Stooq structured fallback", async () => {
@@ -894,18 +863,6 @@ test("sec company facts returns compact summarized data", async () => {
   assert.equal(JSON.stringify(result.output?.data).includes('"facts"'), false)
 })
 
-test("finance data operation returns structured provider-unavailable errors", async () => {
-  const result = await runFinanceDataOperation({
-    operation: "fred_series",
-    provider: "fred",
-    seriesId: "CPIAUCSL",
-  })
-
-  assert.equal(result.output, undefined)
-  assert.equal(result.error?.code, "PROVIDER_UNAVAILABLE")
-  assert.equal(result.error?.retryable, false)
-})
-
 test("finance data metadata includes operation and provider", () => {
   assert.deepEqual(
     getAiSdkFinanceDataToolCallMetadata({
@@ -935,7 +892,7 @@ test("finance data metadata includes operation and provider", () => {
       output: {
         error: {
           operation: "quote",
-          provider: "yahoo",
+          provider: "stooq",
           code: "HTTP_429",
           message: "Rate limited.",
           attempts: 2,
@@ -950,7 +907,7 @@ test("finance data metadata includes operation and provider", () => {
       status: "error",
       sources: [],
       operation: "quote",
-      provider: "yahoo",
+      provider: "stooq",
       attempt: 2,
       durationMs: 25,
       errorCode: "HTTP_429",

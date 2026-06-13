@@ -189,7 +189,6 @@ export async function POST(request: NextRequest) {
           taskMode: inferredPromptTaskMode,
           tools: {
             tavilyEnabled: Boolean(tavilyApiKey?.trim()),
-            fredEnabled: Boolean(process.env.FRED_API_KEY?.trim()),
             secUserAgentConfigured: Boolean(
               process.env.SEC_API_USER_AGENT?.trim()
             ),

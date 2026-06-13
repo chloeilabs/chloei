@@ -15,7 +15,6 @@ type FinancialServicesWorkflowMessage = PromptTextMessage
 
 interface FinancialServicesToolAvailability {
   tavilyEnabled?: boolean
-  fredEnabled?: boolean
   secUserAgentConfigured?: boolean
 }
 
@@ -269,13 +268,11 @@ function formatToolAvailability(
     "- Market/company data: use finance_data first.",
     "- Filings/facts: use SEC-backed finance_data when available; cite returned filing/source URLs.",
     filingRetrievalGuidance,
-    "- Macro/rates: use FRED-backed finance_data when available.",
-    "- News/source research: use Tavily or AI Gateway search when structured tools do not cover the claim.",
+    "- News/source research: use Tavily search when structured tools do not cover the claim.",
     "- Modeling/math/artifacts: use code_execution with the finance backend.",
     "",
     "Provider signals for this request:",
     `- Tavily API key: ${formatAvailability(tools?.tavilyEnabled)}`,
-    `- FRED API key: ${formatAvailability(tools?.fredEnabled)}`,
     `- SEC user agent: ${formatAvailability(tools?.secUserAgentConfigured)}`,
   ].join("\n")
 }

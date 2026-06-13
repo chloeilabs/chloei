@@ -96,7 +96,7 @@ export const watchlistRefreshRequested = inngest.createFunction(
       refreshed: false,
       watchlistId: data.watchlistId,
       reason:
-        "Watchlist refresh is reserved for the finance workflow rollout and should use finance_data/FRED/SEC providers.",
+        "Watchlist refresh is reserved for the finance workflow rollout and should use finance_data/SEC providers.",
     }))
   }
 )
