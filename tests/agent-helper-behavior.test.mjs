@@ -89,7 +89,7 @@ beforeEach(() => {
     systemInstructionAugmentations: {
       withAiSdkInlineCitationInstruction(instruction, options) {
         recorded.augmentedInstructions.push({ instruction, options })
-        return `${instruction}::fmp=${String(options.fmpEnabled)}`
+        return `${instruction}::secFilings=${String(options.secFilingsEnabled)}`
       },
     },
     gatewayResponses: {
@@ -868,7 +868,6 @@ test("agent helper streams fallback output when the model yields no content", as
     runMode: "chat",
     aiGatewayApiKey: "ai-gateway-key",
     tavilyApiKey: "tavily-key",
-    fmpApiKey: "fmp-key",
     messages: [{ role: "user", content: "Hello" }],
     systemInstruction: "system",
     onStreamSettled() {
@@ -888,12 +887,14 @@ test("agent helper streams fallback output when the model yields no content", as
     { type: "agent_status", status: "completed" },
   ])
   assert.equal(recorded.settledCount, 1)
-  assert.equal(recorded.streamParams[0]?.systemInstruction, "system::fmp=true")
+  assert.equal(
+    recorded.streamParams[0]?.systemInstruction,
+    "system::secFilings=false"
+  )
   assert.deepEqual(recorded.augmentedInstructions[0], {
     instruction: "system",
     options: {
       financeEnabled: true,
-      fmpEnabled: true,
       secFilingsEnabled: false,
     },
   })

@@ -47,8 +47,6 @@ const { POST } = await import(routeUrl)
 
 const originalAiGatewayApiKey = process.env.AI_GATEWAY_API_KEY
 const originalTavilyApiKey = process.env.TAVILY_API_KEY
-const originalParallelApiKey = process.env.PARALLEL_API_KEY
-const originalFmpApiKey = process.env.FMP_API_KEY
 const originalSecApiUserAgent = process.env.SEC_API_USER_AGENT
 const originalFinanceWorkflowsEnabled =
   process.env.AGENT_FINANCE_WORKFLOWS_ENABLED
@@ -110,8 +108,6 @@ beforeEach(() => {
 
   process.env.AI_GATEWAY_API_KEY = "ai-gateway-key"
   process.env.TAVILY_API_KEY = "tavily-key"
-  process.env.PARALLEL_API_KEY = "parallel-key"
-  process.env.FMP_API_KEY = "fmp-key"
   delete process.env.SEC_API_USER_AGENT
   delete process.env.AGENT_FINANCE_WORKFLOWS_ENABLED
 
@@ -236,12 +232,6 @@ beforeEach(() => {
 after(() => {
   process.env.AI_GATEWAY_API_KEY = originalAiGatewayApiKey
   process.env.TAVILY_API_KEY = originalTavilyApiKey
-  if (originalParallelApiKey === undefined) {
-    delete process.env.PARALLEL_API_KEY
-  } else {
-    process.env.PARALLEL_API_KEY = originalParallelApiKey
-  }
-  process.env.FMP_API_KEY = originalFmpApiKey
   if (originalSecApiUserAgent === undefined) {
     delete process.env.SEC_API_USER_AGENT
   } else {
@@ -398,8 +388,6 @@ test("agent route passes the resolved prompt context into stream creation", asyn
   ])
   assert.equal(recorded.streamCalls[0]?.aiGatewayApiKey, "ai-gateway-key")
   assert.equal(recorded.streamCalls[0]?.tavilyApiKey, "tavily-key")
-  assert.equal(recorded.streamCalls[0]?.parallelApiKey, "parallel-key")
-  assert.equal(recorded.streamCalls[0]?.fmpApiKey, "fmp-key")
   assert.equal(recorded.streamCalls[0]?.systemInstruction, "system-instruction")
   assert.equal(recorded.streamCalls[0]?.memoryCommitMaxChars, undefined)
   assert.equal(recorded.streamCalls[0]?.onAssistantResponseSettled, undefined)

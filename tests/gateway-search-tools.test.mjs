@@ -77,8 +77,8 @@ test("inline citation instructions avoid separate sources sections", async () =>
   )
   assert.match(
     source,
-    /quota-limited[\s\S]*`parallel_search`[\s\S]*`gateway_web_search`/,
-    "Expected Tavily provider failures to fall back through Parallel and then AI Gateway search."
+    /quota-limited[\s\S]*`gateway_web_search`/,
+    "Expected Tavily failures to fall back to AI Gateway search."
   )
 })
 

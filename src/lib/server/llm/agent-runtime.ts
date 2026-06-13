@@ -3,10 +3,8 @@ import path from "node:path"
 
 import { createGateway } from "@ai-sdk/gateway"
 import {
-  type ContentPart,
   type LanguageModelUsage,
   stepCountIs,
-  type StepResult,
   streamText,
   type ToolSet,
 } from "ai"
@@ -53,7 +51,6 @@ import {
   getAiSdkFinanceDataToolResultMetadata,
   isAiSdkFinanceDataToolName,
 } from "./ai-sdk-finance-data-tools"
-import { createAiSdkFmpMcpToolsContext } from "./ai-sdk-fmp-mcp-tools"
 import {
   getAiSdkGatewayProviderOptionsForMode,
   getAiSdkGatewayProviderOptionsForTaskMode,
@@ -113,7 +110,6 @@ interface AgentRuntimeProfile {
   id: AgentRuntimeProfileId
   codeExecutionBackend?: CodeExecutionBackend
   codeExecutionWorkspaceMode?: "ephemeral" | "preserve"
-  fmpMcpEnabled: boolean
   financeDataEnabled: boolean
   secFilingsEnabled: boolean
   toolMaxSteps: number
@@ -124,8 +120,6 @@ export interface StartAgentRuntimeStreamParams {
   model: ModelType
   aiGatewayApiKey: string
   tavilyApiKey?: string
-  parallelApiKey?: string
-  fmpApiKey?: string
   fredApiKey?: string
   secUserAgent?: string
   userTimeZone?: string
@@ -150,14 +144,12 @@ const AGENT_RUNTIME_PROFILES: Record<
 > = {
   chat_default: {
     id: "chat_default",
-    fmpMcpEnabled: true,
     financeDataEnabled: true,
     secFilingsEnabled: false,
     toolMaxSteps: AGENT_TOOL_MAX_STEPS,
   },
   deep_research: {
     id: "deep_research",
-    fmpMcpEnabled: true,
     financeDataEnabled: true,
     secFilingsEnabled: false,
     toolMaxSteps: AGENT_RESEARCH_TOOL_MAX_STEPS,
@@ -165,7 +157,6 @@ const AGENT_RUNTIME_PROFILES: Record<
   finance_analysis: {
     id: "finance_analysis",
     codeExecutionBackend: "finance",
-    fmpMcpEnabled: false,
     financeDataEnabled: true,
     secFilingsEnabled: true,
     toolMaxSteps: AGENT_FINANCE_TOOL_MAX_STEPS,
@@ -174,7 +165,6 @@ const AGENT_RUNTIME_PROFILES: Record<
     id: "gdpval_workspace",
     codeExecutionBackend: "finance",
     codeExecutionWorkspaceMode: "preserve",
-    fmpMcpEnabled: false,
     financeDataEnabled: true,
     secFilingsEnabled: true,
     toolMaxSteps: AGENT_TOOL_MAX_STEPS,
@@ -305,82 +295,6 @@ function sanitizeResponseMessagesForFallback<T extends { role: string }>(
   return sanitized
 }
 
-function outputHasError(output: unknown): boolean {
-  if (!output || typeof output !== "object") {
-    return false
-  }
-
-  const record = output as Record<string, unknown>
-  if (record.error) {
-    return true
-  }
-
-  const code = typeof record.code === "string" ? record.code.trim() : ""
-  const errorCode =
-    typeof record.errorCode === "string" ? record.errorCode.trim() : ""
-
-  return code.length > 0 || errorCode.length > 0
-}
-
-function isToolFailureResult(
-  result: {
-    toolName: string
-    output: unknown
-  },
-  toolName: string
-): boolean {
-  return result.toolName === toolName && outputHasError(result.output)
-}
-
-function isToolFailureContentPart(
-  part: ContentPart<ToolSet>,
-  toolName: string
-): boolean {
-  if (part.type !== "tool-error" && part.type !== "tool-result") {
-    return false
-  }
-
-  if (part.toolName !== toolName) {
-    return false
-  }
-
-  return part.type === "tool-error" || outputHasError(part.output)
-}
-
-function hasToolFailure(
-  steps: StepResult<ToolSet>[],
-  toolName: string
-): boolean {
-  return steps.some(
-    (step) =>
-      step.toolResults.some((result) =>
-        isToolFailureResult(result, toolName)
-      ) || step.content.some((part) => isToolFailureContentPart(part, toolName))
-  )
-}
-
-function getActiveToolsForSearchFallback(params: {
-  toolNames: string[]
-  steps: StepResult<ToolSet>[]
-  parallelEnabled: boolean
-}): string[] | undefined {
-  if (
-    !params.parallelEnabled ||
-    !params.toolNames.includes("parallel_search") ||
-    !params.toolNames.includes("gateway_web_search")
-  ) {
-    return undefined
-  }
-
-  if (hasToolFailure(params.steps, "parallel_search")) {
-    return params.toolNames.filter((toolName) => toolName !== "parallel_search")
-  }
-
-  return params.toolNames.filter(
-    (toolName) => toolName !== "gateway_web_search"
-  )
-}
-
 function getSourceEvent(
   id: string,
   url: string,
@@ -451,10 +365,6 @@ export async function* startAgentRuntimeStream(
 
   const runtimeProfile = resolveAgentRuntimeProfile(params.runtimeProfile)
   const normalizedTavilyApiKey = params.tavilyApiKey?.trim()
-  const normalizedFmpApiKey = params.fmpApiKey?.trim()
-  let fmpToolsContext: Awaited<
-    ReturnType<typeof createAiSdkFmpMcpToolsContext>
-  > | null = null
 
   const seenToolCalls = new Set<string>()
   const finalizedToolCalls = new Set<string>()
@@ -477,474 +387,430 @@ export async function* startAgentRuntimeStream(
     return getSourceEvent(id, normalizedUrl, normalizedTitle)
   }
 
-  try {
-    const artifactRunId =
-      runtimeProfile.id === "finance_analysis" && params.artifactOwnerId
-        ? randomUUID()
-        : undefined
-    const codeExecutionWorkspaceRoot =
-      runtimeProfile.id === "gdpval_workspace" && AGENT_EVAL_RESULTS_DIR
-        ? path.join(AGENT_EVAL_RESULTS_DIR, "workspaces", randomUUID())
-        : artifactRunId && params.artifactOwnerId
-          ? getAgentArtifactRunRoot({
-              artifactId: artifactRunId,
-              userId: params.artifactOwnerId,
-            })
-          : undefined
-    const codeExecutionWorkspaceMode =
-      runtimeProfile.codeExecutionWorkspaceMode ??
-      (artifactRunId ? "preserve" : undefined)
-    const artifactBaseUrl = artifactRunId
-      ? buildAgentArtifactBaseUrl(artifactRunId)
+  const artifactRunId =
+    runtimeProfile.id === "finance_analysis" && params.artifactOwnerId
+      ? randomUUID()
       : undefined
-    if (runtimeProfile.fmpMcpEnabled) {
-      try {
-        fmpToolsContext =
-          await createAiSdkFmpMcpToolsContext(normalizedFmpApiKey)
-      } catch (error) {
-        logger.warn("FMP MCP tools unavailable; continuing without them.", {
-          error,
-          errorCode: "FMP_MCP_INIT_FAILED",
+  const codeExecutionWorkspaceRoot =
+    runtimeProfile.id === "gdpval_workspace" && AGENT_EVAL_RESULTS_DIR
+      ? path.join(AGENT_EVAL_RESULTS_DIR, "workspaces", randomUUID())
+      : artifactRunId && params.artifactOwnerId
+        ? getAgentArtifactRunRoot({
+            artifactId: artifactRunId,
+            userId: params.artifactOwnerId,
+          })
+        : undefined
+  const codeExecutionWorkspaceMode =
+    runtimeProfile.codeExecutionWorkspaceMode ??
+    (artifactRunId ? "preserve" : undefined)
+  const artifactBaseUrl = artifactRunId
+    ? buildAgentArtifactBaseUrl(artifactRunId)
+    : undefined
+  const tools = {
+    ...createAiSdkCodeExecutionTools({
+      backend: runtimeProfile.codeExecutionBackend,
+      workspaceMode: codeExecutionWorkspaceMode,
+      workspaceRoot:
+        runtimeProfile.id === "gdpval_workspace" || artifactRunId
+          ? codeExecutionWorkspaceRoot
+          : undefined,
+      artifactBaseUrl,
+      artifactUpload:
+        artifactRunId && userId
+          ? {
+              artifactId: artifactRunId,
+              userId,
+            }
+          : undefined,
+      exposeArtifactDirectory: runtimeProfile.id === "gdpval_workspace",
+      inputFiles:
+        runtimeProfile.id === "gdpval_workspace"
+          ? params.codeExecutionInputFiles
+          : undefined,
+    }),
+    ...createAiSdkTavilyTools(normalizedTavilyApiKey),
+    ...createAiSdkManagedSearchTools(),
+    ...createAiSdkKnowledgeSearchTools({
+      enabled: featureFlags.knowledgeSearchEnabled,
+      userId,
+    }),
+    ...(runtimeProfile.financeDataEnabled
+      ? createAiSdkFinanceDataTools({
+          fredApiKey: params.fredApiKey ?? process.env.FRED_API_KEY,
+          secUserAgent: params.secUserAgent ?? process.env.SEC_API_USER_AGENT,
+          yahooEnabled: process.env.AGENT_FINANCE_YAHOO_ENABLED !== "false",
         })
+      : {}),
+    ...(runtimeProfile.secFilingsEnabled
+      ? createAiSdkSecFilingsTools({
+          secUserAgent: params.secUserAgent ?? process.env.SEC_API_USER_AGENT,
+        })
+      : {}),
+    ...createAiSdkTradingAgentsTools(),
+  } as ToolSet
+  const toolNames = Object.keys(tools)
+
+  logger.info("Starting agent runtime stream.", {
+    requestId: params.requestId,
+    model: params.model,
+    runtimeProfile: runtimeProfile.id,
+    toolCount: toolNames.length,
+    toolNames,
+  })
+  const systemInstruction = params.systemInstruction
+
+  const result = streamText({
+    model: gatewayProvider(params.model),
+    system: systemInstruction,
+    messages,
+    abortSignal: params.signal,
+    ...(params.temperature !== undefined
+      ? { temperature: params.temperature }
+      : {}),
+    providerOptions: params.taskMode
+      ? getAiSdkGatewayProviderOptionsForTaskMode({
+          provider: resolvePromptProvider(params.model),
+          taskMode: params.taskMode,
+        })
+      : getAiSdkGatewayProviderOptionsForMode({
+          deepResearch: runtimeProfile.id === "deep_research",
+        }),
+    experimental_telemetry: {
+      isEnabled: true,
+      recordInputs: featureFlags.telemetryRecordIo,
+      recordOutputs: featureFlags.telemetryRecordIo,
+      functionId: "chloei.agent.stream",
+      metadata: {
+        requestId: params.requestId ?? "",
+        modelId: params.model,
+        runtimeProfile: runtimeProfile.id,
+        toolNames: toolNames.join(","),
+        userHash: userId ? hashUserId(userId) : "",
+      },
+    },
+    tools,
+    prepareStep: ({ stepNumber }) => {
+      const forceFinalSynthesis = shouldForceFinalSynthesisStep(
+        stepNumber,
+        runtimeProfile.toolMaxSteps
+      )
+      if (forceFinalSynthesis) {
+        return {
+          toolChoice: "none" as const,
+          system: `${systemInstruction}\n\n${FINAL_SYNTHESIS_STEP_INSTRUCTION}`,
+        }
       }
+
+      if (
+        shouldNudgeMidBudgetSynthesis(stepNumber, runtimeProfile.toolMaxSteps)
+      ) {
+        return {
+          system: `${systemInstruction}\n\n${MID_BUDGET_SYNTHESIS_REMINDER}`,
+        }
+      }
+
+      return undefined
+    },
+    stopWhen: stepCountIs(runtimeProfile.toolMaxSteps),
+  })
+
+  let hasEmittedText = false
+
+  for await (const part of result.fullStream) {
+    if (part.type === "finish-step") {
+      logger.info("Agent runtime model step finished.", {
+        requestId: params.requestId,
+        model: params.model,
+        runtimeProfile: runtimeProfile.id,
+        finishReason: part.finishReason,
+        rawFinishReason: part.rawFinishReason,
+        ...getUsageLogFields(part.usage),
+      })
+      continue
     }
 
-    const tools = {
-      ...createAiSdkCodeExecutionTools({
-        backend: runtimeProfile.codeExecutionBackend,
-        workspaceMode: codeExecutionWorkspaceMode,
-        workspaceRoot:
-          runtimeProfile.id === "gdpval_workspace" || artifactRunId
-            ? codeExecutionWorkspaceRoot
-            : undefined,
-        artifactBaseUrl,
-        artifactUpload:
-          artifactRunId && userId
-            ? {
-                artifactId: artifactRunId,
-                userId,
-              }
-            : undefined,
-        exposeArtifactDirectory: runtimeProfile.id === "gdpval_workspace",
-        inputFiles:
-          runtimeProfile.id === "gdpval_workspace"
-            ? params.codeExecutionInputFiles
-            : undefined,
-      }),
-      ...createAiSdkTavilyTools(normalizedTavilyApiKey),
-      ...createAiSdkManagedSearchTools({
-        parallelApiKey: params.parallelApiKey,
-      }),
-      ...createAiSdkKnowledgeSearchTools({
-        enabled: featureFlags.knowledgeSearchEnabled,
-        userId,
-      }),
-      ...(runtimeProfile.financeDataEnabled
-        ? createAiSdkFinanceDataTools({
-            fmpApiKey: normalizedFmpApiKey,
-            fredApiKey: params.fredApiKey ?? process.env.FRED_API_KEY,
-            secUserAgent: params.secUserAgent ?? process.env.SEC_API_USER_AGENT,
-            yahooEnabled: process.env.AGENT_FINANCE_YAHOO_ENABLED !== "false",
-          })
-        : {}),
-      ...(runtimeProfile.secFilingsEnabled
-        ? createAiSdkSecFilingsTools({
-            secUserAgent: params.secUserAgent ?? process.env.SEC_API_USER_AGENT,
-          })
-        : {}),
-      ...createAiSdkTradingAgentsTools(),
-      ...(fmpToolsContext?.tools ?? {}),
-    } as ToolSet
-    const toolNames = Object.keys(tools)
-    const parallelEnabled = Boolean(params.parallelApiKey?.trim())
+    if (part.type === "finish") {
+      logger.info("Agent runtime stream finished.", {
+        requestId: params.requestId,
+        model: params.model,
+        runtimeProfile: runtimeProfile.id,
+        finishReason: part.finishReason,
+        rawFinishReason: part.rawFinishReason,
+        ...getUsageLogFields(part.totalUsage),
+      })
+      continue
+    }
 
-    logger.info("Starting agent runtime stream.", {
-      requestId: params.requestId,
-      model: params.model,
-      runtimeProfile: runtimeProfile.id,
-      toolCount: toolNames.length,
-      toolNames,
-    })
-    const systemInstruction = params.systemInstruction
+    if (part.type === "abort") {
+      logger.warn("Agent runtime stream aborted.", {
+        requestId: params.requestId,
+        model: params.model,
+        runtimeProfile: runtimeProfile.id,
+        reason: part.reason,
+      })
+      continue
+    }
 
-    const result = streamText({
-      model: gatewayProvider(params.model),
-      system: systemInstruction,
-      messages,
-      abortSignal: params.signal,
-      ...(params.temperature !== undefined
-        ? { temperature: params.temperature }
-        : {}),
-      providerOptions: params.taskMode
-        ? getAiSdkGatewayProviderOptionsForTaskMode({
-            provider: resolvePromptProvider(params.model),
-            taskMode: params.taskMode,
-          })
-        : getAiSdkGatewayProviderOptionsForMode({
-            deepResearch: runtimeProfile.id === "deep_research",
-          }),
-      experimental_telemetry: {
-        isEnabled: true,
-        recordInputs: featureFlags.telemetryRecordIo,
-        recordOutputs: featureFlags.telemetryRecordIo,
-        functionId: "chloei.agent.stream",
-        metadata: {
-          requestId: params.requestId ?? "",
-          modelId: params.model,
-          runtimeProfile: runtimeProfile.id,
-          toolNames: toolNames.join(","),
-          userHash: userId ? hashUserId(userId) : "",
-        },
-      },
-      tools,
-      prepareStep: ({ stepNumber, steps }) => {
-        const forceFinalSynthesis = shouldForceFinalSynthesisStep(
-          stepNumber,
-          runtimeProfile.toolMaxSteps
-        )
-        const activeTools = getActiveToolsForSearchFallback({
-          toolNames,
-          steps,
-          parallelEnabled,
-        })
-        if (forceFinalSynthesis) {
-          return {
-            toolChoice: "none" as const,
-            system: `${systemInstruction}\n\n${FINAL_SYNTHESIS_STEP_INSTRUCTION}`,
-          }
-        }
+    if (part.type === "text-delta") {
+      if (part.text.length > 0) {
+        hasEmittedText = true
+        yield { type: "text_delta", delta: part.text }
+      }
+      continue
+    }
 
-        if (
-          shouldNudgeMidBudgetSynthesis(stepNumber, runtimeProfile.toolMaxSteps)
-        ) {
-          return {
-            ...(activeTools ? { activeTools } : {}),
-            system: `${systemInstruction}\n\n${MID_BUDGET_SYNTHESIS_REMINDER}`,
-          }
-        }
+    if (part.type === "reasoning-delta") {
+      const delta = sanitizeReasoningChunk(part.text)
+      if (delta.length > 0 && !shouldSkipReasoningChunk(delta)) {
+        yield { type: "reasoning_delta", delta }
+      }
+      continue
+    }
 
-        return activeTools ? { activeTools } : undefined
-      },
-      stopWhen: stepCountIs(runtimeProfile.toolMaxSteps),
-    })
+    if (part.type === "source" && part.sourceType === "url") {
+      const sourceEvent = createSourceEvent(
+        part.id,
+        part.url,
+        part.title?.trim() ?? part.url
+      )
+      if (sourceEvent) {
+        yield sourceEvent
+      }
+      continue
+    }
 
-    let hasEmittedText = false
-
-    for await (const part of result.fullStream) {
-      if (part.type === "finish-step") {
-        logger.info("Agent runtime model step finished.", {
-          requestId: params.requestId,
-          model: params.model,
-          runtimeProfile: runtimeProfile.id,
-          finishReason: part.finishReason,
-          rawFinishReason: part.rawFinishReason,
-          ...getUsageLogFields(part.usage),
-        })
+    if (part.type === "tool-call") {
+      const metadata =
+        getAiSdkCodeExecutionToolCallMetadata(part) ??
+        getAiSdkTavilyToolCallMetadata(part) ??
+        getAiSdkManagedSearchToolCallMetadata(part) ??
+        getAiSdkKnowledgeSearchToolCallMetadata(part) ??
+        getAiSdkFinanceDataToolCallMetadata(part) ??
+        getAiSdkSecFilingsToolCallMetadata(part) ??
+        getAiSdkTradingAgentsToolCallMetadata(part)
+      if (!metadata || seenToolCalls.has(metadata.callId)) {
         continue
       }
 
-      if (part.type === "finish") {
-        logger.info("Agent runtime stream finished.", {
-          requestId: params.requestId,
-          model: params.model,
-          runtimeProfile: runtimeProfile.id,
-          finishReason: part.finishReason,
-          rawFinishReason: part.rawFinishReason,
-          ...getUsageLogFields(part.totalUsage),
-        })
+      seenToolCalls.add(metadata.callId)
+      yield {
+        type: "tool_call",
+        callId: metadata.callId,
+        toolName: metadata.toolName,
+        label: metadata.label,
+        ...("query" in metadata && metadata.query
+          ? { query: metadata.query }
+          : {}),
+        ...("operation" in metadata && metadata.operation
+          ? { operation: metadata.operation }
+          : {}),
+        ...("provider" in metadata && metadata.provider
+          ? { provider: metadata.provider }
+          : {}),
+        ...("attempt" in metadata && metadata.attempt
+          ? { attempt: metadata.attempt }
+          : {}),
+      }
+      continue
+    }
+
+    if (part.type === "tool-result") {
+      if (part.preliminary) {
         continue
       }
 
-      if (part.type === "abort") {
-        logger.warn("Agent runtime stream aborted.", {
-          requestId: params.requestId,
-          model: params.model,
-          runtimeProfile: runtimeProfile.id,
-          reason: part.reason,
-        })
+      const metadata =
+        getAiSdkCodeExecutionToolResultMetadata(part) ??
+        getAiSdkTavilyToolResultMetadata(part) ??
+        getAiSdkManagedSearchToolResultMetadata(part) ??
+        getAiSdkKnowledgeSearchToolResultMetadata(part) ??
+        getAiSdkFinanceDataToolResultMetadata(part) ??
+        getAiSdkSecFilingsToolResultMetadata(part) ??
+        getAiSdkTradingAgentsToolResultMetadata(part)
+      if (!metadata || finalizedToolCalls.has(metadata.callId)) {
         continue
       }
 
-      if (part.type === "text-delta") {
-        if (part.text.length > 0) {
-          hasEmittedText = true
-          yield { type: "text_delta", delta: part.text }
-        }
-        continue
+      finalizedToolCalls.add(metadata.callId)
+      yield {
+        type: "tool_result",
+        callId: metadata.callId,
+        toolName: metadata.toolName,
+        status: metadata.status,
+        ...("operation" in metadata && metadata.operation
+          ? { operation: metadata.operation }
+          : {}),
+        ...("provider" in metadata && metadata.provider
+          ? { provider: metadata.provider }
+          : {}),
+        ...("attempt" in metadata && metadata.attempt
+          ? { attempt: metadata.attempt }
+          : {}),
+        ...("durationMs" in metadata && metadata.durationMs !== undefined
+          ? { durationMs: metadata.durationMs }
+          : {}),
+        ...("errorCode" in metadata && metadata.errorCode
+          ? { errorCode: metadata.errorCode }
+          : {}),
+        ...("retryable" in metadata && metadata.retryable !== undefined
+          ? { retryable: metadata.retryable }
+          : {}),
+        ...("artifactManifest" in metadata && metadata.artifactManifest?.length
+          ? { artifactManifest: metadata.artifactManifest }
+          : {}),
       }
 
-      if (part.type === "reasoning-delta") {
-        const delta = sanitizeReasoningChunk(part.text)
-        if (delta.length > 0 && !shouldSkipReasoningChunk(delta)) {
-          yield { type: "reasoning_delta", delta }
-        }
-        continue
-      }
-
-      if (part.type === "source" && part.sourceType === "url") {
+      for (const source of metadata.sources) {
         const sourceEvent = createSourceEvent(
-          part.id,
-          part.url,
-          part.title?.trim() ?? part.url
+          source.id,
+          source.url,
+          source.title
         )
         if (sourceEvent) {
           yield sourceEvent
         }
-        continue
       }
 
-      if (part.type === "tool-call") {
-        const metadata =
-          getAiSdkCodeExecutionToolCallMetadata(part) ??
-          getAiSdkTavilyToolCallMetadata(part) ??
-          getAiSdkManagedSearchToolCallMetadata(part) ??
-          getAiSdkKnowledgeSearchToolCallMetadata(part) ??
-          getAiSdkFinanceDataToolCallMetadata(part) ??
-          getAiSdkSecFilingsToolCallMetadata(part) ??
-          getAiSdkTradingAgentsToolCallMetadata(part) ??
-          fmpToolsContext?.getToolCallMetadata(part)
-        if (!metadata || seenToolCalls.has(metadata.callId)) {
-          continue
-        }
-
-        seenToolCalls.add(metadata.callId)
-        yield {
-          type: "tool_call",
-          callId: metadata.callId,
-          toolName: metadata.toolName,
-          label: metadata.label,
-          ...("query" in metadata && metadata.query
-            ? { query: metadata.query }
-            : {}),
-          ...("operation" in metadata && metadata.operation
-            ? { operation: metadata.operation }
-            : {}),
-          ...("provider" in metadata && metadata.provider
-            ? { provider: metadata.provider }
-            : {}),
-          ...("attempt" in metadata && metadata.attempt
-            ? { attempt: metadata.attempt }
-            : {}),
-        }
-        continue
-      }
-
-      if (part.type === "tool-result") {
-        if (part.preliminary) {
-          continue
-        }
-
-        const metadata =
-          getAiSdkCodeExecutionToolResultMetadata(part) ??
-          getAiSdkTavilyToolResultMetadata(part) ??
-          getAiSdkManagedSearchToolResultMetadata(part) ??
-          getAiSdkKnowledgeSearchToolResultMetadata(part) ??
-          getAiSdkFinanceDataToolResultMetadata(part) ??
-          getAiSdkSecFilingsToolResultMetadata(part) ??
-          getAiSdkTradingAgentsToolResultMetadata(part) ??
-          fmpToolsContext?.getToolResultMetadata(part)
-        if (!metadata || finalizedToolCalls.has(metadata.callId)) {
-          continue
-        }
-
-        finalizedToolCalls.add(metadata.callId)
-        yield {
-          type: "tool_result",
-          callId: metadata.callId,
-          toolName: metadata.toolName,
-          status: metadata.status,
-          ...("operation" in metadata && metadata.operation
-            ? { operation: metadata.operation }
-            : {}),
-          ...("provider" in metadata && metadata.provider
-            ? { provider: metadata.provider }
-            : {}),
-          ...("attempt" in metadata && metadata.attempt
-            ? { attempt: metadata.attempt }
-            : {}),
-          ...("durationMs" in metadata && metadata.durationMs !== undefined
-            ? { durationMs: metadata.durationMs }
-            : {}),
-          ...("errorCode" in metadata && metadata.errorCode
-            ? { errorCode: metadata.errorCode }
-            : {}),
-          ...("retryable" in metadata && metadata.retryable !== undefined
-            ? { retryable: metadata.retryable }
-            : {}),
-          ...("artifactManifest" in metadata &&
-          metadata.artifactManifest?.length
-            ? { artifactManifest: metadata.artifactManifest }
-            : {}),
-        }
-
-        for (const source of metadata.sources) {
-          const sourceEvent = createSourceEvent(
-            source.id,
-            source.url,
-            source.title
-          )
-          if (sourceEvent) {
-            yield sourceEvent
-          }
-        }
-
-        continue
-      }
-
-      if (
-        part.type === "tool-error" &&
-        (isAiSdkCodeExecutionToolName(part.toolName) ||
-          isAiSdkTavilyToolName(part.toolName) ||
-          isAiSdkManagedSearchToolName(part.toolName) ||
-          isAiSdkKnowledgeSearchToolName(part.toolName) ||
-          isAiSdkFinanceDataToolName(part.toolName) ||
-          isAiSdkSecFilingsToolName(part.toolName) ||
-          fmpToolsContext?.isToolName(part.toolName)) &&
-        !finalizedToolCalls.has(part.toolCallId)
-      ) {
-        finalizedToolCalls.add(part.toolCallId)
-        const toolName =
-          isAiSdkCodeExecutionToolName(part.toolName) ||
-          isAiSdkTavilyToolName(part.toolName) ||
-          isAiSdkManagedSearchToolName(part.toolName) ||
-          isAiSdkKnowledgeSearchToolName(part.toolName) ||
-          isAiSdkFinanceDataToolName(part.toolName) ||
-          isAiSdkSecFilingsToolName(part.toolName)
-            ? part.toolName
-            : "fmp_mcp"
-        yield {
-          type: "tool_result",
-          callId: part.toolCallId,
-          toolName,
-          status: "error",
-          errorCode: "TOOL_EXECUTION_ERROR",
-          retryable: true,
-        }
-      }
-
-      if (part.type === "error") {
-        const streamError =
-          "error" in part ? (part as { error?: unknown }).error : part
-        const message =
-          streamError instanceof Error
-            ? streamError.message
-            : typeof streamError === "string"
-              ? streamError
-              : JSON.stringify(streamError)
-        throw new Error(`Agent model stream error: ${message}`)
-      }
+      continue
     }
 
-    const finalReasoningDelta = sanitizeReasoningChunk.flush()
     if (
-      finalReasoningDelta.length > 0 &&
-      !shouldSkipReasoningChunk(finalReasoningDelta)
+      part.type === "tool-error" &&
+      (isAiSdkCodeExecutionToolName(part.toolName) ||
+        isAiSdkTavilyToolName(part.toolName) ||
+        isAiSdkManagedSearchToolName(part.toolName) ||
+        isAiSdkKnowledgeSearchToolName(part.toolName) ||
+        isAiSdkFinanceDataToolName(part.toolName) ||
+        isAiSdkSecFilingsToolName(part.toolName)) &&
+      !finalizedToolCalls.has(part.toolCallId)
     ) {
-      yield { type: "reasoning_delta", delta: finalReasoningDelta }
+      finalizedToolCalls.add(part.toolCallId)
+      const toolName = part.toolName
+      yield {
+        type: "tool_result",
+        callId: part.toolCallId,
+        toolName,
+        status: "error",
+        errorCode: "TOOL_EXECUTION_ERROR",
+        retryable: true,
+      }
     }
 
-    // Synthesis-fallback safety net: if the main stream completed without
-    // emitting any text (model called tools then stopped silent), re-invoke
-    // the model with the tool results in context and force a written answer.
-    // This is the most common failure mode on long multi-source retrieval
-    // chains where the model exhausts evidence-gathering and forgets to
-    // write the synthesis.
-    if (!hasEmittedText && !params.signal?.aborted) {
-      try {
-        const rawResponseMessages = (await result.response).messages
-        const responseMessages =
-          sanitizeResponseMessagesForFallback(rawResponseMessages)
-        logger.warn(
-          "Main stream emitted no text; running synthesis fallback.",
+    if (part.type === "error") {
+      const streamError =
+        "error" in part ? (part as { error?: unknown }).error : part
+      const message =
+        streamError instanceof Error
+          ? streamError.message
+          : typeof streamError === "string"
+            ? streamError
+            : JSON.stringify(streamError)
+      throw new Error(`Agent model stream error: ${message}`)
+    }
+  }
+
+  const finalReasoningDelta = sanitizeReasoningChunk.flush()
+  if (
+    finalReasoningDelta.length > 0 &&
+    !shouldSkipReasoningChunk(finalReasoningDelta)
+  ) {
+    yield { type: "reasoning_delta", delta: finalReasoningDelta }
+  }
+
+  // Synthesis-fallback safety net: if the main stream completed without
+  // emitting any text (model called tools then stopped silent), re-invoke
+  // the model with the tool results in context and force a written answer.
+  // This is the most common failure mode on long multi-source retrieval
+  // chains where the model exhausts evidence-gathering and forgets to
+  // write the synthesis.
+  if (!hasEmittedText && !params.signal?.aborted) {
+    try {
+      const rawResponseMessages = (await result.response).messages
+      const responseMessages =
+        sanitizeResponseMessagesForFallback(rawResponseMessages)
+      logger.warn("Main stream emitted no text; running synthesis fallback.", {
+        requestId: params.requestId,
+        model: params.model,
+        runtimeProfile: runtimeProfile.id,
+        responseMessageCount: responseMessages.length,
+        sanitizedToolStubCount:
+          responseMessages.length - rawResponseMessages.length,
+      })
+
+      const fallbackResult = streamText({
+        model: gatewayProvider(params.model),
+        system: EMPTY_RESPONSE_SYNTHESIS_FALLBACK_SYSTEM,
+        messages: [
+          ...messages,
+          ...responseMessages,
           {
-            requestId: params.requestId,
-            model: params.model,
-            runtimeProfile: runtimeProfile.id,
-            responseMessageCount: responseMessages.length,
-            sanitizedToolStubCount:
-              responseMessages.length - rawResponseMessages.length,
-          }
-        )
-
-        const fallbackResult = streamText({
-          model: gatewayProvider(params.model),
-          system: EMPTY_RESPONSE_SYNTHESIS_FALLBACK_SYSTEM,
-          messages: [
-            ...messages,
-            ...responseMessages,
-            {
-              role: "user",
-              content:
-                "Now write the final answer to my original question using the tool results above. Mirror my exact terminology. Do not call any tools. An empty response is not acceptable — if the evidence is partial, write what you found and name the gap.",
-            },
-          ],
-          abortSignal: params.signal,
-          ...(params.temperature !== undefined
-            ? { temperature: params.temperature }
-            : {}),
-          providerOptions: params.taskMode
-            ? getAiSdkGatewayProviderOptionsForTaskMode({
-                provider: resolvePromptProvider(params.model),
-                taskMode: params.taskMode,
-              })
-            : getAiSdkGatewayProviderOptionsForMode({
-                deepResearch: runtimeProfile.id === "deep_research",
-              }),
-          tools,
-          toolChoice: "none" as const,
-          stopWhen: stepCountIs(1),
-        })
-
-        let fallbackEmittedText = false
-        for await (const part of fallbackResult.fullStream) {
-          if (part.type === "text-delta" && part.text.length > 0) {
-            hasEmittedText = true
-            fallbackEmittedText = true
-            yield { type: "text_delta", delta: part.text }
-            continue
-          }
-          if (part.type === "finish") {
-            logger.info("Synthesis fallback stream finished.", {
-              requestId: params.requestId,
-              model: params.model,
-              runtimeProfile: runtimeProfile.id,
-              finishReason: part.finishReason,
-              fallbackEmittedText,
-              ...getUsageLogFields(part.totalUsage),
+            role: "user",
+            content:
+              "Now write the final answer to my original question using the tool results above. Mirror my exact terminology. Do not call any tools. An empty response is not acceptable — if the evidence is partial, write what you found and name the gap.",
+          },
+        ],
+        abortSignal: params.signal,
+        ...(params.temperature !== undefined
+          ? { temperature: params.temperature }
+          : {}),
+        providerOptions: params.taskMode
+          ? getAiSdkGatewayProviderOptionsForTaskMode({
+              provider: resolvePromptProvider(params.model),
+              taskMode: params.taskMode,
             })
-          }
-          if (part.type === "error") {
-            const streamError =
-              "error" in part ? (part as { error?: unknown }).error : part
-            logger.warn("Synthesis fallback stream emitted an error event.", {
-              requestId: params.requestId,
-              model: params.model,
-              runtimeProfile: runtimeProfile.id,
-              error: streamError,
-            })
-          }
+          : getAiSdkGatewayProviderOptionsForMode({
+              deepResearch: runtimeProfile.id === "deep_research",
+            }),
+        tools,
+        toolChoice: "none" as const,
+        stopWhen: stepCountIs(1),
+      })
+
+      let fallbackEmittedText = false
+      for await (const part of fallbackResult.fullStream) {
+        if (part.type === "text-delta" && part.text.length > 0) {
+          hasEmittedText = true
+          fallbackEmittedText = true
+          yield { type: "text_delta", delta: part.text }
+          continue
         }
-
-        if (!fallbackEmittedText) {
-          logger.warn("Synthesis fallback completed without emitting text.", {
+        if (part.type === "finish") {
+          logger.info("Synthesis fallback stream finished.", {
             requestId: params.requestId,
             model: params.model,
             runtimeProfile: runtimeProfile.id,
-            responseMessageCount: responseMessages.length,
+            finishReason: part.finishReason,
+            fallbackEmittedText,
+            ...getUsageLogFields(part.totalUsage),
           })
         }
-      } catch (fallbackError) {
-        logger.warn("Synthesis fallback failed; yielding nothing.", {
+        if (part.type === "error") {
+          const streamError =
+            "error" in part ? (part as { error?: unknown }).error : part
+          logger.warn("Synthesis fallback stream emitted an error event.", {
+            requestId: params.requestId,
+            model: params.model,
+            runtimeProfile: runtimeProfile.id,
+            error: streamError,
+          })
+        }
+      }
+
+      if (!fallbackEmittedText) {
+        logger.warn("Synthesis fallback completed without emitting text.", {
           requestId: params.requestId,
           model: params.model,
           runtimeProfile: runtimeProfile.id,
-          error: fallbackError,
+          responseMessageCount: responseMessages.length,
         })
       }
+    } catch (fallbackError) {
+      logger.warn("Synthesis fallback failed; yielding nothing.", {
+        requestId: params.requestId,
+        model: params.model,
+        runtimeProfile: runtimeProfile.id,
+        error: fallbackError,
+      })
     }
-  } finally {
-    await fmpToolsContext?.close().catch((error: unknown) => {
-      logger.warn("Failed to close MCP client.", error)
-    })
   }
 }

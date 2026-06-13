@@ -1,6 +1,6 @@
 # Chloei
 
-Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently exposes a curated model selector that defaults to Qwen 3.7 Max and also includes Kimi K2.6 and MiMo V2.5 Pro, routes Research mode to Qwen 3.7 Max with a dedicated Deep Research instruction template, and offers private Blob-backed file attachments, local code execution, optional Tavily retrieval, optional governed Upstash Search knowledge retrieval, optional Inngest jobs, normalized finance data, SEC/EDGAR filing retrieval, optional Financial Modeling Prep MCP tools, optional Mem0 long-term memory, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
+Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently exposes a curated model selector that defaults to Qwen 3.7 Max and also includes Kimi K2.6 and MiMo V2.5 Pro, routes Research mode to Qwen 3.7 Max with a dedicated Deep Research instruction template, and offers private Blob-backed file attachments, local code execution, optional Tavily retrieval, optional governed Upstash Search knowledge retrieval, optional Inngest jobs, normalized finance data, SEC/EDGAR filing retrieval, optional Mem0 long-term memory, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
 
 ## Requirements
 
@@ -122,8 +122,6 @@ Optional variables let you override the built-in safe defaults for message limit
 - `BLOB_READ_WRITE_TOKEN`: enables private Blob upload/download and private agent artifact URLs
 - `AGENT_KNOWLEDGE_SEARCH_ENABLED`, `AGENT_ASYNC_REPORTS_ENABLED`, `AGENT_TELEMETRY_RECORD_IO`, `AGENT_FINANCE_WORKFLOWS_ENABLED`: feature gates; defaults are off unless explicitly set or synced through Edge Config
 - `POSTHOG_ANALYTICS_ENABLED`, `POSTHOG_ANALYTICS_INTERNAL_USERS_ONLY`, `NEXT_PUBLIC_POSTHOG_ANALYTICS_ENABLED`, `NEXT_PUBLIC_POSTHOG_HOST`, `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN`: enable privacy-safe PostHog product analytics. Browser autocapture, pageviews, surveys, heatmaps, feature-flag requests, and replay are disabled; server events use hashed user ids, no GeoIP, and no PostHog person profiles. Server-side capture is restricted to `AGENT_INTERNAL_USER_EMAILS`/`AGENT_INTERNAL_USER_EMAIL_DOMAINS` unless `POSTHOG_ANALYTICS_INTERNAL_USERS_ONLY=false`.
-- `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_TRACES_SAMPLE_RATE`, `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE`: Sentry error/performance telemetry with PII scrubbing and no replay sampling
-- `FMP_API_KEY`: enables curated Financial Modeling Prep MCP tools for structured finance data
 - `FRED_API_KEY`: enables macro/rates series through the normalized `finance_data` tool
 - `SEC_API_USER_AGENT`: identifies Chloei for SEC public company-facts requests
 - `AGENT_FINANCE_TOOL_MAX_STEPS`: max tool steps for finance-analysis runs, defaulting to 20
@@ -151,12 +149,12 @@ By default, Chloei enforces safe built-in agent limits even if you leave all opt
 
 - The current model list is defined in `src/lib/shared/llm/models.ts`.
 - `/`, `/api/agent`, and `/api/models` require an authenticated Better Auth session.
-- Native `web_search` is available through AI Gateway alongside Tavily, FMP, and local code execution.
-- `knowledge_search` is for governed static/internal material only. Live financial facts stay routed through `finance_data`, SEC/FRED/FMP, Tavily, and AI Gateway web search.
+- Native `web_search` is available through AI Gateway alongside Tavily and local code execution.
+- `knowledge_search` is for governed static/internal material only. Live financial facts stay routed through `finance_data`, SEC/FRED, Tavily, and AI Gateway web search.
 - `browser_research` is a retired live tool name retained only so historical thread records continue to parse.
 - PostHog is used for coarse product analytics and rollout analysis only when `analytics.posthog.enabled` or `POSTHOG_ANALYTICS_ENABLED` is on, and server-side capture remains internal-user gated by default. Do not capture prompt text, model output, uploaded filenames, blob paths, document hashes, emails, account data, or credentials in PostHog events.
 - `POST /api/jobs/report` accepts an optional client-generated `reportId` UUID for retry idempotency. Idempotency keys must use report/thread identifiers, not prompt text or document contents.
-- `finance_data` normalizes finance operations across FMP, SEC public company facts, and optional FRED macro/rates data. FMP MCP remains available as a migration compatibility path for chat-default runs.
+- `finance_data` normalizes finance operations across SEC public company facts, Yahoo Finance, Stooq, and optional FRED macro/rates data.
 - `sec_filings` is available when a normal chat or Research request is inferred as finance-analysis work, covering SEC/EDGAR company lookup, filing search, full filing fetches, section extraction, table extraction, and targeted retrieval over filing text.
 - Long-term memory is opt-in and best effort. When `MEMORY_PROVIDER=mem0`, Chloei retrieves user-scoped memories before each agent run and writes the latest user/assistant turn after meaningful completed or incomplete responses. Memory failures never block chat. Self-hosted OSS and Mem0 Platform are both supported through `MEM0_API_URL`; Platform mode stores durable memories under `user_id`, keeps Chloei's agent/thread scope in metadata for reliable cross-thread retrieval and cleanup, and temporarily falls back to the legacy per-user `app_id` scope for old memories.
 - Run Mem0 separately with its REST API and dashboard. For a low-friction shared provider setup, configure Mem0's OpenAI-compatible LLM/embedder through Vercel AI Gateway with `OPENAI_BASE_URL=https://ai-gateway.vercel.sh/v1`, `OPENAI_API_KEY=$AI_GATEWAY_API_KEY`, `openai/text-embedding-3-small` for embeddings, and a low-cost GPT model for memory extraction. Prefer private networking and HTTPS outside local development.

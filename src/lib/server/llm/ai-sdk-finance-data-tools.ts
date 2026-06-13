@@ -5,12 +5,7 @@ import { asRecord, asString } from "@/lib/cast"
 import { createLogger } from "@/lib/logger"
 import type { MessageSource, ToolName } from "@/lib/shared"
 
-import {
-  buildFmpStatusUrl,
-  buildFmpUrl,
-  buildFredStatusUrl,
-  buildFredUrl,
-} from "./finance-data/provider-urls"
+import { buildFredStatusUrl, buildFredUrl } from "./finance-data/provider-urls"
 import {
   classifyFinanceDataRetry,
   fetchJsonWithRetry,
@@ -41,7 +36,7 @@ const SEC_COMPANY_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 export { classifyFinanceDataRetry } from "./finance-data/retry"
 
 type FinanceDataToolName = Extract<ToolName, typeof FINANCE_DATA_TOOL_NAME>
-type FinanceDataProvider = "auto" | "fmp" | "sec" | "fred" | "stooq" | "yahoo"
+type FinanceDataProvider = "auto" | "sec" | "fred" | "stooq" | "yahoo"
 type ResolvedFinanceDataProvider = Exclude<FinanceDataProvider, "auto">
 type FinanceDataOperation =
   | "provider_status"
@@ -56,7 +51,6 @@ type FinanceDataOperation =
   | "options_chain"
 
 interface FinanceDataToolConfig {
-  fmpApiKey?: string
   fredApiKey?: string
   secUserAgent?: string
   /**
@@ -154,9 +148,7 @@ const financeDataInputSchema = z.object({
     "analyst_recommendations",
     "options_chain",
   ]),
-  provider: z
-    .enum(["auto", "fmp", "sec", "fred", "stooq", "yahoo"])
-    .default("auto"),
+  provider: z.enum(["auto", "sec", "fred", "stooq", "yahoo"]).default("auto"),
   query: z.string().trim().min(1).max(500).optional(),
   symbol: z.string().trim().min(1).max(40).optional(),
   cik: z.string().trim().min(1).max(20).optional(),
@@ -229,8 +221,7 @@ function normalizeTickerSymbol(symbol: string): string {
 }
 
 function normalizeProvider(value: unknown): FinanceDataProvider {
-  return value === "fmp" ||
-    value === "sec" ||
+  return value === "sec" ||
     value === "fred" ||
     value === "stooq" ||
     value === "yahoo"
@@ -284,28 +275,6 @@ function resolveProvider(
   }
 
   return "sec"
-}
-
-function resolveFmpFallbackProvider(
-  input: FinanceDataToolInput
-): ResolvedFinanceDataProvider | null {
-  if (input.operation === "quote") {
-    return "yahoo"
-  }
-
-  if (input.operation === "historical_prices") {
-    return "yahoo"
-  }
-
-  if (
-    input.operation === "company_profile" ||
-    input.operation === "symbol_search" ||
-    input.operation === "financial_statements"
-  ) {
-    return "sec"
-  }
-
-  return null
 }
 
 /**
@@ -477,23 +446,9 @@ async function getFinanceProviderStatus(
   config: FinanceDataToolConfig,
   fetchImpl: typeof fetch
 ): Promise<Record<ResolvedFinanceDataProvider, FinanceProviderStatus>> {
-  const fmpApiKey = config.fmpApiKey?.trim()
   const fredApiKey = config.fredApiKey?.trim()
 
-  const [fmp, fred, stooq, yahoo] = await Promise.all([
-    checkJsonProviderStatus({
-      configured: Boolean(fmpApiKey),
-      provider: "fmp",
-      operations: [
-        "symbol_search",
-        "quote",
-        "company_profile",
-        "historical_prices",
-        "financial_statements",
-      ],
-      url: fmpApiKey ? buildFmpStatusUrl(fmpApiKey) : undefined,
-      fetchImpl,
-    }),
+  const [fred, stooq, yahoo] = await Promise.all([
     checkJsonProviderStatus({
       configured: Boolean(fredApiKey),
       provider: "fred",
@@ -519,7 +474,6 @@ async function getFinanceProviderStatus(
   ])
 
   return {
-    fmp,
     fred,
     stooq,
     yahoo,
@@ -831,75 +785,6 @@ export async function runFinanceDataOperation(
   }
 
   try {
-    if (provider === "fmp") {
-      const apiKey = config.fmpApiKey?.trim()
-      const fallbackProvider = resolveFmpFallbackProvider(input)
-      if (!apiKey) {
-        if (fallbackProvider) {
-          return await runFinanceDataOperation(
-            { ...input, provider: fallbackProvider },
-            config
-          )
-        }
-
-        throw Object.assign(new Error("FMP API key is not configured."), {
-          code: "PROVIDER_UNAVAILABLE",
-          retryable: false,
-        })
-      }
-      const url = buildFmpUrl(input, apiKey)
-      const response = await fetchJsonWithRetry({
-        url,
-        provider,
-        fetchImpl,
-      })
-      const durationMs = Date.now() - startedAt
-
-      if (!response.ok) {
-        if (
-          fallbackProvider &&
-          (response.code === "HTTP_401" || response.code === "HTTP_403")
-        ) {
-          return await runFinanceDataOperation(
-            { ...input, provider: fallbackProvider },
-            config
-          )
-        }
-
-        logger.warn("Finance data provider request failed.", {
-          durationMs,
-          errorCode: response.code,
-          outcome: "provider_error",
-          provider,
-        })
-
-        return {
-          error: {
-            message: response.message,
-            code: response.code,
-            operation: input.operation,
-            provider,
-            retryable: response.retryable,
-            attempts: response.attempts,
-            durationMs,
-          },
-        }
-      }
-
-      const source = createProviderSource(provider, input.operation, url)
-      return {
-        output: {
-          operation: input.operation,
-          provider,
-          data: response.data,
-          sources: [source],
-          durationMs,
-          attempts: response.attempts,
-          requestUrl: source.url,
-        },
-      }
-    }
-
     if (provider === "fred") {
       const apiKey = config.fredApiKey?.trim()
       if (!apiKey) {
@@ -1670,7 +1555,6 @@ function inferFinanceEvidenceStatementType(
 function getFinanceEvidenceInputs(params: {
   query: string
   symbol: string
-  fmpApiKey?: string
 }): FinanceDataToolInput[] {
   const statementType = inferFinanceEvidenceStatementType(params.query)
   const quoteRequested =
@@ -1686,7 +1570,7 @@ function getFinanceEvidenceInputs(params: {
   if (quoteRequested) {
     inputs.push({
       operation: "quote",
-      provider: params.fmpApiKey?.trim() ? "fmp" : "auto",
+      provider: "auto",
       symbol: params.symbol,
     })
   }
@@ -1848,7 +1732,6 @@ export async function createAiSdkFinanceDataEvidenceContext(
     getFinanceEvidenceInputs({
       query,
       symbol,
-      fmpApiKey: params.fmpApiKey,
     })
   )
   const results = await Promise.all(
@@ -1902,7 +1785,7 @@ export function createAiSdkFinanceDataTools(
   return {
     finance_data: tool({
       description:
-        "Retrieve normalized finance data for broad-market analysis. Use provider_status first when the user asks what providers or capabilities are available; do not probe individual operations to determine availability after provider_status reports a provider unavailable. Use for company/symbol search, quotes, company profiles, historical prices, financial statements (US filers via SEC, non-US companies via Yahoo Finance), SEC company facts, FRED macro/rates series, analyst recommendations and price targets, options chains, and provider status checks. Quotes, historical prices, analyst targets, and options chains come from Yahoo Finance, which needs no key but is supplementary—prefer SEC/FMP figures for citation-grade or high-stakes claims. Use web search for market news and use code execution for calculations.",
+        "Retrieve normalized finance data for broad-market analysis. Use provider_status first when the user asks what providers or capabilities are available; do not probe individual operations to determine availability after provider_status reports a provider unavailable. Use for company/symbol search, quotes, company profiles, historical prices, financial statements (US filers via SEC, non-US companies via Yahoo Finance), SEC company facts, FRED macro/rates series, analyst recommendations and price targets, options chains, and provider status checks. Quotes, historical prices, analyst targets, and options chains come from Yahoo Finance, which needs no key but is supplementary—prefer SEC figures for citation-grade or high-stakes claims. Use web search for market news and use code execution for calculations.",
       inputSchema: financeDataInputSchema,
       execute: async (input) => runFinanceDataOperation(input, config),
     }),

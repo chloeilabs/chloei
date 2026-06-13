@@ -1,7 +1,3 @@
-import * as Sentry from "@sentry/nextjs"
-
-import { scrubSentryEvent } from "./src/lib/shared/sentry-scrubbing"
-
 function parseEnabled(value: string | undefined): boolean {
   return ["1", "true", "yes", "on", "enabled"].includes(
     value?.trim().toLowerCase() ?? ""
@@ -15,18 +11,6 @@ const postHogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST
 const postHogAnalyticsEnabled = parseEnabled(
   process.env.NEXT_PUBLIC_POSTHOG_ANALYTICS_ENABLED
 )
-
-Sentry.init({
-  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
-  sendDefaultPii: false,
-  tracesSampleRate: Number(
-    process.env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE ?? "0"
-  ),
-  replaysSessionSampleRate: 0,
-  replaysOnErrorSampleRate: 0,
-  integrations: [],
-  beforeSend: scrubSentryEvent,
-})
 
 if (postHogAnalyticsEnabled && postHogProjectToken && postHogHost) {
   void Promise.all([
@@ -67,5 +51,3 @@ if (postHogAnalyticsEnabled && postHogProjectToken && postHogHost) {
     })
     .catch(() => undefined)
 }
-
-export const onRouterTransitionStart = Sentry.captureRouterTransitionStart

@@ -1,4 +1,3 @@
-const FMP_BASE_URL = "https://financialmodelingprep.com/api/v3"
 const FRED_BASE_URL = "https://api.stlouisfed.org/fred"
 
 interface FinanceProviderUrlInput {
@@ -37,83 +36,6 @@ function requireField(
 
 function normalizeLimit(input: FinanceProviderUrlInput, fallback: number) {
   return Math.max(1, Math.min(250, input.limit ?? fallback))
-}
-
-function getStatementEndpoint(
-  statementType: FinanceProviderUrlInput["statementType"]
-): string {
-  if (statementType === "balance_sheet") {
-    return "balance-sheet-statement"
-  }
-
-  if (statementType === "cash_flow") {
-    return "cash-flow-statement"
-  }
-
-  return "income-statement"
-}
-
-export function buildFmpUrl(
-  input: FinanceProviderUrlInput,
-  apiKey: string
-): URL {
-  const operation = input.operation
-  if (operation === "symbol_search") {
-    const url = new URL(`${FMP_BASE_URL}/search`)
-    url.searchParams.set("query", requireField(input, "query"))
-    url.searchParams.set("limit", String(normalizeLimit(input, 10)))
-    url.searchParams.set("apikey", apiKey)
-    return url
-  }
-
-  if (operation === "quote") {
-    const url = new URL(
-      `${FMP_BASE_URL}/quote/${encodeURIComponent(requireField(input, "symbol"))}`
-    )
-    url.searchParams.set("apikey", apiKey)
-    return url
-  }
-
-  if (operation === "company_profile") {
-    const url = new URL(
-      `${FMP_BASE_URL}/profile/${encodeURIComponent(requireField(input, "symbol"))}`
-    )
-    url.searchParams.set("apikey", apiKey)
-    return url
-  }
-
-  if (operation === "historical_prices") {
-    const url = new URL(
-      `${FMP_BASE_URL}/historical-price-full/${encodeURIComponent(requireField(input, "symbol"))}`
-    )
-    if (input.from) {
-      url.searchParams.set("from", input.from)
-    }
-    if (input.to) {
-      url.searchParams.set("to", input.to)
-    }
-    url.searchParams.set("apikey", apiKey)
-    return url
-  }
-
-  if (operation === "financial_statements") {
-    const endpoint = getStatementEndpoint(input.statementType)
-    const url = new URL(
-      `${FMP_BASE_URL}/${endpoint}/${encodeURIComponent(requireField(input, "symbol"))}`
-    )
-    url.searchParams.set("period", input.period ?? "annual")
-    url.searchParams.set("limit", String(normalizeLimit(input, 5)))
-    url.searchParams.set("apikey", apiKey)
-    return url
-  }
-
-  throw new Error(`${operation} is not supported by FMP.`)
-}
-
-export function buildFmpStatusUrl(apiKey: string): URL {
-  const url = new URL(`${FMP_BASE_URL}/quote-short/AAPL`)
-  url.searchParams.set("apikey", apiKey)
-  return url
 }
 
 export function buildFredUrl(

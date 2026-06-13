@@ -276,7 +276,7 @@ Config values to false.
 
 - Keep Neon as the only PostgreSQL system of record.
 - Use Upstash Search only for governed static/internal material. Live financial
-  facts stay routed through `finance_data`, SEC, FRED, FMP, Tavily, and AI
+  facts stay routed through `finance_data`, SEC, FRED, Tavily, and AI
   Gateway web search.
 - `browser_research` is retired as a live tool; the shared tool name remains
   only for historical thread payload compatibility.
