@@ -1153,10 +1153,6 @@ export function inferFinanceDataEvidenceSymbols(query: string): string[] {
     .slice(0, FINANCE_EVIDENCE_MAX_SYMBOLS)
 }
 
-export function inferFinanceDataEvidenceSymbol(query: string): string | null {
-  return inferFinanceDataEvidenceSymbols(query)[0] ?? null
-}
-
 function getMarketCapSlug(symbol: string): string | null {
   return (
     FINANCE_EVIDENCE_COMMON_SYMBOLS.find(

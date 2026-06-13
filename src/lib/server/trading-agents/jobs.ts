@@ -4,8 +4,6 @@ import type { TradingDeskRequest } from "@/lib/shared/trading-agents/types"
 
 import { fetchTradingDeskResult } from "./client"
 
-export const TRADING_ANALYSIS_JOB_TYPE = "trading/analysis.requested" as const
-
 const logger = createLogger("trading-desk-job")
 
 /**

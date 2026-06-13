@@ -28,8 +28,6 @@ export const AGENT_ATTACHMENT_MAX_TOTAL_PREVIEW_BYTES =
 export const AGENT_ATTACHMENT_MAX_DATA_URL_CHARS =
   Math.ceil(AGENT_ATTACHMENT_MAX_FILE_BYTES * 1.4) + 200
 
-export type AgentAttachmentImageMimeType =
-  (typeof AGENT_ATTACHMENT_IMAGE_MIME_TYPES)[number]
 export type AgentAttachmentMimeType =
   (typeof AGENT_ATTACHMENT_MIME_TYPES)[number]
 export type AgentAttachmentKind = "image" | "pdf"
@@ -58,7 +56,6 @@ const IMAGE_MIME_TYPE_SET: ReadonlySet<string> = new Set(
 const ATTACHMENT_MIME_TYPE_SET: ReadonlySet<string> = new Set(
   AGENT_ATTACHMENT_MIME_TYPES
 )
-const IMAGE_DETAIL_SET: ReadonlySet<string> = new Set(AGENT_IMAGE_DETAIL_VALUES)
 const DATA_URL_BASE64_PREFIX_PATTERN = /^data:([^;,]+);base64,/i
 const BASE64_PAYLOAD_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/
 
@@ -77,10 +74,6 @@ export function normalizeAgentAttachmentMimeType(
   return ATTACHMENT_MIME_TYPE_SET.has(normalized)
     ? (normalized as AgentAttachmentMimeType)
     : null
-}
-
-export function isAgentImageDetail(value: unknown): value is AgentImageDetail {
-  return typeof value === "string" && IMAGE_DETAIL_SET.has(value)
 }
 
 export function getAgentAttachmentKind(mediaType: string): AgentAttachmentKind {

@@ -144,11 +144,3 @@ export function appendUserMessage(
 
   return [...baseMessages, userMessage]
 }
-
-export function hasUserMessageAttachments(messages: AgentMessage[]): boolean {
-  return messages.some(
-    (message) =>
-      message.role === "user" &&
-      (message.metadata?.attachments?.length ?? 0) > 0
-  )
-}
