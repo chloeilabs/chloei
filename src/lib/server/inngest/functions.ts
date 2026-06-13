@@ -3,26 +3,12 @@ import { z } from "zod"
 import { createLogger } from "@/lib/logger"
 import { completeReportPlaceholderJob } from "@/lib/server/agent-report-jobs"
 import { updateAgentJobStatus } from "@/lib/server/jobs"
-import { indexUploadedDocument } from "@/lib/server/knowledge-indexing"
 import { runTradingAnalysisJob } from "@/lib/server/trading-agents/jobs"
 import { tradingDeskRequestSchema } from "@/lib/server/trading-agents/request-schema"
 
 import { inngest } from "./client"
 
 const logger = createLogger("inngest-functions")
-
-const documentUploadedSchema = z.object({
-  userId: z.string().trim().min(1),
-  documentId: z.string().trim().min(1),
-  pathname: z.string().trim().min(1),
-  filename: z.string().trim().min(1),
-  contentType: z.string().trim().min(1),
-  sizeBytes: z.number().int().positive(),
-  sha256: z
-    .string()
-    .trim()
-    .regex(/^[a-f0-9]{64}$/i),
-})
 
 const reportRequestedSchema = z.object({
   userId: z.string().trim().min(1),
@@ -49,21 +35,6 @@ const opsInngestSmokeSchema = z.object({
   sentAt: z.string().trim().min(1),
   source: z.literal("chloei_inngest_smoke").optional(),
 })
-
-export const documentUploaded = inngest.createFunction(
-  {
-    id: "knowledge-document-uploaded",
-    idempotency: "event.data.userId + ':' + event.data.documentId",
-    triggers: [{ event: "knowledge/document.uploaded" }],
-  },
-  async ({ event, step }) => {
-    const data = documentUploadedSchema.parse(event.data)
-    await step.run("record-document-metadata", () => data)
-    return step.run("index-uploaded-document", () =>
-      indexUploadedDocument(data)
-    )
-  }
-)
 
 export const reportRequested = inngest.createFunction(
   {
@@ -96,7 +67,7 @@ export const watchlistRefreshRequested = inngest.createFunction(
       refreshed: false,
       watchlistId: data.watchlistId,
       reason:
-        "Watchlist refresh is reserved for the finance workflow rollout and should use finance_data/FRED/SEC providers.",
+        "Watchlist refresh is reserved for the finance workflow rollout and should use finance_data/SEC providers.",
     }))
   }
 )
@@ -173,7 +144,6 @@ export const opsInngestSmoke = inngest.createFunction(
 )
 
 export const inngestFunctions = [
-  documentUploaded,
   reportRequested,
   watchlistRefreshRequested,
   tradingAnalysisRequested,

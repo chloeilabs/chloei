@@ -5,7 +5,6 @@ import { createLogger } from "@/lib/logger"
 import { buildAgentSystemInstruction } from "@/lib/server/agent-context"
 import {
   inferPromptTaskMode,
-  inferUserExpertiseFromMemory,
   type PromptTaskMode,
   resolvePromptProvider,
 } from "@/lib/server/agent-prompt-steering"
@@ -22,7 +21,6 @@ import {
   AGENT_RATE_LIMIT_MAX_REQUESTS,
   AGENT_RATE_LIMIT_WINDOW_MS,
   AGENT_STREAM_TIMEOUT_MS,
-  MEMORY_RUNTIME_CONFIG,
 } from "@/lib/server/agent-runtime-config"
 import {
   createAuthUnavailableResponse,
@@ -36,11 +34,6 @@ import {
 import { resolveFinancialServicesWorkflow } from "@/lib/server/financial-services-workflows"
 import { resolveAgentFeatureFlags } from "@/lib/server/integration-flags"
 import type { AgentRuntimeProfileId } from "@/lib/server/llm/agent-runtime"
-import {
-  commitLongTermMemory,
-  getLongTermMemoryContext,
-  isLongTermMemoryEnabled,
-} from "@/lib/server/long-term-memory"
 import {
   evaluateAndConsumeSlidingWindowRateLimit,
   tryAcquireConcurrencySlot,
@@ -186,44 +179,16 @@ export async function POST(request: NextRequest) {
       userEmail: session.user.email,
     })
     const promptProvider = resolvePromptProvider(selectedModel)
-    const longTermMemoryEnabled =
-      !isE2eMockRequest && isLongTermMemoryEnabled(MEMORY_RUNTIME_CONFIG)
-    const latestUserMessage =
-      [...parsedRequest.messages]
-        .reverse()
-        .find((message) => message.role === "user")?.content ?? ""
-    let longTermMemoryContext: string | undefined
-    if (longTermMemoryEnabled) {
-      try {
-        longTermMemoryContext = await getLongTermMemoryContext({
-          query: latestUserMessage,
-          requestId,
-          signal: request.signal,
-          userId: session.user.id,
-        })
-      } catch (error) {
-        logger.warn("Long-term memory context failed; continuing without it.", {
-          error,
-          errorCode: "AGENT_LONG_TERM_MEMORY_CONTEXT_FAILED",
-          requestId,
-        })
-      }
-    }
-    const userExpertise = inferUserExpertiseFromMemory(longTermMemoryContext)
     const inferredPromptTaskMode =
       parsedRequest.runMode === "research"
         ? "research"
-        : inferPromptTaskMode(
-            parsedRequest.messages,
-            userExpertise ? { userExpertise } : {}
-          )
+        : inferPromptTaskMode(parsedRequest.messages)
     const financialServicesWorkflow = featureFlags.financeWorkflowsEnabled
       ? resolveFinancialServicesWorkflow({
           messages: parsedRequest.messages,
           taskMode: inferredPromptTaskMode,
           tools: {
             tavilyEnabled: Boolean(tavilyApiKey?.trim()),
-            fredEnabled: Boolean(process.env.FRED_API_KEY?.trim()),
             secUserAgentConfigured: Boolean(
               process.env.SEC_API_USER_AGENT?.trim()
             ),
@@ -248,8 +213,6 @@ export async function POST(request: NextRequest) {
           ? { deepResearchMode: true }
           : {}),
         ...(financialServicesWorkflow ? { financialServicesWorkflow } : {}),
-        ...(longTermMemoryEnabled ? { longTermMemoryEnabled } : {}),
-        ...(longTermMemoryContext ? { longTermMemoryContext } : {}),
       }
     )
 
@@ -310,8 +273,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const threadId = parsedRequest.threadId
-
     return observeRouteResponse(
       observation,
       createAgentStreamResponse({
@@ -334,20 +295,6 @@ export async function POST(request: NextRequest) {
         featureFlags,
         messages: parsedRequest.messages,
         systemInstruction,
-        ...(longTermMemoryEnabled && threadId
-          ? {
-              memoryCommitMaxChars: MEMORY_RUNTIME_CONFIG.commitMaxChars,
-              onAssistantResponseSettled: async ({ assistantContent }) => {
-                await commitLongTermMemory({
-                  assistantContent,
-                  messages: parsedRequest.messages,
-                  requestId,
-                  threadId,
-                  userId: session.user.id,
-                })
-              },
-            }
-          : {}),
         onStreamSettled: concurrencySlot?.release,
       }),
       {

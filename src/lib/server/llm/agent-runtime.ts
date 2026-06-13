@@ -56,18 +56,6 @@ import {
   getAiSdkGatewayProviderOptionsForTaskMode,
 } from "./ai-sdk-gateway-provider-options"
 import {
-  createAiSdkKnowledgeSearchTools,
-  getAiSdkKnowledgeSearchToolCallMetadata,
-  getAiSdkKnowledgeSearchToolResultMetadata,
-  isAiSdkKnowledgeSearchToolName,
-} from "./ai-sdk-knowledge-search-tools"
-import {
-  createAiSdkManagedSearchTools,
-  getAiSdkManagedSearchToolCallMetadata,
-  getAiSdkManagedSearchToolResultMetadata,
-  isAiSdkManagedSearchToolName,
-} from "./ai-sdk-managed-search-tools"
-import {
   createAiSdkSecFilingsTools,
   getAiSdkSecFilingsToolCallMetadata,
   getAiSdkSecFilingsToolResultMetadata,
@@ -120,7 +108,6 @@ export interface StartAgentRuntimeStreamParams {
   model: ModelType
   aiGatewayApiKey: string
   tavilyApiKey?: string
-  fredApiKey?: string
   secUserAgent?: string
   userTimeZone?: string
   messages: AgentInputMessage[]
@@ -429,16 +416,9 @@ export async function* startAgentRuntimeStream(
           : undefined,
     }),
     ...createAiSdkTavilyTools(normalizedTavilyApiKey),
-    ...createAiSdkManagedSearchTools(),
-    ...createAiSdkKnowledgeSearchTools({
-      enabled: featureFlags.knowledgeSearchEnabled,
-      userId,
-    }),
     ...(runtimeProfile.financeDataEnabled
       ? createAiSdkFinanceDataTools({
-          fredApiKey: params.fredApiKey ?? process.env.FRED_API_KEY,
           secUserAgent: params.secUserAgent ?? process.env.SEC_API_USER_AGENT,
-          yahooEnabled: process.env.AGENT_FINANCE_YAHOO_ENABLED !== "false",
         })
       : {}),
     ...(runtimeProfile.secFilingsEnabled
@@ -583,8 +563,6 @@ export async function* startAgentRuntimeStream(
       const metadata =
         getAiSdkCodeExecutionToolCallMetadata(part) ??
         getAiSdkTavilyToolCallMetadata(part) ??
-        getAiSdkManagedSearchToolCallMetadata(part) ??
-        getAiSdkKnowledgeSearchToolCallMetadata(part) ??
         getAiSdkFinanceDataToolCallMetadata(part) ??
         getAiSdkSecFilingsToolCallMetadata(part) ??
         getAiSdkTradingAgentsToolCallMetadata(part)
@@ -622,8 +600,6 @@ export async function* startAgentRuntimeStream(
       const metadata =
         getAiSdkCodeExecutionToolResultMetadata(part) ??
         getAiSdkTavilyToolResultMetadata(part) ??
-        getAiSdkManagedSearchToolResultMetadata(part) ??
-        getAiSdkKnowledgeSearchToolResultMetadata(part) ??
         getAiSdkFinanceDataToolResultMetadata(part) ??
         getAiSdkSecFilingsToolResultMetadata(part) ??
         getAiSdkTradingAgentsToolResultMetadata(part)
@@ -678,8 +654,6 @@ export async function* startAgentRuntimeStream(
       part.type === "tool-error" &&
       (isAiSdkCodeExecutionToolName(part.toolName) ||
         isAiSdkTavilyToolName(part.toolName) ||
-        isAiSdkManagedSearchToolName(part.toolName) ||
-        isAiSdkKnowledgeSearchToolName(part.toolName) ||
         isAiSdkFinanceDataToolName(part.toolName) ||
         isAiSdkSecFilingsToolName(part.toolName)) &&
       !finalizedToolCalls.has(part.toolCallId)

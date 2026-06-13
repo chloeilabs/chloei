@@ -44,7 +44,7 @@ test("assistant session state builds assistant messages from stream accumulators
       {
         id: "tool-1",
         callId: "call-1",
-        toolName: "web_search",
+        toolName: "tavily_search",
         label: "Search",
         query: "query",
         status: "success",

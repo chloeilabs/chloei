@@ -7,7 +7,7 @@ import { createLogger } from "@/lib/logger"
 import {
   extractPdfTextForModelInput,
   normalizeExtractedReadableText,
-} from "@/lib/server/knowledge-indexing"
+} from "@/lib/server/pdf-text-extraction"
 import {
   type AgentRequestAttachment,
   getDataUrlMediaType,

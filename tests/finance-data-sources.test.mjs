@@ -15,17 +15,17 @@ const { createFinanceDataProviderSource, createFinanceDataSourceId } =
 
 test("finance data provider sources sanitize API keys and preserve stable ids", () => {
   const first = createFinanceDataProviderSource(
-    "fred",
+    "stooq",
     "quote",
     new URL("https://example.com/quote?symbol=AAPL&apikey=secret")
   )
   const second = createFinanceDataProviderSource(
-    "fred",
+    "stooq",
     "quote",
     new URL("https://example.com/quote?symbol=AAPL&apikey=another-secret")
   )
 
-  assert.equal(first.title, "FRED")
+  assert.equal(first.title, "Stooq")
   assert.equal(first.url, "https://example.com/quote?symbol=AAPL")
   assert.equal(second.url, "https://example.com/quote?symbol=AAPL")
   assert.equal(first.id, second.id)

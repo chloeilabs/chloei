@@ -17,26 +17,6 @@ const DEFAULT_AGENT_RESEARCH_TOOL_MAX_STEPS = 20
 const DEFAULT_AGENT_FINANCE_TOOL_MAX_STEPS = 20
 const DEFAULT_AGENT_CODE_EXECUTION_BACKEND = "restricted"
 const DEFAULT_AI_GATEWAY_CLIENT_TIMEOUT_MS = 3_600_000
-const DEFAULT_MEMORY_PROVIDER = "disabled"
-const DEFAULT_MEM0_API_URL = "http://localhost:8888"
-const DEFAULT_MEMORY_AGENT_ID = "chloei"
-const DEFAULT_MEMORY_TOP_K = 6
-const DEFAULT_MEMORY_THRESHOLD = 0.1
-const DEFAULT_MEMORY_CONTEXT_MAX_CHARS = 3_000
-const DEFAULT_MEMORY_COMMIT_MAX_CHARS = 12_000
-
-export type MemoryProvider = "disabled" | "mem0"
-
-export interface MemoryRuntimeConfig {
-  provider: MemoryProvider
-  mem0ApiUrl: string
-  mem0ApiKey?: string
-  agentId: string
-  topK: number
-  threshold: number
-  contextMaxChars: number
-  commitMaxChars: number
-}
 
 function parsePositiveIntFromEnv(
   value: string | undefined,
@@ -47,22 +27,6 @@ function parsePositiveIntFromEnv(
   }
 
   const parsed = Number.parseInt(value, 10)
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return fallback
-  }
-
-  return parsed
-}
-
-function parsePositiveNumberFromEnv(
-  value: string | undefined,
-  fallback: number
-): number {
-  if (!value) {
-    return fallback
-  }
-
-  const parsed = Number.parseFloat(value)
   if (!Number.isFinite(parsed) || parsed <= 0) {
     return fallback
   }
@@ -107,37 +71,6 @@ function parseOptionalStringFromEnv(
 ): string | undefined {
   const normalized = value?.trim()
   return normalized && normalized.length > 0 ? normalized : undefined
-}
-
-export function resolveMemoryRuntimeConfig(
-  env: NodeJS.ProcessEnv = process.env
-): MemoryRuntimeConfig {
-  return {
-    provider: parseEnumFromEnv(
-      env.MEMORY_PROVIDER,
-      ["disabled", "mem0"] as const,
-      DEFAULT_MEMORY_PROVIDER
-    ),
-    mem0ApiUrl:
-      parseOptionalStringFromEnv(env.MEM0_API_URL) ?? DEFAULT_MEM0_API_URL,
-    mem0ApiKey: parseOptionalStringFromEnv(env.MEM0_API_KEY),
-    agentId:
-      parseOptionalStringFromEnv(env.MEMORY_AGENT_ID) ??
-      DEFAULT_MEMORY_AGENT_ID,
-    topK: parsePositiveIntFromEnv(env.MEMORY_TOP_K, DEFAULT_MEMORY_TOP_K),
-    threshold: parsePositiveNumberFromEnv(
-      env.MEMORY_THRESHOLD,
-      DEFAULT_MEMORY_THRESHOLD
-    ),
-    contextMaxChars: parsePositiveIntFromEnv(
-      env.MEMORY_CONTEXT_MAX_CHARS,
-      DEFAULT_MEMORY_CONTEXT_MAX_CHARS
-    ),
-    commitMaxChars: parsePositiveIntFromEnv(
-      env.MEMORY_COMMIT_MAX_CHARS,
-      DEFAULT_MEMORY_COMMIT_MAX_CHARS
-    ),
-  }
 }
 
 export const AGENT_MAX_MESSAGES = parsePositiveIntFromEnv(
@@ -219,5 +152,3 @@ export const AGENT_CODE_EXECUTION_PYTHON_VENV_PATH = parseOptionalStringFromEnv(
 export const AGENT_EVAL_RESULTS_DIR = parseOptionalStringFromEnv(
   process.env.AGENT_EVAL_RESULTS_DIR
 )
-
-export const MEMORY_RUNTIME_CONFIG = resolveMemoryRuntimeConfig()

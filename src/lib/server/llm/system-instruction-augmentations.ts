@@ -15,17 +15,16 @@ function buildAiSdkFinanceToolingInstruction(options: {
 }): string {
   return [
     "<ai_sdk_finance_tool_rules>",
-    "- Prefer the normalized `finance_data` tool for structured financial facts such as quotes, company profile data, historical prices, financial statements, SEC company facts, and FRED macro/rates data.",
+    "- Prefer the normalized `finance_data` tool for structured financial facts such as quotes, company profile data, historical prices, financial statements, and SEC company facts.",
     "- When answering provider/capability availability questions, use `finance_data` `provider_status` and do not run follow-up probes for providers reported unavailable.",
-    "- For quote/profile requests, use `finance_data` provider `auto` before search; this uses Yahoo Finance quote data (with Stooq fallback) and SEC company submissions.",
-    "- For statement requests, use `finance_data` `financial_statements` provider `auto` with `statementType` set to `income`, `balance_sheet`, or `cash_flow` before search; this uses SEC company facts for US filers and Yahoo Finance for non-US companies. Use code execution for the arithmetic when margins, growth rates, free cash flow, leverage ratios, or comparisons are requested.",
+    "- For quote/profile requests, use `finance_data` provider `auto` before search; this uses Stooq quote data and SEC company submissions.",
+    "- For statement requests, use `finance_data` `financial_statements` provider `auto` with `statementType` set to `income`, `balance_sheet`, or `cash_flow` before search; this uses SEC company facts. Use code execution for the arithmetic when margins, growth rates, free cash flow, leverage ratios, or comparisons are requested.",
     "- For 10-K/10-Q prompts asking for cash flow, capex, liabilities, debt, assets, equity, or balance-sheet items, call `finance_data` first. The statement result includes SEC company-facts and filing source URLs when available; cite those directly. Search EDGAR pages only for narrative context or facts missing from structured data.",
     options.secFilingsEnabled
       ? "- For filing-specific questions, use `sec_filings` for EDGAR company lookup, filing search, filing document fetch, section extraction, table extraction, and targeted retrieval over filing text. Prefer it over web search for facts inside 10-K, 10-Q, 8-K, proxy, or registration filings."
       : null,
     "- For benchmark-style public-company tasks, gather the filing evidence first, then use `code_execution` for arithmetic that affects the answer.",
     "- Prefer Tavily for fresh web discovery, controlled retrieval, extraction, and clickable inline citations.",
-    "- If Tavily is unavailable, quota-limited, rate-limited, or returns a provider error, use `gateway_web_search` for live web discovery.",
     "- Use code execution only for calculation or validation.",
     "- Use the minimum mix of tools needed, then synthesize the answer around the evidence.",
     "</ai_sdk_finance_tool_rules>",

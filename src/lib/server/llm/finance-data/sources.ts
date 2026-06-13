@@ -1,6 +1,6 @@
 import type { MessageSource } from "@/lib/shared"
 
-type FinanceDataSourceProvider = "sec" | "fred" | "stooq" | "yahoo"
+type FinanceDataSourceProvider = "sec" | "stooq"
 type FinanceDataSourceOperation =
   | "provider_status"
   | "symbol_search"
@@ -9,9 +9,6 @@ type FinanceDataSourceOperation =
   | "historical_prices"
   | "financial_statements"
   | "sec_company_facts"
-  | "fred_series"
-  | "analyst_recommendations"
-  | "options_chain"
 
 function sanitizeSourceUrl(url: URL): string {
   const clone = new URL(url.toString())
@@ -45,14 +42,10 @@ export function createFinanceDataProviderSource(
   const title =
     provider === "stooq"
       ? "Stooq"
-      : provider === "yahoo"
-        ? "Yahoo Finance"
-        : provider === "fred"
-          ? "FRED"
-          : operation === "sec_company_facts" ||
-              operation === "financial_statements"
-            ? "SEC company facts"
-            : "SEC company submissions"
+      : operation === "sec_company_facts" ||
+          operation === "financial_statements"
+        ? "SEC company facts"
+        : "SEC company submissions"
 
   return {
     id: createFinanceDataSourceId([provider, operation], sourceUrl),

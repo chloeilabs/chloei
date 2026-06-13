@@ -15,11 +15,3 @@ export function resolvePromptProvider(model) {
     "moonshotai"
   )
 }
-
-export function inferUserExpertiseFromMemory(memoryContext) {
-  return (
-    getTestMocks().agentPromptSteering?.inferUserExpertiseFromMemory?.(
-      memoryContext
-    ) ?? undefined
-  )
-}

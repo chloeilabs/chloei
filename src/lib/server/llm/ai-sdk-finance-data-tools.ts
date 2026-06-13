@@ -2,10 +2,8 @@ import { tool } from "ai"
 import { z } from "zod"
 
 import { asRecord, asString } from "@/lib/cast"
-import { createLogger } from "@/lib/logger"
 import type { MessageSource, ToolName } from "@/lib/shared"
 
-import { buildFredStatusUrl, buildFredUrl } from "./finance-data/provider-urls"
 import {
   classifyFinanceDataRetry,
   fetchJsonWithRetry,
@@ -26,7 +24,6 @@ import {
   parseStooqHistoricalPricesCsv,
   parseStooqQuoteCsv,
 } from "./finance-data/stooq-provider"
-import { runYahooFinanceOperation } from "./finance-data/yahoo-provider"
 
 const FINANCE_DATA_TOOL_NAME = "finance_data" as const
 const SEC_COMPANY_FACTS_BASE_URL = "https://data.sec.gov/api/xbrl/companyfacts"
@@ -36,7 +33,7 @@ const SEC_COMPANY_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 export { classifyFinanceDataRetry } from "./finance-data/retry"
 
 type FinanceDataToolName = Extract<ToolName, typeof FINANCE_DATA_TOOL_NAME>
-type FinanceDataProvider = "auto" | "sec" | "fred" | "stooq" | "yahoo"
+type FinanceDataProvider = "auto" | "sec" | "stooq"
 type ResolvedFinanceDataProvider = Exclude<FinanceDataProvider, "auto">
 type FinanceDataOperation =
   | "provider_status"
@@ -46,19 +43,9 @@ type FinanceDataOperation =
   | "historical_prices"
   | "financial_statements"
   | "sec_company_facts"
-  | "fred_series"
-  | "analyst_recommendations"
-  | "options_chain"
 
 interface FinanceDataToolConfig {
-  fredApiKey?: string
   secUserAgent?: string
-  /**
-   * Yahoo Finance (no key) is enabled by default. Set false to disable it
-   * (e.g. for stricter terms-of-service posture); quote/historical then fall
-   * back to Stooq and Yahoo-only operations report the provider as disabled.
-   */
-  yahooEnabled?: boolean
   fetchImpl?: typeof fetch
 }
 
@@ -133,8 +120,6 @@ interface AiSdkFinanceDataToolResultMetadata {
   retryable?: boolean
 }
 
-const logger = createLogger("finance-data")
-
 const financeDataInputSchema = z.object({
   operation: z.enum([
     "provider_status",
@@ -144,15 +129,11 @@ const financeDataInputSchema = z.object({
     "historical_prices",
     "financial_statements",
     "sec_company_facts",
-    "fred_series",
-    "analyst_recommendations",
-    "options_chain",
   ]),
-  provider: z.enum(["auto", "sec", "fred", "stooq", "yahoo"]).default("auto"),
+  provider: z.enum(["auto", "sec", "stooq"]).default("auto"),
   query: z.string().trim().min(1).max(500).optional(),
   symbol: z.string().trim().min(1).max(40).optional(),
   cik: z.string().trim().min(1).max(20).optional(),
-  seriesId: z.string().trim().min(1).max(80).optional(),
   statementType: z
     .enum(["income", "balance_sheet", "cash_flow"])
     .default("income")
@@ -221,12 +202,7 @@ function normalizeTickerSymbol(symbol: string): string {
 }
 
 function normalizeProvider(value: unknown): FinanceDataProvider {
-  return value === "sec" ||
-    value === "fred" ||
-    value === "stooq" ||
-    value === "yahoo"
-    ? value
-    : "auto"
+  return value === "sec" || value === "stooq" ? value : "auto"
 }
 
 function resolveProvider(
@@ -241,56 +217,33 @@ function resolveProvider(
     return requestedProvider
   }
 
-  if (input.operation === "sec_company_facts") {
-    return "sec"
-  }
-
-  if (input.operation === "fred_series") {
-    return "fred"
-  }
-
-  // Yahoo (no key) is the default for live quotes/prices and is the only
-  // source for analyst targets and options chains.
-  if (input.operation === "quote") {
-    return "yahoo"
-  }
-
-  if (input.operation === "historical_prices") {
-    return "yahoo"
-  }
-
-  if (
-    input.operation === "analyst_recommendations" ||
-    input.operation === "options_chain"
-  ) {
-    return "yahoo"
-  }
-
-  if (input.operation === "financial_statements") {
-    return "sec"
-  }
-
-  if (input.operation === "company_profile") {
-    return "sec"
+  // Quotes and historical prices come from Stooq (keyless); everything else
+  // is served by SEC/EDGAR.
+  if (input.operation === "quote" || input.operation === "historical_prices") {
+    return "stooq"
   }
 
   return "sec"
 }
 
-/**
- * Where Yahoo falls back when it is unavailable or disabled. Only the
- * price operations have a non-Yahoo equivalent (Stooq); profile/financials
- * are reached via SEC first (so they must NOT loop back to SEC here), and
- * analyst/options have no other source.
- */
-function resolveYahooFallbackProvider(
-  input: FinanceDataToolInput
-): ResolvedFinanceDataProvider | null {
-  if (input.operation === "quote" || input.operation === "historical_prices") {
-    return "stooq"
+function isProviderOperationSupported(
+  provider: ResolvedFinanceDataProvider | "local",
+  operation: FinanceDataOperation
+): boolean {
+  if (provider === "local") {
+    return operation === "provider_status"
   }
 
-  return null
+  if (provider === "stooq") {
+    return operation === "quote" || operation === "historical_prices"
+  }
+
+  return (
+    operation === "symbol_search" ||
+    operation === "company_profile" ||
+    operation === "financial_statements" ||
+    operation === "sec_company_facts"
+  )
 }
 
 function buildSecCompanyFactsUrl(cik: string): URL {
@@ -321,49 +274,6 @@ function buildSecFilingUrl(params: {
 
 function buildSecCompanyTickersUrl(): URL {
   return new URL(SEC_COMPANY_TICKERS_URL)
-}
-
-async function checkJsonProviderStatus(params: {
-  configured: boolean
-  provider: ResolvedFinanceDataProvider
-  operations: FinanceDataOperation[]
-  url?: URL
-  headers?: HeadersInit
-  fetchImpl: typeof fetch
-}): Promise<FinanceProviderStatus> {
-  if (!params.configured || !params.url) {
-    return {
-      configured: false,
-      available: false,
-      operations: params.operations,
-      errorCode: "PROVIDER_NOT_CONFIGURED",
-      message: `${params.provider.toUpperCase()} is not configured.`,
-    }
-  }
-
-  const result = await fetchJsonWithRetry({
-    url: params.url,
-    provider: params.provider,
-    headers: params.headers,
-    fetchImpl: params.fetchImpl,
-    timeoutMs: 5_000,
-  })
-
-  if (result.ok) {
-    return {
-      configured: true,
-      available: true,
-      operations: params.operations,
-    }
-  }
-
-  return {
-    configured: true,
-    available: false,
-    operations: params.operations,
-    errorCode: result.code,
-    message: result.message,
-  }
 }
 
 async function checkTextProviderStatus(params: {
@@ -399,84 +309,27 @@ async function checkTextProviderStatus(params: {
   }
 }
 
-const YAHOO_OPERATIONS: FinanceDataOperation[] = [
-  "quote",
-  "historical_prices",
-  "company_profile",
-  "financial_statements",
-  "symbol_search",
-  "analyst_recommendations",
-  "options_chain",
-]
-
-async function checkYahooProviderStatus(
-  config: FinanceDataToolConfig
-): Promise<FinanceProviderStatus> {
-  if (config.yahooEnabled === false) {
-    return {
-      configured: false,
-      available: false,
-      operations: YAHOO_OPERATIONS,
-      errorCode: "PROVIDER_DISABLED",
-      message: "Yahoo Finance is disabled via configuration.",
-    }
-  }
-
-  try {
-    await runYahooFinanceOperation({ operation: "quote", symbol: "AAPL" })
-    return {
-      configured: true,
-      available: true,
-      operations: YAHOO_OPERATIONS,
-    }
-  } catch (error) {
-    const record = asRecord(error)
-    return {
-      configured: true,
-      available: false,
-      operations: YAHOO_OPERATIONS,
-      errorCode: toOptionalString(record?.code) ?? "YAHOO_REQUEST_FAILED",
-      message:
-        toOptionalString(record?.message) ?? "Yahoo Finance is unavailable.",
-    }
-  }
-}
-
 async function getFinanceProviderStatus(
   config: FinanceDataToolConfig,
   fetchImpl: typeof fetch
 ): Promise<Record<ResolvedFinanceDataProvider, FinanceProviderStatus>> {
-  const fredApiKey = config.fredApiKey?.trim()
-
-  const [fred, stooq, yahoo] = await Promise.all([
-    checkJsonProviderStatus({
-      configured: Boolean(fredApiKey),
-      provider: "fred",
-      operations: ["fred_series"],
-      url: fredApiKey ? buildFredStatusUrl(fredApiKey) : undefined,
-      fetchImpl,
-    }),
-    checkTextProviderStatus({
-      provider: "stooq",
-      operations: ["quote"],
-      url: buildStooqQuoteUrl("AAPL"),
-      fetchImpl,
-      validate: (text) => {
-        try {
-          parseStooqQuoteCsv(text)
-          return true
-        } catch {
-          return false
-        }
-      },
-    }),
-    checkYahooProviderStatus(config),
-  ])
+  const stooq = await checkTextProviderStatus({
+    provider: "stooq",
+    operations: ["quote", "historical_prices"],
+    url: buildStooqQuoteUrl("AAPL"),
+    fetchImpl,
+    validate: (text) => {
+      try {
+        parseStooqQuoteCsv(text)
+        return true
+      } catch {
+        return false
+      }
+    },
+  })
 
   return {
-    fred,
     stooq,
-    yahoo,
     sec: {
       configured: true,
       available: true,
@@ -582,47 +435,23 @@ async function resolveSecCikFromSymbol(config: {
 }
 
 /**
- * Resolve a SEC CIK for a symbol, but when the symbol isn't a US SEC filer
- * (no CIK) fall through to Yahoo Finance — which covers non-US fundamentals
- * the SEC simply does not index. Returns either the SEC resolution or a
- * finished Yahoo result to return directly.
+ * Resolve a SEC CIK for a symbol. Non-US issuers that the SEC does not index
+ * surface a SEC_CIK_NOT_FOUND error to the caller.
  */
-async function resolveSecCikOrYahoo(
+async function resolveSecCik(
   input: FinanceDataToolInput,
   config: FinanceDataToolConfig,
   fetchImpl: typeof fetch
-): Promise<
-  | { fallback: FinanceDataToolResultPayload }
-  | { resolved: Awaited<ReturnType<typeof resolveSecCikFromSymbol>> | null }
-> {
+): Promise<Awaited<ReturnType<typeof resolveSecCikFromSymbol>> | null> {
   if (input.cik) {
-    return { resolved: null }
+    return null
   }
 
-  try {
-    const resolved = await resolveSecCikFromSymbol({
-      symbol: requireField(input, "symbol"),
-      fetchImpl,
-      secUserAgent: config.secUserAgent,
-    })
-    return { resolved }
-  } catch (error) {
-    const code = toOptionalString(asRecord(error)?.code)
-    if (
-      code === "SEC_CIK_NOT_FOUND" &&
-      config.yahooEnabled !== false &&
-      input.symbol
-    ) {
-      return {
-        fallback: await runFinanceDataOperation(
-          { ...input, provider: "yahoo" },
-          config
-        ),
-      }
-    }
-
-    throw error
-  }
+  return resolveSecCikFromSymbol({
+    symbol: requireField(input, "symbol"),
+    fetchImpl,
+    secUserAgent: config.secUserAgent,
+  })
 }
 
 function summarizeLatestSecFiling(params: {
@@ -770,6 +599,20 @@ export async function runFinanceDataOperation(
   const fetchImpl = config.fetchImpl ?? fetch
   const provider = resolveProvider(input)
 
+  if (!isProviderOperationSupported(provider, input.operation)) {
+    return {
+      error: {
+        message: `${input.operation} is not supported by the ${provider} provider.`,
+        code: "OPERATION_UNSUPPORTED",
+        operation: input.operation,
+        provider,
+        retryable: false,
+        attempts: 0,
+        durationMs: Date.now() - startedAt,
+      },
+    }
+  }
+
   if (provider === "local") {
     const status = await getFinanceProviderStatus(config, fetchImpl)
     return {
@@ -785,57 +628,6 @@ export async function runFinanceDataOperation(
   }
 
   try {
-    if (provider === "fred") {
-      const apiKey = config.fredApiKey?.trim()
-      if (!apiKey) {
-        throw Object.assign(new Error("FRED API key is not configured."), {
-          code: "PROVIDER_UNAVAILABLE",
-          retryable: false,
-        })
-      }
-      const url = buildFredUrl(input, apiKey)
-      const response = await fetchJsonWithRetry({
-        url,
-        provider,
-        fetchImpl,
-      })
-      const durationMs = Date.now() - startedAt
-
-      if (!response.ok) {
-        logger.warn("Finance data provider request failed.", {
-          durationMs,
-          errorCode: response.code,
-          outcome: "provider_error",
-          provider,
-        })
-
-        return {
-          error: {
-            message: response.message,
-            code: response.code,
-            operation: input.operation,
-            provider,
-            retryable: response.retryable,
-            attempts: response.attempts,
-            durationMs,
-          },
-        }
-      }
-
-      const source = createProviderSource(provider, input.operation, url)
-      return {
-        output: {
-          operation: input.operation,
-          provider,
-          data: response.data,
-          sources: [source],
-          durationMs,
-          attempts: response.attempts,
-          requestUrl: source.url,
-        },
-      }
-    }
-
     if (provider === "stooq") {
       if (
         input.operation !== "quote" &&
@@ -893,77 +685,6 @@ export async function runFinanceDataOperation(
       }
     }
 
-    if (provider === "yahoo") {
-      if (config.yahooEnabled === false) {
-        const fallbackProvider = resolveYahooFallbackProvider(input)
-        if (fallbackProvider) {
-          return await runFinanceDataOperation(
-            { ...input, provider: fallbackProvider },
-            config
-          )
-        }
-
-        return {
-          error: {
-            message: "Yahoo Finance provider is disabled.",
-            code: "PROVIDER_DISABLED",
-            operation: input.operation,
-            provider,
-            retryable: false,
-            attempts: 0,
-            durationMs: Date.now() - startedAt,
-          },
-        }
-      }
-
-      try {
-        const result = await runYahooFinanceOperation(input)
-        return {
-          output: {
-            operation: input.operation,
-            provider,
-            data: result.data,
-            sources: [result.source],
-            durationMs: Date.now() - startedAt,
-            attempts: 1,
-            requestUrl: result.source.url,
-          },
-        }
-      } catch (error) {
-        const record = asRecord(error)
-        const code = toOptionalString(record?.code) ?? "YAHOO_REQUEST_FAILED"
-        const retryable =
-          typeof record?.retryable === "boolean"
-            ? record.retryable
-            : classifyFinanceDataRetry({ code })
-        const fallbackProvider = resolveYahooFallbackProvider(input)
-        if (
-          fallbackProvider &&
-          code !== "INVALID_INPUT" &&
-          code !== "OPERATION_UNSUPPORTED"
-        ) {
-          return await runFinanceDataOperation(
-            { ...input, provider: fallbackProvider },
-            config
-          )
-        }
-
-        return {
-          error: {
-            message:
-              toOptionalString(record?.message) ??
-              "Yahoo Finance request failed.",
-            code,
-            operation: input.operation,
-            provider,
-            retryable,
-            attempts: 1,
-            durationMs: Date.now() - startedAt,
-          },
-        }
-      }
-    }
-
     if (input.operation === "symbol_search") {
       const query = requireField(input, "query").toLowerCase()
       const { rows, url, attempts } = await fetchSecTickerRows({
@@ -993,11 +714,7 @@ export async function runFinanceDataOperation(
     }
 
     if (input.operation === "company_profile") {
-      const secResolution = await resolveSecCikOrYahoo(input, config, fetchImpl)
-      if ("fallback" in secResolution) {
-        return secResolution.fallback
-      }
-      const resolved = secResolution.resolved
+      const resolved = await resolveSecCik(input, config, fetchImpl)
       const cik = input.cik ?? resolved?.cik
       if (!cik) {
         throw Object.assign(
@@ -1050,11 +767,7 @@ export async function runFinanceDataOperation(
     }
 
     if (input.operation === "financial_statements") {
-      const secResolution = await resolveSecCikOrYahoo(input, config, fetchImpl)
-      if ("fallback" in secResolution) {
-        return secResolution.fallback
-      }
-      const resolved = secResolution.resolved
+      const resolved = await resolveSecCik(input, config, fetchImpl)
       const cik = input.cik ?? resolved?.cik
       if (!cik) {
         throw Object.assign(
@@ -1785,7 +1498,7 @@ export function createAiSdkFinanceDataTools(
   return {
     finance_data: tool({
       description:
-        "Retrieve normalized finance data for broad-market analysis. Use provider_status first when the user asks what providers or capabilities are available; do not probe individual operations to determine availability after provider_status reports a provider unavailable. Use for company/symbol search, quotes, company profiles, historical prices, financial statements (US filers via SEC, non-US companies via Yahoo Finance), SEC company facts, FRED macro/rates series, analyst recommendations and price targets, options chains, and provider status checks. Quotes, historical prices, analyst targets, and options chains come from Yahoo Finance, which needs no key but is supplementary—prefer SEC figures for citation-grade or high-stakes claims. Use web search for market news and use code execution for calculations.",
+        "Retrieve normalized finance data for broad-market analysis. Use provider_status first when the user asks what providers or capabilities are available; do not probe individual operations to determine availability after provider_status reports a provider unavailable. Use for company/symbol search, quotes, company profiles, historical prices, financial statements, SEC company facts, and provider status checks. Quotes and historical prices come from Stooq (keyless, delayed); company profiles, financial statements, SEC company facts, and symbol search come from SEC/EDGAR and are citation-grade. Use web search for market news and use code execution for calculations.",
       inputSchema: financeDataInputSchema,
       execute: async (input) => runFinanceDataOperation(input, config),
     }),
@@ -1818,7 +1531,6 @@ export function getAiSdkFinanceDataToolCallMetadata(
     toOptionalString(inputRecord?.query),
     toOptionalString(inputRecord?.symbol),
     toOptionalString(inputRecord?.cik),
-    toOptionalString(inputRecord?.seriesId),
     toOptionalString(inputRecord?.statementType),
     toOptionalString(inputRecord?.period),
     toOptionalString(inputRecord?.from),

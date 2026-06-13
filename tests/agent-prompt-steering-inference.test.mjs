@@ -10,11 +10,9 @@ const steeringUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/agent-prompt-steering.ts")
 ).href
 
-const {
-  createPromptSteeringBlocks,
-  inferPromptTaskMode,
-  inferUserExpertiseFromMemory,
-} = await import(steeringUrl)
+const { createPromptSteeringBlocks, inferPromptTaskMode } = await import(
+  steeringUrl
+)
 
 function user(content) {
   return [{ role: "user", content }]
@@ -213,45 +211,6 @@ test("inferPromptTaskMode userExpertise=writing routes ambiguous prompts to writ
     }),
     "writing"
   )
-})
-
-test("inferUserExpertiseFromMemory picks up finance role tags", () => {
-  assert.equal(
-    inferUserExpertiseFromMemory(
-      "The user is a senior equity research analyst at a sell-side bank."
-    ),
-    "finance"
-  )
-  assert.equal(
-    inferUserExpertiseFromMemory(
-      "User mentioned they passed CFA Level 2 last year."
-    ),
-    "finance"
-  )
-})
-
-test("inferUserExpertiseFromMemory picks up engineering and writing roles", () => {
-  assert.equal(
-    inferUserExpertiseFromMemory(
-      "User is a backend engineer at a fintech startup."
-    ),
-    "engineering"
-  )
-  assert.equal(
-    inferUserExpertiseFromMemory(
-      "Prefers concise drafts. User is a technical writer who edits docs daily."
-    ),
-    "writing"
-  )
-})
-
-test("inferUserExpertiseFromMemory returns undefined for unrelated memory", () => {
-  assert.equal(
-    inferUserExpertiseFromMemory("User likes spicy food and dark mode."),
-    undefined
-  )
-  assert.equal(inferUserExpertiseFromMemory(undefined), undefined)
-  assert.equal(inferUserExpertiseFromMemory(""), undefined)
 })
 
 test("provider overlays are differentiated across providers", () => {

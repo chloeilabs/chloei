@@ -70,24 +70,10 @@ const CLOSED_ANSWER_PATTERN =
 const STRICT_OUTPUT_PATTERN =
   /\b(return only|exactly|exact format|valid json|minified json|last line|single word|one word|single line|one line|two sentences|one sentence|one paragraph|no more than|under \d+ words|no surrounding prose|only one ```|schema|yaml|xml|csv)\b/i
 
-// Long-term memory often surfaces user-expertise tags the model has previously
-// committed about the user. We extract a coarse hint here to bias borderline
-// task-mode classifications.
-const USER_EXPERTISE_PATTERNS: Record<UserExpertiseHint, RegExp> = {
-  finance:
-    /\b(finance|financial)\s+(analyst|engineer|professional|background)|\b(portfolio manager|fund manager|trader|investment banker|cfa|equity research|sell-?side|buy-?side|fp&a)\b/i,
-  engineering:
-    /\b(software|backend|frontend|full-?stack|systems?|platform|infrastructure|devops|sre|data)\s+engineer|\b(developer|programmer|engineer at|technical lead|cto)\b/i,
-  writing:
-    /\b(writer|editor|journalist|copywriter|content strategist|technical writer|author)\b/i,
-  research:
-    /\b(researcher|research scientist|phd candidate|academic|professor)\b/i,
-}
-
 const PROVIDER_OVERLAYS: Record<PromptProvider, string> = {
   alibaba: `
 Use Qwen reasoning mode efficiently.
-- Take advantage of the long context window: skim and cite earlier turns and retrieved memory before re-asking the user for information already present.
+- Take advantage of the long context window: skim and cite earlier turns before re-asking the user for information already present.
 - Prefer direct execution and verification over speculative narration.
 - On format-sensitive tasks, do a literal final-format check before finishing.
 - Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
@@ -103,7 +89,7 @@ Use Gemini reasoning mode efficiently.
 `.trim(),
   moonshotai: `
 Use Kimi reasoning mode efficiently.
-- Take advantage of the long context window: skim and cite earlier turns and retrieved memory before re-asking the user for information already present.
+- Take advantage of the long context window: skim and cite earlier turns before re-asking the user for information already present.
 - Prefer direct execution and verification over speculative narration.
 - On format-sensitive tasks, do a literal final-format check before finishing.
 - Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
@@ -163,8 +149,8 @@ This request is a writing/editing task.
 This request is finance-analysis work.
 - Prefer structured finance tools for market data, company facts, filings, statements, historical prices, macro/rates, FX, and crypto where available.
 - When the user asks what finance providers or capabilities are available, call \`finance_data\` with \`provider_status\` and answer from that status. Do not run representative data probes after a provider is reported unavailable.
-- For ordinary public-company quote/profile requests, use \`finance_data\` with provider \`auto\`: quote resolves to Yahoo Finance with a Stooq fallback and company_profile resolves to SEC submissions. Do not use Tavily or web search for quote/profile while these structured fallbacks are available.
-- For public-company statements, use \`finance_data\` \`financial_statements\` with provider \`auto\` and the requested \`statementType\` (\`income\`, \`balance_sheet\`, or \`cash_flow\`); this resolves to SEC company facts for US filers and Yahoo Finance for non-US companies. If margins, growth rates, free cash flow, leverage ratios, or comparisons are requested, run \`code_execution\` to verify the arithmetic.
+- For ordinary public-company quote/profile requests, use \`finance_data\` with provider \`auto\`: quote resolves to Stooq and company_profile resolves to SEC submissions. Do not use Tavily or web search for quote/profile while these structured tools are available.
+- For public-company statements, use \`finance_data\` \`financial_statements\` with provider \`auto\` and the requested \`statementType\` (\`income\`, \`balance_sheet\`, or \`cash_flow\`); this resolves to SEC company facts. If margins, growth rates, free cash flow, leverage ratios, or comparisons are requested, run \`code_execution\` to verify the arithmetic.
 - For 10-K/10-Q prompts asking for cash flow, capex, liabilities, debt, assets, equity, or balance-sheet items, call \`finance_data\` first instead of searching EDGAR pages. The statement result includes SEC company-facts and filing source URLs when available; cite those directly. Use search only for narrative filing excerpts or facts not present in structured data.
 - For filing-specific public-company questions, use \`sec_filings\` for EDGAR company lookup, filing search, full document fetch, section extraction, table extraction, and targeted retrieval over filing text.
 - Use search or extraction for market news, unsupported assets, methodology checks, or source-backed claims that structured tools do not cover.
@@ -175,7 +161,7 @@ This request is finance-analysis work.
 - Stay on the finance task. Do not narrate unrelated wording, country-name, or language-usage considerations.
 - Mirror the user's exact terminology in your final answer. If they asked about "operating margin", "CET1", "net interest income", "cash flow from operations", or "capital and exploration expenditures", use those exact phrases — do not paraphrase to synonyms a grader or screen-reader would miss.
 - For multi-period comparisons ("compare X across the last N fiscal years", "show the 3-year trend"), call \`finance_data\` with \`sec_company_facts\` once — it returns the full multi-period timeseries — then compute the comparison in \`code_execution\`. Do not make N separate \`financial_statements\` calls for the same metric across N periods.
-- Do not re-search the web (Tavily, gateway_web_search) for data you already have from \`sec_filings\` or \`finance_data\`. Pick one structured source per metric; web search is for narrative or non-structured context only.
+- Do not re-search the web (Tavily) for data you already have from \`sec_filings\` or \`finance_data\`. Pick one structured source per metric; web search is for narrative or non-structured context only.
 - Never finish your turn with no text. After gathering evidence, you must write the synthesis: numbers, terminology, citations, and a brief takeaway. If evidence is partial or contradictory, name what you found and what is missing — silence is a worse failure than an incomplete answer.
 `.trim(),
   research: `
@@ -217,25 +203,6 @@ export function resolvePromptProvider(model: ModelType): PromptProvider {
   }
 
   throw new Error(`Unsupported model provider for model: ${model}`)
-}
-
-export function inferUserExpertiseFromMemory(
-  memoryContext: string | undefined | null
-): UserExpertiseHint | undefined {
-  if (!memoryContext) {
-    return undefined
-  }
-
-  for (const [hint, pattern] of Object.entries(USER_EXPERTISE_PATTERNS) as [
-    UserExpertiseHint,
-    RegExp,
-  ][]) {
-    if (pattern.test(memoryContext)) {
-      return hint
-    }
-  }
-
-  return undefined
 }
 
 function detectFinanceAnalysis(text: string): boolean {
