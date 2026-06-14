@@ -28,7 +28,6 @@
     "@ai-sdk/gateway": "^3.0.112",
     "@base-ui/react": "^1.4.1",
     "@napi-rs/canvas": "0.1.80",
-    "@tanstack/react-query": "^5.100.9",
     "@tavily/core": "^0.7.3",
     "@vercel/analytics": "^2.0.1",
     "@vercel/blob": "^2.3.3",
