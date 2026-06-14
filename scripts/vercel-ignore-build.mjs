@@ -17,7 +17,6 @@ const skipPrefixes = [
   ".github/",
   "dist/",
   "docs/",
-  "evals/",
   "test-results/",
   "tests/",
 ]
@@ -66,6 +65,6 @@ if (webRelevantFiles.length > 0) {
 }
 
 console.log(
-  "Skipping Vercel build because only docs, eval, test, or tooling files changed."
+  "Skipping Vercel build because only docs, test, or tooling files changed."
 )
 process.exit(0)

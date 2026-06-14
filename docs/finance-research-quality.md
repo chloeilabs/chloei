@@ -1,6 +1,6 @@
 # Finance Research Quality Checklist
 
-Use this checklist for public-markets finance-agent runs and live eval review.
+Use this checklist for public-markets finance-agent runs.
 
 ## Required Evidence
 
@@ -42,4 +42,4 @@ Use this checklist for public-markets finance-agent runs and live eval review.
 - SEC tool calls stay on the intended accession after the filing is selected.
 - Recoverable tool retries do not dominate the visible activity timeline.
 - Numeric answers either cite reported values or show deterministic calculations.
-- Fixture evals pass, and the live public-markets eval suite is run before finance-runtime releases.
+- Run this checklist against representative public-markets prompts before finance-runtime releases.

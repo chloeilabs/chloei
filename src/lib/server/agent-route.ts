@@ -241,10 +241,7 @@ function shouldIncludeFinanceToolingInstruction(
 function shouldIncludeSecFilingsToolingInstruction(
   runtimeProfile: AgentRuntimeProfileId | undefined
 ): boolean {
-  return (
-    runtimeProfile === "finance_analysis" ||
-    runtimeProfile === "gdpval_workspace"
-  )
+  return runtimeProfile === "finance_analysis"
 }
 
 function isProviderAuthenticationError(error: unknown): boolean {

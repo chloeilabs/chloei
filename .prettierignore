@@ -10,5 +10,3 @@ pnpm-lock.yaml
 __pycache__/
 .venv/
 tradingagents-service/.venv/
-evals/finance/cache/
-evals/finance/results/

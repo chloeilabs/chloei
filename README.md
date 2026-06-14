@@ -9,7 +9,6 @@ Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently expose
 - **[docs/vercel-production-launch-readiness.md](docs/vercel-production-launch-readiness.md)** — production launch checklist (security, reliability, performance, rollback).
 - **[docs/managed-integrations-rollout.md](docs/managed-integrations-rollout.md)** — managed-integration rollout/rollback runbook (Neon, Inngest, feature flags).
 - **[docs/finance-research-quality.md](docs/finance-research-quality.md)** — quality checklist for public-markets finance-agent runs.
-- **[evals/finance/README.md](evals/finance/README.md)** — finance benchmark harness.
 - **[tradingagents-service/README.md](tradingagents-service/README.md)** — the Trading Desk Python sidecar.
 
 ## Requirements
@@ -62,10 +61,6 @@ pnpm exec playwright install --with-deps chromium
 - `pnpm test:smoke`: run opt-in Playwright browser smoke tests against `SMOKE_BASE_URL`
 - `pnpm test:smoke:mock`: run the credential-free mocked Playwright smoke test used by CI
 - `pnpm test:smoke:mock:build`: build the production app, then run the credential-free mocked smoke test
-- `pnpm eval:finance`: run the finance benchmark harness in fixture mode
-- `pnpm eval:finance -- --mode live`: run the live finance-agent harness against AI Gateway
-- `pnpm eval:finance:live`: run the live public-markets finance acceptance suite
-- `pnpm eval:finance:grade`: grade finance benchmark outputs
 - `pnpm inngest:smoke`: send one no-op `ops/inngest.smoke` event to Inngest
 - `pnpm lint`: run blocking ESLint checks
 - `pnpm lint:fix`: apply autofixable ESLint changes
@@ -148,7 +143,6 @@ Agent request limits, timeouts, tool-step budgets, and the rate-limit window/con
 - `/`, `/api/agent`, and `/api/models` require an authenticated Better Auth session.
 - `finance_data` normalizes finance operations across SEC public company facts and Stooq, with quotes and historical prices from Stooq and company profiles, financial statements, SEC company facts, and symbol search from SEC/EDGAR.
 - `sec_filings` is available when a normal chat or Research request is inferred as finance-analysis work, covering SEC/EDGAR company lookup, filing search, full filing fetches, section extraction, table extraction, and targeted retrieval over filing text.
-- Finance eval fixtures, the live public-markets acceptance suite, live-agent eval mode, and GDPval-style harness scripts live in `evals/finance`.
 - To share logins with another Chloei app, point both apps at the same Better Auth database and secret, set `BETTER_AUTH_COOKIE_DOMAIN` to the shared parent domain, and include every live subdomain in `BETTER_AUTH_TRUSTED_ORIGINS`.
 - Rate limiting and concurrency protection are PostgreSQL-backed when `DATABASE_URL` is configured. Local/no-database runs fall back to in-memory limits unless `AGENT_RATE_LIMIT_STORE=postgres` is set.
 - App storage does not self-initialize on live requests. Vercel deployments in this repo run `pnpm migrate` before `next build`.
