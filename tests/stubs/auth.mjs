@@ -4,6 +4,10 @@ export function isAuthConfigured() {
   return getTestMocks().auth?.isAuthConfigured?.() ?? true
 }
 
+export function getAuthOrNull() {
+  return getTestMocks().auth?.getAuthOrNull?.() ?? null
+}
+
 export function createAuthUnavailableResponse(headers) {
   const customResponse =
     getTestMocks().auth?.createAuthUnavailableResponse?.(headers)
