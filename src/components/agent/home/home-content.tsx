@@ -36,7 +36,6 @@ import {
 } from "@/lib/shared"
 import { cn } from "@/lib/utils"
 
-import { TradingDeskNavButton } from "../../trading-desk-nav-button"
 import { PromptForm } from "../prompt-form/prompt-form"
 import { ScrollToBottom } from "./scroll-to-bottom"
 import { useThreadStoreContext } from "./thread-store-context"
@@ -369,8 +368,6 @@ export function HomePageContent({
                 </TooltipContent>
               </Tooltip>
             ) : null}
-
-            <TradingDeskNavButton />
           </div>
         </div>
 

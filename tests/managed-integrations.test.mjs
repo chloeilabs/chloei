@@ -30,13 +30,6 @@ const pdfTextExtractionUrl = pathToFileURL(
 const integrationFlagsUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/integration-flags.ts")
 ).href
-const inngestEnvironmentUrl = pathToFileURL(
-  path.join(cwd, "src/lib/server/inngest/environment.ts")
-).href
-const inngestFunctionsPath = path.join(
-  cwd,
-  "src/lib/server/inngest/functions.ts"
-)
 
 const {
   buildAuthenticatedPrivateBlobDownloadUrl,
@@ -52,13 +45,6 @@ const {
   toEdgeConfigFlagKey,
   toVercelFlagSlug,
 } = await import(integrationFlagsUrl)
-const {
-  applyInngestEnvironmentInferenceOverrides,
-  resolveInngestEnvironmentInferenceOverrides,
-  resolveInngestEnvironmentName,
-  shouldRunInngestInlineFallback,
-  shouldSendInngestEvents,
-} = await import(inngestEnvironmentUrl)
 
 test("private Blob path helpers keep downloads user-scoped", () => {
   const attachmentId = "01989a40-465d-45c2-8506-b8ddb940b9ad"
@@ -221,25 +207,6 @@ test("integration boolean flags can read Edge Config map shape", async () => {
   }
 })
 
-test("Inngest inline fallback covers trading routes", () => {
-  assert.equal(shouldRunInngestInlineFallback({}), false)
-  assert.equal(
-    shouldRunInngestInlineFallback({ INNGEST_INLINE_FALLBACK: "true" }),
-    true
-  )
-
-  const tradingJobRouteSource = readFileSync(
-    path.join(cwd, "src/app/api/trading-desk/jobs/route.ts"),
-    "utf8"
-  )
-  assert.match(tradingJobRouteSource, /TRADING_DESK_JOB_INLINE_FALLBACK/)
-  assert.match(tradingJobRouteSource, /shouldSendInngestEvents/)
-  assert.match(
-    tradingJobRouteSource,
-    /shouldRunInngestInlineFallback\(\) \|\| !shouldSendInngestEvents\(\)/
-  )
-})
-
 test("private upload route validates client-supplied attachment ids", () => {
   const source = readFileSync(
     path.join(cwd, "src/app/api/uploads/route.ts"),
@@ -320,185 +287,4 @@ test("private blob uploads return authenticated app download URLs", () => {
     /buildAuthenticatedPrivateBlobDownloadUrl\(result\.pathname\)/
   )
   assert.doesNotMatch(source, /downloadUrl: result\.downloadUrl/)
-})
-
-test("Inngest environment resolver uses explicit and branch names", () => {
-  assert.equal(
-    resolveInngestEnvironmentName({
-      INNGEST_ENV: "preview-a",
-      VERCEL_ENV: "production",
-      VERCEL_GIT_COMMIT_REF: "main",
-    }),
-    "preview-a"
-  )
-  assert.equal(
-    resolveInngestEnvironmentName({
-      VERCEL_ENV: "production",
-      VERCEL_GIT_COMMIT_REF: "main",
-    }),
-    undefined
-  )
-  assert.equal(
-    resolveInngestEnvironmentName({
-      VERCEL_GIT_COMMIT_REF: "main",
-      VERCEL_GIT_PRODUCTION_BRANCH: "main",
-    }),
-    undefined
-  )
-  assert.equal(
-    resolveInngestEnvironmentName({
-      BRANCH_NAME: "main",
-      VERCEL_GIT_PRODUCTION_BRANCH: "main",
-    }),
-    undefined
-  )
-  assert.equal(
-    resolveInngestEnvironmentName({
-      VERCEL_ENV: "preview",
-      VERCEL_GIT_COMMIT_REF: "main",
-      VERCEL_GIT_PRODUCTION_BRANCH: "main",
-    }),
-    undefined
-  )
-  assert.equal(
-    resolveInngestEnvironmentName({
-      VERCEL_ENV: "preview",
-      VERCEL_GIT_COMMIT_REF: "feature/chloei",
-      VERCEL_GIT_PRODUCTION_BRANCH: "main",
-    }),
-    "feature/chloei"
-  )
-  assert.equal(
-    resolveInngestEnvironmentName({
-      VERCEL_TARGET_ENV: "production",
-      VERCEL_GIT_COMMIT_REF: "main",
-    }),
-    undefined
-  )
-  assert.equal(
-    resolveInngestEnvironmentName({
-      VERCEL_TARGET_ENV: "preview",
-      VERCEL_GIT_COMMIT_REF: "main",
-      VERCEL_GIT_PRODUCTION_BRANCH: "main",
-    }),
-    undefined
-  )
-  assert.equal(
-    resolveInngestEnvironmentName({
-      VERCEL_TARGET_ENV: "preview",
-      VERCEL_GIT_COMMIT_REF: "feature/chloei",
-      VERCEL_GIT_PRODUCTION_BRANCH: "main",
-    }),
-    "feature/chloei"
-  )
-  assert.equal(resolveInngestEnvironmentName({}), undefined)
-  assert.equal(resolveInngestEnvironmentName({ VERCEL: "1" }), undefined)
-})
-
-test("Inngest environment overrides disable SDK production branch inference", () => {
-  assert.deepEqual(
-    resolveInngestEnvironmentInferenceOverrides({
-      VERCEL_GIT_COMMIT_REF: "main",
-      VERCEL_GIT_PRODUCTION_BRANCH: "main",
-    }),
-    {
-      BRANCH_NAME: undefined,
-      INNGEST_ENV: undefined,
-      VERCEL_GIT_COMMIT_REF: undefined,
-    }
-  )
-  assert.deepEqual(
-    resolveInngestEnvironmentInferenceOverrides({
-      BRANCH_NAME: "main",
-      VERCEL_GIT_PRODUCTION_BRANCH: "main",
-    }),
-    {
-      BRANCH_NAME: undefined,
-      INNGEST_ENV: undefined,
-      VERCEL_GIT_COMMIT_REF: undefined,
-    }
-  )
-  assert.equal(
-    resolveInngestEnvironmentInferenceOverrides({
-      VERCEL_GIT_COMMIT_REF: "feature/chloei",
-      VERCEL_GIT_PRODUCTION_BRANCH: "main",
-    }),
-    undefined
-  )
-  assert.deepEqual(resolveInngestEnvironmentInferenceOverrides({}), {
-    BRANCH_NAME: undefined,
-    INNGEST_ENV: undefined,
-    VERCEL_GIT_COMMIT_REF: undefined,
-  })
-})
-
-test("Inngest environment override application clears production branch vars", () => {
-  const productionEnv = {
-    BRANCH_NAME: "main",
-    VERCEL_ENV: "production",
-    VERCEL_GIT_COMMIT_REF: "main",
-    VERCEL_GIT_PRODUCTION_BRANCH: "main",
-  }
-
-  assert.deepEqual(applyInngestEnvironmentInferenceOverrides(productionEnv), {
-    BRANCH_NAME: undefined,
-    INNGEST_ENV: undefined,
-    VERCEL_GIT_COMMIT_REF: undefined,
-  })
-  assert.equal(productionEnv.BRANCH_NAME, undefined)
-  assert.equal(productionEnv.VERCEL_GIT_COMMIT_REF, undefined)
-  assert.equal(productionEnv.VERCEL_ENV, "production")
-  assert.equal(productionEnv.VERCEL_GIT_PRODUCTION_BRANCH, "main")
-
-  const branchEnv = {
-    VERCEL_ENV: "preview",
-    VERCEL_GIT_COMMIT_REF: "feature/chloei",
-    VERCEL_GIT_PRODUCTION_BRANCH: "main",
-  }
-  assert.equal(applyInngestEnvironmentInferenceOverrides(branchEnv), undefined)
-  assert.equal(branchEnv.VERCEL_GIT_COMMIT_REF, "feature/chloei")
-})
-
-test("Inngest event sender requires a key and known environment", () => {
-  assert.equal(shouldSendInngestEvents({}), false)
-  assert.equal(
-    shouldSendInngestEvents({
-      INNGEST_EVENT_KEY: "event-key",
-    }),
-    false
-  )
-  assert.equal(
-    shouldSendInngestEvents({
-      INNGEST_EVENT_KEY: "event-key",
-      INNGEST_ENV: "preview-a",
-    }),
-    true
-  )
-  assert.equal(
-    shouldSendInngestEvents({
-      INNGEST_EVENT_KEY: "event-key",
-      VERCEL: "1",
-    }),
-    true
-  )
-  assert.equal(
-    shouldSendInngestEvents({
-      INNGEST_EVENT_KEY: "event-key",
-      INNGEST_DEV: "true",
-    }),
-    true
-  )
-})
-
-test("Inngest registers a side-effect-free ops smoke function", () => {
-  const source = readFileSync(inngestFunctionsPath, "utf8")
-
-  assert.match(source, /export const opsInngestSmoke = inngest\.createFunction/)
-  assert.match(source, /id: "ops-inngest-smoke"/)
-  assert.match(source, /event: "ops\/inngest\.smoke"/)
-  assert.match(source, /step\.run\("record-smoke"/)
-  assert.match(
-    source,
-    /export const inngestFunctions = \[[\s\S]*opsInngestSmoke[\s\S]*\]/
-  )
 })

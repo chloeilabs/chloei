@@ -46,7 +46,7 @@ Escalation paths:
 
 - Engineering owner: on-call engineer for the active release.
 - Business owner: Chloei Labs launch owner.
-- Vendor paths: Vercel dashboard and support for platform incidents (including runtime logs and Observability), Neon dashboard/support for database incidents, Inngest for background jobs, AI Gateway/provider dashboard for model failures.
+- Vendor paths: Vercel dashboard and support for platform incidents (including runtime logs and Observability), Neon dashboard/support for database incidents, AI Gateway/provider dashboard for model failures.
 
 Communication channels:
 

@@ -1,15 +1,14 @@
 # Chloei
 
-Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently exposes a curated model selector that defaults to Qwen 3.7 Max and also includes Kimi K2.6 and MiMo V2.5 Pro, routes Research mode to Qwen 3.7 Max with a dedicated Deep Research instruction template, and offers private Blob-backed file attachments, local code execution, optional Tavily retrieval, optional Inngest jobs, normalized finance data, SEC/EDGAR filing retrieval, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
+Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently exposes a curated model selector that defaults to Qwen 3.7 Max and also includes Kimi K2.6 and MiMo V2.5 Pro, routes Research mode to Qwen 3.7 Max with a dedicated Deep Research instruction template, and offers private Blob-backed file attachments, local code execution, optional Tavily retrieval, normalized finance data, SEC/EDGAR filing retrieval, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
 
 ## Documentation
 
 - **[CLAUDE.md](CLAUDE.md)** — architecture reference and conventions (request flow, agent runtime, tools, storage, auth, env vars). The best starting point for understanding the codebase; also read by Claude Code.
 - **[AGENTS.md](AGENTS.md)** — environment setup for coding agents (Cursor Cloud specifics, build/test commands, gotchas).
 - **[docs/vercel-production-launch-readiness.md](docs/vercel-production-launch-readiness.md)** — production launch checklist (security, reliability, performance, rollback).
-- **[docs/managed-integrations-rollout.md](docs/managed-integrations-rollout.md)** — managed-integration rollout/rollback runbook (Neon, Inngest, feature flags).
+- **[docs/managed-integrations-rollout.md](docs/managed-integrations-rollout.md)** — managed-integration rollout/rollback runbook (Neon, feature flags).
 - **[docs/finance-research-quality.md](docs/finance-research-quality.md)** — quality checklist for public-markets finance-agent runs.
-- **[tradingagents-service/README.md](tradingagents-service/README.md)** — the Trading Desk Python sidecar.
 
 ## Requirements
 
@@ -61,7 +60,6 @@ pnpm exec playwright install --with-deps chromium
 - `pnpm test:smoke`: run opt-in Playwright browser smoke tests against `SMOKE_BASE_URL`
 - `pnpm test:smoke:mock`: run the credential-free mocked Playwright smoke test used by CI
 - `pnpm test:smoke:mock:build`: build the production app, then run the credential-free mocked smoke test
-- `pnpm inngest:smoke`: send one no-op `ops/inngest.smoke` event to Inngest
 - `pnpm lint`: run blocking ESLint checks
 - `pnpm lint:fix`: apply autofixable ESLint changes
 - `pnpm format`: write Prettier formatting changes
@@ -79,31 +77,6 @@ pnpm exec playwright install --with-deps chromium
 
 Managed integration rollout, rollback, duplicate-cleanup, and smoke-test steps live in [docs/managed-integrations-rollout.md](docs/managed-integrations-rollout.md). Public-markets finance answer quality checks live in [docs/finance-research-quality.md](docs/finance-research-quality.md).
 
-## Trading Desk
-
-The **Trading Desk** (`/trading-desk`) runs a full multi-agent equity analysis powered by the [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents) framework: market / sentiment / news / fundamentals analysts, a bull-vs-bear research debate, a trader, a three-way risk committee, and a portfolio manager that returns a `Buy / Overweight / Hold / Underweight / Sell` decision. The page streams each agent's status, every report section, the debates, and the final call live.
-
-TradingAgents is Python + LangGraph and a run takes ~1–3 minutes, so it cannot run inside Next.js/Vercel functions. It runs as a separate FastAPI sidecar under [`tradingagents-service/`](tradingagents-service/). Chloei calls that service server-side from `/api/trading-desk/analyze` (auth + rate limited), transforms its SSE into NDJSON, and streams it to the browser. By default the service routes every agent's LLM calls through the same Vercel AI Gateway key the chat app uses.
-
-Run it locally:
-
-```bash
-# 1. Start the sidecar (see tradingagents-service/README.md for details)
-cd tradingagents-service
-cp .env.example .env          # set AI_GATEWAY_API_KEY; or TRADINGAGENTS_MOCK=1 to try it keyless
-docker compose up --build     # serves http://localhost:8000
-
-# 2. Point Chloei at it (in the app's .env.local), then `pnpm dev`
-#    TRADINGAGENTS_SERVICE_URL=http://localhost:8000
-```
-
-The Trading Desk is reachable from the chat sidebar ("Trading desk") or directly at `/trading-desk`. Set `TRADINGAGENTS_ENABLED=false` to hide it. Service wiring is documented in `.env.example` (`TRADINGAGENTS_*`); the server client lives in `src/lib/server/trading-agents/`, the routes in `src/app/api/trading-desk/`, and the UI in `src/components/trading-desk/`.
-
-TradingAgents is exposed through two surfaces, all backed by the same sidecar:
-
-- **Trading Desk page** (`/trading-desk`) — every run posts to `POST /api/trading-desk/jobs` and executes as a background job through Chloei's async-jobs system (the shared `agent_job` table + Inngest, with an inline fallback when Inngest is unconfigured), polled via `GET /api/jobs/{jobId}`. This survives a dropped connection — ideal for long deep-mode runs. **Requires `DATABASE_URL` (and `pnpm migrate`)**; Inngest is optional. The page also still has a live-streaming endpoint (`POST /api/trading-desk/analyze`) available via the `start()` hook method if you want a no-database streaming mode.
-- **Chat tool** — the chat agent can call a `trading_analysis` tool mid-conversation (e.g. "should I buy NVDA?") and fold a compact decision summary into the thread. Registered in `src/lib/server/llm/ai-sdk-trading-agents-tools.ts`.
-
 ## Environment
 
 `.env.example` documents the supported environment variables. Required variables are:
@@ -119,7 +92,6 @@ TradingAgents is exposed through two surfaces, all backed by the same sidecar:
 Optional feature-enabling variables:
 
 - `TAVILY_API_KEY`: enables Tavily search and extract callable tools for chat requests
-- `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY`, `INNGEST_DEV`: enable `/api/inngest` and async job orchestration
 - `BLOB_READ_WRITE_TOKEN`: enables private Blob upload/download and private agent artifact URLs
 - `AGENT_TELEMETRY_RECORD_IO`, `AGENT_FINANCE_WORKFLOWS_ENABLED`: feature gates; defaults are off unless explicitly set or synced through Edge Config
 - `SEC_API_USER_AGENT`: identifies Chloei for SEC public company-facts requests
@@ -152,5 +124,3 @@ Agent request limits, timeouts, tool-step budgets, and the rate-limit window/con
 `pnpm test:smoke` runs Playwright against `SMOKE_BASE_URL` or starts the local dev server at `http://localhost:3000`. Set `SMOKE_EMAIL` and `SMOKE_PASSWORD` for an existing test account before running the live authenticated smoke test. Optional `SMOKE_PROMPT` and `SMOKE_EXPECTED_TEXT` let you tune the live prompt assertion.
 
 `pnpm test:smoke:mock` runs a CI-safe authenticated chat flow with `E2E_MOCK_AUTH=1`, in-memory thread storage, and a deterministic mock agent response against the production Next.js server. Run `pnpm build` first or use `pnpm test:smoke:mock:build`. It does not require Better Auth credentials, PostgreSQL, or AI provider API keys.
-
-`pnpm inngest:smoke` requires `INNGEST_EVENT_KEY`; it sends a disposable `ops/inngest.smoke` event and prints the smoke ID plus Inngest event ID without printing the key. For production, pull env vars into a temporary file and pass it with `--env-file`; see [docs/managed-integrations-rollout.md](docs/managed-integrations-rollout.md).

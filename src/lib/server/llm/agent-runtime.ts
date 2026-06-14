@@ -66,11 +66,6 @@ import {
   isAiSdkTavilyToolName,
 } from "./ai-sdk-tavily-tools"
 import {
-  createAiSdkTradingAgentsTools,
-  getAiSdkTradingAgentsToolCallMetadata,
-  getAiSdkTradingAgentsToolResultMetadata,
-} from "./ai-sdk-trading-agents-tools"
-import {
   type CodeExecutionBackend,
   createAiSdkCodeExecutionTools,
   getAiSdkCodeExecutionToolCallMetadata,
@@ -398,7 +393,6 @@ export async function* startAgentRuntimeStream(
           secUserAgent: params.secUserAgent ?? process.env.SEC_API_USER_AGENT,
         })
       : {}),
-    ...createAiSdkTradingAgentsTools(),
   } as ToolSet
   const toolNames = Object.keys(tools)
 
@@ -536,8 +530,7 @@ export async function* startAgentRuntimeStream(
         getAiSdkCodeExecutionToolCallMetadata(part) ??
         getAiSdkTavilyToolCallMetadata(part) ??
         getAiSdkFinanceDataToolCallMetadata(part) ??
-        getAiSdkSecFilingsToolCallMetadata(part) ??
-        getAiSdkTradingAgentsToolCallMetadata(part)
+        getAiSdkSecFilingsToolCallMetadata(part)
       if (!metadata || seenToolCalls.has(metadata.callId)) {
         continue
       }
@@ -573,8 +566,7 @@ export async function* startAgentRuntimeStream(
         getAiSdkCodeExecutionToolResultMetadata(part) ??
         getAiSdkTavilyToolResultMetadata(part) ??
         getAiSdkFinanceDataToolResultMetadata(part) ??
-        getAiSdkSecFilingsToolResultMetadata(part) ??
-        getAiSdkTradingAgentsToolResultMetadata(part)
+        getAiSdkSecFilingsToolResultMetadata(part)
       if (!metadata || finalizedToolCalls.has(metadata.callId)) {
         continue
       }

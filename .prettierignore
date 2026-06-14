@@ -9,4 +9,3 @@ pnpm-lock.yaml
 .agents/
 __pycache__/
 .venv/
-tradingagents-service/.venv/

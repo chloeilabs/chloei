@@ -54,29 +54,11 @@ CREATE TABLE IF NOT EXISTS agent_rate_limit (
 CREATE INDEX IF NOT EXISTS agent_rate_limit_last_seen_at_idx
 ON agent_rate_limit ("lastSeenAt");
 
-CREATE TABLE IF NOT EXISTS agent_job (
-  id text PRIMARY KEY,
-  "userId" text NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
-  type text NOT NULL,
-  status text NOT NULL,
-  payload jsonb NOT NULL DEFAULT '{}'::jsonb,
-  result jsonb,
-  error text,
-  "idempotencyKey" text NOT NULL,
-  "createdAt" timestamp(3) without time zone NOT NULL,
-  "updatedAt" timestamp(3) without time zone NOT NULL,
-  UNIQUE ("userId", "idempotencyKey")
-);
-
-CREATE INDEX IF NOT EXISTS agent_job_user_updated_at_idx
-ON agent_job ("userId", "updatedAt" DESC);
-
-CREATE INDEX IF NOT EXISTS agent_job_status_updated_at_idx
-ON agent_job (status, "updatedAt" DESC);
-
 DROP TABLE IF EXISTS ${LEGACY_EVENT_TABLE};
 
 DROP TABLE IF EXISTS automation;
+
+DROP TABLE IF EXISTS agent_job;
 
 ALTER TABLE thread
 DROP COLUMN IF EXISTS "${LEGACY_THREAD_CONFIG_COLUMN}";
