@@ -6,8 +6,8 @@ import { type NextRequest } from "next/server"
 import { createLogger } from "@/lib/logger"
 import { resolveRequestIdFromHeaders } from "@/lib/request-id"
 import {
-  createApiErrorResponse,
   createApiHeaders,
+  createErrorResponse,
 } from "@/lib/server/api-response"
 import {
   createAuthUnavailableResponse,
@@ -33,20 +33,6 @@ export const runtime = "nodejs"
 
 const ATTACHMENT_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
-function createErrorResponse(
-  requestId: string,
-  error: string,
-  errorCode: string,
-  status: number
-) {
-  return createApiErrorResponse({
-    requestId,
-    error,
-    errorCode,
-    status,
-  })
-}
 
 export async function POST(request: NextRequest) {
   const requestId = resolveRequestIdFromHeaders(request.headers)

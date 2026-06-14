@@ -3,8 +3,8 @@ import { type NextRequest } from "next/server"
 import { createLogger } from "@/lib/logger"
 import { resolveRequestIdFromHeaders } from "@/lib/request-id"
 import {
-  createApiErrorResponse,
   createApiHeaders,
+  createErrorResponse,
 } from "@/lib/server/api-response"
 import {
   createAuthUnavailableResponse,
@@ -23,20 +23,6 @@ interface JobRouteContext {
   params: Promise<{
     jobId: string
   }>
-}
-
-function createErrorResponse(
-  requestId: string,
-  error: string,
-  errorCode: string,
-  status: number
-) {
-  return createApiErrorResponse({
-    requestId,
-    error,
-    errorCode,
-    status,
-  })
 }
 
 export async function GET(request: NextRequest, context: JobRouteContext) {

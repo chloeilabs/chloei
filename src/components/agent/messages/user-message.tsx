@@ -15,9 +15,9 @@ import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard"
 import {
   type AgentAttachmentMetadata,
   type AgentRunMode,
-  AvailableModels,
   getModelSelectorModels,
   isModelSelectorModel,
+  isModelType,
   type Message,
   type ModelType,
   resolveDefaultModelSelectorModel,
@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "../../ui/button"
 import { Textarea } from "../../ui/textarea"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip"
+import { formatFileSize } from "../prompt-form/attachments"
 import { ModelSelector } from "../prompt-form/model-selector"
 import { ResearchModeToggle } from "../prompt-form/research-mode-toggle"
 import {
@@ -38,25 +39,6 @@ import {
 } from "../shared/shell-styles"
 
 const MAX_CONTENT_HEIGHT = 128
-
-function formatFileSize(sizeBytes: number): string {
-  if (sizeBytes < 1024) {
-    return `${String(sizeBytes)} B`
-  }
-
-  if (sizeBytes < 1024 * 1024) {
-    return `${(sizeBytes / 1024).toFixed(1)} KB`
-  }
-
-  return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
-function isModelType(value: unknown): value is ModelType {
-  return (
-    typeof value === "string" &&
-    Object.values(AvailableModels).includes(value as ModelType)
-  )
-}
 
 function UserAttachmentChip({
   attachment,

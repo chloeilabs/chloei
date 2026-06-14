@@ -36,9 +36,9 @@ import {
 } from "@/lib/shared"
 import { cn } from "@/lib/utils"
 
-import { ScrollToBottom } from "../../task/scroll-to-bottom"
 import { TradingDeskNavButton } from "../../trading-desk-nav-button"
 import { PromptForm } from "../prompt-form/prompt-form"
+import { ScrollToBottom } from "./scroll-to-bottom"
 import { useThreadStoreContext } from "./thread-store-context"
 import { useAgentSession } from "./use-agent-session"
 

@@ -3,8 +3,8 @@ import { type NextRequest } from "next/server"
 import { createLogger } from "@/lib/logger"
 import { resolveRequestIdFromHeaders } from "@/lib/request-id"
 import {
-  createApiErrorResponse,
   createApiHeaders,
+  createErrorResponse,
 } from "@/lib/server/api-response"
 import {
   createAuthUnavailableResponse,
@@ -26,20 +26,6 @@ interface UploadDownloadRouteContext {
   params: Promise<{
     pathname: string[]
   }>
-}
-
-function createErrorResponse(
-  requestId: string,
-  error: string,
-  errorCode: string,
-  status: number
-) {
-  return createApiErrorResponse({
-    requestId,
-    error,
-    errorCode,
-    status,
-  })
 }
 
 function getDownloadFilename(pathname: string): string {
