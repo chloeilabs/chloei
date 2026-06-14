@@ -7,8 +7,8 @@ import { createLogger } from "@/lib/logger"
 import { resolveRequestIdFromHeaders } from "@/lib/request-id"
 import { completeReportPlaceholderJob } from "@/lib/server/agent-report-jobs"
 import {
-  createApiErrorResponse,
   createApiHeaders,
+  createErrorResponse,
 } from "@/lib/server/api-response"
 import {
   createAuthUnavailableResponse,
@@ -32,20 +32,6 @@ const reportRequestSchema = z.object({
   prompt: z.string().trim().min(1).max(8_000),
   title: z.string().trim().min(1).max(200).optional(),
 })
-
-function createErrorResponse(
-  requestId: string,
-  error: string,
-  errorCode: string,
-  status: number
-) {
-  return createApiErrorResponse({
-    requestId,
-    error,
-    errorCode,
-    status,
-  })
-}
 
 export async function POST(request: NextRequest) {
   const requestId = resolveRequestIdFromHeaders(request.headers)

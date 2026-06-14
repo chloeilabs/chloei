@@ -49,3 +49,24 @@ export function createApiErrorResponse(params: CreateApiErrorResponseParams) {
     headers: responseHeaders,
   })
 }
+
+/**
+ * Positional convenience wrapper around {@link createApiErrorResponse} used by
+ * route handlers for terse error returns. The optional `headers` argument
+ * forwards extra response headers (e.g. rate-limit metadata).
+ */
+export function createErrorResponse(
+  requestId: string,
+  error: string,
+  errorCode: string,
+  status: number,
+  headers?: HeadersInit
+) {
+  return createApiErrorResponse({
+    headers,
+    requestId,
+    error,
+    errorCode,
+    status,
+  })
+}

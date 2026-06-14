@@ -17,8 +17,8 @@ import {
   AGENT_RATE_LIMIT_WINDOW_MS,
 } from "@/lib/server/agent-runtime-config"
 import {
-  createApiErrorResponse,
   createApiHeaders,
+  createErrorResponse,
 } from "@/lib/server/api-response"
 import {
   createAuthUnavailableResponse,
@@ -48,22 +48,6 @@ function createEmptyFollowUpResponse(requestId: string) {
       headers: createApiHeaders({ requestId }),
     }
   )
-}
-
-function createErrorResponse(
-  requestId: string,
-  error: string,
-  errorCode: string,
-  status: number,
-  headers?: HeadersInit
-) {
-  return createApiErrorResponse({
-    headers,
-    requestId,
-    error,
-    errorCode,
-    status,
-  })
 }
 
 function createRetryAfterHeaders(retryAfterSeconds: number | null): Headers {

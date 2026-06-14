@@ -13,8 +13,8 @@ import {
   normalizeAgentArtifactPath,
 } from "@/lib/server/agent-artifacts"
 import {
-  createApiErrorResponse,
   createApiHeaders,
+  createErrorResponse,
 } from "@/lib/server/api-response"
 import {
   createAuthUnavailableResponse,
@@ -47,20 +47,6 @@ const CONTENT_TYPES_BY_EXTENSION: Record<string, string> = {
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   ".txt": "text/plain; charset=utf-8",
   ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-}
-
-function createErrorResponse(
-  requestId: string,
-  error: string,
-  errorCode: string,
-  status: number
-) {
-  return createApiErrorResponse({
-    requestId,
-    error,
-    errorCode,
-    status,
-  })
 }
 
 function getContentType(relativePath: string): string {

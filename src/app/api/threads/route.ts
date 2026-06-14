@@ -4,8 +4,8 @@ import { z, ZodError } from "zod"
 import { createLogger } from "@/lib/logger"
 import { resolveRequestIdFromHeaders } from "@/lib/request-id"
 import {
-  createApiErrorResponse,
   createApiHeaders,
+  createErrorResponse,
 } from "@/lib/server/api-response"
 import {
   createAuthUnavailableResponse,
@@ -36,20 +36,6 @@ const threadIdSchema = z.string().trim().min(1).max(200)
 
 function createHeaders(requestId: string) {
   return createApiHeaders({ requestId })
-}
-
-function createErrorResponse(
-  requestId: string,
-  error: string,
-  errorCode: string,
-  status: number
-) {
-  return createApiErrorResponse({
-    requestId,
-    error,
-    errorCode,
-    status,
-  })
 }
 
 async function requireSession(request: NextRequest, requestId: string) {
