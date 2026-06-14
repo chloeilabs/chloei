@@ -106,7 +106,7 @@ test("follow-up questions are prefetched while the assistant is streaming", asyn
 
 test("follow-up backfill retries are retriggered after transient misses", async () => {
   const source = await readFile(
-    path.join(cwd, "src/components/agent/home/use-agent-session.ts"),
+    path.join(cwd, "src/components/agent/home/use-follow-up-questions.ts"),
     "utf8"
   )
 
