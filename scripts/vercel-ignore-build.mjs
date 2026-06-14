@@ -6,7 +6,6 @@ const explicitSkipFiles = new Set([
   "README.md",
   "AGENTS.md",
   "CLAUDE.md",
-  "THIRD_PARTY_NOTICES.md",
   "skills-lock.json",
 ])
 
