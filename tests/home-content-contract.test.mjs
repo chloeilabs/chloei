@@ -72,15 +72,19 @@ test("follow-up questions are prefetched while the assistant is streaming", asyn
     path.join(cwd, "src/components/agent/home/use-agent-session.ts"),
     "utf8"
   )
+  const followUpSource = await readFile(
+    path.join(cwd, "src/components/agent/home/follow-up-questions.ts"),
+    "utf8"
+  )
 
   assert.match(
-    source,
+    followUpSource,
     /const PARALLEL_FOLLOW_UP_MIN_CHARS = 80/,
     "Expected follow-up generation to start early enough to hide network latency behind long streams."
   )
   assert.match(
     source,
-    /shouldStartParallelFollowUpQuestions|PARALLEL_FOLLOW_UP_MIN_CHARS|pendingFollowUpQuestionsRef/,
+    /shouldStartParallelFollowUpQuestions|pendingFollowUpQuestionsRef/,
     "Expected parallel follow-up state for caching questions before the completed render."
   )
   assert.match(
@@ -102,7 +106,7 @@ test("follow-up questions are prefetched while the assistant is streaming", asyn
 
 test("follow-up backfill retries are retriggered after transient misses", async () => {
   const source = await readFile(
-    path.join(cwd, "src/components/agent/home/use-agent-session.ts"),
+    path.join(cwd, "src/components/agent/home/use-follow-up-questions.ts"),
     "utf8"
   )
 

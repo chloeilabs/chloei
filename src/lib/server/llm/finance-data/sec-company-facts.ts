@@ -1,4 +1,7 @@
-import { asRecord, asString } from "@/lib/cast"
+import { asRecord, toOptionalString } from "@/lib/cast"
+
+import { normalizeTickerSymbol } from "./normalizers"
+import { normalizeCik } from "./sec"
 
 export type SecCompanyFactsPeriod = "annual" | "quarter"
 export type SecFinancialStatementType = "income" | "balance_sheet" | "cash_flow"
@@ -106,30 +109,12 @@ const SEC_FINANCIAL_STATEMENT_CONCEPTS = [
   ...Object.values(SEC_CASH_FLOW_CONCEPTS).flat(),
 ] as const
 
-function toOptionalString(value: unknown): string | undefined {
-  const normalized = asString(value)?.trim()
-  return normalized && normalized.length > 0 ? normalized : undefined
-}
-
 function toOptionalNumber(value: unknown): number | undefined {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return undefined
   }
 
   return value
-}
-
-function normalizeSecCik(cik: string): string {
-  const digits = cik.replace(/\D/g, "")
-  if (!digits) {
-    throw new Error("sec_company_facts requires a numeric CIK.")
-  }
-
-  return digits.padStart(10, "0")
-}
-
-function normalizeTickerSymbol(symbol: string): string {
-  return symbol.replace(/\s+/g, "").trim().toUpperCase()
 }
 
 function getSecFactEntries(data: unknown, concept: string): SecFactEntry[] {
@@ -346,7 +331,7 @@ function summarizeSecIncomeStatement(params: {
     statementType: "income",
     provider: "sec",
     source: "SEC company facts",
-    cik: normalizeSecCik(params.cik),
+    cik: normalizeCik(params.cik),
     ...(params.symbol ? { symbol: normalizeTickerSymbol(params.symbol) } : {}),
     fiscalYear: revenue.fiscalYear,
     fiscalPeriod: revenue.fiscalPeriod,
@@ -453,7 +438,7 @@ function summarizeSecBalanceSheet(params: {
     statementType: "balance_sheet",
     provider: "sec",
     source: "SEC company facts",
-    cik: normalizeSecCik(params.cik),
+    cik: normalizeCik(params.cik),
     ...(params.symbol ? { symbol: normalizeTickerSymbol(params.symbol) } : {}),
     fiscalYear: anchor.fiscalYear,
     fiscalPeriod: anchor.fiscalPeriod,
@@ -572,7 +557,7 @@ function summarizeSecCashFlowStatement(params: {
     statementType: "cash_flow",
     provider: "sec",
     source: "SEC company facts",
-    cik: normalizeSecCik(params.cik),
+    cik: normalizeCik(params.cik),
     ...(params.symbol ? { symbol: normalizeTickerSymbol(params.symbol) } : {}),
     fiscalYear: operatingCashFlow.fiscalYear,
     fiscalPeriod: operatingCashFlow.fiscalPeriod,
@@ -669,7 +654,7 @@ export function summarizeSecCompanyFacts(params: {
   }
 
   return {
-    cik: normalizeSecCik(params.cik),
+    cik: normalizeCik(params.cik),
     ...(params.symbol ? { symbol: normalizeTickerSymbol(params.symbol) } : {}),
     entityName: toOptionalString(record?.entityName),
     taxonomyNamespaces: Object.keys(facts ?? {}).sort(),

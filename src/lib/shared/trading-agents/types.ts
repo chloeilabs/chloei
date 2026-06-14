@@ -93,34 +93,6 @@ export const TRADING_DESK_DEFAULT_TEAMS: TradingDeskTeam[] = [
   },
 ]
 
-/** Friendly labels for the analyst keys, for the selection form. */
-export const TRADING_DESK_ANALYST_LABELS: Record<
-  TradingDeskAnalystKey,
-  string
-> = {
-  market: "Market",
-  social: "Social",
-  news: "News",
-  fundamentals: "Fundamentals",
-}
-
-/** Report sections, in render order, with display titles and owning team. */
-export const TRADING_DESK_REPORT_SECTIONS = [
-  { key: "market_report", title: "Market Analysis", team: "analysts" },
-  { key: "sentiment_report", title: "Social Sentiment", team: "analysts" },
-  { key: "news_report", title: "News Analysis", team: "analysts" },
-  { key: "fundamentals_report", title: "Fundamentals", team: "analysts" },
-  { key: "investment_plan", title: "Research Team Decision", team: "research" },
-  { key: "trader_investment_plan", title: "Trading Plan", team: "trading" },
-  {
-    key: "final_trade_decision",
-    title: "Portfolio Decision",
-    team: "portfolio",
-  },
-] as const
-export type TradingDeskReportSectionKey =
-  (typeof TRADING_DESK_REPORT_SECTIONS)[number]["key"]
-
 export interface TradingDeskRequest {
   ticker: string
   tradeDate?: string | null

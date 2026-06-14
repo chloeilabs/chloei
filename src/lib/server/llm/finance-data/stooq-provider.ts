@@ -1,3 +1,5 @@
+import { normalizeTickerSymbol } from "./normalizers"
+
 const STOOQ_BASE_URL = "https://stooq.com/q/l/"
 
 interface StooqHistoricalPricesInput {
@@ -13,10 +15,6 @@ function requireSymbol(input: StooqHistoricalPricesInput): string {
   }
 
   return input.symbol.trim()
-}
-
-function normalizeTickerSymbol(symbol: string): string {
-  return symbol.replace(/\s+/g, "").trim().toUpperCase()
 }
 
 function normalizeLimit(input: StooqHistoricalPricesInput, fallback: number) {

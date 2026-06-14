@@ -1,4 +1,5 @@
 import { ASSISTANT_EMPTY_RESPONSE_FALLBACK } from "@/lib/constants"
+import { createRequestHeaders } from "@/lib/request-id"
 import {
   type AgentAttachmentMetadata,
   type AgentRequestAttachment,
@@ -33,6 +34,24 @@ interface AgentRequestMessageDraft {
 
 interface ToRequestMessagesOptions {
   attachmentsByMessageId?: ReadonlyMap<string, AgentRequestAttachment[]>
+}
+
+function getClientTimeZone(): string | undefined {
+  try {
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone.trim()
+    return timeZone || undefined
+  } catch {
+    return undefined
+  }
+}
+
+export function createAgentRequestHeaders(): HeadersInit {
+  const timeZone = getClientTimeZone()
+
+  return createRequestHeaders({
+    "Content-Type": "application/json",
+    ...(timeZone ? { "X-User-Timezone": timeZone } : {}),
+  })
 }
 
 export function createClientMessageId() {
@@ -143,12 +162,4 @@ export function appendUserMessage(
     : currentMessages
 
   return [...baseMessages, userMessage]
-}
-
-export function hasUserMessageAttachments(messages: AgentMessage[]): boolean {
-  return messages.some(
-    (message) =>
-      message.role === "user" &&
-      (message.metadata?.attachments?.length ?? 0) > 0
-  )
 }

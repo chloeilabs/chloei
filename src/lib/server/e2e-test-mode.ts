@@ -1,7 +1,6 @@
 import { createApiHeaders } from "./api-response"
 
 const E2E_AUTH_COOKIE_NAME = "chloei_e2e_auth"
-const E2E_AUTH_COOKIE_VALUE = "1"
 
 export const E2E_MOCK_VIEWER = {
   id: "e2e-user",
@@ -26,13 +25,6 @@ export function isE2eMockModeEnabled(): boolean {
     process.env.CI === "true" ||
     process.env.E2E_MOCK_AUTH_ALLOW_NEXT_START === "1"
   )
-}
-
-export function getE2eAuthCookie() {
-  return {
-    name: E2E_AUTH_COOKIE_NAME,
-    value: E2E_AUTH_COOKIE_VALUE,
-  } as const
 }
 
 export function isE2eAuthenticatedRequest(headers: Headers): boolean {

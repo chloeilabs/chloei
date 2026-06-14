@@ -27,5 +27,3 @@ export const tradingDeskRequestSchema = z.object({
   online: z.boolean().default(true),
   mock: z.boolean().nullish(),
 })
-
-export type ParsedTradingDeskRequest = z.infer<typeof tradingDeskRequestSchema>

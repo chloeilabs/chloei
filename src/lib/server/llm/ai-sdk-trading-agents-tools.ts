@@ -135,12 +135,6 @@ export function createAiSdkTradingAgentsTools(
   }
 }
 
-export function isAiSdkTradingAgentsToolName(
-  value: unknown
-): value is TradingAnalysisToolName {
-  return value === TRADING_ANALYSIS_TOOL_NAME
-}
-
 export function getAiSdkTradingAgentsToolCallMetadata(
   part:
     | {
