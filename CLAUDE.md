@@ -81,7 +81,7 @@ This boundary is **enforced by Next.js bundling at build time** (importing `pg`/
 
 These are easy to confuse. They are orthogonal:
 
-- **Runtime profile** (`resolveRuntimeProfile` in `app/api/agent/route.ts`, `AGENT_RUNTIME_PROFILES` in `agent-runtime.ts`) — one of `chat_default`, `deep_research`. The profile drives the **tool set** and the **tool-step budget**.
+- **Runtime profile** (`resolveRuntimeProfile` in `app/api/agent/route.ts`, `AGENT_RUNTIME_PROFILES` in `agent-runtime.ts`) — one of `chat_default`, `deep_research`. The profile drives the **tool-step budget** (the tool set itself is the same for both).
 - **Task mode** (`inferPromptTaskMode` in `agent-prompt-steering.ts`) — inferred from message content; drives only the **prompt overlay text** and the Gemini thinking level. Modes: `general`, `coding`, `debugging`, `writing`, `research`, `high_stakes`, `closed_answer`, `instruction_following`.
 
 Research mode is a **request flag** (`runMode: "research"`), not an inference. It selects the `deep_research` profile and `RESEARCH_MODEL` (Qwen 3.7 Max); if that model is unavailable the route returns 400 `AGENT_RESEARCH_MODEL_UNAVAILABLE`.
@@ -110,7 +110,7 @@ Event types:
 - `reasoning_delta` — incremental reasoning text (sanitized + redacted-placeholder-filtered; see below)
 - `agent_status` — `in_progress | completed | failed | cancelled | incomplete`
 - `tool_call` — tool start: `callId`, `toolName`, `label`, plus optional `query`, `operation`, `provider`
-- `tool_result` — tool result: `callId`, `status: success | error`, plus optional `operation`, `provider`, `attempt`, `durationMs`, `errorCode`, `retryable`
+- `tool_result` — tool result: `callId`, `status: success | error`, plus optional `operation`, `provider`, `durationMs`, `errorCode`, `retryable`
 - `source` — citation source: `id`, `url`, `title`
 
 Every event also carries optional `interactionId` and `lastEventId` checkpoint fields.
@@ -139,7 +139,7 @@ User ids are never written into blob storage paths: `hashUserId` (`src/lib/serve
 
 ### Agent Tools
 
-Each tool is only registered when its requirements are met, **and** when the active runtime profile enables it.
+Each tool is only registered when its requirements are met.
 
 | Tool             | Requirement      | Tool id / operations                                                                                                                     |
 | ---------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
