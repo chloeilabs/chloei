@@ -36,7 +36,6 @@ export function getAiSdkGatewayProviderOptionsForTaskMode(params: {
   }
 
   switch (params.taskMode) {
-    case "finance_analysis":
     case "research":
     case "high_stakes":
     case "debugging":

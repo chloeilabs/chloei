@@ -46,6 +46,8 @@ const {
   toVercelFlagSlug,
 } = await import(integrationFlagsUrl)
 
+const TELEMETRY_FLAG_ENV = "AGENT_TELEMETRY_RECORD_IO"
+
 test("private Blob path helpers keep downloads user-scoped", () => {
   const attachmentId = "01989a40-465d-45c2-8506-b8ddb940b9ad"
   const pathname = buildPrivateBlobAttachmentPathname({
@@ -86,25 +88,23 @@ test("readable text normalization preserves document layout for model prompts", 
 })
 
 test("agent feature flags default off and respect explicit env overrides", async () => {
-  const original = process.env.AGENT_FINANCE_WORKFLOWS_ENABLED
+  const original = process.env[TELEMETRY_FLAG_ENV]
   const originalEdgeConfig = process.env.EDGE_CONFIG
   try {
-    delete process.env.AGENT_FINANCE_WORKFLOWS_ENABLED
+    delete process.env[TELEMETRY_FLAG_ENV]
     delete process.env.EDGE_CONFIG
     assert.deepEqual(await resolveAgentFeatureFlags(), {
       telemetryRecordIo: false,
-      financeWorkflowsEnabled: false,
     })
 
-    process.env.AGENT_FINANCE_WORKFLOWS_ENABLED = "true"
+    process.env[TELEMETRY_FLAG_ENV] = "true"
     const flags = await resolveAgentFeatureFlags()
-    assert.equal(flags.financeWorkflowsEnabled, true)
-    assert.equal(flags.telemetryRecordIo, false)
+    assert.equal(flags.telemetryRecordIo, true)
   } finally {
     if (original === undefined) {
-      delete process.env.AGENT_FINANCE_WORKFLOWS_ENABLED
+      delete process.env[TELEMETRY_FLAG_ENV]
     } else {
-      process.env.AGENT_FINANCE_WORKFLOWS_ENABLED = original
+      process.env[TELEMETRY_FLAG_ENV] = original
     }
 
     if (originalEdgeConfig === undefined) {
@@ -116,26 +116,20 @@ test("agent feature flags default off and respect explicit env overrides", async
 })
 
 test("agent feature flag resolution does not mutate shared defaults", async () => {
-  const original = process.env.AGENT_FINANCE_WORKFLOWS_ENABLED
+  const original = process.env[TELEMETRY_FLAG_ENV]
   const originalEdgeConfig = process.env.EDGE_CONFIG
   try {
     delete process.env.EDGE_CONFIG
-    process.env.AGENT_FINANCE_WORKFLOWS_ENABLED = "true"
-    assert.equal(
-      (await resolveAgentFeatureFlags()).financeWorkflowsEnabled,
-      true
-    )
+    process.env[TELEMETRY_FLAG_ENV] = "true"
+    assert.equal((await resolveAgentFeatureFlags()).telemetryRecordIo, true)
 
-    delete process.env.AGENT_FINANCE_WORKFLOWS_ENABLED
-    assert.equal(
-      (await resolveAgentFeatureFlags()).financeWorkflowsEnabled,
-      false
-    )
+    delete process.env[TELEMETRY_FLAG_ENV]
+    assert.equal((await resolveAgentFeatureFlags()).telemetryRecordIo, false)
   } finally {
     if (original === undefined) {
-      delete process.env.AGENT_FINANCE_WORKFLOWS_ENABLED
+      delete process.env[TELEMETRY_FLAG_ENV]
     } else {
-      process.env.AGENT_FINANCE_WORKFLOWS_ENABLED = original
+      process.env[TELEMETRY_FLAG_ENV] = original
     }
 
     if (originalEdgeConfig === undefined) {
@@ -148,31 +142,36 @@ test("agent feature flag resolution does not mutate shared defaults", async () =
 
 test("Edge Config flag keys are compatible with Vercel key restrictions", () => {
   assert.equal(
-    toEdgeConfigFlagKey("agent.finance_workflows.enabled"),
-    "agent_finance_workflows_enabled"
+    toEdgeConfigFlagKey("agent.telemetry.record_io"),
+    "agent_telemetry_record_io"
   )
   assert.equal(
-    toVercelFlagSlug("agent.finance_workflows.enabled"),
-    "agent-finance-workflows-enabled"
+    toVercelFlagSlug("agent.telemetry.record_io"),
+    "agent-telemetry-record-io"
   )
 })
 
 test("agent feature flags can read Vercel/Flags-SDK Edge Config shape", async () => {
   const originalEdgeConfig = process.env.EDGE_CONFIG
+  const originalTelemetry = process.env[TELEMETRY_FLAG_ENV]
   try {
+    delete process.env[TELEMETRY_FLAG_ENV]
     process.env.EDGE_CONFIG = "test-edge-config-connection"
     globalThis[edgeConfigStoreKey] = {
       flags: {
-        "agent-telemetry-record-io": false,
-        "agent-finance-workflows-enabled": true,
+        "agent-telemetry-record-io": true,
       },
     }
 
     const flags = await resolveAgentFeatureFlags()
-    assert.equal(flags.telemetryRecordIo, false)
-    assert.equal(flags.financeWorkflowsEnabled, true)
+    assert.equal(flags.telemetryRecordIo, true)
   } finally {
     delete globalThis[edgeConfigStoreKey]
+    if (originalTelemetry === undefined) {
+      delete process.env[TELEMETRY_FLAG_ENV]
+    } else {
+      process.env[TELEMETRY_FLAG_ENV] = originalTelemetry
+    }
     if (originalEdgeConfig === undefined) {
       delete process.env.EDGE_CONFIG
     } else {
@@ -187,13 +186,13 @@ test("integration boolean flags can read Edge Config map shape", async () => {
     process.env.EDGE_CONFIG = "test-edge-config-connection"
     globalThis[edgeConfigStoreKey] = {
       agent_flags: {
-        "agent.finance_workflows.enabled": true,
+        "agent.telemetry.record_io": true,
       },
     }
 
     assert.equal(
       await resolveIntegrationBooleanFlag({
-        key: "agent.finance_workflows.enabled",
+        key: "agent.telemetry.record_io",
       }),
       true
     )
@@ -261,18 +260,6 @@ test("prompt attachment uploads validate API response shape", () => {
 
   assert.match(source, /UploadAttachmentResponseSchema/)
   assert.match(source, /safeParse\(\s*await response\.json\(\)\s*\)/)
-})
-
-test("code execution artifact collection catches best-effort file-read failures", () => {
-  const source = readFileSync(
-    path.join(cwd, "src/lib/server/llm/code-execution-tools.ts"),
-    "utf8"
-  )
-
-  assert.match(
-    source,
-    /readFile\(\s*(?:\/\*turbopackIgnore: true\*\/\s*)?fullPath\s*\)\.catch\(\(\) => null\)/
-  )
 })
 
 test("private blob uploads return authenticated app download URLs", () => {

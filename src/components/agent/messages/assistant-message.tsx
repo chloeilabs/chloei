@@ -5,7 +5,6 @@ import {
   CircleX,
   Copy,
   CornerDownRight,
-  Download,
   RefreshCcw,
 } from "lucide-react"
 import dynamic from "next/dynamic"
@@ -15,7 +14,6 @@ import { LogoHover } from "@/components/graphics/logo/logo-hover"
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard"
 import {
   type AgentRunMode,
-  type CodeExecutionArtifactMetadata,
   type FollowUpQuestion,
   isModelType,
   type Message,
@@ -125,90 +123,6 @@ function SourceList({
   )
 }
 
-function formatArtifactSize(sizeBytes: number): string {
-  if (sizeBytes < 1024) {
-    return `${String(sizeBytes)} B`
-  }
-
-  if (sizeBytes < 1024 * 1024) {
-    return `${(sizeBytes / 1024).toFixed(1)} KB`
-  }
-
-  return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
-function getArtifactFilename(artifactPath: string): string {
-  return artifactPath.split(/[\\/]/).filter(Boolean).at(-1) ?? artifactPath
-}
-
-type DownloadableArtifact = CodeExecutionArtifactMetadata & { url: string }
-
-function getDownloadableArtifacts(message: Message): DownloadableArtifact[] {
-  const artifacts: DownloadableArtifact[] = []
-  const seen = new Set<string>()
-  const addArtifacts = (
-    manifest: CodeExecutionArtifactMetadata[] | undefined
-  ) => {
-    for (const artifact of manifest ?? []) {
-      const artifactUrl = artifact.url
-      if (!artifactUrl?.startsWith("/api/agent/artifacts/")) {
-        continue
-      }
-
-      const key = `${artifactUrl}:${artifact.path}`
-      if (seen.has(key)) {
-        continue
-      }
-
-      seen.add(key)
-      artifacts.push({ ...artifact, url: artifactUrl })
-    }
-  }
-
-  for (const invocation of message.metadata?.toolInvocations ?? []) {
-    addArtifacts(invocation.artifactManifest)
-  }
-
-  for (const entry of message.metadata?.activityTimeline ?? []) {
-    if (entry.kind === "tool" || entry.kind === "search") {
-      addArtifacts(entry.artifactManifest)
-    }
-  }
-
-  return artifacts
-}
-
-function ArtifactDownloadList({
-  artifacts,
-}: {
-  artifacts: DownloadableArtifact[]
-}) {
-  if (artifacts.length === 0) {
-    return null
-  }
-
-  return (
-    <div className="mt-2 flex flex-wrap gap-1.5">
-      {artifacts.map((artifact) => (
-        <a
-          className="inline-flex max-w-full items-center gap-1.5 rounded-none border bg-muted/40 px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          download
-          href={artifact.url}
-          key={`${artifact.url}:${artifact.path}`}
-        >
-          <Download className="size-3.5 shrink-0" />
-          <span className="truncate">
-            Download {getArtifactFilename(artifact.path)}
-          </span>
-          <span className="shrink-0 text-muted-foreground/70">
-            {formatArtifactSize(artifact.sizeBytes)}
-          </span>
-        </a>
-      ))}
-    </div>
-  )
-}
-
 function FollowUpQuestions({
   onSelect,
   questions,
@@ -294,10 +208,6 @@ export function AssistantMessage({
   const sources = useMemo(
     () => getDedupedSources(message.metadata?.sources),
     [message.metadata?.sources]
-  )
-  const downloadableArtifacts = useMemo(
-    () => getDownloadableArtifacts(message),
-    [message]
   )
   const hasRunningActivity = useMemo(
     () =>
@@ -445,7 +355,6 @@ export function AssistantMessage({
             showSourceFavicon={showSourceFavicon}
             sources={sources}
           />
-          <ArtifactDownloadList artifacts={downloadableArtifacts} />
           {!isAssistantStreaming ? (
             <div className="mt-2 flex items-center gap-1">
               <Tooltip>

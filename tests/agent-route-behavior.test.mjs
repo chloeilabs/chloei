@@ -44,9 +44,6 @@ const { POST } = await import(routeUrl)
 
 const originalAiGatewayApiKey = process.env.AI_GATEWAY_API_KEY
 const originalTavilyApiKey = process.env.TAVILY_API_KEY
-const originalSecApiUserAgent = process.env.SEC_API_USER_AGENT
-const originalFinanceWorkflowsEnabled =
-  process.env.AGENT_FINANCE_WORKFLOWS_ENABLED
 
 let recorded
 
@@ -103,8 +100,6 @@ beforeEach(() => {
 
   process.env.AI_GATEWAY_API_KEY = "ai-gateway-key"
   process.env.TAVILY_API_KEY = "tavily-key"
-  delete process.env.SEC_API_USER_AGENT
-  delete process.env.AGENT_FINANCE_WORKFLOWS_ENABLED
 
   resetTestMocks()
   setTestMocks({
@@ -214,17 +209,6 @@ beforeEach(() => {
 after(() => {
   process.env.AI_GATEWAY_API_KEY = originalAiGatewayApiKey
   process.env.TAVILY_API_KEY = originalTavilyApiKey
-  if (originalSecApiUserAgent === undefined) {
-    delete process.env.SEC_API_USER_AGENT
-  } else {
-    process.env.SEC_API_USER_AGENT = originalSecApiUserAgent
-  }
-  if (originalFinanceWorkflowsEnabled === undefined) {
-    delete process.env.AGENT_FINANCE_WORKFLOWS_ENABLED
-  } else {
-    process.env.AGENT_FINANCE_WORKFLOWS_ENABLED =
-      originalFinanceWorkflowsEnabled
-  }
 })
 
 test("agent route returns auth unavailable when auth is disabled", async () => {
@@ -376,70 +360,7 @@ test("agent route passes the resolved prompt context into stream creation", asyn
   assert.deepEqual(released, ["released"])
 })
 
-test("agent route injects financial services workflow and uses finance runtime", async () => {
-  process.env.AGENT_FINANCE_WORKFLOWS_ENABLED = "true"
-
-  setTestMocks({
-    agentPromptSteering: {
-      inferPromptTaskMode() {
-        return "finance_analysis"
-      },
-      resolvePromptProvider(model) {
-        return `provider:${model}`
-      },
-    },
-    agentRoute: {
-      ...getTestMocks().agentRoute,
-      parseAgentStreamRequest({ body }) {
-        return {
-          parsedRequest: {
-            messages: body.messages,
-            runMode: "chat",
-          },
-          selectedModel: "moonshotai/kimi-k2.6",
-        }
-      },
-    },
-  })
-
-  const response = await POST(
-    createRequest({
-      json: async () => ({
-        messages: [
-          {
-            role: "user",
-            content: "Build a DCF model and trading comps workbook for AAPL.",
-          },
-        ],
-      }),
-    })
-  )
-
-  assert.equal(response.status, 200)
-  const promptContext = recorded.buildInstructionCalls[0]?.context
-  assert.equal(promptContext?.taskMode, "finance_analysis")
-  assert.equal(
-    promptContext?.financialServicesWorkflow?.workflow,
-    "financial_modeling"
-  )
-  assert.deepEqual(promptContext?.financialServicesWorkflow?.skillIds, [
-    "model-builder",
-    "dcf-model",
-    "comps-analysis",
-    "audit-xls",
-    "xlsx-author",
-  ])
-  assert.match(
-    promptContext?.financialServicesWorkflow?.promptBlock ?? "",
-    /Skill: dcf-model/
-  )
-  assert.equal(recorded.streamCalls[0]?.runtimeProfile, "finance_analysis")
-})
-
-test("agent route routes research-mode finance prompts through finance runtime", async () => {
-  process.env.AGENT_FINANCE_WORKFLOWS_ENABLED = "true"
-  process.env.SEC_API_USER_AGENT = "Chloei tests contact@example.com"
-
+test("agent route routes research mode through the deep research runtime", async () => {
   setTestMocks({
     agentRoute: {
       ...getTestMocks().agentRoute,
@@ -461,7 +382,7 @@ test("agent route routes research-mode finance prompts through finance runtime",
         messages: [
           {
             role: "user",
-            content: "Find the latest 10-K and extract the repurchase table.",
+            content: "Research the latest AI Act enforcement timeline.",
           },
         ],
       }),
@@ -469,18 +390,9 @@ test("agent route routes research-mode finance prompts through finance runtime",
   )
 
   assert.equal(response.status, 200)
-  assert.equal(
-    recorded.buildInstructionCalls[0]?.context.taskMode,
-    "finance_analysis"
-  )
-  assert.equal(
-    recorded.buildInstructionCalls[0]?.context.deepResearchMode,
-    true
-  )
-  assert.equal(
-    recorded.buildInstructionCalls[0]?.context.financialServicesWorkflow
-      ?.workflow,
-    "filing_research"
-  )
-  assert.equal(recorded.streamCalls[0]?.runtimeProfile, "finance_analysis")
+  const promptContext = recorded.buildInstructionCalls[0]?.context
+  assert.equal(promptContext?.taskMode, "research")
+  assert.equal(promptContext?.deepResearchMode, true)
+  assert.equal(recorded.streamCalls[0]?.runtimeProfile, "deep_research")
+  assert.equal(recorded.streamCalls[0]?.taskMode, "research")
 })

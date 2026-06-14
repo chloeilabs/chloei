@@ -5,7 +5,6 @@ import { createLogger } from "@/lib/logger"
 import { buildAgentSystemInstruction } from "@/lib/server/agent-context"
 import {
   inferPromptTaskMode,
-  type PromptTaskMode,
   resolvePromptProvider,
 } from "@/lib/server/agent-prompt-steering"
 import {
@@ -31,7 +30,6 @@ import {
   createE2eAgentStreamResponse,
   isE2eMockModeEnabled,
 } from "@/lib/server/e2e-test-mode"
-import { resolveFinancialServicesWorkflow } from "@/lib/server/financial-services-workflows"
 import { resolveAgentFeatureFlags } from "@/lib/server/integration-flags"
 import type { AgentRuntimeProfileId } from "@/lib/server/llm/agent-runtime"
 import {
@@ -43,7 +41,7 @@ import {
   observeRouteResponse,
 } from "@/lib/server/route-observability"
 import { isThreadStoreNotInitializedError } from "@/lib/server/threads"
-import type { AgentRunMode, FinancialServicesWorkflowId } from "@/lib/shared"
+import type { AgentRunMode } from "@/lib/shared"
 
 export const runtime = "nodejs"
 export const maxDuration = 800
@@ -52,20 +50,8 @@ function resolveRateLimitIdentifier(userId: string): string {
   return `user:${userId}`
 }
 
-function resolveRuntimeProfile(
-  taskMode: PromptTaskMode,
-  runMode: AgentRunMode,
-  financialServicesWorkflow?: FinancialServicesWorkflowId
-): AgentRuntimeProfileId {
-  if (financialServicesWorkflow) {
-    return "finance_analysis"
-  }
-
-  if (runMode === "research") {
-    return "deep_research"
-  }
-
-  return taskMode === "finance_analysis" ? "finance_analysis" : "chat_default"
+function resolveRuntimeProfile(runMode: AgentRunMode): AgentRuntimeProfileId {
+  return runMode === "research" ? "deep_research" : "chat_default"
 }
 
 export async function POST(request: NextRequest) {
@@ -175,29 +161,13 @@ export async function POST(request: NextRequest) {
 
     const requestNow = new Date()
     const userTimeZone = resolveUserTimeZone(request)
-    const featureFlags = await resolveAgentFeatureFlags({
-      userEmail: session.user.email,
-    })
+    const featureFlags = await resolveAgentFeatureFlags()
     const promptProvider = resolvePromptProvider(selectedModel)
     const inferredPromptTaskMode =
       parsedRequest.runMode === "research"
         ? "research"
         : inferPromptTaskMode(parsedRequest.messages)
-    const financialServicesWorkflow = featureFlags.financeWorkflowsEnabled
-      ? resolveFinancialServicesWorkflow({
-          messages: parsedRequest.messages,
-          taskMode: inferredPromptTaskMode,
-          tools: {
-            tavilyEnabled: Boolean(tavilyApiKey?.trim()),
-            secUserAgentConfigured: Boolean(
-              process.env.SEC_API_USER_AGENT?.trim()
-            ),
-          },
-        })
-      : null
-    const promptTaskMode = financialServicesWorkflow
-      ? "finance_analysis"
-      : inferredPromptTaskMode
+    const promptTaskMode = inferredPromptTaskMode
     const systemInstruction = buildAgentSystemInstruction(
       {
         id: session.user.id,
@@ -212,7 +182,6 @@ export async function POST(request: NextRequest) {
         ...(parsedRequest.runMode === "research"
           ? { deepResearchMode: true }
           : {}),
-        ...(financialServicesWorkflow ? { financialServicesWorkflow } : {}),
       }
     )
 
@@ -284,13 +253,8 @@ export async function POST(request: NextRequest) {
         aiGatewayApiKey,
         tavilyApiKey,
         userTimeZone,
-        runtimeProfile: resolveRuntimeProfile(
-          promptTaskMode,
-          parsedRequest.runMode,
-          financialServicesWorkflow?.workflow
-        ),
+        runtimeProfile: resolveRuntimeProfile(parsedRequest.runMode),
         taskMode: promptTaskMode,
-        artifactOwnerId: session.user.id,
         userId: session.user.id,
         featureFlags,
         messages: parsedRequest.messages,

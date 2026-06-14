@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto"
-
 import { createGateway } from "@ai-sdk/gateway"
 import {
   type LanguageModelUsage,
@@ -9,17 +7,12 @@ import {
 } from "ai"
 
 import { createLogger } from "@/lib/logger"
-import {
-  buildAgentArtifactDownloadUrl,
-  getAgentArtifactRunRoot,
-} from "@/lib/server/agent-artifacts"
 import { hydrateBlobBackedAttachments } from "@/lib/server/agent-attachment-blobs"
 import {
   type PromptTaskMode,
   resolvePromptProvider,
 } from "@/lib/server/agent-prompt-steering"
 import {
-  AGENT_FINANCE_TOOL_MAX_STEPS,
   AGENT_RESEARCH_TOOL_MAX_STEPS,
   AGENT_TOOL_MAX_STEPS,
 } from "@/lib/server/agent-runtime-config"
@@ -44,21 +37,9 @@ import {
   shouldNudgeMidBudgetSynthesis,
 } from "./agent-runtime-synthesis-gating"
 import {
-  createAiSdkFinanceDataTools,
-  getAiSdkFinanceDataToolCallMetadata,
-  getAiSdkFinanceDataToolResultMetadata,
-  isAiSdkFinanceDataToolName,
-} from "./ai-sdk-finance-data-tools"
-import {
   getAiSdkGatewayProviderOptionsForMode,
   getAiSdkGatewayProviderOptionsForTaskMode,
 } from "./ai-sdk-gateway-provider-options"
-import {
-  createAiSdkSecFilingsTools,
-  getAiSdkSecFilingsToolCallMetadata,
-  getAiSdkSecFilingsToolResultMetadata,
-  isAiSdkSecFilingsToolName,
-} from "./ai-sdk-sec-filings-tools"
 import {
   createAiSdkTavilyTools,
   getAiSdkTavilyToolCallMetadata,
@@ -66,7 +47,6 @@ import {
   isAiSdkTavilyToolName,
 } from "./ai-sdk-tavily-tools"
 import {
-  type CodeExecutionBackend,
   createAiSdkCodeExecutionTools,
   getAiSdkCodeExecutionToolCallMetadata,
   getAiSdkCodeExecutionToolResultMetadata,
@@ -79,18 +59,10 @@ import { preparePdfAttachmentsForModel } from "./pdf-attachment-preprocessor"
 
 const logger = createLogger("agent-runtime")
 
-const AGENT_ARTIFACT_BASE_URL_PLACEHOLDER = "__artifact_base__"
-
-export type AgentRuntimeProfileId =
-  | "chat_default"
-  | "deep_research"
-  | "finance_analysis"
+export type AgentRuntimeProfileId = "chat_default" | "deep_research"
 
 interface AgentRuntimeProfile {
   id: AgentRuntimeProfileId
-  codeExecutionBackend?: CodeExecutionBackend
-  financeDataEnabled: boolean
-  secFilingsEnabled: boolean
   toolMaxSteps: number
 }
 
@@ -99,7 +71,6 @@ export interface StartAgentRuntimeStreamParams {
   model: ModelType
   aiGatewayApiKey: string
   tavilyApiKey?: string
-  secUserAgent?: string
   userTimeZone?: string
   messages: AgentInputMessage[]
   systemInstruction: string
@@ -107,7 +78,6 @@ export interface StartAgentRuntimeStreamParams {
   taskMode?: PromptTaskMode
   temperature?: number
   signal?: AbortSignal
-  artifactOwnerId?: string
   userId?: string
   featureFlags?: AgentFeatureFlags
 }
@@ -118,38 +88,12 @@ const AGENT_RUNTIME_PROFILES: Record<
 > = {
   chat_default: {
     id: "chat_default",
-    financeDataEnabled: true,
-    secFilingsEnabled: false,
     toolMaxSteps: AGENT_TOOL_MAX_STEPS,
   },
   deep_research: {
     id: "deep_research",
-    financeDataEnabled: true,
-    secFilingsEnabled: false,
     toolMaxSteps: AGENT_RESEARCH_TOOL_MAX_STEPS,
   },
-  finance_analysis: {
-    id: "finance_analysis",
-    codeExecutionBackend: "finance",
-    financeDataEnabled: true,
-    secFilingsEnabled: true,
-    toolMaxSteps: AGENT_FINANCE_TOOL_MAX_STEPS,
-  },
-}
-
-function buildAgentArtifactBaseUrl(artifactId: string): string | undefined {
-  const placeholderUrl = buildAgentArtifactDownloadUrl(
-    artifactId,
-    AGENT_ARTIFACT_BASE_URL_PLACEHOLDER
-  )
-  if (!placeholderUrl) {
-    return undefined
-  }
-
-  const placeholderSuffix = `/${AGENT_ARTIFACT_BASE_URL_PLACEHOLDER}`
-  return placeholderUrl.endsWith(placeholderSuffix)
-    ? placeholderUrl.slice(0, -placeholderSuffix.length)
-    : undefined
 }
 
 const FINAL_SYNTHESIS_STEP_INSTRUCTION = [
@@ -297,7 +241,7 @@ function getUsageLogFields(usage: LanguageModelUsage | undefined) {
 export async function* startAgentRuntimeStream(
   params: StartAgentRuntimeStreamParams
 ): AsyncGenerator<AgentStreamEvent> {
-  const userId = params.userId ?? params.artifactOwnerId
+  const userId = params.userId
   const featureFlags = params.featureFlags ?? getDefaultAgentFeatureFlags()
   const gatewayProvider = createGateway({
     apiKey: params.aiGatewayApiKey,
@@ -353,46 +297,9 @@ export async function* startAgentRuntimeStream(
     return getSourceEvent(id, normalizedUrl, normalizedTitle)
   }
 
-  const artifactRunId =
-    runtimeProfile.id === "finance_analysis" && params.artifactOwnerId
-      ? randomUUID()
-      : undefined
-  const codeExecutionWorkspaceRoot =
-    artifactRunId && params.artifactOwnerId
-      ? getAgentArtifactRunRoot({
-          artifactId: artifactRunId,
-          userId: params.artifactOwnerId,
-        })
-      : undefined
-  const codeExecutionWorkspaceMode = artifactRunId ? "preserve" : undefined
-  const artifactBaseUrl = artifactRunId
-    ? buildAgentArtifactBaseUrl(artifactRunId)
-    : undefined
   const tools = {
-    ...createAiSdkCodeExecutionTools({
-      backend: runtimeProfile.codeExecutionBackend,
-      workspaceMode: codeExecutionWorkspaceMode,
-      workspaceRoot: codeExecutionWorkspaceRoot,
-      artifactBaseUrl,
-      artifactUpload:
-        artifactRunId && userId
-          ? {
-              artifactId: artifactRunId,
-              userId,
-            }
-          : undefined,
-    }),
+    ...createAiSdkCodeExecutionTools(),
     ...createAiSdkTavilyTools(normalizedTavilyApiKey),
-    ...(runtimeProfile.financeDataEnabled
-      ? createAiSdkFinanceDataTools({
-          secUserAgent: params.secUserAgent ?? process.env.SEC_API_USER_AGENT,
-        })
-      : {}),
-    ...(runtimeProfile.secFilingsEnabled
-      ? createAiSdkSecFilingsTools({
-          secUserAgent: params.secUserAgent ?? process.env.SEC_API_USER_AGENT,
-        })
-      : {}),
   } as ToolSet
   const toolNames = Object.keys(tools)
 
@@ -528,9 +435,7 @@ export async function* startAgentRuntimeStream(
     if (part.type === "tool-call") {
       const metadata =
         getAiSdkCodeExecutionToolCallMetadata(part) ??
-        getAiSdkTavilyToolCallMetadata(part) ??
-        getAiSdkFinanceDataToolCallMetadata(part) ??
-        getAiSdkSecFilingsToolCallMetadata(part)
+        getAiSdkTavilyToolCallMetadata(part)
       if (!metadata || seenToolCalls.has(metadata.callId)) {
         continue
       }
@@ -550,9 +455,6 @@ export async function* startAgentRuntimeStream(
         ...("provider" in metadata && metadata.provider
           ? { provider: metadata.provider }
           : {}),
-        ...("attempt" in metadata && metadata.attempt
-          ? { attempt: metadata.attempt }
-          : {}),
       }
       continue
     }
@@ -564,9 +466,7 @@ export async function* startAgentRuntimeStream(
 
       const metadata =
         getAiSdkCodeExecutionToolResultMetadata(part) ??
-        getAiSdkTavilyToolResultMetadata(part) ??
-        getAiSdkFinanceDataToolResultMetadata(part) ??
-        getAiSdkSecFilingsToolResultMetadata(part)
+        getAiSdkTavilyToolResultMetadata(part)
       if (!metadata || finalizedToolCalls.has(metadata.callId)) {
         continue
       }
@@ -583,9 +483,6 @@ export async function* startAgentRuntimeStream(
         ...("provider" in metadata && metadata.provider
           ? { provider: metadata.provider }
           : {}),
-        ...("attempt" in metadata && metadata.attempt
-          ? { attempt: metadata.attempt }
-          : {}),
         ...("durationMs" in metadata && metadata.durationMs !== undefined
           ? { durationMs: metadata.durationMs }
           : {}),
@@ -594,9 +491,6 @@ export async function* startAgentRuntimeStream(
           : {}),
         ...("retryable" in metadata && metadata.retryable !== undefined
           ? { retryable: metadata.retryable }
-          : {}),
-        ...("artifactManifest" in metadata && metadata.artifactManifest?.length
-          ? { artifactManifest: metadata.artifactManifest }
           : {}),
       }
 
@@ -617,9 +511,7 @@ export async function* startAgentRuntimeStream(
     if (
       part.type === "tool-error" &&
       (isAiSdkCodeExecutionToolName(part.toolName) ||
-        isAiSdkTavilyToolName(part.toolName) ||
-        isAiSdkFinanceDataToolName(part.toolName) ||
-        isAiSdkSecFilingsToolName(part.toolName)) &&
+        isAiSdkTavilyToolName(part.toolName)) &&
       !finalizedToolCalls.has(part.toolCallId)
     ) {
       finalizedToolCalls.add(part.toolCallId)

@@ -59,14 +59,20 @@ test("agent route streams through the extracted AI Gateway helper path", async (
 
   assert.match(
     helperSource,
-    /withAiSdkInlineCitationInstruction\(\s*params\.systemInstruction,\s*\{[\s\S]*financeEnabled: shouldIncludeFinanceToolingInstruction\([\s\S]*secFilingsEnabled: shouldIncludeSecFilingsToolingInstruction\([\s\S]*\}\s*\)/,
-    "Expected the helper to pass finance tooling augmentation options."
+    /systemInstruction: withAiSdkInlineCitationInstruction\(\s*params\.systemInstruction\s*\)/,
+    "Expected the helper to augment the system instruction with inline-citation rules only."
+  )
+
+  assert.doesNotMatch(
+    helperSource,
+    /shouldIncludeFinanceToolingInstruction|shouldIncludeSecFilingsToolingInstruction|financeEnabled|secFilingsEnabled/,
+    "Expected the helper to drop the removed finance tooling augmentation options."
   )
 
   assert.match(
     routeSource,
-    /runtimeProfile: resolveRuntimeProfile\(\s*promptTaskMode,\s*parsedRequest\.runMode,\s*financialServicesWorkflow\?\.workflow\s*\)/,
-    "Expected /api/agent to select a runtime profile from the inferred task mode, requested run mode, and finance workflow."
+    /runtimeProfile: resolveRuntimeProfile\(\s*parsedRequest\.runMode\s*\)/,
+    "Expected /api/agent to select a runtime profile from the requested run mode."
   )
 })
 
@@ -135,19 +141,14 @@ test("agent runtime gives supported chat models the same runtime toolset", async
     /shouldEnableAmbientFinanceTools|shouldEnableCodeExecutionTools|shouldEnableModelToolCalling|shouldPrefetchWebEvidence|shouldPrefetchFinanceEvidence/,
     "Expected supported chat models to avoid model-specific tool suppression or prefetch branches."
   )
-  assert.match(
+  assert.doesNotMatch(
     runtimeSource,
-    /runtimeProfile\.financeDataEnabled[\s\S]*createAiSdkFinanceDataTools/,
-    "Expected finance data tools to follow the same runtime profile gate for all models."
+    /createAiSdkFinanceDataTools|createAiSdkSecFilingsTools|financeDataEnabled|secFilingsEnabled|codeExecutionBackend/,
+    "Expected the removed finance and SEC runtime tooling to be gone for all models."
   )
   assert.match(
     runtimeSource,
-    /runtimeProfile\.secFilingsEnabled[\s\S]*createAiSdkSecFilingsTools/,
-    "Expected SEC filing tools to follow the finance runtime profile gate."
-  )
-  assert.match(
-    runtimeSource,
-    /createAiSdkCodeExecutionTools\(\{[\s\S]*backend: runtimeProfile\.codeExecutionBackend/,
+    /createAiSdkCodeExecutionTools\(\)/,
     "Expected code execution tools to be created for all chat models."
   )
   assert.match(
@@ -155,10 +156,10 @@ test("agent runtime gives supported chat models the same runtime toolset", async
     /createAiSdkTavilyTools\(normalizedTavilyApiKey\)/,
     "Expected Tavily tools to be created for all chat models."
   )
-  assert.match(
+  assert.doesNotMatch(
     helperSource,
-    /function shouldIncludeFinanceToolingInstruction[\s\S]*return true/,
-    "Expected finance tooling instructions to be available to all selected models."
+    /shouldIncludeFinanceToolingInstruction|shouldIncludeSecFilingsToolingInstruction/,
+    "Expected removed finance tooling-instruction helpers to be gone from the route helper."
   )
   assert.doesNotMatch(
     runtimeSource,

@@ -48,39 +48,25 @@ test("parseStreamEventLine parses extended tool result metadata", () => {
   const line = JSON.stringify({
     type: "tool_result",
     callId: "call-1",
-    toolName: "finance_data",
+    toolName: "code_execution",
     status: "error",
-    operation: "quote",
-    provider: "stooq",
+    operation: "python",
+    provider: "local",
     durationMs: 42,
-    errorCode: "HTTP_429",
+    errorCode: "EXIT_NON_ZERO",
     retryable: true,
-    artifactManifest: [
-      {
-        path: "finance_artifact.xlsx",
-        sizeBytes: 1024,
-        url: "/api/agent/artifacts/run-1/finance_artifact.xlsx",
-      },
-    ],
   })
 
   assert.deepEqual(parseStreamEventLine(line), {
     type: "tool_result",
     callId: "call-1",
-    toolName: "finance_data",
+    toolName: "code_execution",
     status: "error",
-    operation: "quote",
-    provider: "stooq",
+    operation: "python",
+    provider: "local",
     durationMs: 42,
-    errorCode: "HTTP_429",
+    errorCode: "EXIT_NON_ZERO",
     retryable: true,
-    artifactManifest: [
-      {
-        path: "finance_artifact.xlsx",
-        sizeBytes: 1024,
-        url: "/api/agent/artifacts/run-1/finance_artifact.xlsx",
-      },
-    ],
   })
 })
 
@@ -113,41 +99,9 @@ test("parseStreamEventLine rejects malformed checkpoint and tool data", () => {
       JSON.stringify({
         type: "tool_result",
         callId: "call-1",
-        toolName: "finance_data",
+        toolName: "tavily_search",
         status: "error",
         operation: "   ",
-      })
-    ),
-    null
-  )
-
-  assert.equal(
-    parseStreamEventLine(
-      JSON.stringify({
-        type: "tool_result",
-        callId: "call-1",
-        toolName: "code_execution",
-        status: "success",
-        artifactManifest: [{ path: "../escape.xlsx", sizeBytes: 1 }],
-      })
-    ),
-    null
-  )
-
-  assert.equal(
-    parseStreamEventLine(
-      JSON.stringify({
-        type: "tool_result",
-        callId: "call-1",
-        toolName: "code_execution",
-        status: "success",
-        artifactManifest: [
-          {
-            path: "finance_artifact.xlsx",
-            sizeBytes: 1,
-            url: "https://example.com/finance_artifact.xlsx",
-          },
-        ],
       })
     ),
     null

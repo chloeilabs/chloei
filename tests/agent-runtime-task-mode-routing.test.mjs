@@ -32,13 +32,8 @@ test("getAiSdkGatewayProviderOptionsForMode preserves legacy deep-research behav
   )
 })
 
-test("Gemini gets high thinking for finance, research, high_stakes, debugging", () => {
-  for (const taskMode of [
-    "finance_analysis",
-    "research",
-    "high_stakes",
-    "debugging",
-  ]) {
+test("Gemini gets high thinking for research, high_stakes, debugging", () => {
+  for (const taskMode of ["research", "high_stakes", "debugging"]) {
     assert.deepEqual(
       getAiSdkGatewayProviderOptionsForTaskMode({
         provider: "google",
@@ -99,13 +94,7 @@ test("Gemini falls back to default thinking for general/writing", () => {
 })
 
 test("non-Gemini reasoning models receive no explicit provider options", () => {
-  for (const taskMode of [
-    "finance_analysis",
-    "research",
-    "coding",
-    "debugging",
-    "general",
-  ]) {
+  for (const taskMode of ["research", "coding", "debugging", "general"]) {
     for (const provider of ["alibaba", "moonshotai", "xiaomi"]) {
       assert.deepEqual(
         getAiSdkGatewayProviderOptionsForTaskMode({

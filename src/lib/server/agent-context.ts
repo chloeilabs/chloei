@@ -3,8 +3,6 @@ import {
   DEEP_RESEARCH_SYSTEM_INSTRUCTION,
   DEFAULT_OPERATING_INSTRUCTION,
   DEFAULT_SOUL_FALLBACK_INSTRUCTION,
-  type FinancialServicesSkillId,
-  type FinancialServicesWorkflowId,
 } from "@/lib/shared"
 
 import {
@@ -14,11 +12,6 @@ import {
 } from "./agent-prompt-steering"
 
 interface RuntimePromptContext {
-  financialServicesWorkflow?: {
-    workflow: FinancialServicesWorkflowId
-    skillIds: readonly FinancialServicesSkillId[]
-    promptBlock: string
-  }
   now: Date
   userTimeZone?: string
   deepResearchMode?: boolean
@@ -137,15 +130,6 @@ function composeSystemInstruction(params: {
   if (params.runtimeContext.deepResearchMode) {
     blocks.push(
       formatPromptBlock("DEEP RESEARCH MODE", DEEP_RESEARCH_SYSTEM_INSTRUCTION)
-    )
-  }
-
-  if (params.runtimeContext.financialServicesWorkflow) {
-    blocks.push(
-      formatPromptBlock(
-        "FINANCIAL SERVICES WORKFLOW",
-        params.runtimeContext.financialServicesWorkflow.promptBlock
-      )
     )
   }
 

@@ -21,7 +21,7 @@ test("shouldForceFinalSynthesisStep fires only on the last step", () => {
 })
 
 test("shouldNudgeMidBudgetSynthesis kicks in around one-third budget", () => {
-  // finance_analysis budget = 20 → threshold = floor(20/3) = 6
+  // deep_research budget = 20 → threshold = floor(20/3) = 6
   assert.equal(shouldNudgeMidBudgetSynthesis(5, 20), false)
   assert.equal(shouldNudgeMidBudgetSynthesis(6, 20), true)
   assert.equal(shouldNudgeMidBudgetSynthesis(12, 20), true)

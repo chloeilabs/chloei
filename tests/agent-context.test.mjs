@@ -106,20 +106,6 @@ test("deep research mode block toggles with the flag", () => {
   assert.ok(on.includes("--- BEGIN DEEP RESEARCH MODE ---"))
 })
 
-test("financial services workflow block is injected when provided", () => {
-  const prompt = buildAgentSystemInstruction(viewer, {
-    ...baseContext,
-    financialServicesWorkflow: {
-      workflow: "equity_research",
-      skillIds: [],
-      promptBlock: "FS-WORKFLOW-SENTINEL",
-    },
-  })
-
-  assert.ok(prompt.includes("--- BEGIN FINANCIAL SERVICES WORKFLOW ---"))
-  assert.ok(prompt.includes("FS-WORKFLOW-SENTINEL"))
-})
-
 test("provider and task-mode overlays respect their toggles", () => {
   const withOverlays = buildAgentSystemInstruction(viewer, {
     ...baseContext,

@@ -16,11 +16,10 @@ export type PromptTaskMode =
   | "coding"
   | "debugging"
   | "writing"
-  | "finance_analysis"
   | "research"
   | "high_stakes"
 
-type UserExpertiseHint = "finance" | "engineering" | "writing" | "research"
+type UserExpertiseHint = "engineering" | "writing" | "research"
 
 type PromptSteeringMessage = PromptTextMessage
 
@@ -40,11 +39,6 @@ interface InferPromptTaskModeOptions {
   userExpertise?: UserExpertiseHint
 }
 
-// "stock up", "stocking up", and "in stock" are common non-finance idioms that
-// the bare /stock/ pattern would otherwise misclassify as finance_analysis.
-const FINANCE_FALSE_POSITIVE_PATTERN =
-  /\b(stock(?:ing|ed)?\s+up|in\s+stock|out\s+of\s+stock|gold\s+(?:medal|standard|star)|oil\s+(?:painting|change)|bitcoin\s+(?:movie|documentary))\b/i
-
 const CODING_PATTERN =
   /\b(code|coding|function|class|script|algorithm|typescript|javascript|python|sql|regex|unit test|implement|write a program|refactor|module|library|api endpoint|compile|build error)\b/i
 // Debugging is a distinct category: triage/diagnosis work that benefits from
@@ -57,10 +51,6 @@ const RESEARCH_PATTERN =
   /\b(latest|current|today|recent|as of|sources?|cite|citation|link|look up|lookup|verify|check the web|news|price right now|right now|breaking|trending|happening (?:now|today))\b/i
 const HIGH_STAKES_PATTERN =
   /\b(bank|password|phish(?:ed|ing)?|security|medical|doctor|symptom|symptoms|dose|dosage|prescription|pregnant|lawsuit|legal|tax|suicid|self-harm|chest pain|emergency|infection|overdose)\b/i
-// "multiple" alone is too generic ("multiple choice") so only count it when it
-// follows a finance-specific qualifier.
-const FINANCE_ANALYSIS_PATTERN =
-  /\b(stocks?|equit(?:y|ies)|ticker|symbol|quote|quotes|company profile|finance data|financial data|finance provider|finance providers|structured finance|etf|fundamental|valuation|dcf|(?:valuation|earnings|forward|trading|p\/e|pe|ev\/ebitda)\s+multiples?|ev\/ebitda|ebitda|revenue|gross margin|operating margin|free cash flow|fcf|cash flow|income statement|balance sheet|financial statement|filing|10-k|10-q|earnings|guidance|dividend|buyback|market cap|enterprise value|treasury|yield curve|interest rate|fed funds|cpi|inflation|gdp|macro|fred|fx|foreign exchange|currency pair|commodity|commodities|oil price|crude|gold price|crypto|bitcoin|ethereum|portfolio return|sharpe|beta|drawdown)\b/i
 const CLOSED_ANSWER_PATTERN =
   /\b(multiple choice|choose one|which option|final answer|exact answer|boxed|answer:|confidence:|A\)|B\)|C\)|D\))\b/i
 const STRICT_OUTPUT_PATTERN =
@@ -141,25 +131,6 @@ This request is a writing/editing task.
 - Length caps are hard caps; count before finishing when close to the limit.
 - Skip preambles like "Sure, here is your draft" — return the deliverable.
 `.trim(),
-  finance_analysis: `
-This request is finance-analysis work.
-- Prefer structured finance tools for market data, company facts, filings, statements, historical prices, macro/rates, FX, and crypto where available.
-- When the user asks what finance providers or capabilities are available, call \`finance_data\` with \`provider_status\` and answer from that status. Do not run representative data probes after a provider is reported unavailable.
-- For ordinary public-company quote/profile requests, use \`finance_data\` with provider \`auto\`: quote resolves to Stooq and company_profile resolves to SEC submissions. Do not use Tavily or web search for quote/profile while these structured tools are available.
-- For public-company statements, use \`finance_data\` \`financial_statements\` with provider \`auto\` and the requested \`statementType\` (\`income\`, \`balance_sheet\`, or \`cash_flow\`); this resolves to SEC company facts. If margins, growth rates, free cash flow, leverage ratios, or comparisons are requested, run \`code_execution\` to verify the arithmetic.
-- For 10-K/10-Q prompts asking for cash flow, capex, liabilities, debt, assets, equity, or balance-sheet items, call \`finance_data\` first instead of searching EDGAR pages. The statement result includes SEC company-facts and filing source URLs when available; cite those directly. Use search only for narrative filing excerpts or facts not present in structured data.
-- For filing-specific public-company questions, use \`sec_filings\` for EDGAR company lookup, filing search, full document fetch, section extraction, table extraction, and targeted retrieval over filing text.
-- Use search or extraction for market news, unsupported assets, methodology checks, or source-backed claims that structured tools do not cover.
-- Use code execution for valuation math, return calculations, statement transformations, table joins, chart/statistical checks, and any arithmetic that could change the conclusion.
-- Distinguish reported facts, computed values, assumptions, and interpretation.
-- Do not provide personalized investment, tax, legal, or trade-execution advice. Frame analysis as informational unless the user provided an institutional workflow.
-- When data is unavailable, stale, or provider-specific, say that plainly and do not fill gaps with invented figures.
-- Stay on the finance task. Do not narrate unrelated wording, country-name, or language-usage considerations.
-- Mirror the user's exact terminology in your final answer. If they asked about "operating margin", "CET1", "net interest income", "cash flow from operations", or "capital and exploration expenditures", use those exact phrases — do not paraphrase to synonyms a grader or screen-reader would miss.
-- For multi-period comparisons ("compare X across the last N fiscal years", "show the 3-year trend"), call \`finance_data\` with \`sec_company_facts\` once — it returns the full multi-period timeseries — then compute the comparison in \`code_execution\`. Do not make N separate \`financial_statements\` calls for the same metric across N periods.
-- Do not re-search the web (Tavily) for data you already have from \`sec_filings\` or \`finance_data\`. Pick one structured source per metric; web search is for narrative or non-structured context only.
-- Never finish your turn with no text. After gathering evidence, you must write the synthesis: numbers, terminology, citations, and a brief takeaway. If evidence is partial or contradictory, name what you found and what is missing — silence is a worse failure than an incomplete answer.
-`.trim(),
   research: `
 This request needs deep research, freshness, sources, or verification.
 - Clarify missing scope only when the missing detail would materially change the research plan; otherwise proceed with stated assumptions.
@@ -201,14 +172,6 @@ export function resolvePromptProvider(model: ModelType): PromptProvider {
   throw new Error(`Unsupported model provider for model: ${model}`)
 }
 
-function detectFinanceAnalysis(text: string): boolean {
-  if (!FINANCE_ANALYSIS_PATTERN.test(text)) {
-    return false
-  }
-
-  return !FINANCE_FALSE_POSITIVE_PATTERN.test(text)
-}
-
 export function inferPromptTaskMode(
   messages: readonly PromptSteeringMessage[],
   options: InferPromptTaskModeOptions = {}
@@ -230,9 +193,6 @@ export function inferPromptTaskMode(
     STRICT_OUTPUT_PATTERN.test(fullUserText)
   const highStakes = HIGH_STAKES_PATTERN.test(lastUserMessage)
   const financialAdvice = hasPersonalFinancialAdviceIntent(lastUserMessage)
-  const financeAnalysis =
-    detectFinanceAnalysis(lastUserMessage) ||
-    detectFinanceAnalysis(fullUserText)
   const research =
     RESEARCH_PATTERN.test(lastUserMessage) ||
     RESEARCH_PATTERN.test(fullUserText)
@@ -248,10 +208,6 @@ export function inferPromptTaskMode(
 
   if (highStakes) {
     return "high_stakes"
-  }
-
-  if (financeAnalysis) {
-    return "finance_analysis"
   }
 
   if (debugging) {
@@ -276,12 +232,6 @@ export function inferPromptTaskMode(
 
   if (strictOutput) {
     return "instruction_following"
-  }
-
-  // Expertise-driven fallback: a known finance analyst asking a borderline
-  // question that didn't trip any pattern still routes to finance_analysis.
-  if (options.userExpertise === "finance") {
-    return "finance_analysis"
   }
 
   if (options.userExpertise === "research") {

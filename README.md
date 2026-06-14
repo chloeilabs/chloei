@@ -1,6 +1,6 @@
 # Chloei
 
-Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently exposes a curated model selector that defaults to Qwen 3.7 Max and also includes Kimi K2.6 and MiMo V2.5 Pro, routes Research mode to Qwen 3.7 Max with a dedicated Deep Research instruction template, and offers private Blob-backed file attachments, local code execution, optional Tavily retrieval, normalized finance data, SEC/EDGAR filing retrieval, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
+Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently exposes a curated model selector that defaults to Qwen 3.7 Max and also includes Kimi K2.6 and MiMo V2.5 Pro, routes Research mode to Qwen 3.7 Max with a dedicated Deep Research instruction template, and offers private Blob-backed file attachments, local code execution, optional Tavily retrieval, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
 
 ## Documentation
 
@@ -8,7 +8,6 @@ Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently expose
 - **[AGENTS.md](AGENTS.md)** — environment setup for coding agents (Cursor Cloud specifics, build/test commands, gotchas).
 - **[docs/vercel-production-launch-readiness.md](docs/vercel-production-launch-readiness.md)** — production launch checklist (security, reliability, performance, rollback).
 - **[docs/managed-integrations-rollout.md](docs/managed-integrations-rollout.md)** — managed-integration rollout/rollback runbook (Neon, feature flags).
-- **[docs/finance-research-quality.md](docs/finance-research-quality.md)** — quality checklist for public-markets finance-agent runs.
 
 ## Requirements
 
@@ -75,7 +74,7 @@ pnpm exec playwright install --with-deps chromium
 5. Merge to `main` after the preview passes, then confirm production is aliased to [chloei.ai](https://chloei.ai).
 6. Run one authenticated production smoke test: sign in, load models, send a prompt, and verify an existing thread still reopens cleanly.
 
-Managed integration rollout, rollback, duplicate-cleanup, and smoke-test steps live in [docs/managed-integrations-rollout.md](docs/managed-integrations-rollout.md). Public-markets finance answer quality checks live in [docs/finance-research-quality.md](docs/finance-research-quality.md).
+Managed integration rollout, rollback, duplicate-cleanup, and smoke-test steps live in [docs/managed-integrations-rollout.md](docs/managed-integrations-rollout.md).
 
 ## Environment
 
@@ -92,9 +91,8 @@ Managed integration rollout, rollback, duplicate-cleanup, and smoke-test steps l
 Optional feature-enabling variables:
 
 - `TAVILY_API_KEY`: enables Tavily search and extract callable tools for chat requests
-- `BLOB_READ_WRITE_TOKEN`: enables private Blob upload/download and private agent artifact URLs
-- `AGENT_TELEMETRY_RECORD_IO`, `AGENT_FINANCE_WORKFLOWS_ENABLED`: feature gates; defaults are off unless explicitly set or synced through Edge Config
-- `SEC_API_USER_AGENT`: identifies Chloei for SEC public company-facts requests
+- `BLOB_READ_WRITE_TOKEN`: enables private Blob attachment upload/download
+- `AGENT_TELEMETRY_RECORD_IO`: feature gate; defaults off unless explicitly set or synced through Edge Config
 
 Agent request limits, timeouts, tool-step budgets, and the rate-limit window/concurrency are fixed safe constants in `src/lib/server/agent-runtime-config.ts` (no env knobs). `AGENT_RATE_LIMIT_STORE` defaults to `auto`, which uses PostgreSQL when `DATABASE_URL` is configured and falls back to process memory for local/no-database runs (allowed values: `auto`, `postgres`, `memory`); `AGENT_RATE_LIMIT_ENABLED` is a kill switch.
 
@@ -113,8 +111,6 @@ Agent request limits, timeouts, tool-step budgets, and the rate-limit window/con
 
 - The current model list is defined in `src/lib/shared/llm/models.ts`.
 - `/`, `/api/agent`, and `/api/models` require an authenticated Better Auth session.
-- `finance_data` normalizes finance operations across SEC public company facts and Stooq, with quotes and historical prices from Stooq and company profiles, financial statements, SEC company facts, and symbol search from SEC/EDGAR.
-- `sec_filings` is available when a normal chat or Research request is inferred as finance-analysis work, covering SEC/EDGAR company lookup, filing search, full filing fetches, section extraction, table extraction, and targeted retrieval over filing text.
 - To share logins with another Chloei app, point both apps at the same Better Auth database and secret, set `BETTER_AUTH_COOKIE_DOMAIN` to the shared parent domain, and include every live subdomain in `BETTER_AUTH_TRUSTED_ORIGINS`.
 - Rate limiting and concurrency protection are PostgreSQL-backed when `DATABASE_URL` is configured. Local/no-database runs fall back to in-memory limits unless `AGENT_RATE_LIMIT_STORE=postgres` is set.
 - App storage does not self-initialize on live requests. Vercel deployments in this repo run `pnpm migrate` before `next build`.

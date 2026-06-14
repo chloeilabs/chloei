@@ -133,7 +133,7 @@ test("agent system prompt only adds the Deep Research block for Research mode", 
   assert.equal(prompt.includes("--- BEGIN DEEP RESEARCH MODE ---"), false)
 })
 
-test("agent system prompt injects financial services workflow after task steering", () => {
+test("agent system prompt places the identity block after task steering", () => {
   const prompt = buildAgentSystemInstruction(
     {
       id: "user-1",
@@ -143,34 +143,20 @@ test("agent system prompt injects financial services workflow after task steerin
     {
       now: new Date("2026-05-03T12:34:56.000Z"),
       provider: "google",
-      taskMode: "finance_analysis",
-      financialServicesWorkflow: {
-        workflow: "financial_modeling",
-        skillIds: ["model-builder", "dcf-model"],
-        promptBlock:
-          "# Chloei Financial Services Workflow\n\nSelected workflow: financial_modeling\n\n## Selected Skills\n## Skill: dcf-model",
-      },
+      taskMode: "coding",
     }
   )
 
   const operatingIndex = prompt.indexOf("--- BEGIN OPERATING INSTRUCTIONS ---")
-  const taskIndex = prompt.indexOf(
-    "--- BEGIN TASK MODE OVERLAY: FINANCE_ANALYSIS ---"
-  )
-  const workflowIndex = prompt.indexOf(
-    "--- BEGIN FINANCIAL SERVICES WORKFLOW ---"
-  )
+  const taskIndex = prompt.indexOf("--- BEGIN TASK MODE OVERLAY: CODING ---")
   const identityIndex = prompt.indexOf(
     "--- BEGIN IDENTITY AND TONE CONTEXT ---"
   )
 
   assert(operatingIndex >= 0, "OPERATING INSTRUCTIONS block not found")
-  assert(taskIndex >= 0, "FINANCE_ANALYSIS task block not found")
-  assert(workflowIndex > taskIndex, "Workflow should follow task steering")
+  assert(taskIndex >= 0, "CODING task block not found")
   assert(
-    identityIndex > workflowIndex,
-    "Identity and tone should follow workflow block"
+    identityIndex > taskIndex,
+    "Identity and tone should follow task steering"
   )
-  assert.match(prompt, /Selected workflow: financial_modeling/)
-  assert.match(prompt, /Skill: dcf-model/)
 })

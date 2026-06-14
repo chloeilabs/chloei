@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Chloei is a **Next.js 16 / React 19** authenticated AI chat app backed by the **Vercel AI Gateway**. A single streaming agent endpoint (`/api/agent`) runs a multi-step tool-using loop (web search, code execution, finance data, SEC filings) and streams NDJSON to the browser. Auth, sessions, threads, and rate limiting are **PostgreSQL-backed** (Better Auth + Kysely/`pg`).
+Chloei is a **Next.js 16 / React 19** authenticated AI chat app backed by the **Vercel AI Gateway**. A single streaming agent endpoint (`/api/agent`) runs a multi-step tool-using loop (web search, code execution) and streams NDJSON to the browser. Auth, sessions, threads, and rate limiting are **PostgreSQL-backed** (Better Auth + Kysely/`pg`).
 
 > **Maintaining this file:** keep it accurate and concise — stale or bloated guidance makes Claude ignore the parts that matter. Cite durable anchors (file paths + symbol names), not line numbers. When you change a subsystem, update the matching section here in the same PR.
 
@@ -56,7 +56,7 @@ Client (useAgentSession)
     → Zod validation (parseAgentStreamRequest) — incl. runMode (chat|research) and model
     → Concurrency slot acquire (max 4 in-flight per user)
     → System prompt assembly (buildAgentSystemInstruction)
-    → Runtime profile resolution (chat_default | deep_research | finance_analysis)
+    → Runtime profile resolution (chat_default | deep_research)
     → AI Gateway stream via Vercel AI SDK (startGatewayResponseStream → runAgentStream)
     → NDJSON chunks (application/x-ndjson) → client
       → readResponseStreamLines / parseStreamEventLine
@@ -81,8 +81,8 @@ This boundary is **enforced by Next.js bundling at build time** (importing `pg`/
 
 These are easy to confuse. They are orthogonal:
 
-- **Runtime profile** (`resolveRuntimeProfile` in `app/api/agent/route.ts`, `AGENT_RUNTIME_PROFILES` in `agent-runtime.ts`) — one of `chat_default`, `deep_research`, `finance_analysis`. The profile drives the **tool set**, the **code-execution backend** (`finance` for `finance_analysis`), the **tool-step budget**, and artifact/workspace behavior.
-- **Task mode** (`inferPromptTaskMode` in `agent-prompt-steering.ts`) — inferred from message content; drives only the **prompt overlay text** and the Gemini thinking level. Modes: `general`, `coding`, `debugging`, `writing`, `research`, `finance_analysis`, `high_stakes`, `closed_answer`, `instruction_following`.
+- **Runtime profile** (`resolveRuntimeProfile` in `app/api/agent/route.ts`, `AGENT_RUNTIME_PROFILES` in `agent-runtime.ts`) — one of `chat_default`, `deep_research`. The profile drives the **tool-step budget** (the tool set itself is the same for both).
+- **Task mode** (`inferPromptTaskMode` in `agent-prompt-steering.ts`) — inferred from message content; drives only the **prompt overlay text** and the Gemini thinking level. Modes: `general`, `coding`, `debugging`, `writing`, `research`, `high_stakes`, `closed_answer`, `instruction_following`.
 
 Research mode is a **request flag** (`runMode: "research"`), not an inference. It selects the `deep_research` profile and `RESEARCH_MODEL` (Qwen 3.7 Max); if that model is unavailable the route returns 400 `AGENT_RESEARCH_MODEL_UNAVAILABLE`.
 
@@ -95,11 +95,10 @@ Research mode is a **request flag** (`runMode: "research"`), not an inference. I
 3. **Provider overlay** (`PROVIDER OVERLAY: ALIBABA|GOOGLE|MOONSHOTAI|XIAOMI`) — keyed by the model's **provider org**, not its nickname (alibaba=Qwen, google=Gemini, moonshotai=Kimi, xiaomi=MiMo). Always applied for a supported model.
 4. **Task mode overlay** (`TASK MODE OVERLAY: <MODE>`)
 5. `DEEP RESEARCH MODE` — only for `runMode: "research"`
-6. `FINANCIAL SERVICES WORKFLOW` — only when a financial-services workflow resolves (`financeWorkflowsEnabled` flag)
-7. `IDENTITY AND TONE CONTEXT` — `DEFAULT_SOUL_FALLBACK_INSTRUCTION` (`src/lib/shared/llm/system-instructions.ts`)
-8. `AUTH USER CONTEXT` — authenticated user id, name, email
+6. `IDENTITY AND TONE CONTEXT` — `DEFAULT_SOUL_FALLBACK_INSTRUCTION` (`src/lib/shared/llm/system-instructions.ts`)
+7. `AUTH USER CONTEXT` — authenticated user id, name, email
 
-Inline-citation rules and finance tool rules are appended **later**, by `withAiSdkInlineCitationInstruction` (`system-instruction-augmentations.ts`), inside `createAgentStreamResponse` — not by `buildAgentSystemInstruction`.
+Inline-citation rules are appended **later**, by `withAiSdkInlineCitationInstruction` (`system-instruction-augmentations.ts`), inside `createAgentStreamResponse` — not by `buildAgentSystemInstruction`.
 
 ### Streaming Protocol
 
@@ -111,7 +110,7 @@ Event types:
 - `reasoning_delta` — incremental reasoning text (sanitized + redacted-placeholder-filtered; see below)
 - `agent_status` — `in_progress | completed | failed | cancelled | incomplete`
 - `tool_call` — tool start: `callId`, `toolName`, `label`, plus optional `query`, `operation`, `provider`
-- `tool_result` — tool result: `callId`, `status: success | error`, plus optional `operation`, `provider`, `attempt`, `durationMs`, `errorCode`, `retryable`, `artifactManifest`
+- `tool_result` — tool result: `callId`, `status: success | error`, plus optional `operation`, `provider`, `durationMs`, `errorCode`, `retryable`
 - `source` — citation source: `id`, `url`, `title`
 
 Every event also carries optional `interactionId` and `lastEventId` checkpoint fields.
@@ -140,32 +139,23 @@ User ids are never written into blob storage paths: `hashUserId` (`src/lib/serve
 
 ### Agent Tools
 
-Each tool is only registered when its requirements are met, **and** when the active runtime profile enables it. Finance tools (`finance_data`, `sec_filings`) and the finance code-execution backend are enabled for the `finance_analysis` profile.
+Each tool is only registered when its requirements are met.
 
-| Tool             | Requirement          | Tool id / operations                                                                                                                     |
-| ---------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `tavily_search`  | `TAVILY_API_KEY`     | Web search. `topic: general\|news\|finance`, `timeRange`, `includeDomains`, `excludeDomains`, `country`; up to **8** results (default 5) |
-| `tavily_extract` | `TAVILY_API_KEY`     | Extract content from up to **5** URLs; `extractDepth: basic\|advanced` (default advanced), `format: markdown\|text`                      |
-| `code_execution` | always on            | `language: javascript\|python`; backend resolved from profile / `AGENT_CODE_EXECUTION_BACKEND`                                           |
-| `finance_data`   | public Stooq/SEC     | ops: `provider_status \| symbol_search \| quote \| company_profile \| historical_prices \| financial_statements \| sec_company_facts`    |
-| `sec_filings`    | public SEC endpoints | ops: `company_search \| filing_search \| document_fetch \| section_extract \| table_extract \| retrieve_information`                     |
+| Tool             | Requirement      | Tool id / operations                                                                                                                     |
+| ---------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `tavily_search`  | `TAVILY_API_KEY` | Web search. `topic: general\|news\|finance`, `timeRange`, `includeDomains`, `excludeDomains`, `country`; up to **8** results (default 5) |
+| `tavily_extract` | `TAVILY_API_KEY` | Extract content from up to **5** URLs; `extractDepth: basic\|advanced` (default advanced), `format: markdown\|text`                      |
+| `code_execution` | always on        | `language: javascript\|python`; runs on the restricted computation-only backend                                                          |
 
 **Code execution** (`src/lib/server/llm/code-execution-tools.ts`):
 
 - Runs in a temp directory; network/filesystem/subprocess access blocked.
 - JavaScript: runs via the Node binary (`process.execPath`) with `--input-type=module --eval`.
 - Python: runs via `python3 -I -c` (the `python3` binary on `PATH`).
-- **Restricted backend** (default): computation-only Python imports (`math`, `collections`, `itertools`, …).
-- **Finance backend** (`AGENT_CODE_EXECUTION_BACKEND=finance`, or the `finance_analysis` profile): adds `pandas`, `numpy`, `scipy`, `openpyxl`, `xlsxwriter`, `matplotlib`, `statsmodels`, plus `dateutil`, `mpl_toolkits`, `zipfile`. Network/subprocess stay blocked; file access is restricted to the workspace + temp dir (mounted reference files are readable by relative path). Optional interpreter via `AGENT_CODE_EXECUTION_PYTHON_VENV_PATH`.
+- **Restricted backend** (the only backend): computation-only Python imports (`math`, `collections`, `itertools`, …).
 - **Limits**: timeout default **10 s**, max **60 s**; code input and output each capped at **12,000 chars**.
 
-**Finance data** (`ai-sdk-finance-data-tools.ts`): quotes + historical prices come from **Stooq** (keyless, delayed); company profiles, statements, company facts, and symbol search come from **SEC/EDGAR**. `provider: auto|sec|stooq`. Source URLs are sanitized (api keys stripped); errors carry `retryable` metadata. Internal fetch: 2 attempts, 12 s timeout. SEC requests use `SEC_API_USER_AGENT`, falling back to a generic UA (surfaced in `provider_status`).
-
-**SEC filings** (`ai-sdk-sec-filings-tools.ts`): EDGAR retrieval/extraction over filing text. Only `https://www.sec.gov/Archives/edgar/data/...` URLs are accepted. Caps: default 25,000 / max 80,000 chars per fetch; default 10 / max 50 results. Pass `accessionNumber` through `document_fetch`/`section_extract`/`table_extract`/`retrieve_information` to stay on the same filing. Quality expectations: `docs/finance-research-quality.md`.
-
-**Artifacts** (`src/lib/server/agent-artifacts.ts`): only the **finance backend with a preserved workspace** emits artifacts. Generated files (≤ 50) are collected into an `artifactManifest` (`{ path, sizeBytes, url? }`), excluding mounted inputs and `__pycache__`. URLs are either private Vercel Blob links or the local authenticated route `/api/agent/artifacts/{artifactId}/{...path}` (path-traversal-safe, per-user scoped, `Content-Disposition: attachment`). Storage root: `<tmpdir>/chloei-agent-artifacts`.
-
-**Max tool steps** (constants in `agent-runtime-config.ts`): 12 default; 20 for research and finance-analysis runs.
+**Max tool steps** (constants in `agent-runtime-config.ts`): 12 default; 20 for research runs.
 
 ### Model Registry
 
@@ -251,12 +241,11 @@ Image and PDF attachments use a two-tier client flow plus private server storage
 
 ### Feature Flags
 
-`src/lib/server/integration-flags.ts` resolves two default-off flags: `telemetryRecordIo`, `financeWorkflowsEnabled`. Precedence:
+`src/lib/server/integration-flags.ts` resolves one default-off flag: `telemetryRecordIo`. Precedence:
 
-1. Explicit `AGENT_*` env vars (`AGENT_TELEMETRY_RECORD_IO`, `AGENT_FINANCE_WORKFLOWS_ENABLED`).
-2. Edge Config (`EDGE_CONFIG`) — checked across three map namespaces in order: **`agent_flags`, `analytics_flags`, `flags`**, matching dotted keys (`agent.telemetry.record_io`, `agent.finance_workflows.enabled`) or their Vercel slug form (`agent-telemetry-record-io`, …), then top-level fallback keys.
-3. Internal-user defaults — when `AGENT_ENABLE_NEW_CAPABILITIES_FOR_INTERNAL_USERS=true`, `financeWorkflowsEnabled` turns on for users in `AGENT_INTERNAL_USER_EMAILS` / `AGENT_INTERNAL_USER_EMAIL_DOMAINS` (telemetry IO is **not** flipped by this).
-4. Built-in defaults (off).
+1. Explicit `AGENT_*` env var (`AGENT_TELEMETRY_RECORD_IO`).
+2. Edge Config (`EDGE_CONFIG`) — checked across three map namespaces in order: **`agent_flags`, `analytics_flags`, `flags`**, matching the dotted key (`agent.telemetry.record_io`) or its Vercel slug form (`agent-telemetry-record-io`), then top-level fallback keys.
+3. Built-in default (off).
 
 ### Observability and Telemetry
 
@@ -280,7 +269,6 @@ src/
     api/
       agent/route.ts       # POST /api/agent — streaming agent endpoint
       agent/follow-ups/    # Follow-up question suggestions
-      agent/artifacts/     # Authenticated code-execution artifact downloads
       auth/[...all]/       # Better Auth catch-all
       models/route.ts      # GET /api/models — available models for configured keys
       threads/route.ts     # GET/PUT/DELETE /api/threads — thread CRUD
@@ -314,7 +302,6 @@ src/
       agent-prompt-steering.ts  # Task-mode inference + provider/task overlays
       agent-route.ts            # parseAgentStreamRequest, createAgentStreamResponse
       agent-runtime-config.ts   # Runtime constants + a few operational env switches
-      agent-artifacts.ts        # Artifact storage root + download URL helpers
       agent-attachment-blobs.ts # Blob-backed attachment hydration
       auth.ts / auth-session.ts # isAuthConfigured, getRequestSession
       integration-flags.ts      # Default-off feature flags (env + Edge Config)
@@ -330,15 +317,12 @@ src/
         gateway-responses.ts              # startGatewayResponseStream
         gateway-client.ts                 # undici dispatcher for AI Gateway
         ai-sdk-gateway-provider-options.ts # Per-model provider options (Gemini thinking)
-        ai-sdk-finance-data-tools.ts      # finance_data tool (Stooq, SEC)
-        ai-sdk-sec-filings-tools.ts       # sec_filings tool (EDGAR)
         ai-sdk-tavily-tools.ts            # tavily_search / tavily_extract
-        code-execution-tools.ts           # Sandboxed JS/Python execution + artifacts
-        finance-data/                     # Provider internals (stooq, sec, normalizers, retry, sources)
+        code-execution-tools.ts           # Sandboxed JS/Python execution
         image-vision-preprocessor.ts      # Image → text via Gateway vision
         pdf-attachment-preprocessor.ts    # PDF → text for the model
         initial-reasoning-chunk-sanitizer.ts # Redacted-reasoning filtering
-        system-instruction-augmentations.ts  # Citation + finance rules appended to prompt
+        system-instruction-augmentations.ts  # Citation rules appended to prompt
     shared/
       agent/messages.ts          # AgentStreamEvent, Message, ToolInvocation, run modes/statuses
       agent/attachments.ts       # Attachment metadata types
@@ -346,7 +330,6 @@ src/
       agent-request-limits.ts    # Message/char limit defaults
       llm/models.ts              # AvailableModels, ModelInfos, SUPPORTED/SELECTOR/RESEARCH
       llm/system-instructions.ts # DEFAULT_OPERATING_INSTRUCTION, DEFAULT_SOUL_FALLBACK_INSTRUCTION
-      llm/financial-services.ts  # Financial-services workflow data
       threads.ts                 # Thread type, sort/normalize/deriveThreadTitle
   proxy.ts                # Next.js middleware (named export `proxy` + `config`)
 tests/
@@ -404,23 +387,17 @@ AI_GATEWAY_API_KEY=
 
 All others are optional with safe defaults. See `.env.example` for the annotated list.
 
-| Variable                                           | Purpose                                                             |
-| -------------------------------------------------- | ------------------------------------------------------------------- |
-| `AUTH_DATABASE_URL`                                | Separate DB for Better Auth (falls back to / reuses `DATABASE_URL`) |
-| `BETTER_AUTH_TRUSTED_ORIGINS`                      | Comma-separated additional trusted origins                          |
-| `BETTER_AUTH_COOKIE_DOMAIN`                        | Shared cookie domain for cross-subdomain auth                       |
-| `TAVILY_API_KEY`                                   | Enables `tavily_search` + `tavily_extract`                          |
-| `SEC_API_USER_AGENT`                               | User agent for SEC requests (falls back to a generic UA)            |
-| `BLOB_READ_WRITE_TOKEN`                            | Private Vercel Blob store for attachments + artifacts               |
-| `EDGE_CONFIG`                                      | Vercel Edge Config connection for remote feature flags              |
-| `AGENT_FINANCE_WORKFLOWS_ENABLED`                  | Feature flag: financial-services workflows (default off)            |
-| `AGENT_TELEMETRY_RECORD_IO`                        | Feature flag: record prompt/output IO in telemetry (default off)    |
-| `AGENT_ENABLE_NEW_CAPABILITIES_FOR_INTERNAL_USERS` | Turn on internal-user flag defaults                                 |
-| `AGENT_INTERNAL_USER_EMAILS` / `..._EMAIL_DOMAINS` | Internal-user allowlists for flag defaults                          |
-| `AGENT_RATE_LIMIT_ENABLED`                         | Rate-limit kill switch (default true)                               |
-| `AGENT_RATE_LIMIT_STORE`                           | `auto` (default), `memory`, or `postgres`                           |
-| `AGENT_CODE_EXECUTION_BACKEND`                     | `restricted` (default) or `finance` for ad-hoc runs                 |
-| `AGENT_CODE_EXECUTION_PYTHON_VENV_PATH`            | Venv/python interpreter for the finance backend (optional)          |
+| Variable                      | Purpose                                                             |
+| ----------------------------- | ------------------------------------------------------------------- |
+| `AUTH_DATABASE_URL`           | Separate DB for Better Auth (falls back to / reuses `DATABASE_URL`) |
+| `BETTER_AUTH_TRUSTED_ORIGINS` | Comma-separated additional trusted origins                          |
+| `BETTER_AUTH_COOKIE_DOMAIN`   | Shared cookie domain for cross-subdomain auth                       |
+| `TAVILY_API_KEY`              | Enables `tavily_search` + `tavily_extract`                          |
+| `BLOB_READ_WRITE_TOKEN`       | Private Vercel Blob store for attachments                           |
+| `EDGE_CONFIG`                 | Vercel Edge Config connection for remote feature flags              |
+| `AGENT_TELEMETRY_RECORD_IO`   | Feature flag: record prompt/output IO in telemetry (default off)    |
+| `AGENT_RATE_LIMIT_ENABLED`    | Rate-limit kill switch (default true)                               |
+| `AGENT_RATE_LIMIT_STORE`      | `auto` (default), `memory`, or `postgres`                           |
 
 Request size limits, stream/gateway timeouts, tool-step budgets, the rate-limit window/concurrency magnitudes, and body-size limits are **fixed constants** in `src/lib/server/agent-runtime-config.ts` / `next.config.mjs` — not env-configurable. Change them in code if needed.
 

@@ -19,7 +19,7 @@ test("assistant actions appear only after streaming above follow-ups", async () 
 
   assert.match(
     source,
-    /<ArtifactDownloadList artifacts=\{downloadableArtifacts\} \/>[\s\S]*\{!isAssistantStreaming \? \([\s\S]*Copy response[\s\S]*Regenerate response[\s\S]*\) : null\}[\s\S]*isFollowUpQuestionsPending \? \([\s\S]*<FollowUpQuestionsPending \/>[\s\S]*<FollowUpQuestions/,
+    /\{!isAssistantStreaming \? \([\s\S]*Copy response[\s\S]*Regenerate response[\s\S]*\) : null\}[\s\S]*isFollowUpQuestionsPending \? \([\s\S]*<FollowUpQuestionsPending \/>[\s\S]*<FollowUpQuestions/,
     "Expected response actions and pending follow-ups to be shown only after streaming and before resolved follow-up questions."
   )
   assert.match(
