@@ -184,7 +184,7 @@ Handled:
 
 - Fluid Compute is enabled.
 - Bundle budget checks run in CI.
-- Agent message size, total payload size, tool steps, stream timeout, rate limit, and concurrency limits are bounded by env-backed defaults.
+- Agent message size, total payload size, tool steps, stream timeout, rate limit, and concurrency limits are bounded by fixed constants in `src/lib/server/agent-runtime-config.ts` (a rate-limit kill switch and store selector remain env-configurable).
 
 Dashboard actions:
 

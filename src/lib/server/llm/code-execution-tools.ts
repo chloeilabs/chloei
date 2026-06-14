@@ -38,7 +38,7 @@ const CODE_EXECUTION_DEFAULT_TIMEOUT_MS = 10_000
 const CODE_EXECUTION_MAX_TIMEOUT_MS = 60_000
 const CODE_EXECUTION_MAX_CODE_CHARS = 12_000
 const CODE_EXECUTION_MAX_OUTPUT_CHARS = 12_000
-const PYTHON3_COMMAND = process.env.PYTHON3_PATH?.trim() ?? "python3"
+const PYTHON3_COMMAND = "python3"
 
 type CodeExecutionToolName = Extract<ToolName, typeof CODE_EXECUTION_TOOL_NAME>
 type CodeExecutionLanguage = "javascript" | "python"

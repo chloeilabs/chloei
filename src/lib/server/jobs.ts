@@ -4,11 +4,7 @@ import { sql } from "kysely"
 
 import { getDatabase } from "./postgres"
 
-export const AGENT_JOB_TYPES = [
-  "agent/report.requested",
-  "market/watchlist.refresh.requested",
-  "trading/analysis.requested",
-] as const
+export const AGENT_JOB_TYPES = ["trading/analysis.requested"] as const
 
 export const AGENT_JOB_STATUSES = [
   "queued",

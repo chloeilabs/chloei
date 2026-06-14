@@ -79,7 +79,7 @@ ensure_env_var "DATABASE_URL" "${DATABASE_URL_VALUE}"
 ensure_env_var "BETTER_AUTH_URL" "${BETTER_AUTH_URL_VALUE}"
 ensure_env_var "BETTER_AUTH_SECRET" "${BETTER_AUTH_SECRET_VALUE}"
 
-for key in AI_GATEWAY_API_KEY TAVILY_API_KEY FRED_API_KEY SEC_API_USER_AGENT; do
+for key in AI_GATEWAY_API_KEY TAVILY_API_KEY SEC_API_USER_AGENT; do
   if [[ -n "${!key:-}" ]]; then
     ensure_env_var "${key}" "${!key}"
   fi

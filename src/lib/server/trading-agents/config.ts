@@ -30,11 +30,7 @@ export const TRADINGAGENTS_SERVICE_TOKEN =
 export const TRADINGAGENTS_ENABLED =
   (process.env.TRADINGAGENTS_ENABLED ?? "true").trim().toLowerCase() !== "false"
 
-export const TRADINGAGENTS_REQUEST_TIMEOUT_MS = (() => {
-  const raw = process.env.TRADINGAGENTS_REQUEST_TIMEOUT_MS
-  const parsed = raw ? Number.parseInt(raw, 10) : NaN
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_TIMEOUT_MS
-})()
+export const TRADINGAGENTS_REQUEST_TIMEOUT_MS = DEFAULT_TIMEOUT_MS
 
 /** Headers for every request to the sidecar. */
 export function tradingAgentsServiceHeaders(

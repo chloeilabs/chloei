@@ -36,11 +36,10 @@ validation is working.
 
 ## Environment Scope
 
-Production is in internal-only rollout for async reports and finance workflows:
+Production is in internal-only rollout for finance workflows:
 
 ```text
 AGENT_ENABLE_NEW_CAPABILITIES_FOR_INTERNAL_USERS=true
-AGENT_ASYNC_REPORTS_ENABLED=<unset>
 AGENT_TELEMETRY_RECORD_IO=false
 AGENT_FINANCE_WORKFLOWS_ENABLED=<unset>
 INNGEST_INLINE_FALLBACK=<unset>
@@ -49,7 +48,6 @@ INNGEST_INLINE_FALLBACK=<unset>
 Preview is the integration test surface:
 
 ```text
-AGENT_ASYNC_REPORTS_ENABLED=true
 AGENT_FINANCE_WORKFLOWS_ENABLED=true
 AGENT_TELEMETRY_RECORD_IO=false
 INNGEST_INLINE_FALLBACK=1
@@ -70,9 +68,9 @@ Runtime flag resolution is implemented in
 4. Built-in defaults.
 
 Edge Config values for a capability key override internal-user defaults. During
-the internal-only production rollout, the global rollout keys for async reports
-and finance workflows must stay absent from Edge Config. Raw telemetry IO
-remains explicitly false in both environment variables and Edge Config.
+the internal-only production rollout, the global rollout key for finance
+workflows must stay absent from Edge Config. Raw telemetry IO remains explicitly
+false in both environment variables and Edge Config.
 
 Edge Config store `chloei-flags` should contain:
 
@@ -108,7 +106,6 @@ fully locked-down state:
    internally enabled:
 
    ```bash
-   vercel env rm AGENT_ASYNC_REPORTS_ENABLED production --yes
    vercel env rm AGENT_FINANCE_WORKFLOWS_ENABLED production --yes
    ```
 
@@ -176,11 +173,10 @@ Authenticated rollout smoke after internal production flags are enabled:
 1. Sign in as an internal user.
 2. Upload a non-sensitive test document and confirm it is stored through private
    Blob metadata only.
-3. Enqueue a report through `POST /api/jobs/report` and poll `GET /api/jobs/:id`.
+3. Run a finance-analysis chat and confirm the financial-services workflow block
+   resolves for the internal user (and not for an external test user).
 4. Confirm Vercel runtime logs capture the request/outcome without raw prompts,
    completions, or PII (`vercel logs https://chloei.ai --since 30m`).
-5. Confirm an external test user still receives `JOB_REPORT_DISABLED` for async
-   reports.
 
 ## Quality Gates
 
@@ -205,10 +201,9 @@ tool selection for live market facts.
 Fastest capability rollback:
 
 ```bash
-printf '%s' false | vercel env add AGENT_ASYNC_REPORTS_ENABLED production --force --yes
 printf '%s' false | vercel env add AGENT_TELEMETRY_RECORD_IO production --force --yes
 printf '%s' false | vercel env add AGENT_FINANCE_WORKFLOWS_ENABLED production --force --yes
-vercel edge-config update chloei-flags --scope chloei --patch '{"items":[{"operation":"update","key":"agent_flags","value":{"agent.async_reports.enabled":false,"agent.telemetry.record_io":false,"agent.finance_workflows.enabled":false}},{"operation":"update","key":"flags","value":{"agent-async-reports-enabled":false,"agent-telemetry-record-io":false,"agent-finance-workflows-enabled":false}}]}'
+vercel edge-config update chloei-flags --scope chloei --patch '{"items":[{"operation":"update","key":"agent_flags","value":{"agent.telemetry.record_io":false,"agent.finance_workflows.enabled":false}},{"operation":"update","key":"flags","value":{"agent-telemetry-record-io":false,"agent-finance-workflows-enabled":false}}]}'
 vercel redeploy https://chloei.ai
 ```
 

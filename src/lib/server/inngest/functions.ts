@@ -1,7 +1,6 @@
 import { z } from "zod"
 
 import { createLogger } from "@/lib/logger"
-import { completeReportPlaceholderJob } from "@/lib/server/agent-report-jobs"
 import { updateAgentJobStatus } from "@/lib/server/jobs"
 import { runTradingAnalysisJob } from "@/lib/server/trading-agents/jobs"
 import { tradingDeskRequestSchema } from "@/lib/server/trading-agents/request-schema"
@@ -9,20 +8,6 @@ import { tradingDeskRequestSchema } from "@/lib/server/trading-agents/request-sc
 import { inngest } from "./client"
 
 const logger = createLogger("inngest-functions")
-
-const reportRequestedSchema = z.object({
-  userId: z.string().trim().min(1),
-  jobId: z.string().trim().min(1),
-  reportId: z.uuid().optional(),
-  threadId: z.string().trim().min(1).optional(),
-  prompt: z.string().trim().min(1).max(8_000),
-  title: z.string().trim().min(1).max(200).optional(),
-})
-
-const watchlistRefreshSchema = z.object({
-  userId: z.string().trim().min(1),
-  watchlistId: z.string().trim().min(1),
-})
 
 const tradingAnalysisRequestedSchema = z.object({
   userId: z.string().trim().min(1),
@@ -35,42 +20,6 @@ const opsInngestSmokeSchema = z.object({
   sentAt: z.string().trim().min(1),
   source: z.literal("chloei_inngest_smoke").optional(),
 })
-
-export const reportRequested = inngest.createFunction(
-  {
-    id: "agent-report-requested",
-    idempotency: "event.data.userId + ':' + event.data.jobId",
-    triggers: [{ event: "agent/report.requested" }],
-  },
-  async ({ event, step }) => {
-    const data = reportRequestedSchema.parse(event.data)
-    return step.run("complete-report-placeholder", () =>
-      completeReportPlaceholderJob({
-        jobId: data.jobId,
-        reportId: data.reportId,
-        threadId: data.threadId,
-        title: data.title,
-      })
-    )
-  }
-)
-
-export const watchlistRefreshRequested = inngest.createFunction(
-  {
-    id: "market-watchlist-refresh-requested",
-    idempotency: "event.data.userId + ':' + event.data.watchlistId",
-    triggers: [{ event: "market/watchlist.refresh.requested" }],
-  },
-  async ({ event, step }) => {
-    const data = watchlistRefreshSchema.parse(event.data)
-    return step.run("refresh-placeholder", () => ({
-      refreshed: false,
-      watchlistId: data.watchlistId,
-      reason:
-        "Watchlist refresh is reserved for the finance workflow rollout and should use finance_data/SEC providers.",
-    }))
-  }
-)
 
 export const tradingAnalysisRequested = inngest.createFunction(
   {
@@ -143,9 +92,4 @@ export const opsInngestSmoke = inngest.createFunction(
   }
 )
 
-export const inngestFunctions = [
-  reportRequested,
-  watchlistRefreshRequested,
-  tradingAnalysisRequested,
-  opsInngestSmoke,
-]
+export const inngestFunctions = [tradingAnalysisRequested, opsInngestSmoke]

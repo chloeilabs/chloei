@@ -161,7 +161,7 @@ Each tool is only registered when its requirements are met, **and** when the act
 
 - Runs in a temp directory; network/filesystem/subprocess access blocked.
 - JavaScript: runs via the Node binary (`process.execPath`) with `--input-type=module --eval`.
-- Python: runs via `python3 -I -c` (override the binary with `PYTHON3_PATH`).
+- Python: runs via `python3 -I -c` (the `python3` binary on `PATH`).
 - **Restricted backend** (default): computation-only Python imports (`math`, `collections`, `itertools`, …).
 - **Finance backend** (`AGENT_CODE_EXECUTION_BACKEND=finance`, or the `finance_analysis`/`gdpval_workspace` profile): adds `pandas`, `numpy`, `scipy`, `openpyxl`, `xlsxwriter`, `matplotlib`, `statsmodels`, plus `dateutil`, `mpl_toolkits`, `zipfile`. Network/subprocess stay blocked; file access is restricted to the workspace + temp dir (mounted reference files are readable by relative path). Optional interpreter via `AGENT_CODE_EXECUTION_PYTHON_VENV_PATH`.
 - **Limits**: timeout default **10 s**, max **60 s**; code input and output each capped at **12,000 chars**.
@@ -170,9 +170,9 @@ Each tool is only registered when its requirements are met, **and** when the act
 
 **SEC filings** (`ai-sdk-sec-filings-tools.ts`): EDGAR retrieval/extraction over filing text. Only `https://www.sec.gov/Archives/edgar/data/...` URLs are accepted. Caps: default 25,000 / max 80,000 chars per fetch; default 10 / max 50 results. Pass `accessionNumber` through `document_fetch`/`section_extract`/`table_extract`/`retrieve_information` to stay on the same filing. Quality expectations: `docs/finance-research-quality.md`.
 
-**Artifacts** (`src/lib/server/agent-artifacts.ts`): only the **finance backend with a preserved workspace** emits artifacts. Generated files (≤ 50) are collected into an `artifactManifest` (`{ path, sizeBytes, url? }`), excluding mounted inputs and `__pycache__`. URLs are either private Vercel Blob links or the local authenticated route `/api/agent/artifacts/{artifactId}/{...path}` (path-traversal-safe, per-user scoped, `Content-Disposition: attachment`). Storage root: `AGENT_ARTIFACT_ROOT` (default `<tmpdir>/chloei-agent-artifacts`).
+**Artifacts** (`src/lib/server/agent-artifacts.ts`): only the **finance backend with a preserved workspace** emits artifacts. Generated files (≤ 50) are collected into an `artifactManifest` (`{ path, sizeBytes, url? }`), excluding mounted inputs and `__pycache__`. URLs are either private Vercel Blob links or the local authenticated route `/api/agent/artifacts/{artifactId}/{...path}` (path-traversal-safe, per-user scoped, `Content-Disposition: attachment`). Storage root: `<tmpdir>/chloei-agent-artifacts`.
 
-**Max tool steps**: 12 default (`AGENT_TOOL_MAX_STEPS`); 20 for research (`AGENT_RESEARCH_TOOL_MAX_STEPS`) and finance-analysis (`AGENT_FINANCE_TOOL_MAX_STEPS`).
+**Max tool steps** (constants in `agent-runtime-config.ts`): 12 default; 20 for research and finance-analysis runs.
 
 ### Model Registry
 
@@ -231,7 +231,7 @@ Default store is `auto` (PostgreSQL-backed when `DATABASE_URL` is set; in-memory
 - **Sliding window**: 60 req / 60 s per user (key `user:<userId>`).
 - **Concurrency slots**: max 4 in-flight requests per user.
 
-Persistent state lives in the `agent_rate_limit` table (`identifier` PK, `hits` jsonb, `inFlight`, `lastSeenAt`); stale rows are cleaned opportunistically; the store fails open to memory on DB error. All limits are overridable via `AGENT_*` env vars (`src/lib/server/agent-runtime-config.ts`).
+Persistent state lives in the `agent_rate_limit` table (`identifier` PK, `hits` jsonb, `inFlight`, `lastSeenAt`); stale rows are cleaned opportunistically; the store fails open to memory on DB error. The window/limit/concurrency magnitudes are fixed constants (`src/lib/server/agent-runtime-config.ts`); only the kill switch (`AGENT_RATE_LIMIT_ENABLED`) and the store selector (`AGENT_RATE_LIMIT_STORE`) stay env-configurable.
 
 Separately, **Better Auth has its own credential-route limits** (`auth.ts`): ~100 req / 10 s globally, with `/sign-in/email` and `/sign-up/email` capped at 5 req / 15 min. This is independent of the agent limiter.
 
@@ -258,7 +258,7 @@ Image and PDF attachments use a two-tier client flow plus private server storage
 
 ### Async Jobs (Inngest)
 
-`src/lib/server/inngest/` + `src/lib/server/jobs.ts` (the `agent_job` table) back Trading Desk runs and async report generation. Served at `/api/inngest`; status via `/api/jobs/[jobId]`; report enqueue via `/api/jobs/report`.
+`src/lib/server/inngest/` + `src/lib/server/jobs.ts` (the `agent_job` table) back Trading Desk background runs. Served at `/api/inngest`; status via `/api/jobs/[jobId]`.
 
 ```sql
 CREATE TABLE agent_job (
@@ -272,23 +272,23 @@ CREATE TABLE agent_job (
 );
 ```
 
-- Job types: `agent/report.requested`, `market/watchlist.refresh.requested`, `trading/analysis.requested`. Statuses: `queued|running|completed|failed`.
-- `createAgentJob` is idempotent via `ON CONFLICT ("userId","idempotencyKey")`. `/api/jobs/report` accepts an optional client-generated `reportId` UUID; the idempotency key is `report:<userId>:<threadId|adhoc>:<reportId>`. Idempotency keys must derive from user/document/report/thread ids — **never** from prompt text or document contents.
-- **Inline fallback**: Trading Desk runs inline when Inngest is unconfigured **or** `INNGEST_INLINE_FALLBACK` is set; report jobs inline **only** when `INNGEST_INLINE_FALLBACK=1|true`.
-- **Async report generation is currently a placeholder** (`completeReportPlaceholderJob` returns a stub result); it is not yet wired to the agent runtime.
+- Job type: `trading/analysis.requested`. Statuses: `queued|running|completed|failed`.
+- `createAgentJob` is idempotent via `ON CONFLICT ("userId","idempotencyKey")`. Idempotency keys must derive from user/document/report/thread ids — **never** from prompt text or document contents.
+- **Inline fallback**: Trading Desk runs inline when Inngest is unconfigured **or** `INNGEST_INLINE_FALLBACK` is set.
+- An `ops/inngest.smoke` connectivity probe (`opsInngestSmoke`) is exercised by `pnpm inngest:smoke`.
 
 ### Feature Flags
 
-`src/lib/server/integration-flags.ts` resolves three default-off flags: `asyncReportsEnabled`, `telemetryRecordIo`, `financeWorkflowsEnabled`. Precedence:
+`src/lib/server/integration-flags.ts` resolves two default-off flags: `telemetryRecordIo`, `financeWorkflowsEnabled`. Precedence:
 
-1. Explicit `AGENT_*` env vars (`AGENT_ASYNC_REPORTS_ENABLED`, `AGENT_TELEMETRY_RECORD_IO`, `AGENT_FINANCE_WORKFLOWS_ENABLED`).
-2. Edge Config (`EDGE_CONFIG`) — checked across three map namespaces in order: **`agent_flags`, `analytics_flags`, `flags`**, matching dotted keys (`agent.async_reports.enabled`, `agent.telemetry.record_io`, `agent.finance_workflows.enabled`) or their Vercel slug form (`agent-async-reports-enabled`, …), then top-level fallback keys.
-3. Internal-user defaults — when `AGENT_ENABLE_NEW_CAPABILITIES_FOR_INTERNAL_USERS=true`, `asyncReportsEnabled` + `financeWorkflowsEnabled` turn on for users in `AGENT_INTERNAL_USER_EMAILS` / `AGENT_INTERNAL_USER_EMAIL_DOMAINS` (telemetry IO is **not** flipped by this).
+1. Explicit `AGENT_*` env vars (`AGENT_TELEMETRY_RECORD_IO`, `AGENT_FINANCE_WORKFLOWS_ENABLED`).
+2. Edge Config (`EDGE_CONFIG`) — checked across three map namespaces in order: **`agent_flags`, `analytics_flags`, `flags`**, matching dotted keys (`agent.telemetry.record_io`, `agent.finance_workflows.enabled`) or their Vercel slug form (`agent-telemetry-record-io`, …), then top-level fallback keys.
+3. Internal-user defaults — when `AGENT_ENABLE_NEW_CAPABILITIES_FOR_INTERNAL_USERS=true`, `financeWorkflowsEnabled` turns on for users in `AGENT_INTERNAL_USER_EMAILS` / `AGENT_INTERNAL_USER_EMAIL_DOMAINS` (telemetry IO is **not** flipped by this).
 4. Built-in defaults (off).
 
 ### Observability and Telemetry
 
-- **Logging**: `createLogger(scope)` (`src/lib/logger.ts`) returns `{ info, warn, error }`. In production (`NODE_ENV=production` or `LOG_FORMAT=json`) it emits newline-delimited JSON with structured fields (always `level`, `message`, `scope`, `timestamp`; when present `requestId`, `errorCode`, `durationMs`, `method`, `model`, `outcome`, `route`, `status`, plus Vercel deployment metadata). In dev it falls back to human-readable `[scope] message`.
+- **Logging**: `createLogger(scope)` (`src/lib/logger.ts`) returns `{ info, warn, error }`. In production (`NODE_ENV=production`) it emits newline-delimited JSON with structured fields (always `level`, `message`, `scope`, `timestamp`; when present `requestId`, `errorCode`, `durationMs`, `method`, `model`, `outcome`, `route`, `status`, plus Vercel deployment metadata). In dev it falls back to human-readable `[scope] message`.
 - **Route observability**: all API routes use `createRouteObservation` / `observeRouteResponse` (`src/lib/server/route-observability.ts`) to log duration, outcome, and error codes.
 - **Product analytics**: `@vercel/analytics` and `@vercel/speed-insights` are mounted in the root layout (`src/app/layout.tsx`).
 - **There is no Sentry, PostHog, or OpenTelemetry** — those integrations were removed. Error tracking is via Vercel runtime logs (the structured JSON above). Do not reintroduce them without an explicit decision.
@@ -313,8 +313,7 @@ src/
       agent/artifacts/     # Authenticated code-execution artifact downloads
       auth/[...all]/       # Better Auth catch-all
       inngest/route.ts     # Inngest function endpoint (async jobs)
-      jobs/[jobId]/        # Async job status
-      jobs/report/         # Async report enqueue (placeholder runtime)
+      jobs/[jobId]/        # Async job status (Trading Desk runs)
       models/route.ts      # GET /api/models — available models for configured keys
       threads/route.ts     # GET/PUT/DELETE /api/threads — thread CRUD
       trading-desk/        # analyze (stream), jobs (async), config
@@ -348,10 +347,9 @@ src/
       agent-context.ts          # buildAgentSystemInstruction
       agent-prompt-steering.ts  # Task-mode inference + provider/task overlays
       agent-route.ts            # parseAgentStreamRequest, createAgentStreamResponse
-      agent-runtime-config.ts   # All AGENT_* env var defaults
+      agent-runtime-config.ts   # Runtime constants + a few operational env switches
       agent-artifacts.ts        # Artifact storage root + download URL helpers
       agent-attachment-blobs.ts # Blob-backed attachment hydration
-      agent-report-jobs.ts      # Async report job completion (placeholder)
       auth.ts / auth-session.ts # isAuthConfigured, getRequestSession
       integration-flags.ts      # Default-off feature flags (env + Edge Config)
       jobs.ts                   # agent_job table helpers
@@ -443,47 +441,34 @@ BETTER_AUTH_URL=http://localhost:3000
 AI_GATEWAY_API_KEY=
 ```
 
-All others are optional with safe defaults. See `.env.example` for the full annotated list.
+All others are optional with safe defaults. See `.env.example` for the annotated list.
 
-| Variable                                                 | Purpose                                                                      |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `AUTH_DATABASE_URL`                                      | Separate DB for Better Auth (falls back to / reuses `DATABASE_URL`)          |
-| `BETTER_AUTH_TRUSTED_ORIGINS`                            | Comma-separated additional trusted origins                                   |
-| `BETTER_AUTH_COOKIE_DOMAIN`                              | Shared cookie domain for cross-subdomain auth                                |
-| `TAVILY_API_KEY`                                         | Enables `tavily_search` + `tavily_extract`                                   |
-| `SEC_API_USER_AGENT`                                     | User agent for SEC requests (falls back to a generic UA)                     |
-| `BLOB_READ_WRITE_TOKEN`                                  | Private Vercel Blob store for attachments + artifacts                        |
-| `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY`              | Enable Inngest async jobs                                                    |
-| `INNGEST_ENV` / `INNGEST_DEV`                            | Inngest environment selection / dev mode                                     |
-| `INNGEST_INLINE_FALLBACK`                                | `1`/`true` runs jobs inline without Inngest (required to inline report jobs) |
-| `EDGE_CONFIG`                                            | Vercel Edge Config connection for remote feature flags                       |
-| `TRADINGAGENTS_SERVICE_URL`                              | Trading Desk sidecar base URL (default `http://localhost:8000`)              |
-| `TRADINGAGENTS_SERVICE_TOKEN`                            | Shared secret sent to the sidecar (`X-Service-Token`)                        |
-| `TRADINGAGENTS_ENABLED`                                  | Enable/disable the Trading Desk (default true)                               |
-| `TRADINGAGENTS_REQUEST_TIMEOUT_MS`                       | Upstream sidecar request timeout (default 600,000)                           |
-| `AGENT_ASYNC_REPORTS_ENABLED`                            | Feature flag: async report jobs (default off)                                |
-| `AGENT_FINANCE_WORKFLOWS_ENABLED`                        | Feature flag: financial-services workflows (default off)                     |
-| `AGENT_TELEMETRY_RECORD_IO`                              | Feature flag: record prompt/output IO in telemetry (default off)             |
-| `AGENT_ENABLE_NEW_CAPABILITIES_FOR_INTERNAL_USERS`       | Turn on internal-user flag defaults                                          |
-| `AGENT_INTERNAL_USER_EMAILS` / `..._EMAIL_DOMAINS`       | Internal-user allowlists for flag defaults                                   |
-| `PYTHON3_PATH`                                           | Override `python3` for code execution                                        |
-| `AGENT_CODE_EXECUTION_BACKEND`                           | `restricted` (default) or `finance`                                          |
-| `AGENT_CODE_EXECUTION_PYTHON_VENV_PATH`                  | Optional venv/python for the finance backend                                 |
-| `AGENT_ARTIFACT_ROOT`                                    | Artifact storage root (default `<tmpdir>/chloei-agent-artifacts`)            |
-| `AGENT_EVAL_RESULTS_DIR`                                 | Output dir for finance eval results/artifacts                                |
-| `AGENT_MAX_MESSAGES` / `_MESSAGE_CHARS` / `_TOTAL_CHARS` | Request size limits (50 / 12,000 / 48,000)                                   |
-| `AGENT_STREAM_TIMEOUT_MS`                                | Stream timeout (default 800,000)                                             |
-| `AGENT_TOOL_MAX_STEPS`                                   | Max tool steps per run (default 12)                                          |
-| `AGENT_RESEARCH_TOOL_MAX_STEPS`                          | Max tool steps for research runs (default 20)                                |
-| `AGENT_FINANCE_TOOL_MAX_STEPS`                           | Max tool steps for finance-analysis runs (default 20)                        |
-| `AI_GATEWAY_CLIENT_TIMEOUT_MS`                           | AI Gateway HTTP client timeout (default 3,600,000)                           |
-| `AGENT_RATE_LIMIT_ENABLED`                               | Enable/disable rate limiting (default true)                                  |
-| `AGENT_RATE_LIMIT_WINDOW_MS` / `_MAX_REQUESTS`           | Sliding window (default 60,000 ms / 60)                                      |
-| `AGENT_RATE_LIMIT_STORE`                                 | `auto` (default), `memory`, or `postgres`                                    |
-| `AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT`               | Concurrency limit (default 4)                                                |
-| `NEXT_SERVER_ACTIONS_BODY_SIZE_LIMIT`                    | Server actions body limit (default `1mb`)                                    |
-| `NEXT_PROXY_CLIENT_MAX_BODY_SIZE`                        | Proxy client max body size (default `12mb`)                                  |
-| `LOG_FORMAT`                                             | Set to `json` to force structured logs in dev                                |
+| Variable                                           | Purpose                                                             |
+| -------------------------------------------------- | ------------------------------------------------------------------- |
+| `AUTH_DATABASE_URL`                                | Separate DB for Better Auth (falls back to / reuses `DATABASE_URL`) |
+| `BETTER_AUTH_TRUSTED_ORIGINS`                      | Comma-separated additional trusted origins                          |
+| `BETTER_AUTH_COOKIE_DOMAIN`                        | Shared cookie domain for cross-subdomain auth                       |
+| `TAVILY_API_KEY`                                   | Enables `tavily_search` + `tavily_extract`                          |
+| `SEC_API_USER_AGENT`                               | User agent for SEC requests (falls back to a generic UA)            |
+| `BLOB_READ_WRITE_TOKEN`                            | Private Vercel Blob store for attachments + artifacts               |
+| `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY`        | Enable Inngest async jobs (Trading Desk)                            |
+| `INNGEST_ENV` / `INNGEST_DEV`                      | Inngest environment selection / dev mode                            |
+| `INNGEST_INLINE_FALLBACK`                          | `1`/`true` runs jobs inline without Inngest                         |
+| `EDGE_CONFIG`                                      | Vercel Edge Config connection for remote feature flags              |
+| `TRADINGAGENTS_SERVICE_URL`                        | Trading Desk sidecar base URL (default `http://localhost:8000`)     |
+| `TRADINGAGENTS_SERVICE_TOKEN`                      | Shared secret sent to the sidecar (`X-Service-Token`)               |
+| `TRADINGAGENTS_ENABLED`                            | Enable/disable the Trading Desk (default true)                      |
+| `AGENT_FINANCE_WORKFLOWS_ENABLED`                  | Feature flag: financial-services workflows (default off)            |
+| `AGENT_TELEMETRY_RECORD_IO`                        | Feature flag: record prompt/output IO in telemetry (default off)    |
+| `AGENT_ENABLE_NEW_CAPABILITIES_FOR_INTERNAL_USERS` | Turn on internal-user flag defaults                                 |
+| `AGENT_INTERNAL_USER_EMAILS` / `..._EMAIL_DOMAINS` | Internal-user allowlists for flag defaults                          |
+| `AGENT_RATE_LIMIT_ENABLED`                         | Rate-limit kill switch (default true)                               |
+| `AGENT_RATE_LIMIT_STORE`                           | `auto` (default), `memory`, or `postgres`                           |
+| `AGENT_CODE_EXECUTION_BACKEND`                     | `restricted` (default) or `finance` for ad-hoc/eval runs            |
+| `AGENT_CODE_EXECUTION_PYTHON_VENV_PATH`            | Venv/python for the finance backend (set by the eval runner)        |
+| `AGENT_EVAL_RESULTS_DIR`                           | Output dir for finance eval results (set by the eval runner)        |
+
+Request size limits, stream/gateway timeouts, tool-step budgets, the rate-limit window/concurrency magnitudes, and body-size limits are **fixed constants** in `src/lib/server/agent-runtime-config.ts` / `next.config.mjs` — not env-configurable. Change them in code if needed.
 
 ## Gotchas
 

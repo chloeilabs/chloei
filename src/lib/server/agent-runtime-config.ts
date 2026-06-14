@@ -4,45 +4,30 @@ import {
   AGENT_REQUEST_MAX_TOTAL_CHARS,
 } from "@/lib/shared/agent-request-limits"
 
-const DEFAULT_AGENT_MAX_MESSAGES = AGENT_REQUEST_MAX_MESSAGES
-const DEFAULT_AGENT_MAX_MESSAGE_CHARS = AGENT_REQUEST_MAX_MESSAGE_CHARS
-const DEFAULT_AGENT_MAX_TOTAL_CHARS = AGENT_REQUEST_MAX_TOTAL_CHARS
-const DEFAULT_AGENT_STREAM_TIMEOUT_MS = 800_000
-const DEFAULT_AGENT_RATE_LIMIT_WINDOW_MS = 60_000
-const DEFAULT_AGENT_RATE_LIMIT_MAX_REQUESTS = 60
-const DEFAULT_AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT = 4
-const DEFAULT_AGENT_RATE_LIMIT_STORE = "auto"
-const DEFAULT_AGENT_TOOL_MAX_STEPS = 12
-const DEFAULT_AGENT_RESEARCH_TOOL_MAX_STEPS = 20
-const DEFAULT_AGENT_FINANCE_TOOL_MAX_STEPS = 20
-const DEFAULT_AGENT_CODE_EXECUTION_BACKEND = "restricted"
-const DEFAULT_AI_GATEWAY_CLIENT_TIMEOUT_MS = 3_600_000
+// Request size limits (shared defaults).
+export const AGENT_MAX_MESSAGES = AGENT_REQUEST_MAX_MESSAGES
+export const AGENT_MAX_MESSAGE_CHARS = AGENT_REQUEST_MAX_MESSAGE_CHARS
+export const AGENT_MAX_TOTAL_CHARS = AGENT_REQUEST_MAX_TOTAL_CHARS
 
-function parsePositiveIntFromEnv(
-  value: string | undefined,
-  fallback: number
-): number {
-  if (!value) {
-    return fallback
-  }
+// Timeouts (ms).
+export const AGENT_STREAM_TIMEOUT_MS = 800_000
+export const AI_GATEWAY_CLIENT_TIMEOUT_MS = 3_600_000
 
-  const parsed = Number.parseInt(value, 10)
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return fallback
-  }
+// Sliding-window rate limit + per-client concurrency.
+export const AGENT_RATE_LIMIT_WINDOW_MS = 60_000
+export const AGENT_RATE_LIMIT_MAX_REQUESTS = 60
+export const AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT = 4
 
-  return parsed
-}
+// Tool-step budgets per runtime profile.
+export const AGENT_TOOL_MAX_STEPS = 12
+export const AGENT_RESEARCH_TOOL_MAX_STEPS = 20
+export const AGENT_FINANCE_TOOL_MAX_STEPS = 20
 
 function parseBooleanFromEnv(
   value: string | undefined,
   fallback: boolean
 ): boolean {
-  if (!value) {
-    return fallback
-  }
-
-  const normalized = value.trim().toLowerCase()
+  const normalized = value?.trim().toLowerCase()
   if (normalized === "true") {
     return true
   }
@@ -73,82 +58,32 @@ function parseOptionalStringFromEnv(
   return normalized && normalized.length > 0 ? normalized : undefined
 }
 
-export const AGENT_MAX_MESSAGES = parsePositiveIntFromEnv(
-  process.env.AGENT_MAX_MESSAGES,
-  DEFAULT_AGENT_MAX_MESSAGES
-)
-
-export const AGENT_MAX_MESSAGE_CHARS = parsePositiveIntFromEnv(
-  process.env.AGENT_MAX_MESSAGE_CHARS,
-  DEFAULT_AGENT_MAX_MESSAGE_CHARS
-)
-
-export const AGENT_MAX_TOTAL_CHARS = parsePositiveIntFromEnv(
-  process.env.AGENT_MAX_TOTAL_CHARS,
-  DEFAULT_AGENT_MAX_TOTAL_CHARS
-)
-
-export const AGENT_STREAM_TIMEOUT_MS = parsePositiveIntFromEnv(
-  process.env.AGENT_STREAM_TIMEOUT_MS,
-  DEFAULT_AGENT_STREAM_TIMEOUT_MS
-)
-
-export const AI_GATEWAY_CLIENT_TIMEOUT_MS = parsePositiveIntFromEnv(
-  process.env.AI_GATEWAY_CLIENT_TIMEOUT_MS,
-  DEFAULT_AI_GATEWAY_CLIENT_TIMEOUT_MS
-)
-
+// Operational switches kept environment-configurable: a rate-limit kill switch
+// and the persistence backend (memory vs. postgres) for tests and local runs.
 export const AGENT_RATE_LIMIT_ENABLED = parseBooleanFromEnv(
   process.env.AGENT_RATE_LIMIT_ENABLED,
   true
 )
 
-export const AGENT_RATE_LIMIT_WINDOW_MS = parsePositiveIntFromEnv(
-  process.env.AGENT_RATE_LIMIT_WINDOW_MS,
-  DEFAULT_AGENT_RATE_LIMIT_WINDOW_MS
-)
-
-export const AGENT_RATE_LIMIT_MAX_REQUESTS = parsePositiveIntFromEnv(
-  process.env.AGENT_RATE_LIMIT_MAX_REQUESTS,
-  DEFAULT_AGENT_RATE_LIMIT_MAX_REQUESTS
-)
-
-export const AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT = parsePositiveIntFromEnv(
-  process.env.AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT,
-  DEFAULT_AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT
-)
-
 export const AGENT_RATE_LIMIT_STORE = parseEnumFromEnv(
   process.env.AGENT_RATE_LIMIT_STORE,
   ["auto", "memory", "postgres"] as const,
-  DEFAULT_AGENT_RATE_LIMIT_STORE
+  "auto"
 )
 
-export const AGENT_TOOL_MAX_STEPS = parsePositiveIntFromEnv(
-  process.env.AGENT_TOOL_MAX_STEPS,
-  DEFAULT_AGENT_TOOL_MAX_STEPS
-)
-
-export const AGENT_RESEARCH_TOOL_MAX_STEPS = parsePositiveIntFromEnv(
-  process.env.AGENT_RESEARCH_TOOL_MAX_STEPS,
-  DEFAULT_AGENT_RESEARCH_TOOL_MAX_STEPS
-)
-
-export const AGENT_FINANCE_TOOL_MAX_STEPS = parsePositiveIntFromEnv(
-  process.env.AGENT_FINANCE_TOOL_MAX_STEPS,
-  DEFAULT_AGENT_FINANCE_TOOL_MAX_STEPS
-)
-
+// Code-execution backend. The finance/eval runtime profile selects "finance"
+// per request; this env default only affects ad-hoc runs and the eval harness.
 export const AGENT_CODE_EXECUTION_BACKEND = parseEnumFromEnv(
   process.env.AGENT_CODE_EXECUTION_BACKEND,
   ["restricted", "finance"] as const,
-  DEFAULT_AGENT_CODE_EXECUTION_BACKEND
+  "restricted"
 )
 
 export const AGENT_CODE_EXECUTION_PYTHON_VENV_PATH = parseOptionalStringFromEnv(
   process.env.AGENT_CODE_EXECUTION_PYTHON_VENV_PATH
 )
 
+// Eval-harness artifact output directory (set programmatically by the runner).
 export const AGENT_EVAL_RESULTS_DIR = parseOptionalStringFromEnv(
   process.env.AGENT_EVAL_RESULTS_DIR
 )

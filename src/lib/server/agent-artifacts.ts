@@ -2,19 +2,13 @@ import { createHash } from "node:crypto"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
-const DEFAULT_AGENT_ARTIFACT_ROOT = path.join(
+export const AGENT_ARTIFACT_ROOT = path.join(
   /*turbopackIgnore: true*/
   tmpdir(),
   "chloei-agent-artifacts"
 )
 const ARTIFACT_ID_PATTERN = /^[A-Za-z0-9_-]{1,100}$/
 const MAX_ARTIFACT_PATH_CHARS = 500
-
-const configuredAgentArtifactRoot = process.env.AGENT_ARTIFACT_ROOT?.trim()
-export const AGENT_ARTIFACT_ROOT =
-  configuredAgentArtifactRoot && configuredAgentArtifactRoot.length > 0
-    ? configuredAgentArtifactRoot
-    : DEFAULT_AGENT_ARTIFACT_ROOT
 
 function getArtifactUserKey(userId: string): string {
   return createHash("sha256").update(userId).digest("hex")

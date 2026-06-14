@@ -24,7 +24,6 @@ const {
 // short-circuits the lookup).
 const ENV_KEYS = [
   "EDGE_CONFIG",
-  "AGENT_ASYNC_REPORTS_ENABLED",
   "AGENT_TELEMETRY_RECORD_IO",
   "AGENT_FINANCE_WORKFLOWS_ENABLED",
   "AGENT_INTERNAL_USER_EMAILS",
@@ -61,12 +60,12 @@ async function withEnv(overrides, fn) {
 
 test("flag key encoders normalize separators", () => {
   assert.equal(
-    toEdgeConfigFlagKey("agent.async_reports.enabled"),
-    "agent_async_reports_enabled"
+    toEdgeConfigFlagKey("agent.finance_workflows.enabled"),
+    "agent_finance_workflows_enabled"
   )
   assert.equal(
-    toVercelFlagSlug("agent.async_reports.enabled"),
-    "agent-async-reports-enabled"
+    toVercelFlagSlug("agent.finance_workflows.enabled"),
+    "agent-finance-workflows-enabled"
   )
   assert.equal(
     toVercelFlagSlug("agent.telemetry.record_io"),
@@ -77,13 +76,12 @@ test("flag key encoders normalize separators", () => {
 test("getDefaultAgentFeatureFlags returns fresh all-disabled copies", () => {
   const first = getDefaultAgentFeatureFlags()
   assert.deepEqual(first, {
-    asyncReportsEnabled: false,
     telemetryRecordIo: false,
     financeWorkflowsEnabled: false,
   })
 
-  first.asyncReportsEnabled = true
-  assert.equal(getDefaultAgentFeatureFlags().asyncReportsEnabled, false)
+  first.financeWorkflowsEnabled = true
+  assert.equal(getDefaultAgentFeatureFlags().financeWorkflowsEnabled, false)
 })
 
 test("isInternalUser matches configured emails and domains", async () => {
@@ -104,21 +102,21 @@ test("isInternalUser matches configured emails and domains", async () => {
 })
 
 test("resolveIntegrationBooleanFlag reads env names in order", async () => {
-  await withEnv({ AGENT_ASYNC_REPORTS_ENABLED: "true" }, async () => {
+  await withEnv({ AGENT_FINANCE_WORKFLOWS_ENABLED: "true" }, async () => {
     assert.equal(
       await resolveIntegrationBooleanFlag({
-        key: "agent.async_reports.enabled",
-        envNames: ["AGENT_ASYNC_REPORTS_ENABLED"],
+        key: "agent.finance_workflows.enabled",
+        envNames: ["AGENT_FINANCE_WORKFLOWS_ENABLED"],
       }),
       true
     )
   })
 
-  await withEnv({ AGENT_ASYNC_REPORTS_ENABLED: "off" }, async () => {
+  await withEnv({ AGENT_FINANCE_WORKFLOWS_ENABLED: "off" }, async () => {
     assert.equal(
       await resolveIntegrationBooleanFlag({
-        key: "agent.async_reports.enabled",
-        envNames: ["AGENT_ASYNC_REPORTS_ENABLED"],
+        key: "agent.finance_workflows.enabled",
+        envNames: ["AGENT_FINANCE_WORKFLOWS_ENABLED"],
         defaultValue: true,
       }),
       false
@@ -128,7 +126,7 @@ test("resolveIntegrationBooleanFlag reads env names in order", async () => {
   await withEnv({}, async () => {
     assert.equal(
       await resolveIntegrationBooleanFlag({
-        key: "agent.async_reports.enabled",
+        key: "agent.finance_workflows.enabled",
         defaultValue: true,
       }),
       true
@@ -139,7 +137,6 @@ test("resolveIntegrationBooleanFlag reads env names in order", async () => {
 test("resolveAgentFeatureFlags defaults everything off", async () => {
   await withEnv({}, async () => {
     assert.deepEqual(await resolveAgentFeatureFlags(), {
-      asyncReportsEnabled: false,
       telemetryRecordIo: false,
       financeWorkflowsEnabled: false,
     })
@@ -150,7 +147,6 @@ test("resolveAgentFeatureFlags applies per-flag env overrides", async () => {
   await withEnv({ AGENT_TELEMETRY_RECORD_IO: "1" }, async () => {
     const flags = await resolveAgentFeatureFlags()
     assert.equal(flags.telemetryRecordIo, true)
-    assert.equal(flags.asyncReportsEnabled, false)
     assert.equal(flags.financeWorkflowsEnabled, false)
   })
 })
@@ -165,7 +161,6 @@ test("internal users get opt-in capability defaults", async () => {
       const flags = await resolveAgentFeatureFlags({
         userEmail: "insider@example.com",
       })
-      assert.equal(flags.asyncReportsEnabled, true)
       assert.equal(flags.financeWorkflowsEnabled, true)
       assert.equal(flags.telemetryRecordIo, false)
     }
@@ -177,14 +172,13 @@ test("explicit env flags override internal-user defaults", async () => {
     {
       AGENT_INTERNAL_USER_EMAILS: "insider@example.com",
       AGENT_ENABLE_NEW_CAPABILITIES_FOR_INTERNAL_USERS: "true",
-      AGENT_ASYNC_REPORTS_ENABLED: "false",
+      AGENT_FINANCE_WORKFLOWS_ENABLED: "false",
     },
     async () => {
       const flags = await resolveAgentFeatureFlags({
         userEmail: "insider@example.com",
       })
-      assert.equal(flags.asyncReportsEnabled, false)
-      assert.equal(flags.financeWorkflowsEnabled, true)
+      assert.equal(flags.financeWorkflowsEnabled, false)
     }
   )
 })
