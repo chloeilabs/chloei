@@ -1602,39 +1602,57 @@ function getErrorPayload(params: {
   }
 }
 
+type SecFilingsRuntimeConfig = Required<
+  Pick<SecFilingsToolConfig, "fetchImpl">
+> &
+  Pick<SecFilingsToolConfig, "secUserAgent">
+
+interface SecFilingsOperationSpec {
+  run: (
+    input: SecFilingsToolInput,
+    config: SecFilingsRuntimeConfig,
+    startedAt: number
+  ) => Promise<SecFilingsToolResultPayload>
+  label: string
+}
+
+const SEC_FILINGS_OPERATIONS: Record<
+  SecFilingsOperation,
+  SecFilingsOperationSpec
+> = {
+  company_search: { run: runCompanySearch, label: "Searching SEC companies" },
+  filing_search: { run: runFilingSearch, label: SEC_FILINGS_LABEL },
+  document_fetch: { run: runDocumentFetch, label: "Reading SEC filing" },
+  section_extract: {
+    run: runSectionExtract,
+    label: "Extracting SEC filing section",
+  },
+  table_extract: {
+    run: runTableExtract,
+    label: "Extracting SEC filing tables",
+  },
+  retrieve_information: {
+    run: runRetrieveInformation,
+    label: "Retrieving SEC filing evidence",
+  },
+}
+
 export async function runSecFilingsOperation(
   input: SecFilingsToolInput,
   config: SecFilingsToolConfig = {}
 ): Promise<SecFilingsToolResultPayload> {
   const startedAt = Date.now()
-  const fetchImpl = config.fetchImpl ?? fetch
-  const runtimeConfig = {
-    fetchImpl,
+  const runtimeConfig: SecFilingsRuntimeConfig = {
+    fetchImpl: config.fetchImpl ?? fetch,
     secUserAgent: config.secUserAgent,
   }
 
   try {
-    if (input.operation === "company_search") {
-      return await runCompanySearch(input, runtimeConfig, startedAt)
-    }
-
-    if (input.operation === "filing_search") {
-      return await runFilingSearch(input, runtimeConfig, startedAt)
-    }
-
-    if (input.operation === "document_fetch") {
-      return await runDocumentFetch(input, runtimeConfig, startedAt)
-    }
-
-    if (input.operation === "section_extract") {
-      return await runSectionExtract(input, runtimeConfig, startedAt)
-    }
-
-    if (input.operation === "table_extract") {
-      return await runTableExtract(input, runtimeConfig, startedAt)
-    }
-
-    return await runRetrieveInformation(input, runtimeConfig, startedAt)
+    return await SEC_FILINGS_OPERATIONS[input.operation].run(
+      input,
+      runtimeConfig,
+      startedAt
+    )
   } catch (error) {
     return {
       error: getErrorPayload({
@@ -1668,28 +1686,8 @@ function toSourcesFromOutput(output: SecFilingsToolOutput): MessageSource[] {
 
 function getToolLabel(input: unknown): string {
   const operation = toOptionalString(asRecord(input)?.operation)
-  if (operation === "company_search") {
-    return "Searching SEC companies"
-  }
-
-  if (operation === "filing_search") {
-    return "Searching SEC filings"
-  }
-
-  if (operation === "document_fetch") {
-    return "Reading SEC filing"
-  }
-
-  if (operation === "section_extract") {
-    return "Extracting SEC filing section"
-  }
-
-  if (operation === "table_extract") {
-    return "Extracting SEC filing tables"
-  }
-
-  if (operation === "retrieve_information") {
-    return "Retrieving SEC filing evidence"
+  if (operation && operation in SEC_FILINGS_OPERATIONS) {
+    return SEC_FILINGS_OPERATIONS[operation as SecFilingsOperation].label
   }
 
   return SEC_FILINGS_LABEL
