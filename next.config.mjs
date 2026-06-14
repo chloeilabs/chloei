@@ -2,27 +2,8 @@ const isProduction =
   process.env.VERCEL_ENV === "production" ||
   process.env.NODE_ENV === "production"
 
-function parseSizeLimitFromEnv(value, fallback) {
-  if (!value) {
-    return fallback
-  }
-
-  const normalized = value.trim().toLowerCase()
-  if (/^\d+[kmgpt]b$/.test(normalized)) {
-    return normalized
-  }
-
-  return fallback
-}
-
-const serverActionsBodySizeLimit = parseSizeLimitFromEnv(
-  process.env.NEXT_SERVER_ACTIONS_BODY_SIZE_LIMIT,
-  "1mb"
-)
-const proxyClientMaxBodySize = parseSizeLimitFromEnv(
-  process.env.NEXT_PROXY_CLIENT_MAX_BODY_SIZE,
-  "12mb"
-)
+const serverActionsBodySizeLimit = "1mb"
+const proxyClientMaxBodySize = "12mb"
 
 function buildContentSecurityPolicy() {
   const directives = [

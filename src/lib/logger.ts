@@ -145,11 +145,6 @@ function isServerProductionLoggerEnabled(): boolean {
     return false
   }
 
-  const logFormat = process.env.LOG_FORMAT?.trim().toLowerCase()
-  if (logFormat === "json") {
-    return true
-  }
-
   return process.env.NODE_ENV === "production"
 }
 

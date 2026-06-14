@@ -2,7 +2,7 @@ import type { Message } from "./agent/messages"
 import type { ModelType } from "./llm/models"
 
 export const DEFAULT_THREAD_TITLE = "New Conversation"
-export const THREAD_TITLE_MAX_LENGTH = 50
+const THREAD_TITLE_MAX_LENGTH = 50
 
 export interface Thread {
   id: string

@@ -15,14 +15,14 @@ const PARALLEL_FOLLOW_UP_MIN_CHARS = 80
 // implementation. Treat those as absent so only generated follow-ups render.
 const LEGACY_CANNED_FOLLOW_UP_ID_PREFIX = "fallback-follow-up"
 
-export interface FollowUpQuestionRequestTarget {
+interface FollowUpQuestionRequestTarget {
   assistantMessageId: string
   messages: AgentMessage[]
   model: ModelType
   runMode: AgentRunMode
 }
 
-export type FollowUpQuestionRequestKind = "backfill" | "final" | "parallel"
+type FollowUpQuestionRequestKind = "backfill" | "final" | "parallel"
 
 export interface FollowUpQuestionRequestParams {
   assistantMessageId: string

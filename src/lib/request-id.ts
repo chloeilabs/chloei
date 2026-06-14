@@ -9,7 +9,7 @@ function normalizeRequestId(
   return trimmedValue
 }
 
-export function createRequestId(): string {
+function createRequestId(): string {
   return crypto.randomUUID()
 }
 

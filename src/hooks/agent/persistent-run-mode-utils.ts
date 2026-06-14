@@ -8,7 +8,7 @@ interface StoredRunMode {
   version: typeof STORED_RUN_MODE_VERSION
 }
 
-export function isAgentRunMode(value: unknown): value is AgentRunMode {
+function isAgentRunMode(value: unknown): value is AgentRunMode {
   return (
     typeof value === "string" &&
     (AGENT_RUN_MODES as readonly string[]).includes(value)

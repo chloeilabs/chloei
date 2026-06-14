@@ -22,7 +22,7 @@ interface DescribeImageParams {
   signal?: AbortSignal
 }
 
-export async function describeAttachmentImage(
+async function describeAttachmentImage(
   params: DescribeImageParams
 ): Promise<string> {
   if (!params.attachment.dataUrl) {

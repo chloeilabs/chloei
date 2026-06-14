@@ -10,7 +10,7 @@ const SAFE_FILENAME_PATTERN = /[^A-Za-z0-9._-]+/g
 const MAX_FILENAME_CHARS = 120
 const ATTACHMENT_ID_SCHEMA = z.uuid()
 
-export interface PrivateBlobUploadResult {
+interface PrivateBlobUploadResult {
   pathname: string
   url: string
   downloadUrl: string
@@ -19,7 +19,7 @@ export interface PrivateBlobUploadResult {
   contentType: string
 }
 
-export interface PrivateBlobReadResult {
+interface PrivateBlobReadResult {
   buffer: Buffer
   contentType: string
   sizeBytes: number

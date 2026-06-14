@@ -100,26 +100,25 @@ test("readable text normalization preserves document layout for model prompts", 
 })
 
 test("agent feature flags default off and respect explicit env overrides", async () => {
-  const original = process.env.AGENT_ASYNC_REPORTS_ENABLED
+  const original = process.env.AGENT_FINANCE_WORKFLOWS_ENABLED
   const originalEdgeConfig = process.env.EDGE_CONFIG
   try {
-    delete process.env.AGENT_ASYNC_REPORTS_ENABLED
+    delete process.env.AGENT_FINANCE_WORKFLOWS_ENABLED
     delete process.env.EDGE_CONFIG
     assert.deepEqual(await resolveAgentFeatureFlags(), {
-      asyncReportsEnabled: false,
       telemetryRecordIo: false,
       financeWorkflowsEnabled: false,
     })
 
-    process.env.AGENT_ASYNC_REPORTS_ENABLED = "true"
+    process.env.AGENT_FINANCE_WORKFLOWS_ENABLED = "true"
     const flags = await resolveAgentFeatureFlags()
-    assert.equal(flags.asyncReportsEnabled, true)
+    assert.equal(flags.financeWorkflowsEnabled, true)
     assert.equal(flags.telemetryRecordIo, false)
   } finally {
     if (original === undefined) {
-      delete process.env.AGENT_ASYNC_REPORTS_ENABLED
+      delete process.env.AGENT_FINANCE_WORKFLOWS_ENABLED
     } else {
-      process.env.AGENT_ASYNC_REPORTS_ENABLED = original
+      process.env.AGENT_FINANCE_WORKFLOWS_ENABLED = original
     }
 
     if (originalEdgeConfig === undefined) {
@@ -131,20 +130,26 @@ test("agent feature flags default off and respect explicit env overrides", async
 })
 
 test("agent feature flag resolution does not mutate shared defaults", async () => {
-  const original = process.env.AGENT_ASYNC_REPORTS_ENABLED
+  const original = process.env.AGENT_FINANCE_WORKFLOWS_ENABLED
   const originalEdgeConfig = process.env.EDGE_CONFIG
   try {
     delete process.env.EDGE_CONFIG
-    process.env.AGENT_ASYNC_REPORTS_ENABLED = "true"
-    assert.equal((await resolveAgentFeatureFlags()).asyncReportsEnabled, true)
+    process.env.AGENT_FINANCE_WORKFLOWS_ENABLED = "true"
+    assert.equal(
+      (await resolveAgentFeatureFlags()).financeWorkflowsEnabled,
+      true
+    )
 
-    delete process.env.AGENT_ASYNC_REPORTS_ENABLED
-    assert.equal((await resolveAgentFeatureFlags()).asyncReportsEnabled, false)
+    delete process.env.AGENT_FINANCE_WORKFLOWS_ENABLED
+    assert.equal(
+      (await resolveAgentFeatureFlags()).financeWorkflowsEnabled,
+      false
+    )
   } finally {
     if (original === undefined) {
-      delete process.env.AGENT_ASYNC_REPORTS_ENABLED
+      delete process.env.AGENT_FINANCE_WORKFLOWS_ENABLED
     } else {
-      process.env.AGENT_ASYNC_REPORTS_ENABLED = original
+      process.env.AGENT_FINANCE_WORKFLOWS_ENABLED = original
     }
 
     if (originalEdgeConfig === undefined) {
@@ -157,12 +162,12 @@ test("agent feature flag resolution does not mutate shared defaults", async () =
 
 test("Edge Config flag keys are compatible with Vercel key restrictions", () => {
   assert.equal(
-    toEdgeConfigFlagKey("agent.async_reports.enabled"),
-    "agent_async_reports_enabled"
+    toEdgeConfigFlagKey("agent.finance_workflows.enabled"),
+    "agent_finance_workflows_enabled"
   )
   assert.equal(
-    toVercelFlagSlug("agent.async_reports.enabled"),
-    "agent-async-reports-enabled"
+    toVercelFlagSlug("agent.finance_workflows.enabled"),
+    "agent-finance-workflows-enabled"
   )
 })
 
@@ -172,14 +177,12 @@ test("agent feature flags can read Vercel/Flags-SDK Edge Config shape", async ()
     process.env.EDGE_CONFIG = "test-edge-config-connection"
     globalThis[edgeConfigStoreKey] = {
       flags: {
-        "agent-async-reports-enabled": true,
         "agent-telemetry-record-io": false,
         "agent-finance-workflows-enabled": true,
       },
     }
 
     const flags = await resolveAgentFeatureFlags()
-    assert.equal(flags.asyncReportsEnabled, true)
     assert.equal(flags.telemetryRecordIo, false)
     assert.equal(flags.financeWorkflowsEnabled, true)
   } finally {
@@ -198,13 +201,13 @@ test("integration boolean flags can read Edge Config map shape", async () => {
     process.env.EDGE_CONFIG = "test-edge-config-connection"
     globalThis[edgeConfigStoreKey] = {
       agent_flags: {
-        "agent.async_reports.enabled": true,
+        "agent.finance_workflows.enabled": true,
       },
     }
 
     assert.equal(
       await resolveIntegrationBooleanFlag({
-        key: "agent.async_reports.enabled",
+        key: "agent.finance_workflows.enabled",
       }),
       true
     )
@@ -218,47 +221,12 @@ test("integration boolean flags can read Edge Config map shape", async () => {
   }
 })
 
-test("async report idempotency does not derive keys from prompt text", () => {
-  const source = readFileSync(
-    path.join(cwd, "src/app/api/jobs/report/route.ts"),
-    "utf8"
-  )
-
-  assert.match(source, /reportId = parsed\.data\.reportId \?\? randomUUID\(\)/)
-  assert.doesNotMatch(source, /Buffer\.from\(parsed\.data\.prompt\)/)
-  assert.doesNotMatch(source, /toString\("base64url"\)/)
-})
-
-test("async report enqueue failure isolates status update failures", () => {
-  const source = readFileSync(
-    path.join(cwd, "src/app/api/jobs/report/route.ts"),
-    "utf8"
-  )
-
-  assert.match(source, /JOB_REPORT_STATUS_UPDATE_FAILED/)
-  assert.match(
-    source,
-    /Failed to mark report job as failed after enqueue error/
-  )
-})
-
-test("Inngest inline fallback covers report/trading routes", () => {
+test("Inngest inline fallback covers trading routes", () => {
   assert.equal(shouldRunInngestInlineFallback({}), false)
   assert.equal(
     shouldRunInngestInlineFallback({ INNGEST_INLINE_FALLBACK: "true" }),
     true
   )
-
-  const reportRouteSource = readFileSync(
-    path.join(cwd, "src/app/api/jobs/report/route.ts"),
-    "utf8"
-  )
-  assert.match(reportRouteSource, /JOB_REPORT_INLINE_FALLBACK/)
-  assert.match(
-    reportRouteSource,
-    /const shouldRunInlineFallback = shouldRunInngestInlineFallback\(\)/
-  )
-  assert.match(reportRouteSource, /} else {\n\s+let enqueueError: unknown/)
 
   const tradingJobRouteSource = readFileSync(
     path.join(cwd, "src/app/api/trading-desk/jobs/route.ts"),

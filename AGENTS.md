@@ -1,5 +1,13 @@
 # AGENTS.md
 
+Instructions for coding agents (Cursor, Codex, Claude Code, etc.) working in this repo.
+
+- **Architecture & conventions:** see [CLAUDE.md](CLAUDE.md) — the request flow, agent runtime, tools, storage/auth model, code conventions, and the full environment-variable reference live there. Read it before making changes.
+- **Generic local setup:** see [README.md](README.md).
+- **This file** covers the Cursor Cloud environment and the build/test commands and gotchas an agent needs to run the project.
+
+Chloei is a Next.js 16 / React 19 chat app on the Vercel AI Gateway, with PostgreSQL-backed auth, threads, and rate limiting. Validate changes with `pnpm lint` (zero warnings), `pnpm typecheck`, and `pnpm test` before finishing.
+
 ## Cursor Cloud-specific instructions
 
 ### Services

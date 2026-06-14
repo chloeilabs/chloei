@@ -26,7 +26,7 @@ export type ToolName = (typeof TOOL_NAMES)[number]
 export const SEARCH_TOOL_NAMES = [
   "tavily_search",
 ] as const satisfies readonly ToolName[]
-export type SearchToolName = (typeof SEARCH_TOOL_NAMES)[number]
+type SearchToolName = (typeof SEARCH_TOOL_NAMES)[number]
 export type ToolInvocationStatus = "running" | "success" | "error"
 export const AGENT_RUN_STATUSES = [
   "in_progress",
@@ -136,17 +136,17 @@ interface InteractionCheckpointFields {
   lastEventId?: string
 }
 
-export interface TextDeltaStreamEvent extends InteractionCheckpointFields {
+interface TextDeltaStreamEvent extends InteractionCheckpointFields {
   type: "text_delta"
   delta: string
 }
 
-export interface ReasoningDeltaStreamEvent extends InteractionCheckpointFields {
+interface ReasoningDeltaStreamEvent extends InteractionCheckpointFields {
   type: "reasoning_delta"
   delta: string
 }
 
-export interface ToolCallStreamEvent extends InteractionCheckpointFields {
+interface ToolCallStreamEvent extends InteractionCheckpointFields {
   type: "tool_call"
   callId: string | null
   toolName: ToolName
@@ -160,7 +160,7 @@ export interface ToolCallStreamEvent extends InteractionCheckpointFields {
   retryable?: boolean
 }
 
-export interface ToolResultStreamEvent extends InteractionCheckpointFields {
+interface ToolResultStreamEvent extends InteractionCheckpointFields {
   type: "tool_result"
   callId: string | null
   toolName?: ToolName
@@ -174,12 +174,12 @@ export interface ToolResultStreamEvent extends InteractionCheckpointFields {
   artifactManifest?: CodeExecutionArtifactMetadata[]
 }
 
-export interface SourceStreamEvent extends InteractionCheckpointFields {
+interface SourceStreamEvent extends InteractionCheckpointFields {
   type: "source"
   source: MessageSource
 }
 
-export interface AgentStatusStreamEvent extends InteractionCheckpointFields {
+interface AgentStatusStreamEvent extends InteractionCheckpointFields {
   type: "agent_status"
   status: AgentRunStatus
 }
@@ -201,7 +201,7 @@ export interface Message {
   metadata?: MessageMetadata
 }
 
-export interface MessageMetadata {
+interface MessageMetadata {
   parts?: AssistantMessagePart[]
   attachments?: AgentAttachmentMetadata[]
   isStreaming?: boolean

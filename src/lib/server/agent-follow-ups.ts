@@ -24,7 +24,7 @@ const generatedFollowUpQuestionTextsSchema = z
   .min(1)
   .max(4)
 
-export const generatedFollowUpQuestionsSchema = z
+const generatedFollowUpQuestionsSchema = z
   .object({
     questions: generatedFollowUpQuestionTextsSchema,
   })
@@ -57,12 +57,12 @@ export const followUpQuestionsResponseSchema = z
   })
   .strict()
 
-export interface FollowUpContextMessage {
+interface FollowUpContextMessage {
   role: "user" | "assistant"
   content: string
 }
 
-export const followUpContextMessageSchema = z
+const followUpContextMessageSchema = z
   .object({
     role: z.enum(["user", "assistant"]),
     content: z.string().trim().min(1).max(AGENT_REQUEST_MAX_MESSAGE_CHARS),

@@ -3,8 +3,8 @@ import { asRecord, toOptionalString } from "@/lib/cast"
 import { normalizeTickerSymbol } from "./normalizers"
 import { normalizeCik } from "./sec"
 
-export type SecCompanyFactsPeriod = "annual" | "quarter"
-export type SecFinancialStatementType = "income" | "balance_sheet" | "cash_flow"
+type SecCompanyFactsPeriod = "annual" | "quarter"
+type SecFinancialStatementType = "income" | "balance_sheet" | "cash_flow"
 
 export interface SecFilingSummary {
   form: string

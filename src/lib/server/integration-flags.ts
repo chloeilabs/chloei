@@ -3,16 +3,14 @@ import { createLogger } from "@/lib/logger"
 const logger = createLogger("integration-flags")
 
 export const AGENT_FLAG_KEYS = [
-  "agent.async_reports.enabled",
   "agent.telemetry.record_io",
   "agent.finance_workflows.enabled",
 ] as const
 
-export type AgentFlagKey = (typeof AGENT_FLAG_KEYS)[number]
-export type IntegrationFlagKey = AgentFlagKey
+type AgentFlagKey = (typeof AGENT_FLAG_KEYS)[number]
+type IntegrationFlagKey = AgentFlagKey
 
 export interface AgentFeatureFlags {
-  asyncReportsEnabled: boolean
   telemetryRecordIo: boolean
   financeWorkflowsEnabled: boolean
 }
@@ -22,19 +20,16 @@ interface ResolveAgentFeatureFlagsParams {
 }
 
 const DEFAULT_FLAGS: AgentFeatureFlags = {
-  asyncReportsEnabled: false,
   telemetryRecordIo: false,
   financeWorkflowsEnabled: false,
 }
 
 const ENV_FLAG_NAMES: Record<keyof AgentFeatureFlags, string> = {
-  asyncReportsEnabled: "AGENT_ASYNC_REPORTS_ENABLED",
   telemetryRecordIo: "AGENT_TELEMETRY_RECORD_IO",
   financeWorkflowsEnabled: "AGENT_FINANCE_WORKFLOWS_ENABLED",
 }
 
 const EDGE_FLAG_KEYS: Record<keyof AgentFeatureFlags, IntegrationFlagKey> = {
-  asyncReportsEnabled: "agent.async_reports.enabled",
   telemetryRecordIo: "agent.telemetry.record_io",
   financeWorkflowsEnabled: "agent.finance_workflows.enabled",
 }
@@ -137,7 +132,6 @@ function getInternalDefaultFlags(
 
   return {
     ...DEFAULT_FLAGS,
-    asyncReportsEnabled: true,
     financeWorkflowsEnabled: true,
   }
 }

@@ -9,7 +9,7 @@ interface CreateApiErrorResponseParams extends CreateApiHeadersParams {
   status: number
 }
 
-export interface ApiErrorResponseBody {
+interface ApiErrorResponseBody {
   error: string
   errorCode: string
   requestId: string
