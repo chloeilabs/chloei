@@ -48,18 +48,18 @@ test("parseStreamEventLine parses extended tool result metadata", () => {
   const line = JSON.stringify({
     type: "tool_result",
     callId: "call-1",
-    toolName: "finance_data",
+    toolName: "code_execution",
     status: "error",
-    operation: "quote",
-    provider: "stooq",
+    operation: "python",
+    provider: "local",
     durationMs: 42,
-    errorCode: "HTTP_429",
+    errorCode: "EXIT_NON_ZERO",
     retryable: true,
     artifactManifest: [
       {
-        path: "finance_artifact.xlsx",
+        path: "model_output.xlsx",
         sizeBytes: 1024,
-        url: "/api/agent/artifacts/run-1/finance_artifact.xlsx",
+        url: "/api/agent/artifacts/run-1/model_output.xlsx",
       },
     ],
   })
@@ -67,18 +67,18 @@ test("parseStreamEventLine parses extended tool result metadata", () => {
   assert.deepEqual(parseStreamEventLine(line), {
     type: "tool_result",
     callId: "call-1",
-    toolName: "finance_data",
+    toolName: "code_execution",
     status: "error",
-    operation: "quote",
-    provider: "stooq",
+    operation: "python",
+    provider: "local",
     durationMs: 42,
-    errorCode: "HTTP_429",
+    errorCode: "EXIT_NON_ZERO",
     retryable: true,
     artifactManifest: [
       {
-        path: "finance_artifact.xlsx",
+        path: "model_output.xlsx",
         sizeBytes: 1024,
-        url: "/api/agent/artifacts/run-1/finance_artifact.xlsx",
+        url: "/api/agent/artifacts/run-1/model_output.xlsx",
       },
     ],
   })
@@ -113,7 +113,7 @@ test("parseStreamEventLine rejects malformed checkpoint and tool data", () => {
       JSON.stringify({
         type: "tool_result",
         callId: "call-1",
-        toolName: "finance_data",
+        toolName: "tavily_search",
         status: "error",
         operation: "   ",
       })
@@ -143,9 +143,9 @@ test("parseStreamEventLine rejects malformed checkpoint and tool data", () => {
         status: "success",
         artifactManifest: [
           {
-            path: "finance_artifact.xlsx",
+            path: "model_output.xlsx",
             sizeBytes: 1,
-            url: "https://example.com/finance_artifact.xlsx",
+            url: "https://example.com/model_output.xlsx",
           },
         ],
       })

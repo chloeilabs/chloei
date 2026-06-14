@@ -1,10 +1,9 @@
 import { getTestMocks } from "./mock-state.mjs"
 
-export function withAiSdkInlineCitationInstruction(instruction, options) {
+export function withAiSdkInlineCitationInstruction(instruction) {
   return (
     getTestMocks().systemInstructionAugmentations?.withAiSdkInlineCitationInstruction?.(
-      instruction,
-      options
+      instruction
     ) ?? instruction
   )
 }

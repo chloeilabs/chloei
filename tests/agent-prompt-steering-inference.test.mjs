@@ -18,25 +18,6 @@ function user(content) {
   return [{ role: "user", content }]
 }
 
-test("inferPromptTaskMode classifies the standard finance baseline cases", () => {
-  assert.equal(
-    inferPromptTaskMode(
-      user(
-        "Compare AAPL valuation using revenue, EBITDA, FCF, and recent 10-K data."
-      )
-    ),
-    "finance_analysis"
-  )
-  assert.equal(
-    inferPromptTaskMode(user("Find the current quote for AAPL.")),
-    "finance_analysis"
-  )
-  assert.equal(
-    inferPromptTaskMode(user("What finance data providers are available?")),
-    "finance_analysis"
-  )
-})
-
 test("inferPromptTaskMode does not mistake stock-up idioms for finance", () => {
   assert.equal(
     inferPromptTaskMode(user("Stock up on supplies for the trip.")),
@@ -181,24 +162,11 @@ test("inferPromptTaskMode falls back to general when nothing matches", () => {
   )
 })
 
-test("inferPromptTaskMode upgrades borderline queries when userExpertise=finance", () => {
-  assert.equal(
-    inferPromptTaskMode(user("Hello!"), { userExpertise: "finance" }),
-    "finance_analysis"
-  )
-  assert.equal(
-    inferPromptTaskMode(user("Tell me about Q2."), {
-      userExpertise: "finance",
-    }),
-    "finance_analysis"
-  )
-})
-
 test("inferPromptTaskMode never lets userExpertise downgrade high_stakes routing", () => {
   assert.equal(
     inferPromptTaskMode(
       user("Should I buy this stock in my retirement account?"),
-      { userExpertise: "finance" }
+      { userExpertise: "research" }
     ),
     "high_stakes"
   )

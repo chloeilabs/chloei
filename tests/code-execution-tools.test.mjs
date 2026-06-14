@@ -25,7 +25,7 @@ const {
 } = await import(codeExecutionToolsUrl)
 
 test("restricted code execution blocks finance-only Python imports", async () => {
-  const tools = createAiSdkCodeExecutionTools({ backend: "restricted" })
+  const tools = createAiSdkCodeExecutionTools()
   const result = await tools.code_execution.execute({
     language: "python",
     code: "import pandas as pd\nprint('blocked')",
@@ -35,160 +35,42 @@ test("restricted code execution blocks finance-only Python imports", async () =>
   assert.equal(result.error?.code, "BLOCKED_PATTERN")
 })
 
-test("finance code execution reports workspace spreadsheet artifacts", async () => {
-  const tempRoot = await mkdtemp(path.join(tmpdir(), "chloei-code-test-"))
-  try {
-    const tools = createAiSdkCodeExecutionTools({
-      backend: "finance",
-      workspaceMode: "preserve",
-      workspaceRoot: tempRoot,
-      artifactBaseUrl: "/api/agent/artifacts/run-1",
-      exposeArtifactDirectory: true,
-    })
-    const result = await tools.code_execution.execute({
-      language: "python",
-      code: [
-        "import zipfile",
-        "with zipfile.ZipFile('finance_artifact.xlsx', 'w') as workbook:",
-        "    workbook.writestr('[Content_Types].xml', '<Types/>')",
-        "print('created')",
-      ].join("\n"),
-    })
-
-    assert.equal(result.error, undefined)
-    assert.equal(result.output?.backend, "finance")
-    assert.equal(
-      result.output?.artifactManifest.some(
-        (artifact) =>
-          artifact.path === "finance_artifact.xlsx" &&
-          artifact.url === "/api/agent/artifacts/run-1/finance_artifact.xlsx"
-      ),
-      true
-    )
-    assert.match(result.output?.artifactDirectory ?? "", /workspace$/)
-
-    const persistedResult = await tools.code_execution.execute({
-      language: "python",
-      code: [
-        "import zipfile",
-        "with zipfile.ZipFile('finance_artifact.xlsx') as workbook:",
-        "    print(','.join(workbook.namelist()))",
-      ].join("\n"),
-    })
-
-    assert.equal(persistedResult.error, undefined)
-    assert.match(persistedResult.output?.stdout ?? "", /\[Content_Types\]\.xml/)
-
-    assert.deepEqual(
-      getAiSdkCodeExecutionToolResultMetadata({
-        toolCallId: "call-code",
-        toolName: "code_execution",
-        output: result,
-      }),
-      {
-        callId: "call-code",
-        toolName: "code_execution",
-        status: "success",
-        operation: "python",
-        provider: "local",
-        durationMs: result.output.durationMs,
-        errorCode: undefined,
-        retryable: false,
-        artifactManifest: [
-          {
-            path: "finance_artifact.xlsx",
-            sizeBytes: result.output.artifactManifest.find(
-              (artifact) => artifact.path === "finance_artifact.xlsx"
-            ).sizeBytes,
-            url: "/api/agent/artifacts/run-1/finance_artifact.xlsx",
-          },
-        ],
-        sources: [],
-      }
-    )
-  } finally {
-    await rm(tempRoot, { recursive: true, force: true })
-  }
-})
-
-test("finance code execution blocks unsafe path literals", async () => {
-  const tools = createAiSdkCodeExecutionTools({ backend: "finance" })
+test("code execution reports computation results with local provider metadata", async () => {
+  const tools = createAiSdkCodeExecutionTools()
   const result = await tools.code_execution.execute({
     language: "python",
-    code: [
-      "import zipfile",
-      "with zipfile.ZipFile('../escape.xlsx', 'w') as workbook:",
-      "    workbook.writestr('[Content_Types].xml', '<Types/>')",
-    ].join("\n"),
+    code: "print(sum(range(10)))",
   })
 
-  assert.equal(result.output, undefined)
-  assert.equal(result.error?.code, "BLOCKED_PATTERN")
-  assert.match(result.error?.message ?? "", /relative workspace paths/)
-})
+  assert.equal(result.error, undefined)
+  assert.equal(result.output?.backend, "restricted")
+  assert.match(result.output?.stdout ?? "", /45/)
+  assert.deepEqual(result.output?.artifactManifest, [])
 
-test("preserved code execution workspace does not overwrite mounted inputs", async () => {
-  const tempRoot = await mkdtemp(path.join(tmpdir(), "chloei-code-test-"))
-  try {
-    const inputSource = path.join(tempRoot, "source.xlsx")
-    await writeFile(inputSource, "original")
-
-    const tools = createAiSdkCodeExecutionTools({
-      backend: "finance",
-      workspaceMode: "preserve",
-      workspaceRoot: tempRoot,
-      inputFiles: [
-        {
-          sourcePath: inputSource,
-          relativePath: "mounted.xlsx",
-        },
-      ],
-    })
-
-    const writeResult = await tools.code_execution.execute({
-      language: "python",
-      code: [
-        "import zipfile",
-        "with zipfile.ZipFile('mounted.xlsx', 'w') as workbook:",
-        "    workbook.writestr('modified.txt', 'changed')",
-      ].join("\n"),
-    })
-
-    assert.equal(writeResult.error, undefined)
-    assert.equal(
-      writeResult.output?.artifactManifest.some(
-        (artifact) => artifact.path === "mounted.xlsx"
-      ),
-      true
-    )
-
-    const readResult = await tools.code_execution.execute({
-      language: "python",
-      code: [
-        "import zipfile",
-        "with zipfile.ZipFile('mounted.xlsx') as workbook:",
-        "    print(','.join(workbook.namelist()))",
-      ].join("\n"),
-    })
-
-    assert.equal(readResult.error, undefined)
-    assert.match(readResult.output?.stdout ?? "", /modified\.txt/)
-    assert.equal(
-      readResult.output?.artifactManifest.some(
-        (artifact) => artifact.path === "mounted.xlsx"
-      ),
-      false
-    )
-  } finally {
-    await rm(tempRoot, { recursive: true, force: true })
-  }
+  assert.deepEqual(
+    getAiSdkCodeExecutionToolResultMetadata({
+      toolCallId: "call-code",
+      toolName: "code_execution",
+      output: result,
+    }),
+    {
+      callId: "call-code",
+      toolName: "code_execution",
+      status: "success",
+      operation: "python",
+      provider: "local",
+      durationMs: result.output.durationMs,
+      errorCode: undefined,
+      retryable: false,
+      sources: [],
+    }
+  )
 })
 
 test("preserved code execution workspace hides raw artifact directory by default", async () => {
   const tempRoot = await mkdtemp(path.join(tmpdir(), "chloei-code-test-"))
   try {
     const tools = createAiSdkCodeExecutionTools({
-      backend: "finance",
       workspaceMode: "preserve",
       workspaceRoot: tempRoot,
     })
@@ -211,7 +93,6 @@ test("preserved code execution workspace excludes nested mounted inputs from art
     await writeFile(inputSource, "original")
 
     const tools = createAiSdkCodeExecutionTools({
-      backend: "finance",
       workspaceMode: "preserve",
       workspaceRoot: tempRoot,
       inputFiles: [

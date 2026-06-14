@@ -87,9 +87,9 @@ beforeEach(() => {
       },
     },
     systemInstructionAugmentations: {
-      withAiSdkInlineCitationInstruction(instruction, options) {
-        recorded.augmentedInstructions.push({ instruction, options })
-        return `${instruction}::secFilings=${String(options.secFilingsEnabled)}`
+      withAiSdkInlineCitationInstruction(instruction) {
+        recorded.augmentedInstructions.push({ instruction })
+        return `${instruction}::cited`
       },
     },
     gatewayResponses: {
@@ -887,16 +887,9 @@ test("agent helper streams fallback output when the model yields no content", as
     { type: "agent_status", status: "completed" },
   ])
   assert.equal(recorded.settledCount, 1)
-  assert.equal(
-    recorded.streamParams[0]?.systemInstruction,
-    "system::secFilings=false"
-  )
+  assert.equal(recorded.streamParams[0]?.systemInstruction, "system::cited")
   assert.deepEqual(recorded.augmentedInstructions[0], {
     instruction: "system",
-    options: {
-      financeEnabled: true,
-      secFilingsEnabled: false,
-    },
   })
 })
 

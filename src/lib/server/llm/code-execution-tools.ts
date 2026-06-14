@@ -18,10 +18,6 @@ import { z } from "zod"
 
 import { asRecord } from "@/lib/cast"
 import {
-  AGENT_CODE_EXECUTION_BACKEND,
-  AGENT_CODE_EXECUTION_PYTHON_VENV_PATH,
-} from "@/lib/server/agent-runtime-config"
-import {
   buildAuthenticatedPrivateBlobDownloadUrl,
   buildPrivateBlobArtifactPathname,
   isPrivateBlobConfigured,
@@ -32,8 +28,8 @@ import type { CodeExecutionArtifactMetadata, ToolName } from "@/lib/shared"
 const CODE_EXECUTION_TOOL_NAME = "code_execution" as const
 const CODE_EXECUTION_LABEL = "Running code" as const
 
-// Finance/eval prompts run pandas/openpyxl-style calculations and spreadsheet
-// artifact writes, which need a longer cap than lightweight chat snippets.
+// Code-execution snippets can run heavier computation than lightweight chat
+// text, so allow a longer cap than a plain response would need.
 const CODE_EXECUTION_DEFAULT_TIMEOUT_MS = 10_000
 const CODE_EXECUTION_MAX_TIMEOUT_MS = 60_000
 const CODE_EXECUTION_MAX_CODE_CHARS = 12_000
@@ -42,7 +38,7 @@ const PYTHON3_COMMAND = "python3"
 
 type CodeExecutionToolName = Extract<ToolName, typeof CODE_EXECUTION_TOOL_NAME>
 type CodeExecutionLanguage = "javascript" | "python"
-export type CodeExecutionBackend = "restricted" | "finance"
+export type CodeExecutionBackend = "restricted"
 type CodeExecutionWorkspaceMode = "ephemeral" | "preserve"
 
 interface CodeExecutionToolArgs {
@@ -120,7 +116,6 @@ interface AiSdkCodeExecutionToolResultMetadata {
 }
 
 interface CreateAiSdkCodeExecutionToolsOptions {
-  backend?: CodeExecutionBackend
   workspaceMode?: CodeExecutionWorkspaceMode
   workspaceRoot?: string
   artifactBaseUrl?: string
@@ -189,23 +184,6 @@ const PYTHON_ALLOWED_IMPORTS = new Set([
   "typing",
 ])
 
-const PYTHON_FINANCE_ALLOWED_IMPORTS = new Set([
-  ...PYTHON_ALLOWED_IMPORTS,
-  "dateutil",
-  "matplotlib",
-  "mpl_toolkits",
-  "numpy",
-  "openpyxl",
-  "pandas",
-  "scipy",
-  "statsmodels",
-  "xlsxwriter",
-  "zipfile",
-])
-
-const PYTHON_STRING_LITERAL_PATTERN =
-  /(?:^|[^A-Za-z0-9_])(?:[rRuUbBfF]{0,3})(["'])((?:\\.|(?!\1)[^\\\r\n])*)\1/g
-
 const ARTIFACT_CONTENT_TYPES_BY_EXTENSION: Record<string, string> = {
   ".csv": "text/csv; charset=utf-8",
   ".gif": "image/gif",
@@ -243,10 +221,6 @@ function normalizeLanguage(value: unknown): CodeExecutionLanguage {
   return value === "python" ? "python" : "javascript"
 }
 
-function normalizeBackend(value: unknown): CodeExecutionBackend {
-  return value === "finance" ? "finance" : "restricted"
-}
-
 function resolveLabel(language: CodeExecutionLanguage | undefined): string {
   if (language === "python") {
     return "Running Python"
@@ -268,52 +242,11 @@ function buildCombinedOutput(stdout: string, stderr: string): string {
   return sections.join("\n\n").trim()
 }
 
-function resolvePythonCommand(backend: CodeExecutionBackend): string {
-  const venvPath =
-    backend === "finance" ? AGENT_CODE_EXECUTION_PYTHON_VENV_PATH : undefined
-  if (!venvPath) {
-    return PYTHON3_COMMAND
-  }
-
-  const baseName = path.basename(venvPath)
-  if (baseName === "python" || baseName === "python3") {
-    return venvPath
-  }
-
-  return path.join(venvPath, "bin", "python")
-}
-
 function inferLanguageFromCommand(command: string): CodeExecutionLanguage {
   const baseName = path.basename(command).toLowerCase()
   return baseName === "python" || baseName === "python3"
     ? "python"
     : "javascript"
-}
-
-function isUnsafeWorkspacePathLiteral(value: string): boolean {
-  const normalized = value.trim().replaceAll("\\", "/")
-  if (!normalized) {
-    return false
-  }
-
-  return (
-    normalized.startsWith("/") ||
-    normalized.startsWith("~/") ||
-    normalized.startsWith("file:") ||
-    /^[A-Za-z]:\//.test(normalized) ||
-    normalized.split("/").includes("..")
-  )
-}
-
-function validatePathStringLiterals(code: string): string | null {
-  for (const match of code.matchAll(PYTHON_STRING_LITERAL_PATTERN)) {
-    const literal = match[2] ?? ""
-    if (isUnsafeWorkspacePathLiteral(literal)) {
-      return "Python finance code execution can only access relative workspace paths without parent-directory traversal."
-    }
-  }
-
-  return null
 }
 
 function buildPythonSandboxedCode(
@@ -613,15 +546,9 @@ async function getMountedInputFileHashes(
   return hashes
 }
 
-function validatePythonImports(
-  code: string,
-  backend: CodeExecutionBackend
-): string | null {
+function validatePythonImports(code: string): string | null {
   const lines = code.split(/\r?\n/g)
-  const allowedImports =
-    backend === "finance"
-      ? PYTHON_FINANCE_ALLOWED_IMPORTS
-      : PYTHON_ALLOWED_IMPORTS
+  const allowedImports = PYTHON_ALLOWED_IMPORTS
 
   for (const line of lines) {
     const importMatch = /^\s*import\s+(.+?)\s*$/.exec(line)
@@ -671,14 +598,7 @@ function validateCodeSafety(args: CodeExecutionToolArgs): string | null {
     }
   }
 
-  if (args.backend === "finance") {
-    const pathLiteralError = validatePathStringLiterals(args.code)
-    if (pathLiteralError) {
-      return pathLiteralError
-    }
-  }
-
-  return validatePythonImports(args.code, args.backend)
+  return validatePythonImports(args.code)
 }
 
 async function runProcess(args: {
@@ -908,7 +828,7 @@ async function executeCode(
   }
 
   if (args.language === "python") {
-    const pythonCommand = resolvePythonCommand(args.backend)
+    const pythonCommand = PYTHON3_COMMAND
     const result = await runProcess({
       command: pythonCommand,
       commandArgs: ["-I", "-c", args.code],
@@ -991,9 +911,7 @@ export function isAiSdkCodeExecutionToolName(
 export function createAiSdkCodeExecutionTools(
   options: CreateAiSdkCodeExecutionToolsOptions = {}
 ) {
-  const backend = normalizeBackend(
-    options.backend ?? AGENT_CODE_EXECUTION_BACKEND
-  )
+  const backend: CodeExecutionBackend = "restricted"
   const workspaceMode = options.workspaceMode ?? "ephemeral"
   const workspaceRoot =
     options.workspaceRoot ??
@@ -1008,9 +926,7 @@ export function createAiSdkCodeExecutionTools(
   return {
     code_execution: tool({
       description:
-        backend === "finance"
-          ? "Execute small self-contained JavaScript or curated Python finance-analysis snippets for arithmetic, statistics, table transformations, spreadsheet generation, chart generation, or quick validation. Network, subprocess, and host filesystem access are blocked. In finance/eval mode, mounted reference files may be read by relative path with libraries such as pandas/openpyxl, and generated workspace artifacts are reported in an artifact manifest that may include download URLs. For spreadsheet deliverables, write relative filenames directly with library save APIs such as DataFrame.to_excel('deliverable.xlsx'), Workbook.save('deliverable.xlsx'), or plt.savefig('chart.png'). Do not create scratch/test/probe files; every generated file may be treated as a submitted artifact. Avoid blocked APIs such as open(), pathlib, os, subprocess, requests, urllib, and sockets."
-          : "Execute small self-contained JavaScript or Python snippets for arithmetic, logic checks, data transformations, or quick validation. This tool cannot access the network, filesystem, or subprocesses.",
+        "Execute small self-contained JavaScript or Python snippets for arithmetic, logic checks, data transformations, or quick validation. This tool cannot access the network, filesystem, or subprocesses.",
       inputSchema: codeExecutionInputSchema,
       execute: async (input) =>
         executeCode({

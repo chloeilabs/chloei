@@ -21,7 +21,6 @@ export const AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT = 4
 // Tool-step budgets per runtime profile.
 export const AGENT_TOOL_MAX_STEPS = 12
 export const AGENT_RESEARCH_TOOL_MAX_STEPS = 20
-export const AGENT_FINANCE_TOOL_MAX_STEPS = 20
 
 function parseBooleanFromEnv(
   value: string | undefined,
@@ -51,13 +50,6 @@ function parseEnumFromEnv<const T extends readonly string[]>(
   return allowedValues.includes(normalized) ? normalized : fallback
 }
 
-function parseOptionalStringFromEnv(
-  value: string | undefined
-): string | undefined {
-  const normalized = value?.trim()
-  return normalized && normalized.length > 0 ? normalized : undefined
-}
-
 // Operational switches kept environment-configurable: a rate-limit kill switch
 // and the persistence backend (memory vs. postgres) for tests and local runs.
 export const AGENT_RATE_LIMIT_ENABLED = parseBooleanFromEnv(
@@ -69,16 +61,4 @@ export const AGENT_RATE_LIMIT_STORE = parseEnumFromEnv(
   process.env.AGENT_RATE_LIMIT_STORE,
   ["auto", "memory", "postgres"] as const,
   "auto"
-)
-
-// Code-execution backend. The finance runtime profile selects "finance"
-// per request; this env default only affects ad-hoc runs.
-export const AGENT_CODE_EXECUTION_BACKEND = parseEnumFromEnv(
-  process.env.AGENT_CODE_EXECUTION_BACKEND,
-  ["restricted", "finance"] as const,
-  "restricted"
-)
-
-export const AGENT_CODE_EXECUTION_PYTHON_VENV_PATH = parseOptionalStringFromEnv(
-  process.env.AGENT_CODE_EXECUTION_PYTHON_VENV_PATH
 )

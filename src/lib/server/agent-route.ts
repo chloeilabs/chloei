@@ -229,21 +229,6 @@ function textDeltaEvent(delta: string): AgentStreamEvent {
   return { type: "text_delta", delta }
 }
 
-function shouldIncludeFinanceToolingInstruction(
-  model: ModelType,
-  runtimeProfile: AgentRuntimeProfileId | undefined
-): boolean {
-  void model
-  void runtimeProfile
-  return true
-}
-
-function shouldIncludeSecFilingsToolingInstruction(
-  runtimeProfile: AgentRuntimeProfileId | undefined
-): boolean {
-  return runtimeProfile === "finance_analysis"
-}
-
 function isProviderAuthenticationError(error: unknown): boolean {
   const record = asRecord(error)
   const status =
@@ -838,16 +823,7 @@ export function createAgentStreamResponse(
           featureFlags: params.featureFlags,
           messages: params.messages,
           systemInstruction: withAiSdkInlineCitationInstruction(
-            params.systemInstruction,
-            {
-              financeEnabled: shouldIncludeFinanceToolingInstruction(
-                params.selectedModel,
-                params.runtimeProfile
-              ),
-              secFilingsEnabled: shouldIncludeSecFilingsToolingInstruction(
-                params.runtimeProfile
-              ),
-            }
+            params.systemInstruction
           ),
           signal: streamSignal,
         })

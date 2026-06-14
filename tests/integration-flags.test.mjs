@@ -12,7 +12,6 @@ const moduleUrl = pathToFileURL(
 
 const {
   getDefaultAgentFeatureFlags,
-  isInternalUser,
   resolveAgentFeatureFlags,
   resolveIntegrationBooleanFlag,
   toEdgeConfigFlagKey,
@@ -22,14 +21,7 @@ const {
 // All env that the module reads. Cleared before each scenario so tests never
 // leak into one another and Edge Config is never contacted (EDGE_CONFIG unset
 // short-circuits the lookup).
-const ENV_KEYS = [
-  "EDGE_CONFIG",
-  "AGENT_TELEMETRY_RECORD_IO",
-  "AGENT_FINANCE_WORKFLOWS_ENABLED",
-  "AGENT_INTERNAL_USER_EMAILS",
-  "AGENT_INTERNAL_USER_EMAIL_DOMAINS",
-  "AGENT_ENABLE_NEW_CAPABILITIES_FOR_INTERNAL_USERS",
-]
+const ENV_KEYS = ["EDGE_CONFIG", "AGENT_TELEMETRY_RECORD_IO"]
 
 async function withEnv(overrides, fn) {
   const saved = new Map()
@@ -60,12 +52,8 @@ async function withEnv(overrides, fn) {
 
 test("flag key encoders normalize separators", () => {
   assert.equal(
-    toEdgeConfigFlagKey("agent.finance_workflows.enabled"),
-    "agent_finance_workflows_enabled"
-  )
-  assert.equal(
-    toVercelFlagSlug("agent.finance_workflows.enabled"),
-    "agent-finance-workflows-enabled"
+    toEdgeConfigFlagKey("agent.telemetry.record_io"),
+    "agent_telemetry_record_io"
   )
   assert.equal(
     toVercelFlagSlug("agent.telemetry.record_io"),
@@ -77,46 +65,28 @@ test("getDefaultAgentFeatureFlags returns fresh all-disabled copies", () => {
   const first = getDefaultAgentFeatureFlags()
   assert.deepEqual(first, {
     telemetryRecordIo: false,
-    financeWorkflowsEnabled: false,
   })
 
-  first.financeWorkflowsEnabled = true
-  assert.equal(getDefaultAgentFeatureFlags().financeWorkflowsEnabled, false)
-})
-
-test("isInternalUser matches configured emails and domains", async () => {
-  await withEnv(
-    {
-      AGENT_INTERNAL_USER_EMAILS: "insider@example.com, other@team.dev",
-      AGENT_INTERNAL_USER_EMAIL_DOMAINS: "trusted.io",
-    },
-    () => {
-      assert.equal(isInternalUser("INSIDER@example.com"), true)
-      assert.equal(isInternalUser("anyone@trusted.io"), true)
-      assert.equal(isInternalUser("stranger@gmail.com"), false)
-      assert.equal(isInternalUser(""), false)
-      assert.equal(isInternalUser(null), false)
-      assert.equal(isInternalUser(undefined), false)
-    }
-  )
+  first.telemetryRecordIo = true
+  assert.equal(getDefaultAgentFeatureFlags().telemetryRecordIo, false)
 })
 
 test("resolveIntegrationBooleanFlag reads env names in order", async () => {
-  await withEnv({ AGENT_FINANCE_WORKFLOWS_ENABLED: "true" }, async () => {
+  await withEnv({ AGENT_TELEMETRY_RECORD_IO: "true" }, async () => {
     assert.equal(
       await resolveIntegrationBooleanFlag({
-        key: "agent.finance_workflows.enabled",
-        envNames: ["AGENT_FINANCE_WORKFLOWS_ENABLED"],
+        key: "agent.telemetry.record_io",
+        envNames: ["AGENT_TELEMETRY_RECORD_IO"],
       }),
       true
     )
   })
 
-  await withEnv({ AGENT_FINANCE_WORKFLOWS_ENABLED: "off" }, async () => {
+  await withEnv({ AGENT_TELEMETRY_RECORD_IO: "off" }, async () => {
     assert.equal(
       await resolveIntegrationBooleanFlag({
-        key: "agent.finance_workflows.enabled",
-        envNames: ["AGENT_FINANCE_WORKFLOWS_ENABLED"],
+        key: "agent.telemetry.record_io",
+        envNames: ["AGENT_TELEMETRY_RECORD_IO"],
         defaultValue: true,
       }),
       false
@@ -126,7 +96,7 @@ test("resolveIntegrationBooleanFlag reads env names in order", async () => {
   await withEnv({}, async () => {
     assert.equal(
       await resolveIntegrationBooleanFlag({
-        key: "agent.finance_workflows.enabled",
+        key: "agent.telemetry.record_io",
         defaultValue: true,
       }),
       true
@@ -138,7 +108,6 @@ test("resolveAgentFeatureFlags defaults everything off", async () => {
   await withEnv({}, async () => {
     assert.deepEqual(await resolveAgentFeatureFlags(), {
       telemetryRecordIo: false,
-      financeWorkflowsEnabled: false,
     })
   })
 })
@@ -147,38 +116,5 @@ test("resolveAgentFeatureFlags applies per-flag env overrides", async () => {
   await withEnv({ AGENT_TELEMETRY_RECORD_IO: "1" }, async () => {
     const flags = await resolveAgentFeatureFlags()
     assert.equal(flags.telemetryRecordIo, true)
-    assert.equal(flags.financeWorkflowsEnabled, false)
   })
-})
-
-test("internal users get opt-in capability defaults", async () => {
-  await withEnv(
-    {
-      AGENT_INTERNAL_USER_EMAILS: "insider@example.com",
-      AGENT_ENABLE_NEW_CAPABILITIES_FOR_INTERNAL_USERS: "true",
-    },
-    async () => {
-      const flags = await resolveAgentFeatureFlags({
-        userEmail: "insider@example.com",
-      })
-      assert.equal(flags.financeWorkflowsEnabled, true)
-      assert.equal(flags.telemetryRecordIo, false)
-    }
-  )
-})
-
-test("explicit env flags override internal-user defaults", async () => {
-  await withEnv(
-    {
-      AGENT_INTERNAL_USER_EMAILS: "insider@example.com",
-      AGENT_ENABLE_NEW_CAPABILITIES_FOR_INTERNAL_USERS: "true",
-      AGENT_FINANCE_WORKFLOWS_ENABLED: "false",
-    },
-    async () => {
-      const flags = await resolveAgentFeatureFlags({
-        userEmail: "insider@example.com",
-      })
-      assert.equal(flags.financeWorkflowsEnabled, false)
-    }
-  )
 })
