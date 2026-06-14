@@ -19,7 +19,6 @@ export const TOOL_NAMES = [
   "tavily_extract",
   "finance_data",
   "sec_filings",
-  "trading_analysis",
 ] as const
 export type ToolName = (typeof TOOL_NAMES)[number]
 

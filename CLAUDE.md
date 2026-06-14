@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Chloei is a **Next.js 16 / React 19** authenticated AI chat app backed by the **Vercel AI Gateway**. A single streaming agent endpoint (`/api/agent`) runs a multi-step tool-using loop (web search, code execution, finance data, SEC filings, trading analysis) and streams NDJSON to the browser. Auth, sessions, threads, and rate limiting are **PostgreSQL-backed** (Better Auth + Kysely/`pg`).
+Chloei is a **Next.js 16 / React 19** authenticated AI chat app backed by the **Vercel AI Gateway**. A single streaming agent endpoint (`/api/agent`) runs a multi-step tool-using loop (web search, code execution, finance data, SEC filings) and streams NDJSON to the browser. Auth, sessions, threads, and rate limiting are **PostgreSQL-backed** (Better Auth + Kysely/`pg`).
 
 > **Maintaining this file:** keep it accurate and concise — stale or bloated guidance makes Claude ignore the parts that matter. Cite durable anchors (file paths + symbol names), not line numbers. When you change a subsystem, update the matching section here in the same PR.
 
@@ -17,7 +17,7 @@ pnpm start                # Start the production Next.js server
 # Database (must run before first request — storage does NOT self-initialize)
 pnpm migrate              # Run both auth + app migrations
 pnpm auth:migrate         # Better Auth schema only
-pnpm app:migrate          # thread + agent_job + agent_rate_limit tables (also drops legacy tables)
+pnpm app:migrate          # thread + agent_rate_limit tables (also drops legacy tables)
 pnpm threads:migrate      # Alias for pnpm app:migrate
 
 # Quality checks (run before committing)
@@ -34,9 +34,6 @@ pnpm test                                        # All unit tests (node --test t
 pnpm test:smoke:mock                            # Credential-free Playwright smoke (needs a prior build)
 pnpm test:smoke:mock:build                      # Build production app, then run mock smoke
 node --test tests/agent-route-contract.test.mjs  # Single test file
-
-# Ops
-pnpm inngest:smoke                              # Send one no-op ops/inngest.smoke event (needs INNGEST_EVENT_KEY)
 ```
 
 ESLint runs with `--max-warnings=0`, so any warning fails the build. CI also enforces `pnpm format:check`. Run `pnpm lint && pnpm format:check && pnpm typecheck` before committing.
@@ -145,14 +142,13 @@ User ids are never written into blob storage paths: `hashUserId` (`src/lib/serve
 
 Each tool is only registered when its requirements are met, **and** when the active runtime profile enables it. Finance tools (`finance_data`, `sec_filings`) and the finance code-execution backend are enabled for the `finance_analysis` profile.
 
-| Tool               | Requirement                                | Tool id / operations                                                                                                                     |
-| ------------------ | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `tavily_search`    | `TAVILY_API_KEY`                           | Web search. `topic: general\|news\|finance`, `timeRange`, `includeDomains`, `excludeDomains`, `country`; up to **8** results (default 5) |
-| `tavily_extract`   | `TAVILY_API_KEY`                           | Extract content from up to **5** URLs; `extractDepth: basic\|advanced` (default advanced), `format: markdown\|text`                      |
-| `code_execution`   | always on                                  | `language: javascript\|python`; backend resolved from profile / `AGENT_CODE_EXECUTION_BACKEND`                                           |
-| `finance_data`     | public Stooq/SEC                           | ops: `provider_status \| symbol_search \| quote \| company_profile \| historical_prices \| financial_statements \| sec_company_facts`    |
-| `sec_filings`      | public SEC endpoints                       | ops: `company_search \| filing_search \| document_fetch \| section_extract \| table_extract \| retrieve_information`                     |
-| `trading_analysis` | `TRADINGAGENTS_ENABLED` (≠false) + sidecar | `ticker`, `depth`, `analysts[]`; runs the Trading Desk sidecar (1–3 min)                                                                 |
+| Tool             | Requirement          | Tool id / operations                                                                                                                     |
+| ---------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `tavily_search`  | `TAVILY_API_KEY`     | Web search. `topic: general\|news\|finance`, `timeRange`, `includeDomains`, `excludeDomains`, `country`; up to **8** results (default 5) |
+| `tavily_extract` | `TAVILY_API_KEY`     | Extract content from up to **5** URLs; `extractDepth: basic\|advanced` (default advanced), `format: markdown\|text`                      |
+| `code_execution` | always on            | `language: javascript\|python`; backend resolved from profile / `AGENT_CODE_EXECUTION_BACKEND`                                           |
+| `finance_data`   | public Stooq/SEC     | ops: `provider_status \| symbol_search \| quote \| company_profile \| historical_prices \| financial_statements \| sec_company_facts`    |
+| `sec_filings`    | public SEC endpoints | ops: `company_search \| filing_search \| document_fetch \| section_extract \| table_extract \| retrieve_information`                     |
 
 **Code execution** (`src/lib/server/llm/code-execution-tools.ts`):
 
@@ -208,7 +204,7 @@ CREATE TABLE thread (
 -- Index: thread_user_updated_at_idx ON ("userId", "updatedAt" DESC)
 ```
 
-`app-migrate.mjs` also creates `agent_rate_limit` and `agent_job` (below), backfills `title`, and drops legacy tables/columns.
+`app-migrate.mjs` also creates `agent_rate_limit`, backfills `title`, and drops legacy tables/columns.
 
 **Pinning is client-side only** — there is no server column. Pinned thread ids live in `localStorage` (`chloei:pinned-thread-ids`, `src/components/nav-threads.tsx`) and pinned-first ordering happens in the sidebar render, not in the API.
 
@@ -239,7 +235,7 @@ Better Auth handles sessions. `getRequestSession` (`src/lib/server/auth-session.
 **Middleware** (`src/proxy.ts`) — exported as a **named** `proxy` function plus `config` (not a default export):
 
 - **Matcher is only `["/", "/sign-in", "/sign-up"]`.** It does **not** match `/api/*`. API routes are guarded by their own in-route `isAuthConfigured()` / `getRequestSession()` checks, not by middleware.
-- `/api/auth/*` and `/api/inngest` are passed through unconditionally (when matched).
+- `/api/auth/*` is passed through unconditionally (when matched).
 - Auth not configured → allow auth pages, 503 on API, redirect elsewhere to `/sign-in`.
 - Authenticated → redirect auth pages home (or the `redirect` query path).
 - Not authenticated → redirect to `/sign-in`.
@@ -252,27 +248,6 @@ Image and PDF attachments use a two-tier client flow plus private server storage
 - **Upload**: on submit, files are read as data URLs and best-effort uploaded to private Blob via `POST /api/uploads` (`src/lib/server/private-blob-storage.ts`). On upload failure they fall back to an inline `dataUrl`. Blob objects are `access: private`, tenant-isolated under `users/<sha256(userId)>/…`; downloads go only through the authenticated route `/api/uploads/<segments>`.
 - **Client persistence**: per-message attachment payloads are stored in **IndexedDB** (`chloei-attachments`, keyed by `(threadId, messageId, attachmentId)`), hydrated on thread open and pruned to surviving messages.
 - **Model preparation**: `hydrateBlobBackedAttachments` fetches blob bytes at run time; PDFs are text-extracted (`pdf-text-extraction.ts`); images on text-only models are described via the Gemini vision preprocessor.
-
-### Async Jobs (Inngest)
-
-`src/lib/server/inngest/` + `src/lib/server/jobs.ts` (the `agent_job` table) back Trading Desk background runs. Served at `/api/inngest`; status via `/api/jobs/[jobId]`.
-
-```sql
-CREATE TABLE agent_job (
-  id               text PRIMARY KEY,
-  "userId"         text NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
-  type text, status text,
-  payload jsonb DEFAULT '{}', result jsonb, error text,
-  "idempotencyKey" text NOT NULL,
-  "createdAt"/"updatedAt" timestamp(3),
-  UNIQUE ("userId", "idempotencyKey")
-);
-```
-
-- Job type: `trading/analysis.requested`. Statuses: `queued|running|completed|failed`.
-- `createAgentJob` is idempotent via `ON CONFLICT ("userId","idempotencyKey")`. Idempotency keys must derive from user/document/report/thread ids — **never** from prompt text or document contents.
-- **Inline fallback**: Trading Desk runs inline when Inngest is unconfigured **or** `INNGEST_INLINE_FALLBACK` is set.
-- An `ops/inngest.smoke` connectivity probe (`opsInngestSmoke`) is exercised by `pnpm inngest:smoke`.
 
 ### Feature Flags
 
@@ -292,8 +267,7 @@ CREATE TABLE agent_job (
 
 ### Integrations
 
-- **Trading Desk** (`/trading-desk`; `src/components/trading-desk/`, `src/app/api/trading-desk/`, `src/lib/server/trading-agents/`) — proxies an external Python "TradingAgents" FastAPI sidecar (`TRADINGAGENTS_SERVICE_URL`, default `http://localhost:8000`; enabled unless `TRADINGAGENTS_ENABLED=false`) for multi-agent equity analysis. Runs as an async job (or live NDJSON stream) and is also exposed to chat via the `trading_analysis` tool. The page enqueues `POST /api/trading-desk/jobs` and polls `GET /api/jobs/{id}` every 2.5 s (survives dropped connections). Sidecar docs: `tradingagents-service/README.md`.
-- **File attachments / async jobs / feature flags** — see the dedicated sections above.
+- **File attachments / feature flags** — see the dedicated sections above.
 
 ## File Structure
 
@@ -303,17 +277,13 @@ src/
     (auth)/             # Sign-in / sign-up pages (route group)
     (home)/             # Main app — wraps children in ThreadStoreProvider
       page.tsx          #   server component: auth-guards, getModels(), seeds RQ cache
-      trading-desk/     #   Trading Desk page (shares the (home) sidebar + thread store)
     api/
       agent/route.ts       # POST /api/agent — streaming agent endpoint
       agent/follow-ups/    # Follow-up question suggestions
       agent/artifacts/     # Authenticated code-execution artifact downloads
       auth/[...all]/       # Better Auth catch-all
-      inngest/route.ts     # Inngest function endpoint (async jobs)
-      jobs/[jobId]/        # Async job status (Trading Desk runs)
       models/route.ts      # GET /api/models — available models for configured keys
       threads/route.ts     # GET/PUT/DELETE /api/threads — thread CRUD
-      trading-desk/        # analyze (stream), jobs (async), config
       uploads/             # Private Blob attachment upload + download
     layout.tsx          # Root layout: fonts, dark theme, Analytics + SpeedInsights, dev cache-reset
     manifest.ts         # PWA manifest (production-only standalone)
@@ -328,7 +298,6 @@ src/
     nav-threads.tsx     # Thread list + client-side pinning (localStorage)
     nav-user.tsx        # Account menu + sign-out
     search-chats.tsx    # Client-side thread title search dialog
-    trading-desk/       # Trading Desk UI + use-trading-desk-run
     auth/               # Sign-in/up forms, auth shell
     graphics/           # Logo + visual effects
     layout/             # QueryClientProvider, route group layout
@@ -349,14 +318,11 @@ src/
       agent-attachment-blobs.ts # Blob-backed attachment hydration
       auth.ts / auth-session.ts # isAuthConfigured, getRequestSession
       integration-flags.ts      # Default-off feature flags (env + Edge Config)
-      jobs.ts                   # agent_job table helpers
       privacy.ts                # hashUserId (blob path prefixes)
       rate-limit.ts             # Sliding window + concurrency slot
       route-observability.ts    # createRouteObservation, observeRouteResponse
       threads.ts / thread-payload.ts  # Thread CRUD + Zod parsing
       postgres.ts               # getDatabase() Kysely instance
-      inngest/                  # Inngest client + functions + environment resolution
-      trading-agents/           # Trading Desk sidecar client, config, jobs
       llm/
         agent-runtime.ts                  # Core tool-loop orchestration
         agent-runtime-messages.ts         # Message preparation (rejects system-role)
@@ -367,7 +333,6 @@ src/
         ai-sdk-finance-data-tools.ts      # finance_data tool (Stooq, SEC)
         ai-sdk-sec-filings-tools.ts       # sec_filings tool (EDGAR)
         ai-sdk-tavily-tools.ts            # tavily_search / tavily_extract
-        ai-sdk-trading-agents-tools.ts    # trading_analysis tool (sidecar)
         code-execution-tools.ts           # Sandboxed JS/Python execution + artifacts
         finance-data/                     # Provider internals (stooq, sec, normalizers, retry, sources)
         image-vision-preprocessor.ts      # Image → text via Gateway vision
@@ -383,7 +348,6 @@ src/
       llm/system-instructions.ts # DEFAULT_OPERATING_INSTRUCTION, DEFAULT_SOUL_FALLBACK_INSTRUCTION
       llm/financial-services.ts  # Financial-services workflow data
       threads.ts                 # Thread type, sort/normalize/deriveThreadTitle
-      trading-agents/types.ts    # Shared Trading Desk types
   proxy.ts                # Next.js middleware (named export `proxy` + `config`)
 tests/
   *.test.mjs              # ~50 Node built-in test-runner files (no Jest/Vitest)
@@ -448,13 +412,7 @@ All others are optional with safe defaults. See `.env.example` for the annotated
 | `TAVILY_API_KEY`                                   | Enables `tavily_search` + `tavily_extract`                          |
 | `SEC_API_USER_AGENT`                               | User agent for SEC requests (falls back to a generic UA)            |
 | `BLOB_READ_WRITE_TOKEN`                            | Private Vercel Blob store for attachments + artifacts               |
-| `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY`        | Enable Inngest async jobs (Trading Desk)                            |
-| `INNGEST_ENV` / `INNGEST_DEV`                      | Inngest environment selection / dev mode                            |
-| `INNGEST_INLINE_FALLBACK`                          | `1`/`true` runs jobs inline without Inngest                         |
 | `EDGE_CONFIG`                                      | Vercel Edge Config connection for remote feature flags              |
-| `TRADINGAGENTS_SERVICE_URL`                        | Trading Desk sidecar base URL (default `http://localhost:8000`)     |
-| `TRADINGAGENTS_SERVICE_TOKEN`                      | Shared secret sent to the sidecar (`X-Service-Token`)               |
-| `TRADINGAGENTS_ENABLED`                            | Enable/disable the Trading Desk (default true)                      |
 | `AGENT_FINANCE_WORKFLOWS_ENABLED`                  | Feature flag: financial-services workflows (default off)            |
 | `AGENT_TELEMETRY_RECORD_IO`                        | Feature flag: record prompt/output IO in telemetry (default off)    |
 | `AGENT_ENABLE_NEW_CAPABILITIES_FOR_INTERNAL_USERS` | Turn on internal-user flag defaults                                 |
