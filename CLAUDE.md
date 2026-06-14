@@ -84,7 +84,7 @@ This boundary is **enforced by Next.js bundling at build time** (importing `pg`/
 
 These are easy to confuse. They are orthogonal:
 
-- **Runtime profile** (`resolveRuntimeProfile` in `agent-route.ts`, `AGENT_RUNTIME_PROFILES` in `agent-runtime.ts`) — one of `chat_default`, `deep_research`, `finance_analysis`. The profile drives the **tool set**, the **code-execution backend** (`finance` for `finance_analysis`), the **tool-step budget**, and artifact/workspace behavior.
+- **Runtime profile** (`resolveRuntimeProfile` in `app/api/agent/route.ts`, `AGENT_RUNTIME_PROFILES` in `agent-runtime.ts`) — one of `chat_default`, `deep_research`, `finance_analysis`. The profile drives the **tool set**, the **code-execution backend** (`finance` for `finance_analysis`), the **tool-step budget**, and artifact/workspace behavior.
 - **Task mode** (`inferPromptTaskMode` in `agent-prompt-steering.ts`) — inferred from message content; drives only the **prompt overlay text** and the Gemini thinking level. Modes: `general`, `coding`, `debugging`, `writing`, `research`, `finance_analysis`, `high_stakes`, `closed_answer`, `instruction_following`.
 
 Research mode is a **request flag** (`runMode: "research"`), not an inference. It selects the `deep_research` profile and `RESEARCH_MODEL` (Qwen 3.7 Max); if that model is unavailable the route returns 400 `AGENT_RESEARCH_MODEL_UNAVAILABLE`.
