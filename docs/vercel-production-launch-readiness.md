@@ -46,7 +46,7 @@ Escalation paths:
 
 - Engineering owner: on-call engineer for the active release.
 - Business owner: Chloei Labs launch owner.
-- Vendor paths: Vercel dashboard and support for platform incidents, Neon dashboard/support for database incidents, Sentry for error traces, Inngest for background jobs, AI Gateway/provider dashboard for model failures.
+- Vendor paths: Vercel dashboard and support for platform incidents (including runtime logs and Observability), Neon dashboard/support for database incidents, Inngest for background jobs, AI Gateway/provider dashboard for model failures.
 
 Communication channels:
 
@@ -95,7 +95,7 @@ Vercel dashboard/CLI checks:
 - Deployment Protection is enabled for generated deployments.
 - Firewall system mitigations are active.
 - A custom WAF rule blocks common scanner paths.
-- A project-scoped Sentry Log Drain is enabled: `drn_s60eMRuih4HINeal`.
+- Error tracking is via Vercel runtime logs (structured JSON from `src/lib/logger.ts`); there is no Sentry/PostHog/OpenTelemetry integration.
 - No IP blocks are configured yet.
 - Production env has required app secrets, including `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `AI_GATEWAY_API_KEY`, and `BLOB_READ_WRITE_TOKEN`.
 
@@ -116,15 +116,16 @@ WAF follow-up:
    vercel firewall publish --yes
    ```
 
-Current Log Drain:
+Runtime logs and error tracking:
 
-- `Chloei Sentry Logs` sends production and preview logs for `lambda`, `edge`, `static`, `build`, `firewall`, `external`, and `redirect` sources to Sentry.
-- The manual Sentry drain requires the `x-sentry-auth` header documented in Sentry Project Settings > Client Keys (DSN) > Vercel.
-- Verify it appears in Vercel with:
+- Production emits structured JSON logs (`src/lib/logger.ts`) to stdout/stderr, surfaced in Vercel runtime logs. Route-level logging (`src/lib/server/route-observability.ts`) records request id, route, method, status, duration, and outcome.
+- There is no third-party error-tracking integration (Sentry/PostHog/OpenTelemetry were removed). Inspect errors with the CLI or the Vercel Observability dashboard:
 
   ```bash
-  vercel api '/v1/drains?teamId=team_8zGk2XORbbDx04iMB2hVxYlo' --raw
+  vercel logs https://chloei.ai --since 30m --level error --no-follow
   ```
+
+- If a dedicated error tracker is reintroduced later, configure it as a Vercel Log Drain and document the drain id here.
 
 ## Reliability Readiness
 

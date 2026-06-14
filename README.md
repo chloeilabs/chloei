@@ -2,6 +2,16 @@
 
 Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently exposes a curated model selector that defaults to Qwen 3.7 Max and also includes Kimi K2.6 and MiMo V2.5 Pro, routes Research mode to Qwen 3.7 Max with a dedicated Deep Research instruction template, and offers private Blob-backed file attachments, local code execution, optional Tavily retrieval, optional Inngest jobs, normalized finance data, SEC/EDGAR filing retrieval, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
 
+## Documentation
+
+- **[CLAUDE.md](CLAUDE.md)** — architecture reference and conventions (request flow, agent runtime, tools, storage, auth, env vars). The best starting point for understanding the codebase; also read by Claude Code.
+- **[AGENTS.md](AGENTS.md)** — environment setup for coding agents (Cursor Cloud specifics, build/test commands, gotchas).
+- **[docs/vercel-production-launch-readiness.md](docs/vercel-production-launch-readiness.md)** — production launch checklist (security, reliability, performance, rollback).
+- **[docs/managed-integrations-rollout.md](docs/managed-integrations-rollout.md)** — managed-integration rollout/rollback runbook (Neon, Inngest, feature flags).
+- **[docs/finance-research-quality.md](docs/finance-research-quality.md)** — quality checklist for public-markets finance-agent runs.
+- **[evals/finance/README.md](evals/finance/README.md)** — finance benchmark harness.
+- **[tradingagents-service/README.md](tradingagents-service/README.md)** — the Trading Desk Python sidecar.
+
 ## Requirements
 
 - Node.js 24.x

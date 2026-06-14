@@ -1,6 +1,6 @@
 # Managed Integrations Rollout
 
-Last verified: June 7, 2026.
+Last verified: June 14, 2026.
 
 This runbook covers the Chloei managed integration stack for financial-services
 agent capabilities. The default posture is privacy-first: all new production
@@ -8,19 +8,24 @@ capabilities stay off unless a documented rollout step enables them, and raw
 prompts, completions, attachment contents, account data, credentials, and PII
 must not be sent to telemetry providers.
 
+> Telemetry note: Chloei no longer ships a third-party error/analytics SDK.
+> Sentry, PostHog, and OpenTelemetry were removed; error tracking is via Vercel
+> runtime logs (structured JSON from `src/lib/logger.ts`) and product analytics
+> via Vercel Web Analytics + Speed Insights. Update this runbook if a managed
+> error tracker is reintroduced.
+
 ## Current Live State
 
 `vercel integration list chloei` should show exactly one available resource for
 each managed capability, all connected to the `chloei` project:
 
-| Resource           | Product | Purpose                                 |
-| ------------------ | ------- | --------------------------------------- |
-| `chloei-sentry`    | Sentry  | Errors, performance traces, source maps |
-| `chloei-workflows` | Inngest | Durable agent workflows and jobs        |
-| `chloei-db`        | Neon    | Primary PostgreSQL system of record     |
+| Resource           | Product | Purpose                             |
+| ------------------ | ------- | ----------------------------------- |
+| `chloei-workflows` | Inngest | Durable agent workflows and jobs    |
+| `chloei-db`        | Neon    | Primary PostgreSQL system of record |
 
-There should be no duplicate project-level Sentry or Inngest resources. If the
-Vercel integrations console shows an extra product tile that is not connected to
+There should be no duplicate project-level Inngest resources. If the Vercel
+integrations console shows an extra product tile that is not connected to
 `chloei`, confirm no project resource is attached before removing it from the
 integration console.
 
@@ -172,7 +177,8 @@ Authenticated rollout smoke after internal production flags are enabled:
 2. Upload a non-sensitive test document and confirm it is stored through private
    Blob metadata only.
 3. Enqueue a report through `POST /api/jobs/report` and poll `GET /api/jobs/:id`.
-4. Verify Sentry receives errors/traces without PII.
+4. Confirm Vercel runtime logs capture the request/outcome without raw prompts,
+   completions, or PII (`vercel logs https://chloei.ai --since 30m`).
 5. Confirm an external test user still receives `JOB_REPORT_DISABLED` for async
    reports.
 
@@ -248,7 +254,9 @@ Also restore the `chloei-flags` Edge Config values to false.
   public URLs.
 - Inngest events must use idempotency keys derived from user, document, report,
   or thread identifiers, not prompt text or document contents.
-- Sentry replay stays disabled and Sentry scrubbing must remain in place.
+- Raw prompts, completions, attachment contents, and PII must never be written
+  to logs or telemetry; `AGENT_TELEMETRY_RECORD_IO` must stay `false` outside an
+  approved, controlled eval cohort.
 
 ## Verification Commands
 
