@@ -24,7 +24,7 @@ interface ResolveFinancialServicesWorkflowParams {
   tools?: FinancialServicesToolAvailability
 }
 
-export interface FinancialServicesWorkflowContext {
+interface FinancialServicesWorkflowContext {
   workflow: FinancialServicesWorkflowId
   skillIds: FinancialServicesSkillId[]
   promptBlock: string

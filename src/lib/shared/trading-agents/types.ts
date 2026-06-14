@@ -13,7 +13,7 @@ export const TRADING_DESK_ANALYST_KEYS = [
   "news",
   "fundamentals",
 ] as const
-export type TradingDeskAnalystKey = (typeof TRADING_DESK_ANALYST_KEYS)[number]
+type TradingDeskAnalystKey = (typeof TRADING_DESK_ANALYST_KEYS)[number]
 
 export const TRADING_DESK_DEPTHS = ["shallow", "medium", "deep"] as const
 export type TradingDeskDepth = (typeof TRADING_DESK_DEPTHS)[number]
@@ -26,11 +26,11 @@ export const TRADING_DESK_SIGNALS = [
   "Underweight",
   "Sell",
 ] as const
-export type TradingDeskSignal = (typeof TRADING_DESK_SIGNALS)[number]
+type TradingDeskSignal = (typeof TRADING_DESK_SIGNALS)[number]
 
 export type TradingDeskAgentStatus = "pending" | "in_progress" | "completed"
 
-export interface TradingDeskAgent {
+interface TradingDeskAgent {
   key: string
   name: string
   selectable: boolean
@@ -126,7 +126,7 @@ export interface TradingDeskConfig {
   mock_default: boolean
 }
 
-export interface TradingDeskReport {
+interface TradingDeskReport {
   market_report: string
   sentiment_report: string
   news_report: string
@@ -156,7 +156,7 @@ export interface TradingDeskStats {
 
 // --- Streamed events (discriminated by `type`) ------------------------------
 
-export interface TaRunStartedEvent {
+interface TaRunStartedEvent {
   type: "run_started"
   run_id: string
   ticker: string
@@ -173,7 +173,7 @@ export interface TaRunStartedEvent {
   mock: boolean
 }
 
-export interface TaAgentStatusEvent {
+interface TaAgentStatusEvent {
   type: "agent_status"
   agent: string
   status: TradingDeskAgentStatus
@@ -181,7 +181,7 @@ export interface TaAgentStatusEvent {
   team_label: string
 }
 
-export interface TaReportSectionEvent {
+interface TaReportSectionEvent {
   type: "report_section"
   section: string
   title: string
@@ -189,28 +189,28 @@ export interface TaReportSectionEvent {
   content: string
 }
 
-export interface TaDebateUpdateEvent {
+interface TaDebateUpdateEvent {
   type: "debate_update"
   debate: "research" | "risk"
   role: string
   content: string
 }
 
-export interface TaToolCallEvent {
+interface TaToolCallEvent {
   type: "tool_call"
   tool: string
   args: unknown
   agent: string | null
 }
 
-export interface TaActivityEvent {
+interface TaActivityEvent {
   type: "activity"
   kind: string
   content: string
   agent: string | null
 }
 
-export interface TaStatsEvent extends TradingDeskStats {
+interface TaStatsEvent extends TradingDeskStats {
   type: "stats"
 }
 
@@ -224,13 +224,13 @@ export interface TaRunCompletedEvent {
   elapsed_seconds: number
 }
 
-export interface TaErrorEvent {
+interface TaErrorEvent {
   type: "error"
   message: string
   where?: string | null
 }
 
-export interface TaDoneEvent {
+interface TaDoneEvent {
   type: "done"
 }
 

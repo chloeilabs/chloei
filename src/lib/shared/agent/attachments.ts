@@ -1,11 +1,11 @@
-export const AGENT_ATTACHMENT_IMAGE_MIME_TYPES = [
+const AGENT_ATTACHMENT_IMAGE_MIME_TYPES = [
   "image/png",
   "image/jpeg",
   "image/webp",
   "image/gif",
 ] as const
 
-export const AGENT_ATTACHMENT_PDF_MIME_TYPE = "application/pdf" as const
+const AGENT_ATTACHMENT_PDF_MIME_TYPE = "application/pdf" as const
 
 export const AGENT_ATTACHMENT_MIME_TYPES = [
   AGENT_ATTACHMENT_PDF_MIME_TYPE,
@@ -31,7 +31,7 @@ export const AGENT_ATTACHMENT_MAX_DATA_URL_CHARS =
 export type AgentAttachmentMimeType =
   (typeof AGENT_ATTACHMENT_MIME_TYPES)[number]
 export type AgentAttachmentKind = "image" | "pdf"
-export type AgentImageDetail = (typeof AGENT_IMAGE_DETAIL_VALUES)[number]
+type AgentImageDetail = (typeof AGENT_IMAGE_DETAIL_VALUES)[number]
 
 export interface AgentAttachmentMetadata {
   id: string

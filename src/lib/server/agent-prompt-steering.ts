@@ -20,11 +20,7 @@ export type PromptTaskMode =
   | "research"
   | "high_stakes"
 
-export type UserExpertiseHint =
-  | "finance"
-  | "engineering"
-  | "writing"
-  | "research"
+type UserExpertiseHint = "finance" | "engineering" | "writing" | "research"
 
 type PromptSteeringMessage = PromptTextMessage
 

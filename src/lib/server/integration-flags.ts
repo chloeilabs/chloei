@@ -7,8 +7,8 @@ export const AGENT_FLAG_KEYS = [
   "agent.finance_workflows.enabled",
 ] as const
 
-export type AgentFlagKey = (typeof AGENT_FLAG_KEYS)[number]
-export type IntegrationFlagKey = AgentFlagKey
+type AgentFlagKey = (typeof AGENT_FLAG_KEYS)[number]
+type IntegrationFlagKey = AgentFlagKey
 
 export interface AgentFeatureFlags {
   telemetryRecordIo: boolean

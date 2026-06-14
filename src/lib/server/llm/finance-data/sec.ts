@@ -3,12 +3,9 @@
  * sec_filings tools.
  */
 
-export const SEC_COMPANY_FACTS_BASE_URL =
-  "https://data.sec.gov/api/xbrl/companyfacts"
-export const SEC_COMPANY_SUBMISSIONS_BASE_URL =
-  "https://data.sec.gov/submissions"
-export const SEC_COMPANY_TICKERS_URL =
-  "https://www.sec.gov/files/company_tickers.json"
+const SEC_COMPANY_FACTS_BASE_URL = "https://data.sec.gov/api/xbrl/companyfacts"
+const SEC_COMPANY_SUBMISSIONS_BASE_URL = "https://data.sec.gov/submissions"
+const SEC_COMPANY_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 
 /** Normalize a CIK to its canonical 10-digit zero-padded form. */
 export function normalizeCik(cik: string): string {

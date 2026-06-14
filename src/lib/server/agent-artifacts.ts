@@ -2,7 +2,7 @@ import { createHash } from "node:crypto"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
-export const AGENT_ARTIFACT_ROOT = path.join(
+const AGENT_ARTIFACT_ROOT = path.join(
   /*turbopackIgnore: true*/
   tmpdir(),
   "chloei-agent-artifacts"

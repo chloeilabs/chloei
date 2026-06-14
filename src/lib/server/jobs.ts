@@ -13,10 +13,10 @@ export const AGENT_JOB_STATUSES = [
   "failed",
 ] as const
 
-export type AgentJobType = (typeof AGENT_JOB_TYPES)[number]
-export type AgentJobStatus = (typeof AGENT_JOB_STATUSES)[number]
+type AgentJobType = (typeof AGENT_JOB_TYPES)[number]
+type AgentJobStatus = (typeof AGENT_JOB_STATUSES)[number]
 
-export interface AgentJob {
+interface AgentJob {
   id: string
   userId: string
   type: AgentJobType

@@ -23,7 +23,7 @@ export const TRADINGAGENTS_SERVICE_URL = (
 ).replace(/\/+$/, "")
 
 /** Optional shared secret; sent as `X-Service-Token` when set. */
-export const TRADINGAGENTS_SERVICE_TOKEN =
+const TRADINGAGENTS_SERVICE_TOKEN =
   process.env.TRADINGAGENTS_SERVICE_TOKEN?.trim() ?? ""
 
 /** Feature gate. Defaults on so the Trading Desk works against a local service. */

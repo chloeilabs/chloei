@@ -21,7 +21,7 @@ const opsInngestSmokeSchema = z.object({
   source: z.literal("chloei_inngest_smoke").optional(),
 })
 
-export const tradingAnalysisRequested = inngest.createFunction(
+const tradingAnalysisRequested = inngest.createFunction(
   {
     id: "trading-analysis-requested",
     idempotency: "event.data.userId + ':' + event.data.jobId",

@@ -29,14 +29,14 @@ export interface TradingDeskSectionState {
   order: number
 }
 
-export interface TradingDeskActivityItem {
+interface TradingDeskActivityItem {
   id: number
   kind: string
   agent: string | null
   text: string
 }
 
-export interface TradingDeskRunState {
+interface TradingDeskRunState {
   status: TradingDeskRunStatus
   ticker: string | null
   tradeDate: string | null

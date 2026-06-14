@@ -11,7 +11,7 @@ declare global {
 }
 
 export const DATABASE_URL_ENV_NAME = "DATABASE_URL" as const
-export const AUTH_DATABASE_URL_ENV_NAME = "AUTH_DATABASE_URL" as const
+const AUTH_DATABASE_URL_ENV_NAME = "AUTH_DATABASE_URL" as const
 
 type DatabaseUrlEnvName =
   | typeof DATABASE_URL_ENV_NAME
@@ -52,7 +52,7 @@ function createDatabase(pool: Pool) {
   })
 }
 
-export function isDatabaseConfigured(name: DatabaseUrlEnvName): boolean {
+function isDatabaseConfigured(name: DatabaseUrlEnvName): boolean {
   return getConfiguredDatabaseUrl(name) !== null
 }
 
