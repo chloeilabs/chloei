@@ -4,10 +4,7 @@ import { z } from "zod"
 import { asRecord, toOptionalString } from "@/lib/cast"
 import type { MessageSource, ToolName } from "@/lib/shared"
 
-import {
-  normalizeTickerSymbol,
-  requireField,
-} from "./finance-data/normalizers"
+import { normalizeTickerSymbol, requireField } from "./finance-data/normalizers"
 import {
   classifyFinanceDataRetry,
   fetchJsonWithRetry,

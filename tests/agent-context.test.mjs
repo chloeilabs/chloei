@@ -77,9 +77,7 @@ test("falls back to (not provided) for blank viewer fields", () => {
 test("runtime date context is anchored to the provided timestamp", () => {
   const prompt = buildAgentSystemInstruction(viewer, baseContext)
 
-  assert.ok(
-    prompt.includes("Current UTC timestamp: 2026-06-14T12:30:00.000Z")
-  )
+  assert.ok(prompt.includes("Current UTC timestamp: 2026-06-14T12:30:00.000Z"))
 })
 
 test("valid user time zone is rendered and invalid is dropped", () => {

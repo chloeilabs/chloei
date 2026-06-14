@@ -98,7 +98,10 @@ test("shouldRequestFollowUpQuestions requires completed, real content", () => {
     true
   )
   assert.equal(
-    shouldRequestFollowUpQuestions({ content: "   ", agentStatus: "completed" }),
+    shouldRequestFollowUpQuestions({
+      content: "   ",
+      agentStatus: "completed",
+    }),
     false
   )
   assert.equal(
