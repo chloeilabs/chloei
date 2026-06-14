@@ -1,15 +1,5 @@
 import { spawn } from "node:child_process"
-import { createHash, randomUUID } from "node:crypto"
-import { createReadStream } from "node:fs"
-import {
-  copyFile,
-  mkdir,
-  mkdtemp,
-  readdir,
-  readFile,
-  rm,
-  stat,
-} from "node:fs/promises"
+import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
@@ -17,13 +7,7 @@ import { tool } from "ai"
 import { z } from "zod"
 
 import { asRecord } from "@/lib/cast"
-import {
-  buildAuthenticatedPrivateBlobDownloadUrl,
-  buildPrivateBlobArtifactPathname,
-  isPrivateBlobConfigured,
-  uploadPrivateBlob,
-} from "@/lib/server/private-blob-storage"
-import type { CodeExecutionArtifactMetadata, ToolName } from "@/lib/shared"
+import type { ToolName } from "@/lib/shared"
 
 const CODE_EXECUTION_TOOL_NAME = "code_execution" as const
 const CODE_EXECUTION_LABEL = "Running code" as const
@@ -39,35 +23,12 @@ const PYTHON3_COMMAND = "python3"
 type CodeExecutionToolName = Extract<ToolName, typeof CODE_EXECUTION_TOOL_NAME>
 type CodeExecutionLanguage = "javascript" | "python"
 export type CodeExecutionBackend = "restricted"
-type CodeExecutionWorkspaceMode = "ephemeral" | "preserve"
 
 interface CodeExecutionToolArgs {
   language: CodeExecutionLanguage
   code: string
   timeoutMs: number
   backend: CodeExecutionBackend
-  workspaceMode: CodeExecutionWorkspaceMode
-  workspaceRoot?: string
-  artifactBaseUrl?: string
-  artifactUpload?: CodeExecutionArtifactUploadOptions
-  exposeArtifactDirectory?: boolean
-  inputFiles?: CodeExecutionInputFile[]
-}
-
-interface CodeExecutionInputFile {
-  sourcePath: string
-  relativePath: string
-}
-
-interface CodeExecutionArtifactUploadOptions {
-  artifactId: string
-  userId: string
-}
-
-interface CodeExecutionArtifact {
-  path: string
-  sizeBytes: number
-  url?: string
 }
 
 interface CodeExecutionToolOutput {
@@ -79,8 +40,6 @@ interface CodeExecutionToolOutput {
   durationMs: number
   truncated: boolean
   backend: CodeExecutionBackend
-  artifactManifest: CodeExecutionArtifact[]
-  artifactDirectory?: string
 }
 
 interface CodeExecutionToolErrorPayload extends Partial<CodeExecutionToolOutput> {
@@ -112,16 +71,6 @@ interface AiSdkCodeExecutionToolResultMetadata {
   durationMs?: number
   errorCode?: string
   retryable?: boolean
-  artifactManifest?: CodeExecutionArtifactMetadata[]
-}
-
-interface CreateAiSdkCodeExecutionToolsOptions {
-  workspaceMode?: CodeExecutionWorkspaceMode
-  workspaceRoot?: string
-  artifactBaseUrl?: string
-  artifactUpload?: CodeExecutionArtifactUploadOptions
-  exposeArtifactDirectory?: boolean
-  inputFiles?: CodeExecutionInputFile[]
 }
 
 const codeExecutionInputSchema = z.object({
@@ -183,28 +132,6 @@ const PYTHON_ALLOWED_IMPORTS = new Set([
   "time",
   "typing",
 ])
-
-const ARTIFACT_CONTENT_TYPES_BY_EXTENSION: Record<string, string> = {
-  ".csv": "text/csv; charset=utf-8",
-  ".gif": "image/gif",
-  ".jpeg": "image/jpeg",
-  ".jpg": "image/jpeg",
-  ".json": "application/json; charset=utf-8",
-  ".pdf": "application/pdf",
-  ".png": "image/png",
-  ".pptx":
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  ".txt": "text/plain; charset=utf-8",
-  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-}
-
-function inferArtifactContentType(relativePath: string): string {
-  return (
-    ARTIFACT_CONTENT_TYPES_BY_EXTENSION[
-      path.extname(relativePath).toLowerCase()
-    ] ?? "application/octet-stream"
-  )
-}
 
 function clampTimeoutMs(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -336,216 +263,6 @@ function appendWithLimit(
   }
 }
 
-async function collectArtifactManifest(
-  rootDir: string,
-  excludedPathHashes: ReadonlyMap<string, string> = new Map(),
-  artifactBaseUrl?: string,
-  artifactUpload?: CodeExecutionArtifactUploadOptions
-): Promise<CodeExecutionArtifact[]> {
-  const artifacts: CodeExecutionArtifact[] = []
-  const normalizedArtifactBaseUrl = artifactBaseUrl?.replace(/\/+$/, "")
-
-  async function walk(directory: string) {
-    const entries = await readdir(/*turbopackIgnore: true*/ directory, {
-      withFileTypes: true,
-    }).catch(() => [])
-
-    for (const entry of entries) {
-      if (artifacts.length >= 50 || entry.name === "__pycache__") {
-        continue
-      }
-
-      const fullPath = path.join(
-        /*turbopackIgnore: true*/ directory,
-        entry.name
-      )
-      if (entry.isDirectory()) {
-        await walk(fullPath)
-        continue
-      }
-
-      if (!entry.isFile()) {
-        continue
-      }
-
-      const fileStats = await stat(/*turbopackIgnore: true*/ fullPath).catch(
-        () => null
-      )
-      if (!fileStats) {
-        continue
-      }
-
-      const relativePath = path
-        .relative(rootDir, fullPath)
-        .replaceAll(path.sep, "/")
-      const excludedHash = excludedPathHashes.get(relativePath)
-      if (excludedHash) {
-        const currentHash = await computeFileHash(fullPath)
-        if (currentHash === excludedHash) {
-          continue
-        }
-      }
-
-      let artifactUrl = normalizedArtifactBaseUrl
-        ? `${normalizedArtifactBaseUrl}/${relativePath
-            .split("/")
-            .map((segment) => encodeURIComponent(segment))
-            .join("/")}`
-        : undefined
-
-      if (artifactUpload && isPrivateBlobConfigured()) {
-        const blobPathname = buildPrivateBlobArtifactPathname({
-          artifactId: artifactUpload.artifactId,
-          userId: artifactUpload.userId,
-          relativePath,
-        })
-        if (blobPathname) {
-          const artifactBody = await readFile(
-            /*turbopackIgnore: true*/ fullPath
-          ).catch(() => null)
-          const uploaded = artifactBody
-            ? await uploadPrivateBlob({
-                pathname: blobPathname,
-                body: artifactBody,
-                contentType: inferArtifactContentType(relativePath),
-              }).catch(() => null)
-            : null
-          const downloadUrl = uploaded
-            ? buildAuthenticatedPrivateBlobDownloadUrl(uploaded.pathname)
-            : null
-          artifactUrl = downloadUrl ?? artifactUrl
-        }
-      }
-
-      artifacts.push({
-        path: relativePath,
-        sizeBytes: fileStats.size,
-        ...(artifactUrl ? { url: artifactUrl } : {}),
-      })
-    }
-  }
-
-  await walk(rootDir)
-  return artifacts.sort((a, b) => a.path.localeCompare(b.path))
-}
-
-async function computeFileHash(filePath: string): Promise<string | null> {
-  const hash = createHash("sha256")
-  const stream = createReadStream(/*turbopackIgnore: true*/ filePath)
-
-  try {
-    for await (const chunk of stream as AsyncIterable<Buffer>) {
-      hash.update(chunk)
-    }
-
-    return hash.digest("hex")
-  } catch {
-    return null
-  }
-}
-
-function normalizeInputFileRelativePath(value: string): string | null {
-  const normalized = value.trim().replaceAll("\\", "/")
-  if (
-    !normalized ||
-    normalized.startsWith("/") ||
-    /^[A-Za-z]:\//.test(normalized)
-  ) {
-    return null
-  }
-
-  const segments = normalized.split("/")
-  if (
-    segments.some(
-      (segment) =>
-        !segment ||
-        segment === "." ||
-        segment === ".." ||
-        segment.includes("\0")
-    )
-  ) {
-    return null
-  }
-
-  return segments.join("/")
-}
-
-async function copyInputFiles(
-  workspaceDir: string,
-  inputFiles: CodeExecutionInputFile[] | undefined
-): Promise<Set<string>> {
-  const copied = new Set<string>()
-  if (!inputFiles?.length) {
-    return copied
-  }
-
-  for (const inputFile of inputFiles) {
-    const relativePath = normalizeInputFileRelativePath(inputFile.relativePath)
-    if (!relativePath) {
-      continue
-    }
-
-    const destination = path.join(
-      /*turbopackIgnore: true*/ workspaceDir,
-      relativePath
-    )
-    const destinationStats = await stat(
-      /*turbopackIgnore: true*/ destination
-    ).catch(() => null)
-    if (destinationStats) {
-      continue
-    }
-
-    await mkdir(/*turbopackIgnore: true*/ path.dirname(destination), {
-      recursive: true,
-    })
-    await copyFile(
-      /*turbopackIgnore: true*/ inputFile.sourcePath,
-      /*turbopackIgnore: true*/ destination
-    )
-    copied.add(relativePath)
-  }
-
-  return copied
-}
-
-function getMountedInputFilePaths(
-  inputFiles: CodeExecutionInputFile[] | undefined
-): Set<string> {
-  const mounted = new Set<string>()
-  if (!inputFiles?.length) {
-    return mounted
-  }
-
-  for (const inputFile of inputFiles) {
-    const relativePath = normalizeInputFileRelativePath(inputFile.relativePath)
-    if (relativePath) {
-      mounted.add(relativePath)
-    }
-  }
-
-  return mounted
-}
-
-async function getMountedInputFileHashes(
-  workspaceDir: string,
-  inputFiles: CodeExecutionInputFile[] | undefined
-): Promise<Map<string, string>> {
-  const mounted = getMountedInputFilePaths(inputFiles)
-  const hashes = new Map<string, string>()
-
-  for (const relativePath of mounted) {
-    const fileHash = await computeFileHash(
-      path.join(/*turbopackIgnore: true*/ workspaceDir, relativePath)
-    )
-    if (fileHash) {
-      hashes.set(relativePath, fileHash)
-    }
-  }
-
-  return hashes
-}
-
 function validatePythonImports(code: string): string | null {
   const lines = code.split(/\r?\n/g)
   const allowedImports = PYTHON_ALLOWED_IMPORTS
@@ -607,41 +324,21 @@ async function runProcess(args: {
   language?: CodeExecutionLanguage
   timeoutMs: number
   backend: CodeExecutionBackend
-  workspaceMode: CodeExecutionWorkspaceMode
-  workspaceRoot?: string
-  artifactBaseUrl?: string
-  artifactUpload?: CodeExecutionArtifactUploadOptions
-  exposeArtifactDirectory?: boolean
-  inputFiles?: CodeExecutionInputFile[]
 }): Promise<CodeExecutionToolResultPayload> {
   const startedAt = Date.now()
-  const normalizedWorkspaceRoot = args.workspaceRoot?.trim()
-  const tempRoot =
-    normalizedWorkspaceRoot && normalizedWorkspaceRoot.length > 0
-      ? normalizedWorkspaceRoot
-      : tmpdir()
-  await mkdir(/*turbopackIgnore: true*/ tempRoot, { recursive: true })
-  const tempDir =
-    args.workspaceMode === "preserve"
-      ? tempRoot
-      : await mkdtemp(
-          path.join(
-            /*turbopackIgnore: true*/
-            tempRoot,
-            "chloei-code-exec-"
-          )
-        )
+  const tempDir = await mkdtemp(
+    path.join(
+      /*turbopackIgnore: true*/
+      tmpdir(),
+      "chloei-code-exec-"
+    )
+  )
   const workspaceDir = path.join(
     /*turbopackIgnore: true*/
     tempDir,
     "workspace"
   )
   await mkdir(/*turbopackIgnore: true*/ workspaceDir, { recursive: true })
-  await copyInputFiles(workspaceDir, args.inputFiles)
-  const mountedInputFileHashes = await getMountedInputFileHashes(
-    workspaceDir,
-    args.inputFiles
-  )
   const commandArgs =
     args.language === "python" &&
     args.commandArgs[0] === "-I" &&
@@ -658,14 +355,6 @@ async function runProcess(args: {
   let stderr = ""
   let truncated = false
   let timedOut = false
-
-  const collectManifest = async (): Promise<CodeExecutionArtifact[]> =>
-    collectArtifactManifest(
-      workspaceDir,
-      mountedInputFileHashes,
-      args.artifactBaseUrl,
-      args.artifactUpload
-    )
 
   try {
     return await new Promise<CodeExecutionToolResultPayload>((resolve) => {
@@ -726,58 +415,32 @@ async function runProcess(args: {
       })
 
       child.on("close", (exitCode: number | null) => {
-        void (async () => {
-          const durationMs = Date.now() - startedAt
-          const combinedOutput = buildCombinedOutput(stdout, stderr)
-          const artifactManifest = await collectManifest()
-          const artifactDirectory =
-            args.workspaceMode === "preserve" &&
-            args.exposeArtifactDirectory === true
-              ? workspaceDir
-              : undefined
+        const durationMs = Date.now() - startedAt
+        const combinedOutput = buildCombinedOutput(stdout, stderr)
 
-          if (timedOut) {
-            finish({
-              error: {
-                message: `Code execution timed out after ${String(args.timeoutMs)}ms.`,
-                code: "TIMEOUT",
-                timedOut: true,
-                stdout,
-                stderr,
-                combinedOutput,
-                durationMs,
-                truncated,
-                backend: args.backend,
-                artifactManifest,
-                ...(artifactDirectory ? { artifactDirectory } : {}),
-              },
-            })
-            return
-          }
-
-          const normalizedExitCode = typeof exitCode === "number" ? exitCode : 1
-          if (normalizedExitCode !== 0) {
-            finish({
-              error: {
-                message: `Code execution exited with status ${String(normalizedExitCode)}.`,
-                code: "EXIT_NON_ZERO",
-                exitCode: normalizedExitCode,
-                stdout,
-                stderr,
-                combinedOutput,
-                durationMs,
-                truncated,
-                backend: args.backend,
-                artifactManifest,
-                ...(artifactDirectory ? { artifactDirectory } : {}),
-              },
-            })
-            return
-          }
-
+        if (timedOut) {
           finish({
-            output: {
-              language: args.language ?? inferLanguageFromCommand(args.command),
+            error: {
+              message: `Code execution timed out after ${String(args.timeoutMs)}ms.`,
+              code: "TIMEOUT",
+              timedOut: true,
+              stdout,
+              stderr,
+              combinedOutput,
+              durationMs,
+              truncated,
+              backend: args.backend,
+            },
+          })
+          return
+        }
+
+        const normalizedExitCode = typeof exitCode === "number" ? exitCode : 1
+        if (normalizedExitCode !== 0) {
+          finish({
+            error: {
+              message: `Code execution exited with status ${String(normalizedExitCode)}.`,
+              code: "EXIT_NON_ZERO",
               exitCode: normalizedExitCode,
               stdout,
               stderr,
@@ -785,20 +448,22 @@ async function runProcess(args: {
               durationMs,
               truncated,
               backend: args.backend,
-              artifactManifest,
-              ...(artifactDirectory ? { artifactDirectory } : {}),
             },
           })
-        })().catch((error: unknown) => {
-          finish({
-            error: {
-              message:
-                error instanceof Error
-                  ? error.message
-                  : "Code execution artifact collection failed.",
-              code: "ARTIFACT_COLLECTION_ERROR",
-            },
-          })
+          return
+        }
+
+        finish({
+          output: {
+            language: args.language ?? inferLanguageFromCommand(args.command),
+            exitCode: normalizedExitCode,
+            stdout,
+            stderr,
+            combinedOutput,
+            durationMs,
+            truncated,
+            backend: args.backend,
+          },
         })
       })
 
@@ -808,9 +473,7 @@ async function runProcess(args: {
       }, args.timeoutMs)
     })
   } finally {
-    if (args.workspaceMode !== "preserve") {
-      await rm(tempDir, { recursive: true, force: true })
-    }
+    await rm(tempDir, { recursive: true, force: true })
   }
 }
 
@@ -835,12 +498,6 @@ async function executeCode(
       language: "python",
       timeoutMs: args.timeoutMs,
       backend: args.backend,
-      workspaceMode: args.workspaceMode,
-      workspaceRoot: args.workspaceRoot,
-      artifactBaseUrl: args.artifactBaseUrl,
-      artifactUpload: args.artifactUpload,
-      exposeArtifactDirectory: args.exposeArtifactDirectory,
-      inputFiles: args.inputFiles,
     })
 
     if (result.output) {
@@ -860,12 +517,6 @@ async function executeCode(
     language: "javascript",
     timeoutMs: args.timeoutMs,
     backend: args.backend,
-    workspaceMode: args.workspaceMode,
-    workspaceRoot: args.workspaceRoot,
-    artifactBaseUrl: args.artifactBaseUrl,
-    artifactUpload: args.artifactUpload,
-    exposeArtifactDirectory: args.exposeArtifactDirectory,
-    inputFiles: args.inputFiles,
   })
 
   if (result.output) {
@@ -908,20 +559,8 @@ export function isAiSdkCodeExecutionToolName(
   return value === CODE_EXECUTION_TOOL_NAME
 }
 
-export function createAiSdkCodeExecutionTools(
-  options: CreateAiSdkCodeExecutionToolsOptions = {}
-) {
+export function createAiSdkCodeExecutionTools() {
   const backend: CodeExecutionBackend = "restricted"
-  const workspaceMode = options.workspaceMode ?? "ephemeral"
-  const workspaceRoot =
-    options.workspaceRoot ??
-    (workspaceMode === "preserve"
-      ? path.join(
-          /*turbopackIgnore: true*/
-          tmpdir(),
-          `chloei-code-exec-${randomUUID()}`
-        )
-      : undefined)
 
   return {
     code_execution: tool({
@@ -934,12 +573,6 @@ export function createAiSdkCodeExecutionTools(
           code: input.code,
           timeoutMs: clampTimeoutMs(input.timeoutMs),
           backend,
-          workspaceMode,
-          workspaceRoot,
-          artifactBaseUrl: options.artifactBaseUrl,
-          artifactUpload: options.artifactUpload,
-          exposeArtifactDirectory: options.exposeArtifactDirectory,
-          inputFiles: options.inputFiles,
         }),
     }),
   }
@@ -981,8 +614,6 @@ export function getAiSdkCodeExecutionToolResultMetadata(
   }
 
   const payload = parseAiSdkResultPayload(part.output)
-  const artifactManifest =
-    payload?.output?.artifactManifest ?? payload?.error?.artifactManifest
   return {
     callId: part.toolCallId,
     toolName: CODE_EXECUTION_TOOL_NAME,
@@ -992,7 +623,6 @@ export function getAiSdkCodeExecutionToolResultMetadata(
     durationMs: payload?.output?.durationMs ?? payload?.error?.durationMs,
     errorCode: payload?.error?.code,
     retryable: payload?.error?.timedOut === true,
-    ...(artifactManifest?.length ? { artifactManifest } : {}),
     sources: [],
   }
 }

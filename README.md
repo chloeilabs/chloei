@@ -91,7 +91,7 @@ Managed integration rollout, rollback, duplicate-cleanup, and smoke-test steps l
 Optional feature-enabling variables:
 
 - `TAVILY_API_KEY`: enables Tavily search and extract callable tools for chat requests
-- `BLOB_READ_WRITE_TOKEN`: enables private Blob upload/download and private agent artifact URLs
+- `BLOB_READ_WRITE_TOKEN`: enables private Blob attachment upload/download
 - `AGENT_TELEMETRY_RECORD_IO`: feature gate; defaults off unless explicitly set or synced through Edge Config
 
 Agent request limits, timeouts, tool-step budgets, and the rate-limit window/concurrency are fixed safe constants in `src/lib/server/agent-runtime-config.ts` (no env knobs). `AGENT_RATE_LIMIT_STORE` defaults to `auto`, which uses PostgreSQL when `DATABASE_URL` is configured and falls back to process memory for local/no-database runs (allowed values: `auto`, `postgres`, `memory`); `AGENT_RATE_LIMIT_ENABLED` is a kill switch.

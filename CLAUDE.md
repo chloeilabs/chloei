@@ -81,7 +81,7 @@ This boundary is **enforced by Next.js bundling at build time** (importing `pg`/
 
 These are easy to confuse. They are orthogonal:
 
-- **Runtime profile** (`resolveRuntimeProfile` in `app/api/agent/route.ts`, `AGENT_RUNTIME_PROFILES` in `agent-runtime.ts`) — one of `chat_default`, `deep_research`. The profile drives the **tool set**, the **tool-step budget**, and artifact/workspace behavior.
+- **Runtime profile** (`resolveRuntimeProfile` in `app/api/agent/route.ts`, `AGENT_RUNTIME_PROFILES` in `agent-runtime.ts`) — one of `chat_default`, `deep_research`. The profile drives the **tool set** and the **tool-step budget**.
 - **Task mode** (`inferPromptTaskMode` in `agent-prompt-steering.ts`) — inferred from message content; drives only the **prompt overlay text** and the Gemini thinking level. Modes: `general`, `coding`, `debugging`, `writing`, `research`, `high_stakes`, `closed_answer`, `instruction_following`.
 
 Research mode is a **request flag** (`runMode: "research"`), not an inference. It selects the `deep_research` profile and `RESEARCH_MODEL` (Qwen 3.7 Max); if that model is unavailable the route returns 400 `AGENT_RESEARCH_MODEL_UNAVAILABLE`.
@@ -110,7 +110,7 @@ Event types:
 - `reasoning_delta` — incremental reasoning text (sanitized + redacted-placeholder-filtered; see below)
 - `agent_status` — `in_progress | completed | failed | cancelled | incomplete`
 - `tool_call` — tool start: `callId`, `toolName`, `label`, plus optional `query`, `operation`, `provider`
-- `tool_result` — tool result: `callId`, `status: success | error`, plus optional `operation`, `provider`, `attempt`, `durationMs`, `errorCode`, `retryable`, `artifactManifest`
+- `tool_result` — tool result: `callId`, `status: success | error`, plus optional `operation`, `provider`, `attempt`, `durationMs`, `errorCode`, `retryable`
 - `source` — citation source: `id`, `url`, `title`
 
 Every event also carries optional `interactionId` and `lastEventId` checkpoint fields.
@@ -154,8 +154,6 @@ Each tool is only registered when its requirements are met, **and** when the act
 - Python: runs via `python3 -I -c` (the `python3` binary on `PATH`).
 - **Restricted backend** (the only backend): computation-only Python imports (`math`, `collections`, `itertools`, …).
 - **Limits**: timeout default **10 s**, max **60 s**; code input and output each capped at **12,000 chars**.
-
-**Artifacts** (`src/lib/server/agent-artifacts.ts`): no runtime profile currently produces artifacts — the artifact infrastructure remains but is not currently triggered. When a run does emit them, generated files (≤ 50) are collected into an `artifactManifest` (`{ path, sizeBytes, url? }`), excluding mounted inputs and `__pycache__`. URLs are either private Vercel Blob links or the local authenticated route `/api/agent/artifacts/{artifactId}/{...path}` (path-traversal-safe, per-user scoped, `Content-Disposition: attachment`). Storage root: `<tmpdir>/chloei-agent-artifacts`.
 
 **Max tool steps** (constants in `agent-runtime-config.ts`): 12 default; 20 for research runs.
 
@@ -271,7 +269,6 @@ src/
     api/
       agent/route.ts       # POST /api/agent — streaming agent endpoint
       agent/follow-ups/    # Follow-up question suggestions
-      agent/artifacts/     # Authenticated code-execution artifact downloads
       auth/[...all]/       # Better Auth catch-all
       models/route.ts      # GET /api/models — available models for configured keys
       threads/route.ts     # GET/PUT/DELETE /api/threads — thread CRUD
@@ -305,7 +302,6 @@ src/
       agent-prompt-steering.ts  # Task-mode inference + provider/task overlays
       agent-route.ts            # parseAgentStreamRequest, createAgentStreamResponse
       agent-runtime-config.ts   # Runtime constants + a few operational env switches
-      agent-artifacts.ts        # Artifact storage root + download URL helpers
       agent-attachment-blobs.ts # Blob-backed attachment hydration
       auth.ts / auth-session.ts # isAuthConfigured, getRequestSession
       integration-flags.ts      # Default-off feature flags (env + Edge Config)
@@ -322,7 +318,7 @@ src/
         gateway-client.ts                 # undici dispatcher for AI Gateway
         ai-sdk-gateway-provider-options.ts # Per-model provider options (Gemini thinking)
         ai-sdk-tavily-tools.ts            # tavily_search / tavily_extract
-        code-execution-tools.ts           # Sandboxed JS/Python execution + artifacts
+        code-execution-tools.ts           # Sandboxed JS/Python execution
         image-vision-preprocessor.ts      # Image → text via Gateway vision
         pdf-attachment-preprocessor.ts    # PDF → text for the model
         initial-reasoning-chunk-sanitizer.ts # Redacted-reasoning filtering
@@ -397,7 +393,7 @@ All others are optional with safe defaults. See `.env.example` for the annotated
 | `BETTER_AUTH_TRUSTED_ORIGINS` | Comma-separated additional trusted origins                          |
 | `BETTER_AUTH_COOKIE_DOMAIN`   | Shared cookie domain for cross-subdomain auth                       |
 | `TAVILY_API_KEY`              | Enables `tavily_search` + `tavily_extract`                          |
-| `BLOB_READ_WRITE_TOKEN`       | Private Vercel Blob store for attachments + artifacts               |
+| `BLOB_READ_WRITE_TOKEN`       | Private Vercel Blob store for attachments                           |
 | `EDGE_CONFIG`                 | Vercel Edge Config connection for remote feature flags              |
 | `AGENT_TELEMETRY_RECORD_IO`   | Feature flag: record prompt/output IO in telemetry (default off)    |
 | `AGENT_RATE_LIMIT_ENABLED`    | Rate-limit kill switch (default true)                               |

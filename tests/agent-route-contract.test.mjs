@@ -148,7 +148,7 @@ test("agent runtime gives supported chat models the same runtime toolset", async
   )
   assert.match(
     runtimeSource,
-    /createAiSdkCodeExecutionTools\(\{/,
+    /createAiSdkCodeExecutionTools\(\)/,
     "Expected code execution tools to be created for all chat models."
   )
   assert.match(

@@ -43,12 +43,6 @@ export interface MessageSource {
   title: string
 }
 
-export interface CodeExecutionArtifactMetadata {
-  path: string
-  sizeBytes: number
-  url?: string
-}
-
 export interface ToolRunMetadata {
   operation?: string
   provider?: string
@@ -56,7 +50,6 @@ export interface ToolRunMetadata {
   durationMs?: number
   errorCode?: string
   retryable?: boolean
-  artifactManifest?: CodeExecutionArtifactMetadata[]
 }
 
 export interface ToolInvocation {
@@ -72,7 +65,6 @@ export interface ToolInvocation {
   durationMs?: number
   errorCode?: string
   retryable?: boolean
-  artifactManifest?: CodeExecutionArtifactMetadata[]
 }
 
 interface ActivityTimelineBaseEntry {
@@ -94,7 +86,6 @@ export interface ToolActivityTimelineEntry extends ActivityTimelineBaseEntry {
   durationMs?: number
   errorCode?: string
   retryable?: boolean
-  artifactManifest?: CodeExecutionArtifactMetadata[]
 }
 
 export interface SearchActivityTimelineEntry extends ActivityTimelineBaseEntry {
@@ -109,7 +100,6 @@ export interface SearchActivityTimelineEntry extends ActivityTimelineBaseEntry {
   durationMs?: number
   errorCode?: string
   retryable?: boolean
-  artifactManifest?: CodeExecutionArtifactMetadata[]
 }
 
 export interface SourcesActivityTimelineEntry extends ActivityTimelineBaseEntry {
@@ -168,7 +158,6 @@ interface ToolResultStreamEvent extends InteractionCheckpointFields {
   durationMs?: number
   errorCode?: string
   retryable?: boolean
-  artifactManifest?: CodeExecutionArtifactMetadata[]
 }
 
 interface SourceStreamEvent extends InteractionCheckpointFields {

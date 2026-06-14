@@ -262,18 +262,6 @@ test("prompt attachment uploads validate API response shape", () => {
   assert.match(source, /safeParse\(\s*await response\.json\(\)\s*\)/)
 })
 
-test("code execution artifact collection catches best-effort file-read failures", () => {
-  const source = readFileSync(
-    path.join(cwd, "src/lib/server/llm/code-execution-tools.ts"),
-    "utf8"
-  )
-
-  assert.match(
-    source,
-    /readFile\(\s*(?:\/\*turbopackIgnore: true\*\/\s*)?fullPath\s*\)\.catch\(\(\) => null\)/
-  )
-})
-
 test("private blob uploads return authenticated app download URLs", () => {
   const source = readFileSync(
     path.join(cwd, "src/lib/server/private-blob-storage.ts"),

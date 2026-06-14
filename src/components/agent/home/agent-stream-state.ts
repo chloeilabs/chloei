@@ -54,9 +54,6 @@ function getToolRunMetadata(
     ...(event.durationMs !== undefined ? { durationMs: event.durationMs } : {}),
     ...(event.errorCode ? { errorCode: event.errorCode } : {}),
     ...(event.retryable !== undefined ? { retryable: event.retryable } : {}),
-    ...("artifactManifest" in event
-      ? { artifactManifest: [...(event.artifactManifest ?? [])] }
-      : {}),
   }
 }
 

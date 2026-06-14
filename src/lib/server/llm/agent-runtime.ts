@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto"
-
 import { createGateway } from "@ai-sdk/gateway"
 import {
   type LanguageModelUsage,
@@ -9,10 +7,6 @@ import {
 } from "ai"
 
 import { createLogger } from "@/lib/logger"
-import {
-  buildAgentArtifactDownloadUrl,
-  getAgentArtifactRunRoot,
-} from "@/lib/server/agent-artifacts"
 import { hydrateBlobBackedAttachments } from "@/lib/server/agent-attachment-blobs"
 import {
   type PromptTaskMode,
@@ -65,13 +59,10 @@ import { preparePdfAttachmentsForModel } from "./pdf-attachment-preprocessor"
 
 const logger = createLogger("agent-runtime")
 
-const AGENT_ARTIFACT_BASE_URL_PLACEHOLDER = "__artifact_base__"
-
 export type AgentRuntimeProfileId = "chat_default" | "deep_research"
 
 interface AgentRuntimeProfile {
   id: AgentRuntimeProfileId
-  preservesArtifactWorkspace?: boolean
   toolMaxSteps: number
 }
 
@@ -87,7 +78,6 @@ export interface StartAgentRuntimeStreamParams {
   taskMode?: PromptTaskMode
   temperature?: number
   signal?: AbortSignal
-  artifactOwnerId?: string
   userId?: string
   featureFlags?: AgentFeatureFlags
 }
@@ -104,21 +94,6 @@ const AGENT_RUNTIME_PROFILES: Record<
     id: "deep_research",
     toolMaxSteps: AGENT_RESEARCH_TOOL_MAX_STEPS,
   },
-}
-
-function buildAgentArtifactBaseUrl(artifactId: string): string | undefined {
-  const placeholderUrl = buildAgentArtifactDownloadUrl(
-    artifactId,
-    AGENT_ARTIFACT_BASE_URL_PLACEHOLDER
-  )
-  if (!placeholderUrl) {
-    return undefined
-  }
-
-  const placeholderSuffix = `/${AGENT_ARTIFACT_BASE_URL_PLACEHOLDER}`
-  return placeholderUrl.endsWith(placeholderSuffix)
-    ? placeholderUrl.slice(0, -placeholderSuffix.length)
-    : undefined
 }
 
 const FINAL_SYNTHESIS_STEP_INSTRUCTION = [
@@ -266,7 +241,7 @@ function getUsageLogFields(usage: LanguageModelUsage | undefined) {
 export async function* startAgentRuntimeStream(
   params: StartAgentRuntimeStreamParams
 ): AsyncGenerator<AgentStreamEvent> {
-  const userId = params.userId ?? params.artifactOwnerId
+  const userId = params.userId
   const featureFlags = params.featureFlags ?? getDefaultAgentFeatureFlags()
   const gatewayProvider = createGateway({
     apiKey: params.aiGatewayApiKey,
@@ -322,34 +297,8 @@ export async function* startAgentRuntimeStream(
     return getSourceEvent(id, normalizedUrl, normalizedTitle)
   }
 
-  const artifactRunId =
-    runtimeProfile.preservesArtifactWorkspace && params.artifactOwnerId
-      ? randomUUID()
-      : undefined
-  const codeExecutionWorkspaceRoot =
-    artifactRunId && params.artifactOwnerId
-      ? getAgentArtifactRunRoot({
-          artifactId: artifactRunId,
-          userId: params.artifactOwnerId,
-        })
-      : undefined
-  const codeExecutionWorkspaceMode = artifactRunId ? "preserve" : undefined
-  const artifactBaseUrl = artifactRunId
-    ? buildAgentArtifactBaseUrl(artifactRunId)
-    : undefined
   const tools = {
-    ...createAiSdkCodeExecutionTools({
-      workspaceMode: codeExecutionWorkspaceMode,
-      workspaceRoot: codeExecutionWorkspaceRoot,
-      artifactBaseUrl,
-      artifactUpload:
-        artifactRunId && userId
-          ? {
-              artifactId: artifactRunId,
-              userId,
-            }
-          : undefined,
-    }),
+    ...createAiSdkCodeExecutionTools(),
     ...createAiSdkTavilyTools(normalizedTavilyApiKey),
   } as ToolSet
   const toolNames = Object.keys(tools)
@@ -542,9 +491,6 @@ export async function* startAgentRuntimeStream(
           : {}),
         ...("retryable" in metadata && metadata.retryable !== undefined
           ? { retryable: metadata.retryable }
-          : {}),
-        ...("artifactManifest" in metadata && metadata.artifactManifest?.length
-          ? { artifactManifest: metadata.artifactManifest }
           : {}),
       }
 

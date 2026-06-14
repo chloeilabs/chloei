@@ -89,22 +89,6 @@ export function buildPrivateBlobAttachmentPathname(params: {
   return `${getPrivateBlobUserPrefix(params.userId)}/attachments/${attachmentId}/${sanitizeFilename(params.filename)}`
 }
 
-export function buildPrivateBlobArtifactPathname(params: {
-  userId: string
-  artifactId: string
-  relativePath: string
-}): string | null {
-  const normalizedRelativePath = normalizeBlobPathname(params.relativePath)
-  if (!normalizedRelativePath) {
-    return null
-  }
-
-  return `${getPrivateBlobUserPrefix(params.userId)}/artifacts/${sanitizeFilename(params.artifactId)}/${normalizedRelativePath
-    .split("/")
-    .map(sanitizeFilename)
-    .join("/")}`
-}
-
 export function buildAuthenticatedPrivateBlobDownloadUrl(
   pathname: string
 ): string | null {

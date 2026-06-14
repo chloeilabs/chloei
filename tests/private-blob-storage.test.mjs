@@ -13,7 +13,6 @@ const moduleUrl = pathToFileURL(
 
 const {
   buildAuthenticatedPrivateBlobDownloadUrl,
-  buildPrivateBlobArtifactPathname,
   buildPrivateBlobAttachmentPathname,
   getPrivateBlobUserPrefix,
   isPrivateBlobConfigured,
@@ -134,36 +133,6 @@ test("buildPrivateBlobAttachmentPathname generates a UUID when none is given", (
   assert.match(
     generatedId,
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-  )
-})
-
-test("buildPrivateBlobArtifactPathname builds under the artifacts namespace", () => {
-  assert.equal(
-    buildPrivateBlobArtifactPathname({
-      userId: "user-a",
-      artifactId: "run-1",
-      relativePath: "out/report.txt",
-    }),
-    `${getPrivateBlobUserPrefix("user-a")}/artifacts/run-1/out/report.txt`
-  )
-})
-
-test("buildPrivateBlobArtifactPathname rejects traversal in the relative path", () => {
-  assert.equal(
-    buildPrivateBlobArtifactPathname({
-      userId: "user-a",
-      artifactId: "run-1",
-      relativePath: "../escape.txt",
-    }),
-    null
-  )
-  assert.equal(
-    buildPrivateBlobArtifactPathname({
-      userId: "user-a",
-      artifactId: "run-1",
-      relativePath: "/abs.txt",
-    }),
-    null
   )
 })
 

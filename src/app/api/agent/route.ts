@@ -255,7 +255,6 @@ export async function POST(request: NextRequest) {
         userTimeZone,
         runtimeProfile: resolveRuntimeProfile(parsedRequest.runMode),
         taskMode: promptTaskMode,
-        artifactOwnerId: session.user.id,
         userId: session.user.id,
         featureFlags,
         messages: parsedRequest.messages,

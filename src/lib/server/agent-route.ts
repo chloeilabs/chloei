@@ -156,7 +156,6 @@ interface CreateAgentStreamResponseParams {
   userTimeZone?: string
   runtimeProfile?: AgentRuntimeProfileId
   taskMode?: PromptTaskMode
-  artifactOwnerId?: string
   userId?: string
   featureFlags?: AgentFeatureFlags
   messages: AgentStreamRequest["messages"]
@@ -818,7 +817,6 @@ export function createAgentStreamResponse(
           userTimeZone: params.userTimeZone,
           runtimeProfile: params.runtimeProfile,
           ...(params.taskMode ? { taskMode: params.taskMode } : {}),
-          artifactOwnerId: params.artifactOwnerId,
           userId: params.userId,
           featureFlags: params.featureFlags,
           messages: params.messages,
