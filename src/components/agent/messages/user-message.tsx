@@ -104,7 +104,7 @@ export function UserMessage({
     newRunMode: AgentRunMode
   }) => Promise<void> | void
 }) {
-  const { data: availableModels = [] } = useModels()
+  const { data: availableModels } = useModels()
   const modelSelectorModels = useMemo(
     () => getModelSelectorModels(availableModels),
     [availableModels]

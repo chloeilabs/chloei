@@ -1,12 +1,7 @@
-import {
-  dehydrate,
-  HydrationBoundary,
-  QueryClient,
-} from "@tanstack/react-query"
 import { redirect } from "next/navigation"
 
 import { HomePageContent } from "@/components/agent/home/home-content"
-import { QueryClientProvider } from "@/components/layout/query-client-provider"
+import { ModelsProvider } from "@/hooks/agent/use-models"
 import { getModels } from "@/lib/actions/api-keys"
 import { isAuthConfigured } from "@/lib/server/auth"
 import { getCurrentViewer } from "@/lib/server/auth-session"
@@ -28,12 +23,8 @@ export default async function Home() {
     redirect("/sign-in")
   }
 
-  const queryClient = new QueryClient()
-
   const availableModels = getModels()
   const modelSelectorModels = getModelSelectorModels(availableModels)
-
-  queryClient.setQueryData(["models"], availableModels)
 
   const resolvedInitialSelectedModel =
     modelSelectorModels.length > 0
@@ -41,13 +32,11 @@ export default async function Home() {
       : null
 
   return (
-    <QueryClientProvider>
-      <HydrationBoundary state={dehydrate(queryClient)}>
-        <HomePageContent
-          initialSelectedModel={resolvedInitialSelectedModel}
-          viewer={viewer}
-        />
-      </HydrationBoundary>
-    </QueryClientProvider>
+    <ModelsProvider models={availableModels}>
+      <HomePageContent
+        initialSelectedModel={resolvedInitialSelectedModel}
+        viewer={viewer}
+      />
+    </ModelsProvider>
   )
 }

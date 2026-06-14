@@ -205,7 +205,7 @@ CREATE TABLE thread (
 - `PUT` — upsert a full `Thread`.
 - `DELETE` — delete by id (body `{ id }`); responds `204 No Content`.
 
-**Client thread store** (`src/components/agent/home/use-thread-store.ts` via `ThreadStoreProvider`) — a bespoke `useState`/refs store (not React Query). It holds `threadSummaries` (the list), lazily-hydrated full `threads`, and `currentThreadId`. Writes go through `saveThread`: optimistic local merge, then an immediate or 800 ms-debounced `PUT`, with 3 s retry, per-thread `AbortController` dedupe, and `updatedAt` stale-write protection. Only `/api/models` uses React Query.
+**Client thread store** (`src/components/agent/home/use-thread-store.ts` via `ThreadStoreProvider`) — a bespoke `useState`/refs store (not React Query). It holds `threadSummaries` (the list), lazily-hydrated full `threads`, and `currentThreadId`. Writes go through `saveThread`: optimistic local merge, then an immediate or 800 ms-debounced `PUT`, with 3 s retry, per-thread `AbortController` dedupe, and `updatedAt` stale-write protection. The available-model list is resolved once on the server (`getModels()` in `page.tsx`) and read from a `ModelsProvider` context (`src/hooks/agent/use-models.tsx`) — there is no client-side data-fetching library.
 
 ### Rate Limiting
 
@@ -288,10 +288,10 @@ src/
     search-chats.tsx    # Client-side thread title search dialog
     auth/               # Sign-in/up forms, auth shell
     graphics/           # Logo + visual effects
-    layout/             # QueryClientProvider, route group layout
+    layout/             # route group layout
     ui/                 # shadcn/ui primitives (base-lyra/stone) + ShikiCode
   hooks/
-    agent/              # use-models (React Query), use-persistent-selected-model,
+    agent/              # use-models (server-seeded models context), use-persistent-selected-model,
                         #   use-persistent-run-mode (both localStorage-backed)
   lib/
     actions/api-keys.ts # getModels() server action

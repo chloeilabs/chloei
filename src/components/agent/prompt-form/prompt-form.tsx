@@ -151,7 +151,7 @@ export function PromptForm({
     [pendingAttachments]
   )
 
-  const { data: availableModels = [] } = useModels()
+  const { data: availableModels } = useModels()
   const modelSelectorModels = useMemo(
     () => getModelSelectorModels(availableModels),
     [availableModels]
