@@ -35,10 +35,7 @@ pnpm test:smoke:mock                            # Credential-free Playwright smo
 pnpm test:smoke:mock:build                      # Build production app, then run mock smoke
 node --test tests/agent-route-contract.test.mjs  # Single test file
 
-# Finance evals + ops
-pnpm eval:finance                               # Fixture finance eval baseline
-pnpm eval:finance:live                          # Live public-markets finance acceptance suite
-pnpm eval:finance:grade                         # Grade finance eval outputs
+# Ops
 pnpm inngest:smoke                              # Send one no-op ops/inngest.smoke event (needs INNGEST_EVENT_KEY)
 ```
 
@@ -62,7 +59,7 @@ Client (useAgentSession)
     → Zod validation (parseAgentStreamRequest) — incl. runMode (chat|research) and model
     → Concurrency slot acquire (max 4 in-flight per user)
     → System prompt assembly (buildAgentSystemInstruction)
-    → Runtime profile resolution (chat_default | deep_research | finance_analysis | gdpval_workspace)
+    → Runtime profile resolution (chat_default | deep_research | finance_analysis)
     → AI Gateway stream via Vercel AI SDK (startGatewayResponseStream → runAgentStream)
     → NDJSON chunks (application/x-ndjson) → client
       → readResponseStreamLines / parseStreamEventLine
@@ -87,7 +84,7 @@ This boundary is **enforced by Next.js bundling at build time** (importing `pg`/
 
 These are easy to confuse. They are orthogonal:
 
-- **Runtime profile** (`resolveRuntimeProfile` in `agent-route.ts`, `AGENT_RUNTIME_PROFILES` in `agent-runtime.ts`) — one of `chat_default`, `deep_research`, `finance_analysis`, `gdpval_workspace`. The profile drives the **tool set**, the **code-execution backend** (`finance` for `finance_analysis`/`gdpval_workspace`), the **tool-step budget**, and artifact/workspace behavior. `gdpval_workspace` is eval-only (preserves the code-execution workspace, exposes the artifact directory, accepts `codeExecutionInputFiles`) and is never auto-selected from an HTTP request.
+- **Runtime profile** (`resolveRuntimeProfile` in `app/api/agent/route.ts`, `AGENT_RUNTIME_PROFILES` in `agent-runtime.ts`) — one of `chat_default`, `deep_research`, `finance_analysis`. The profile drives the **tool set**, the **code-execution backend** (`finance` for `finance_analysis`), the **tool-step budget**, and artifact/workspace behavior.
 - **Task mode** (`inferPromptTaskMode` in `agent-prompt-steering.ts`) — inferred from message content; drives only the **prompt overlay text** and the Gemini thinking level. Modes: `general`, `coding`, `debugging`, `writing`, `research`, `finance_analysis`, `high_stakes`, `closed_answer`, `instruction_following`.
 
 Research mode is a **request flag** (`runMode: "research"`), not an inference. It selects the `deep_research` profile and `RESEARCH_MODEL` (Qwen 3.7 Max); if that model is unavailable the route returns 400 `AGENT_RESEARCH_MODEL_UNAVAILABLE`.
@@ -146,7 +143,7 @@ User ids are never written into blob storage paths: `hashUserId` (`src/lib/serve
 
 ### Agent Tools
 
-Each tool is only registered when its requirements are met, **and** when the active runtime profile enables it. Finance tools (`finance_data`, `sec_filings`) and the finance code-execution backend are enabled for `finance_analysis`/`gdpval_workspace` profiles.
+Each tool is only registered when its requirements are met, **and** when the active runtime profile enables it. Finance tools (`finance_data`, `sec_filings`) and the finance code-execution backend are enabled for the `finance_analysis` profile.
 
 | Tool               | Requirement                                | Tool id / operations                                                                                                                     |
 | ------------------ | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
@@ -163,7 +160,7 @@ Each tool is only registered when its requirements are met, **and** when the act
 - JavaScript: runs via the Node binary (`process.execPath`) with `--input-type=module --eval`.
 - Python: runs via `python3 -I -c` (the `python3` binary on `PATH`).
 - **Restricted backend** (default): computation-only Python imports (`math`, `collections`, `itertools`, …).
-- **Finance backend** (`AGENT_CODE_EXECUTION_BACKEND=finance`, or the `finance_analysis`/`gdpval_workspace` profile): adds `pandas`, `numpy`, `scipy`, `openpyxl`, `xlsxwriter`, `matplotlib`, `statsmodels`, plus `dateutil`, `mpl_toolkits`, `zipfile`. Network/subprocess stay blocked; file access is restricted to the workspace + temp dir (mounted reference files are readable by relative path). Optional interpreter via `AGENT_CODE_EXECUTION_PYTHON_VENV_PATH`.
+- **Finance backend** (`AGENT_CODE_EXECUTION_BACKEND=finance`, or the `finance_analysis` profile): adds `pandas`, `numpy`, `scipy`, `openpyxl`, `xlsxwriter`, `matplotlib`, `statsmodels`, plus `dateutil`, `mpl_toolkits`, `zipfile`. Network/subprocess stay blocked; file access is restricted to the workspace + temp dir (mounted reference files are readable by relative path). Optional interpreter via `AGENT_CODE_EXECUTION_PYTHON_VENV_PATH`.
 - **Limits**: timeout default **10 s**, max **60 s**; code input and output each capped at **12,000 chars**.
 
 **Finance data** (`ai-sdk-finance-data-tools.ts`): quotes + historical prices come from **Stooq** (keyless, delayed); company profiles, statements, company facts, and symbol search come from **SEC/EDGAR**. `provider: auto|sec|stooq`. Source URLs are sanitized (api keys stripped); errors carry `retryable` metadata. Internal fetch: 2 attempts, 12 s timeout. SEC requests use `SEC_API_USER_AGENT`, falling back to a generic UA (surfaced in `provider_status`).
@@ -464,9 +461,8 @@ All others are optional with safe defaults. See `.env.example` for the annotated
 | `AGENT_INTERNAL_USER_EMAILS` / `..._EMAIL_DOMAINS` | Internal-user allowlists for flag defaults                          |
 | `AGENT_RATE_LIMIT_ENABLED`                         | Rate-limit kill switch (default true)                               |
 | `AGENT_RATE_LIMIT_STORE`                           | `auto` (default), `memory`, or `postgres`                           |
-| `AGENT_CODE_EXECUTION_BACKEND`                     | `restricted` (default) or `finance` for ad-hoc/eval runs            |
-| `AGENT_CODE_EXECUTION_PYTHON_VENV_PATH`            | Venv/python for the finance backend (set by the eval runner)        |
-| `AGENT_EVAL_RESULTS_DIR`                           | Output dir for finance eval results (set by the eval runner)        |
+| `AGENT_CODE_EXECUTION_BACKEND`                     | `restricted` (default) or `finance` for ad-hoc runs                 |
+| `AGENT_CODE_EXECUTION_PYTHON_VENV_PATH`            | Venv/python interpreter for the finance backend (optional)          |
 
 Request size limits, stream/gateway timeouts, tool-step budgets, the rate-limit window/concurrency magnitudes, and body-size limits are **fixed constants** in `src/lib/server/agent-runtime-config.ts` / `next.config.mjs` — not env-configurable. Change them in code if needed.
 

@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto"
-import path from "node:path"
 
 import { createGateway } from "@ai-sdk/gateway"
 import {
@@ -20,7 +19,6 @@ import {
   resolvePromptProvider,
 } from "@/lib/server/agent-prompt-steering"
 import {
-  AGENT_EVAL_RESULTS_DIR,
   AGENT_FINANCE_TOOL_MAX_STEPS,
   AGENT_RESEARCH_TOOL_MAX_STEPS,
   AGENT_TOOL_MAX_STEPS,
@@ -92,12 +90,10 @@ export type AgentRuntimeProfileId =
   | "chat_default"
   | "deep_research"
   | "finance_analysis"
-  | "gdpval_workspace"
 
 interface AgentRuntimeProfile {
   id: AgentRuntimeProfileId
   codeExecutionBackend?: CodeExecutionBackend
-  codeExecutionWorkspaceMode?: "ephemeral" | "preserve"
   financeDataEnabled: boolean
   secFilingsEnabled: boolean
   toolMaxSteps: number
@@ -119,10 +115,6 @@ export interface StartAgentRuntimeStreamParams {
   artifactOwnerId?: string
   userId?: string
   featureFlags?: AgentFeatureFlags
-  codeExecutionInputFiles?: {
-    sourcePath: string
-    relativePath: string
-  }[]
 }
 
 const AGENT_RUNTIME_PROFILES: Record<
@@ -147,14 +139,6 @@ const AGENT_RUNTIME_PROFILES: Record<
     financeDataEnabled: true,
     secFilingsEnabled: true,
     toolMaxSteps: AGENT_FINANCE_TOOL_MAX_STEPS,
-  },
-  gdpval_workspace: {
-    id: "gdpval_workspace",
-    codeExecutionBackend: "finance",
-    codeExecutionWorkspaceMode: "preserve",
-    financeDataEnabled: true,
-    secFilingsEnabled: true,
-    toolMaxSteps: AGENT_TOOL_MAX_STEPS,
   },
 }
 
@@ -379,17 +363,13 @@ export async function* startAgentRuntimeStream(
       ? randomUUID()
       : undefined
   const codeExecutionWorkspaceRoot =
-    runtimeProfile.id === "gdpval_workspace" && AGENT_EVAL_RESULTS_DIR
-      ? path.join(AGENT_EVAL_RESULTS_DIR, "workspaces", randomUUID())
-      : artifactRunId && params.artifactOwnerId
-        ? getAgentArtifactRunRoot({
-            artifactId: artifactRunId,
-            userId: params.artifactOwnerId,
-          })
-        : undefined
-  const codeExecutionWorkspaceMode =
-    runtimeProfile.codeExecutionWorkspaceMode ??
-    (artifactRunId ? "preserve" : undefined)
+    artifactRunId && params.artifactOwnerId
+      ? getAgentArtifactRunRoot({
+          artifactId: artifactRunId,
+          userId: params.artifactOwnerId,
+        })
+      : undefined
+  const codeExecutionWorkspaceMode = artifactRunId ? "preserve" : undefined
   const artifactBaseUrl = artifactRunId
     ? buildAgentArtifactBaseUrl(artifactRunId)
     : undefined
@@ -397,10 +377,7 @@ export async function* startAgentRuntimeStream(
     ...createAiSdkCodeExecutionTools({
       backend: runtimeProfile.codeExecutionBackend,
       workspaceMode: codeExecutionWorkspaceMode,
-      workspaceRoot:
-        runtimeProfile.id === "gdpval_workspace" || artifactRunId
-          ? codeExecutionWorkspaceRoot
-          : undefined,
+      workspaceRoot: codeExecutionWorkspaceRoot,
       artifactBaseUrl,
       artifactUpload:
         artifactRunId && userId
@@ -408,11 +385,6 @@ export async function* startAgentRuntimeStream(
               artifactId: artifactRunId,
               userId,
             }
-          : undefined,
-      exposeArtifactDirectory: runtimeProfile.id === "gdpval_workspace",
-      inputFiles:
-        runtimeProfile.id === "gdpval_workspace"
-          ? params.codeExecutionInputFiles
           : undefined,
     }),
     ...createAiSdkTavilyTools(normalizedTavilyApiKey),

@@ -188,13 +188,12 @@ pnpm lint
 pnpm typecheck
 pnpm build
 pnpm test:smoke:mock:build
-pnpm eval:finance
-pnpm eval:finance:grade
 ```
 
-The finance eval gate should fail on regressions in citation presence, numerical
-consistency, current-date handling, unsupported financial-advice boundaries, and
-tool selection for live market facts.
+Public-markets finance answer quality (citation presence, numerical consistency,
+current-date handling, unsupported financial-advice boundaries, and tool selection
+for live market facts) is verified manually against the checklist in
+[docs/finance-research-quality.md](finance-research-quality.md).
 
 ## Rollback
 

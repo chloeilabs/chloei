@@ -71,8 +71,8 @@ export const AGENT_RATE_LIMIT_STORE = parseEnumFromEnv(
   "auto"
 )
 
-// Code-execution backend. The finance/eval runtime profile selects "finance"
-// per request; this env default only affects ad-hoc runs and the eval harness.
+// Code-execution backend. The finance runtime profile selects "finance"
+// per request; this env default only affects ad-hoc runs.
 export const AGENT_CODE_EXECUTION_BACKEND = parseEnumFromEnv(
   process.env.AGENT_CODE_EXECUTION_BACKEND,
   ["restricted", "finance"] as const,
@@ -81,9 +81,4 @@ export const AGENT_CODE_EXECUTION_BACKEND = parseEnumFromEnv(
 
 export const AGENT_CODE_EXECUTION_PYTHON_VENV_PATH = parseOptionalStringFromEnv(
   process.env.AGENT_CODE_EXECUTION_PYTHON_VENV_PATH
-)
-
-// Eval-harness artifact output directory (set programmatically by the runner).
-export const AGENT_EVAL_RESULTS_DIR = parseOptionalStringFromEnv(
-  process.env.AGENT_EVAL_RESULTS_DIR
 )
