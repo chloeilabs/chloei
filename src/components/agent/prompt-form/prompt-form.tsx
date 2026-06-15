@@ -398,6 +398,13 @@ export function PromptForm({
                 type="submit"
                 size="iconSm"
                 disabled={isSubmitButtonDisabled}
+                aria-label={
+                  isFormPending
+                    ? "Sending message"
+                    : isStreaming && !trimmedMessage
+                      ? "Stop response"
+                      : "Send message"
+                }
                 className="shrink-0 ring-offset-background"
               >
                 {isFormPending ? (
