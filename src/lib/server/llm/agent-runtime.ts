@@ -7,10 +7,6 @@ import {
 } from "ai"
 
 import { createLogger } from "@/lib/logger"
-import {
-  type PromptTaskMode,
-  resolvePromptProvider,
-} from "@/lib/server/agent-prompt-steering"
 import { AGENT_TOOL_MAX_STEPS } from "@/lib/server/agent-runtime-config"
 import {
   type AgentFeatureFlags,
@@ -27,7 +23,6 @@ import {
   shouldForceFinalSynthesisStep,
   shouldNudgeMidBudgetSynthesis,
 } from "./agent-runtime-synthesis-gating"
-import { getAiSdkGatewayProviderOptionsForTaskMode } from "./ai-sdk-gateway-provider-options"
 import {
   createAiSdkTavilyTools,
   getAiSdkTavilyToolCallMetadata,
@@ -53,7 +48,6 @@ export interface StartAgentRuntimeStreamParams {
   userTimeZone?: string
   messages: AgentInputMessage[]
   systemInstruction: string
-  taskMode: PromptTaskMode
   temperature?: number
   signal?: AbortSignal
   userId?: string
@@ -256,10 +250,6 @@ export async function* startAgentRuntimeStream(
     ...(params.temperature !== undefined
       ? { temperature: params.temperature }
       : {}),
-    providerOptions: getAiSdkGatewayProviderOptionsForTaskMode({
-      provider: resolvePromptProvider(params.model),
-      taskMode: params.taskMode,
-    }),
     experimental_telemetry: {
       isEnabled: true,
       recordInputs: featureFlags.telemetryRecordIo,
@@ -508,10 +498,6 @@ export async function* startAgentRuntimeStream(
         ...(params.temperature !== undefined
           ? { temperature: params.temperature }
           : {}),
-        providerOptions: getAiSdkGatewayProviderOptionsForTaskMode({
-          provider: resolvePromptProvider(params.model),
-          taskMode: params.taskMode,
-        }),
         tools,
         toolChoice: "none" as const,
         stopWhen: stepCountIs(1),

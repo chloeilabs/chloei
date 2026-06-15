@@ -78,7 +78,7 @@ This boundary is **enforced by Next.js bundling at build time** (importing `pg`/
 
 ### Task Modes
 
-**Task mode** (`inferPromptTaskMode` in `agent-prompt-steering.ts`) is inferred from message content and drives only the **prompt overlay text** (`TASK MODE OVERLAY: <MODE>`) and the Gemini thinking level. Modes: `general`, `coding`, `debugging`, `writing`, `research`, `high_stakes`, `closed_answer`, `instruction_following`. The tool-step budget is a single fixed constant (`AGENT_TOOL_MAX_STEPS`) — there is no per-request runtime-profile selection. (The `research` task mode is an automatic content-based overlay, not a user-facing toggle.)
+**Task mode** (`inferPromptTaskMode` in `agent-prompt-steering.ts`) is inferred from message content and drives only the **prompt overlay text** (`TASK MODE OVERLAY: <MODE>`). Modes: `general`, `coding`, `debugging`, `writing`, `research`, `high_stakes`, `closed_answer`, `instruction_following`. The tool-step budget is a single fixed constant (`AGENT_TOOL_MAX_STEPS`) — there is no per-request runtime-profile selection. (The `research` task mode is an automatic content-based overlay, not a user-facing toggle.)
 
 ### System Prompt Composition
 
@@ -86,7 +86,7 @@ This boundary is **enforced by Next.js bundling at build time** (importing `pg`/
 
 1. `OPERATING INSTRUCTIONS` — `DEFAULT_OPERATING_INSTRUCTION` (`src/lib/shared/llm/system-instructions.ts`)
 2. `RUNTIME DATE CONTEXT` — current UTC timestamp + user timezone (from `X-User-Timezone` header)
-3. **Provider overlay** (`PROVIDER OVERLAY: ALIBABA|GOOGLE|MOONSHOTAI|XIAOMI`) — keyed by the model's **provider org**, not its nickname (alibaba=Qwen, google=Gemini, moonshotai=Kimi, xiaomi=MiMo). Always applied for a supported model.
+3. **Provider overlay** (`PROVIDER OVERLAY: ALIBABA|MOONSHOTAI`) — keyed by the model's **provider org**, not its nickname (alibaba=Qwen, moonshotai=Kimi). Always applied for a supported model.
 4. **Task mode overlay** (`TASK MODE OVERLAY: <MODE>`)
 5. `IDENTITY AND TONE CONTEXT` — `DEFAULT_SOUL_FALLBACK_INSTRUCTION` (`src/lib/shared/llm/system-instructions.ts`)
 6. `AUTH USER CONTEXT` — authenticated user id, name, email
@@ -154,15 +154,12 @@ Each tool is only registered when its requirements are met.
 
 All models are defined in `src/lib/shared/llm/models.ts`:
 
-| Key                             | Model ID                        | Display Name           |
-| ------------------------------- | ------------------------------- | ---------------------- |
-| `ALIBABA_QWEN3_7_MAX`           | `alibaba/qwen3.7-max`           | Qwen 3.7 Max           |
-| `GOOGLE_GEMINI_3_1_PRO_PREVIEW` | `google/gemini-3.1-pro-preview` | Gemini 3.1 Pro Preview |
-| `MOONSHOTAI_KIMI_K2_6`          | `moonshotai/kimi-k2.6`          | Kimi K2.6              |
-| `XIAOMI_MIMO_V2_5_PRO`          | `xiaomi/mimo-v2.5-pro`          | MiMo V2.5 Pro          |
+| Key                    | Model ID               | Display Name |
+| ---------------------- | ---------------------- | ------------ |
+| `ALIBABA_QWEN3_7_MAX`  | `alibaba/qwen3.7-max`  | Qwen 3.7 Max |
+| `MOONSHOTAI_KIMI_K2_6` | `moonshotai/kimi-k2.6` | Kimi K2.6    |
 
-- `MODEL_SELECTOR_MODELS` — the chat selector subset: Qwen 3.7 Max, Kimi K2.6, MiMo V2.5 Pro.
-- Gemini stays in `SUPPORTED_MODELS` for Gateway availability but is not a standalone chat selector option.
+- `MODEL_SELECTOR_MODELS` — the chat selector subset: Qwen 3.7 Max and Kimi K2.6.
 - The agent is text-only: all chat input is plain text (no image, file, or PDF input).
 - Adding a model means updating `AvailableModels`, `ModelInfos`, `SUPPORTED_MODELS`, and optionally `MODEL_SELECTOR_MODELS`. `/api/models` filters this registry by configured keys (`getModels()` in `src/lib/actions/api-keys.ts`).
 
@@ -298,7 +295,6 @@ src/
         agent-runtime-synthesis-gating.ts # Final-step + mid-budget synthesis predicates
         gateway-responses.ts              # startGatewayResponseStream
         gateway-client.ts                 # undici dispatcher for AI Gateway
-        ai-sdk-gateway-provider-options.ts # Per-model provider options (Gemini thinking)
         ai-sdk-tavily-tools.ts            # tavily_search / tavily_extract
         code-execution-tools.ts           # Sandboxed JS/Python execution
         initial-reasoning-chunk-sanitizer.ts # Redacted-reasoning filtering

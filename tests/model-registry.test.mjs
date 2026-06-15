@@ -16,16 +16,16 @@ test("shared model registry includes the curated gateway models", async () => {
     "Expected legacy model ids to be fully removed from the shared model registry."
   )
 
-  assert.match(
+  assert.doesNotMatch(
     source,
-    /ALIBABA_QWEN3_7_MAX:\s*"alibaba\/qwen3\.7-max"/,
-    "Expected AvailableModels to include ALIBABA_QWEN3_7_MAX."
+    /google\/gemini-3\.1-pro-preview|xiaomi\/mimo-v2\.5-pro|GOOGLE_GEMINI_3_1_PRO_PREVIEW|XIAOMI_MIMO_V2_5_PRO|Gemini 3\.1 Pro Preview|MiMo V2\.5 Pro/,
+    "Expected Gemini 3.1 Pro Preview and MiMo V2.5 Pro to be fully removed from the shared model registry."
   )
 
   assert.match(
     source,
-    /GOOGLE_GEMINI_3_1_PRO_PREVIEW:\s*"google\/gemini-3\.1-pro-preview"/,
-    "Expected AvailableModels to include GOOGLE_GEMINI_3_1_PRO_PREVIEW."
+    /ALIBABA_QWEN3_7_MAX:\s*"alibaba\/qwen3\.7-max"/,
+    "Expected AvailableModels to include ALIBABA_QWEN3_7_MAX."
   )
 
   assert.match(
@@ -35,21 +35,15 @@ test("shared model registry includes the curated gateway models", async () => {
   )
 
   assert.match(
-    source,
-    /XIAOMI_MIMO_V2_5_PRO:\s*"xiaomi\/mimo-v2\.5-pro"/,
-    "Expected AvailableModels to include XIAOMI_MIMO_V2_5_PRO."
+    source.replace(/\s+/g, " "),
+    /SUPPORTED_MODELS = \[ AvailableModels\.ALIBABA_QWEN3_7_MAX, AvailableModels\.MOONSHOTAI_KIMI_K2_6, \] as const/,
+    "Expected SUPPORTED_MODELS to list Qwen 3.7 Max and Kimi K2.6."
   )
 
   assert.match(
     source.replace(/\s+/g, " "),
-    /SUPPORTED_MODELS = \[ AvailableModels\.ALIBABA_QWEN3_7_MAX, AvailableModels\.GOOGLE_GEMINI_3_1_PRO_PREVIEW, AvailableModels\.MOONSHOTAI_KIMI_K2_6, AvailableModels\.XIAOMI_MIMO_V2_5_PRO, \] as const/,
-    "Expected SUPPORTED_MODELS to list Qwen 3.7 Max, Gemini 3.1 Pro Preview, Kimi K2.6, and MiMo V2.5 Pro."
-  )
-
-  assert.match(
-    source.replace(/\s+/g, " "),
-    /MODEL_SELECTOR_MODELS = \[ AvailableModels\.ALIBABA_QWEN3_7_MAX, AvailableModels\.MOONSHOTAI_KIMI_K2_6, AvailableModels\.XIAOMI_MIMO_V2_5_PRO, \] as const/,
-    "Expected the chat model selector to default to Qwen 3.7 Max before Kimi K2.6 and MiMo V2.5 Pro."
+    /MODEL_SELECTOR_MODELS = \[ AvailableModels\.ALIBABA_QWEN3_7_MAX, AvailableModels\.MOONSHOTAI_KIMI_K2_6, \] as const/,
+    "Expected the chat model selector to default to Qwen 3.7 Max before Kimi K2.6."
   )
 
   assert.match(
@@ -60,19 +54,7 @@ test("shared model registry includes the curated gateway models", async () => {
 
   assert.match(
     source,
-    /\[AvailableModels\.GOOGLE_GEMINI_3_1_PRO_PREVIEW\]:\s*\{[\s\S]*name:\s*"Gemini 3\.1 Pro Preview"/,
-    "Expected ModelInfos to define display metadata for GOOGLE_GEMINI_3_1_PRO_PREVIEW."
-  )
-
-  assert.match(
-    source,
     /\[AvailableModels\.MOONSHOTAI_KIMI_K2_6\]:\s*\{[\s\S]*name:\s*"Kimi K2\.6"/,
     "Expected ModelInfos to define display metadata for MOONSHOTAI_KIMI_K2_6."
-  )
-
-  assert.match(
-    source,
-    /\[AvailableModels\.XIAOMI_MIMO_V2_5_PRO\]:\s*\{[\s\S]*name:\s*"MiMo V2\.5 Pro"/,
-    "Expected ModelInfos to define display metadata for XIAOMI_MIMO_V2_5_PRO."
   )
 })

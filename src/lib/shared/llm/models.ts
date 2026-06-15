@@ -1,8 +1,6 @@
 export const AvailableModels = {
   ALIBABA_QWEN3_7_MAX: "alibaba/qwen3.7-max",
-  GOOGLE_GEMINI_3_1_PRO_PREVIEW: "google/gemini-3.1-pro-preview",
   MOONSHOTAI_KIMI_K2_6: "moonshotai/kimi-k2.6",
-  XIAOMI_MIMO_V2_5_PRO: "xiaomi/mimo-v2.5-pro",
 } as const
 
 export type ModelType = (typeof AvailableModels)[keyof typeof AvailableModels]
@@ -21,9 +19,7 @@ export interface ModelInfo {
 
 export const SUPPORTED_MODELS = [
   AvailableModels.ALIBABA_QWEN3_7_MAX,
-  AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW,
   AvailableModels.MOONSHOTAI_KIMI_K2_6,
-  AvailableModels.XIAOMI_MIMO_V2_5_PRO,
 ] as const
 
 export const ALL_MODELS = [...SUPPORTED_MODELS] as const
@@ -31,7 +27,6 @@ export const ALL_MODELS = [...SUPPORTED_MODELS] as const
 export const MODEL_SELECTOR_MODELS = [
   AvailableModels.ALIBABA_QWEN3_7_MAX,
   AvailableModels.MOONSHOTAI_KIMI_K2_6,
-  AvailableModels.XIAOMI_MIMO_V2_5_PRO,
 ] as const
 
 const MODEL_SELECTOR_MODEL_SET: ReadonlySet<ModelType> = new Set(
@@ -66,16 +61,8 @@ export const ModelInfos: Record<ModelType, ModelInfo> = {
     id: AvailableModels.ALIBABA_QWEN3_7_MAX,
     name: "Qwen 3.7 Max",
   },
-  [AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW]: {
-    id: AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW,
-    name: "Gemini 3.1 Pro Preview",
-  },
   [AvailableModels.MOONSHOTAI_KIMI_K2_6]: {
     id: AvailableModels.MOONSHOTAI_KIMI_K2_6,
     name: "Kimi K2.6",
-  },
-  [AvailableModels.XIAOMI_MIMO_V2_5_PRO]: {
-    id: AvailableModels.XIAOMI_MIMO_V2_5_PRO,
-    name: "MiMo V2.5 Pro",
   },
 }

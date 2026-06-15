@@ -26,30 +26,22 @@ test("prompt steering resolves supported model providers", () => {
     "alibaba"
   )
   assert.equal(
-    resolvePromptProvider(AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW),
-    "google"
-  )
-  assert.equal(
     resolvePromptProvider(AvailableModels.MOONSHOTAI_KIMI_K2_6),
     "moonshotai"
-  )
-  assert.equal(
-    resolvePromptProvider(AvailableModels.XIAOMI_MIMO_V2_5_PRO),
-    "xiaomi"
   )
 })
 
 test("prompt steering includes provider overlays for supported models", () => {
   const blocks = createPromptSteeringBlocks({
-    provider: "google",
+    provider: "moonshotai",
     taskMode: "research",
   })
   const overlayText = blocks.map((block) => block.body).join("\n\n")
 
   assert.match(
     overlayText,
-    /Use Gemini reasoning mode efficiently/,
-    "Expected Google prompts to receive the Gemini provider overlay."
+    /Use Kimi reasoning mode efficiently/,
+    "Expected Moonshot AI prompts to receive the Kimi provider overlay."
   )
   assert.match(
     overlayText,

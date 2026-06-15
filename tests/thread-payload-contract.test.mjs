@@ -126,7 +126,7 @@ test("thread store delegates parsing and persistence shaping to the payload help
 test("thread payload drops legacy run-mode metadata from stored threads", () => {
   const parsed = parseThreadPayload({
     id: "thread-1",
-    model: "google/gemini-3.1-pro-preview",
+    model: "alibaba/qwen3.7-max",
     messages: [
       {
         id: "message-1",
