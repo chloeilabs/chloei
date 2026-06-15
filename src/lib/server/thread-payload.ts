@@ -1,9 +1,7 @@
 import { z } from "zod"
 
 import {
-  AGENT_RUN_MODES,
   AGENT_RUN_STATUSES,
-  type AgentRunMode,
   DEFAULT_THREAD_TITLE,
   isModelType,
   type ModelType,
@@ -19,7 +17,6 @@ const TOOL_NAME_SCHEMA = z.enum(TOOL_NAMES)
 const SEARCH_TOOL_NAME_SCHEMA = z.enum(SEARCH_TOOL_NAMES)
 const TOOL_INVOCATION_STATUS_SCHEMA = z.enum(["running", "success", "error"])
 const AGENT_RUN_STATUS_SCHEMA = z.enum(AGENT_RUN_STATUSES)
-const AGENT_RUN_MODE_SCHEMA = z.enum(AGENT_RUN_MODES)
 const MODEL_TYPE_SCHEMA = z.custom<ModelType>(
   isModelType,
   "Invalid model type."
@@ -166,7 +163,6 @@ const messageMetadataSchema = z
     parts: z.array(assistantMessagePartSchema).optional(),
     isStreaming: z.boolean().optional(),
     selectedModel: MODEL_TYPE_SCHEMA.optional(),
-    runMode: AGENT_RUN_MODE_SCHEMA.optional(),
     agentStatus: AGENT_RUN_STATUS_SCHEMA.optional(),
     interactionId: z.string().trim().min(1).max(200).optional(),
     lastEventId: z.string().trim().min(1).max(500).optional(),
@@ -263,11 +259,6 @@ function sanitizeThreadTitle(value: unknown): string {
 
   const title = value.trim()
   return title || DEFAULT_THREAD_TITLE
-}
-
-function sanitizeRunModeValue(value: unknown): AgentRunMode | undefined {
-  const parsed = AGENT_RUN_MODE_SCHEMA.safeParse(value)
-  return parsed.success ? parsed.data : undefined
 }
 
 function sanitizeOptionalString(
@@ -393,7 +384,6 @@ function sanitizeMessageMetadata(value: unknown) {
     metadata.followUpQuestionsPending
   )
   const selectedModel = sanitizeModelValue(metadata.selectedModel)
-  const runMode = sanitizeRunModeValue(metadata.runMode)
   const agentStatus = AGENT_RUN_STATUS_SCHEMA.safeParse(metadata.agentStatus)
   const interactionId = sanitizeOptionalString(metadata.interactionId, 200)
   const lastEventId = sanitizeOptionalString(metadata.lastEventId, 500)
@@ -441,7 +431,6 @@ function sanitizeMessageMetadata(value: unknown) {
     ...(parts ? { parts } : {}),
     ...(isStreaming !== undefined ? { isStreaming } : {}),
     ...(selectedModel !== undefined ? { selectedModel } : {}),
-    ...(runMode !== undefined ? { runMode } : {}),
     ...(agentStatus.success ? { agentStatus: agentStatus.data } : {}),
     ...(interactionId ? { interactionId } : {}),
     ...(lastEventId ? { lastEventId } : {}),

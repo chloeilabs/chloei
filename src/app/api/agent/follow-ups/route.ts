@@ -237,7 +237,6 @@ export async function POST(request: NextRequest) {
         aiGatewayApiKey,
         messages: parsed.messages,
         model: parsed.model,
-        runMode: parsed.runMode,
         signal: request.signal,
         userId: session.user.id,
       })

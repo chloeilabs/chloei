@@ -18,9 +18,8 @@ export const AGENT_RATE_LIMIT_WINDOW_MS = 60_000
 export const AGENT_RATE_LIMIT_MAX_REQUESTS = 60
 export const AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT = 4
 
-// Tool-step budgets per runtime profile.
+// Tool-step budget for the agent loop.
 export const AGENT_TOOL_MAX_STEPS = 12
-export const AGENT_RESEARCH_TOOL_MAX_STEPS = 20
 
 function parseBooleanFromEnv(
   value: string | undefined,

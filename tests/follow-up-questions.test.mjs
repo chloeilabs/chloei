@@ -40,7 +40,6 @@ function assistantMessage(overrides = {}) {
       isStreaming: false,
       agentStatus: "completed",
       selectedModel: MODEL,
-      runMode: "chat",
       ...metadata,
     },
   }
@@ -160,7 +159,7 @@ test("legacy vs generated follow-up detection", () => {
 test("getFollowUpQuestionRequestTargets selects an eligible assistant turn", () => {
   const messages = [
     { id: "u1", role: "user", content: "Question?", createdAt: "t" },
-    assistantMessage({ id: "a1", metadata: { runMode: "research" } }),
+    assistantMessage({ id: "a1" }),
   ]
 
   const targets = getFollowUpQuestionRequestTargets(messages, new Set())
@@ -168,7 +167,6 @@ test("getFollowUpQuestionRequestTargets selects an eligible assistant turn", () 
   assert.equal(targets.length, 1)
   assert.equal(targets[0].assistantMessageId, "a1")
   assert.equal(targets[0].model, MODEL)
-  assert.equal(targets[0].runMode, "research")
   assert.deepEqual(
     targets[0].messages.map((message) => message.id),
     ["u1", "a1"]

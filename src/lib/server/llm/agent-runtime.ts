@@ -11,10 +11,7 @@ import {
   type PromptTaskMode,
   resolvePromptProvider,
 } from "@/lib/server/agent-prompt-steering"
-import {
-  AGENT_RESEARCH_TOOL_MAX_STEPS,
-  AGENT_TOOL_MAX_STEPS,
-} from "@/lib/server/agent-runtime-config"
+import { AGENT_TOOL_MAX_STEPS } from "@/lib/server/agent-runtime-config"
 import {
   type AgentFeatureFlags,
   getDefaultAgentFeatureFlags,
@@ -30,10 +27,7 @@ import {
   shouldForceFinalSynthesisStep,
   shouldNudgeMidBudgetSynthesis,
 } from "./agent-runtime-synthesis-gating"
-import {
-  getAiSdkGatewayProviderOptionsForMode,
-  getAiSdkGatewayProviderOptionsForTaskMode,
-} from "./ai-sdk-gateway-provider-options"
+import { getAiSdkGatewayProviderOptionsForTaskMode } from "./ai-sdk-gateway-provider-options"
 import {
   createAiSdkTavilyTools,
   getAiSdkTavilyToolCallMetadata,
@@ -51,13 +45,6 @@ import { createReasoningDisplaySanitizer } from "./initial-reasoning-chunk-sanit
 
 const logger = createLogger("agent-runtime")
 
-export type AgentRuntimeProfileId = "chat_default" | "deep_research"
-
-interface AgentRuntimeProfile {
-  id: AgentRuntimeProfileId
-  toolMaxSteps: number
-}
-
 export interface StartAgentRuntimeStreamParams {
   requestId?: string
   model: ModelType
@@ -66,26 +53,11 @@ export interface StartAgentRuntimeStreamParams {
   userTimeZone?: string
   messages: AgentInputMessage[]
   systemInstruction: string
-  runtimeProfile?: AgentRuntimeProfileId
-  taskMode?: PromptTaskMode
+  taskMode: PromptTaskMode
   temperature?: number
   signal?: AbortSignal
   userId?: string
   featureFlags?: AgentFeatureFlags
-}
-
-const AGENT_RUNTIME_PROFILES: Record<
-  AgentRuntimeProfileId,
-  AgentRuntimeProfile
-> = {
-  chat_default: {
-    id: "chat_default",
-    toolMaxSteps: AGENT_TOOL_MAX_STEPS,
-  },
-  deep_research: {
-    id: "deep_research",
-    toolMaxSteps: AGENT_RESEARCH_TOOL_MAX_STEPS,
-  },
 }
 
 const FINAL_SYNTHESIS_STEP_INSTRUCTION = [
@@ -112,12 +84,6 @@ const EMPTY_RESPONSE_SYNTHESIS_FALLBACK_SYSTEM = [
   "If the evidence is incomplete or contradictory, write what you found, name the gap, and end with a clear summary.",
   "An empty response is not acceptable.",
 ].join(" ")
-
-function resolveAgentRuntimeProfile(
-  id: AgentRuntimeProfileId | undefined
-): AgentRuntimeProfile {
-  return AGENT_RUNTIME_PROFILES[id ?? "chat_default"]
-}
 
 // When the main stream finishes mid-tool-call (e.g. abort or provider hiccup),
 // response.messages can include assistant tool-call parts that never received
@@ -245,7 +211,6 @@ export async function* startAgentRuntimeStream(
     return
   }
 
-  const runtimeProfile = resolveAgentRuntimeProfile(params.runtimeProfile)
   const normalizedTavilyApiKey = params.tavilyApiKey?.trim()
 
   const seenToolCalls = new Set<string>()
@@ -278,7 +243,6 @@ export async function* startAgentRuntimeStream(
   logger.info("Starting agent runtime stream.", {
     requestId: params.requestId,
     model: params.model,
-    runtimeProfile: runtimeProfile.id,
     toolCount: toolNames.length,
     toolNames,
   })
@@ -292,14 +256,10 @@ export async function* startAgentRuntimeStream(
     ...(params.temperature !== undefined
       ? { temperature: params.temperature }
       : {}),
-    providerOptions: params.taskMode
-      ? getAiSdkGatewayProviderOptionsForTaskMode({
-          provider: resolvePromptProvider(params.model),
-          taskMode: params.taskMode,
-        })
-      : getAiSdkGatewayProviderOptionsForMode({
-          deepResearch: runtimeProfile.id === "deep_research",
-        }),
+    providerOptions: getAiSdkGatewayProviderOptionsForTaskMode({
+      provider: resolvePromptProvider(params.model),
+      taskMode: params.taskMode,
+    }),
     experimental_telemetry: {
       isEnabled: true,
       recordInputs: featureFlags.telemetryRecordIo,
@@ -308,7 +268,6 @@ export async function* startAgentRuntimeStream(
       metadata: {
         requestId: params.requestId ?? "",
         modelId: params.model,
-        runtimeProfile: runtimeProfile.id,
         toolNames: toolNames.join(","),
         userHash: userId ? hashUserId(userId) : "",
       },
@@ -317,7 +276,7 @@ export async function* startAgentRuntimeStream(
     prepareStep: ({ stepNumber }) => {
       const forceFinalSynthesis = shouldForceFinalSynthesisStep(
         stepNumber,
-        runtimeProfile.toolMaxSteps
+        AGENT_TOOL_MAX_STEPS
       )
       if (forceFinalSynthesis) {
         return {
@@ -326,9 +285,7 @@ export async function* startAgentRuntimeStream(
         }
       }
 
-      if (
-        shouldNudgeMidBudgetSynthesis(stepNumber, runtimeProfile.toolMaxSteps)
-      ) {
+      if (shouldNudgeMidBudgetSynthesis(stepNumber, AGENT_TOOL_MAX_STEPS)) {
         return {
           system: `${systemInstruction}\n\n${MID_BUDGET_SYNTHESIS_REMINDER}`,
         }
@@ -336,7 +293,7 @@ export async function* startAgentRuntimeStream(
 
       return undefined
     },
-    stopWhen: stepCountIs(runtimeProfile.toolMaxSteps),
+    stopWhen: stepCountIs(AGENT_TOOL_MAX_STEPS),
   })
 
   let hasEmittedText = false
@@ -346,7 +303,6 @@ export async function* startAgentRuntimeStream(
       logger.info("Agent runtime model step finished.", {
         requestId: params.requestId,
         model: params.model,
-        runtimeProfile: runtimeProfile.id,
         finishReason: part.finishReason,
         rawFinishReason: part.rawFinishReason,
         ...getUsageLogFields(part.usage),
@@ -358,7 +314,6 @@ export async function* startAgentRuntimeStream(
       logger.info("Agent runtime stream finished.", {
         requestId: params.requestId,
         model: params.model,
-        runtimeProfile: runtimeProfile.id,
         finishReason: part.finishReason,
         rawFinishReason: part.rawFinishReason,
         ...getUsageLogFields(part.totalUsage),
@@ -370,7 +325,6 @@ export async function* startAgentRuntimeStream(
       logger.warn("Agent runtime stream aborted.", {
         requestId: params.requestId,
         model: params.model,
-        runtimeProfile: runtimeProfile.id,
         reason: part.reason,
       })
       continue
@@ -533,7 +487,6 @@ export async function* startAgentRuntimeStream(
       logger.warn("Main stream emitted no text; running synthesis fallback.", {
         requestId: params.requestId,
         model: params.model,
-        runtimeProfile: runtimeProfile.id,
         responseMessageCount: responseMessages.length,
         sanitizedToolStubCount:
           responseMessages.length - rawResponseMessages.length,
@@ -555,14 +508,10 @@ export async function* startAgentRuntimeStream(
         ...(params.temperature !== undefined
           ? { temperature: params.temperature }
           : {}),
-        providerOptions: params.taskMode
-          ? getAiSdkGatewayProviderOptionsForTaskMode({
-              provider: resolvePromptProvider(params.model),
-              taskMode: params.taskMode,
-            })
-          : getAiSdkGatewayProviderOptionsForMode({
-              deepResearch: runtimeProfile.id === "deep_research",
-            }),
+        providerOptions: getAiSdkGatewayProviderOptionsForTaskMode({
+          provider: resolvePromptProvider(params.model),
+          taskMode: params.taskMode,
+        }),
         tools,
         toolChoice: "none" as const,
         stopWhen: stepCountIs(1),
@@ -580,7 +529,6 @@ export async function* startAgentRuntimeStream(
           logger.info("Synthesis fallback stream finished.", {
             requestId: params.requestId,
             model: params.model,
-            runtimeProfile: runtimeProfile.id,
             finishReason: part.finishReason,
             fallbackEmittedText,
             ...getUsageLogFields(part.totalUsage),
@@ -592,7 +540,6 @@ export async function* startAgentRuntimeStream(
           logger.warn("Synthesis fallback stream emitted an error event.", {
             requestId: params.requestId,
             model: params.model,
-            runtimeProfile: runtimeProfile.id,
             error: streamError,
           })
         }
@@ -602,7 +549,6 @@ export async function* startAgentRuntimeStream(
         logger.warn("Synthesis fallback completed without emitting text.", {
           requestId: params.requestId,
           model: params.model,
-          runtimeProfile: runtimeProfile.id,
           responseMessageCount: responseMessages.length,
         })
       }
@@ -610,7 +556,6 @@ export async function* startAgentRuntimeStream(
       logger.warn("Synthesis fallback failed; yielding nothing.", {
         requestId: params.requestId,
         model: params.model,
-        runtimeProfile: runtimeProfile.id,
         error: fallbackError,
       })
     }

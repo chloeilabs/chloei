@@ -3,11 +3,7 @@ import { randomUUID } from "node:crypto"
 import type { GatewayProviderOptions } from "@ai-sdk/gateway"
 import { z } from "zod"
 
-import {
-  type AgentRunMode,
-  type FollowUpQuestion,
-  type ModelType,
-} from "@/lib/shared"
+import { type FollowUpQuestion, type ModelType } from "@/lib/shared"
 import {
   AGENT_REQUEST_MAX_MESSAGE_CHARS,
   AGENT_REQUEST_MAX_MESSAGES,
@@ -72,7 +68,6 @@ const followUpContextMessageSchema = z
 export const followUpRequestSchema = z
   .object({
     model: z.string().trim().min(1).max(200),
-    runMode: z.enum(["chat", "research"]).optional(),
     threadId: z.string().trim().min(1).max(200).optional(),
     assistantMessageId: z.string().trim().min(1).max(200).optional(),
     messages: z
@@ -169,7 +164,6 @@ export async function generateFollowUpQuestions(params: {
   aiGatewayApiKey: string
   messages: readonly FollowUpContextMessage[]
   model: ModelType
-  runMode?: AgentRunMode
   signal?: AbortSignal
   userId: string
 }): Promise<FollowUpQuestion[]> {
@@ -192,7 +186,6 @@ export async function generateFollowUpQuestions(params: {
     prompt: [
       "Generate exactly three follow-up questions for the latest assistant response.",
       'Use this exact JSON shape: {"questions":["...","...","..."]}.',
-      `Conversation mode: ${params.runMode ?? "chat"}.`,
       "Avoid questions the assistant already answered directly.",
       "Conversation:",
       context,
@@ -207,7 +200,6 @@ export async function generateFollowUpQuestions(params: {
           "feature:follow_up_questions",
           `generation_model:${FOLLOW_UP_GENERATION_MODEL}`,
           `source_model:${params.model}`,
-          `run_mode:${params.runMode ?? "chat"}`,
         ],
       } satisfies GatewayProviderOptions,
     },

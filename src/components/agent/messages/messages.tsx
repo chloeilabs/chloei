@@ -4,7 +4,6 @@ import "../shared/shell-styles.css"
 import { memo, useMemo } from "react"
 
 import {
-  type AgentRunMode,
   isAssistantMessage,
   isModelType,
   isUserMessage,
@@ -71,12 +70,10 @@ function MessagesComponent({
     messageId: string
     newContent: string
     newModel: ModelType
-    newRunMode: AgentRunMode
   }) => Promise<void> | void
   onFollowUpQuestionClick?: (params: {
     model: ModelType
     question: string
-    runMode: AgentRunMode
   }) => void
 }) {
   const messageGroups = useMemo(() => groupMessages(messages), [messages])
@@ -133,10 +130,6 @@ function MessagesComponent({
                 const regenerateModel = isModelType(message.llmModel)
                   ? message.llmModel
                   : userMessage?.metadata?.selectedModel
-                const regenerateRunMode =
-                  message.metadata?.runMode ??
-                  userMessage?.metadata?.runMode ??
-                  "chat"
                 const canRegenerate =
                   !disableEditing &&
                   Boolean(userMessage) &&
@@ -149,7 +142,6 @@ function MessagesComponent({
                           messageId: userMessage.id,
                           newContent: userMessage.content,
                           newModel: regenerateModel,
-                          newRunMode: regenerateRunMode,
                         })
                       }
                     : undefined

@@ -123,7 +123,7 @@ test("thread store delegates parsing and persistence shaping to the payload help
   )
 })
 
-test("thread payload preserves valid run modes and drops invalid run modes", () => {
+test("thread payload drops legacy run-mode metadata from stored threads", () => {
   const parsed = parseThreadPayload({
     id: "thread-1",
     model: "google/gemini-3.1-pro-preview",
@@ -139,21 +139,14 @@ test("thread payload preserves valid run modes and drops invalid run modes", () 
           runMode: "research",
         },
       },
-      {
-        id: "message-2",
-        role: "assistant",
-        content: "Done.",
-        llmModel: "google/gemini-3.1-pro-preview",
-        createdAt: "2026-04-26T00:00:01.000Z",
-        metadata: {
-          runMode: "invalid",
-        },
-      },
     ],
     createdAt: "2026-04-26T00:00:00.000Z",
     updatedAt: "2026-04-26T00:00:01.000Z",
   })
 
-  assert.equal(parsed.messages[0]?.metadata?.runMode, "research")
-  assert.equal(parsed.messages[1]?.metadata?.runMode, undefined)
+  assert.equal(
+    parsed.messages[0]?.metadata?.selectedModel,
+    "moonshotai/kimi-k2.6"
+  )
+  assert.equal(parsed.messages[0]?.metadata?.runMode, undefined)
 })

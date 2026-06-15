@@ -31,7 +31,6 @@ import {
   isE2eMockModeEnabled,
 } from "@/lib/server/e2e-test-mode"
 import { resolveAgentFeatureFlags } from "@/lib/server/integration-flags"
-import type { AgentRuntimeProfileId } from "@/lib/server/llm/agent-runtime"
 import {
   evaluateAndConsumeSlidingWindowRateLimit,
   tryAcquireConcurrencySlot,
@@ -41,17 +40,12 @@ import {
   observeRouteResponse,
 } from "@/lib/server/route-observability"
 import { isThreadStoreNotInitializedError } from "@/lib/server/threads"
-import type { AgentRunMode } from "@/lib/shared"
 
 export const runtime = "nodejs"
 export const maxDuration = 800
 
 function resolveRateLimitIdentifier(userId: string): string {
   return `user:${userId}`
-}
-
-function resolveRuntimeProfile(runMode: AgentRunMode): AgentRuntimeProfileId {
-  return runMode === "research" ? "deep_research" : "chat_default"
 }
 
 export async function POST(request: NextRequest) {
@@ -163,11 +157,7 @@ export async function POST(request: NextRequest) {
     const userTimeZone = resolveUserTimeZone(request)
     const featureFlags = await resolveAgentFeatureFlags()
     const promptProvider = resolvePromptProvider(selectedModel)
-    const inferredPromptTaskMode =
-      parsedRequest.runMode === "research"
-        ? "research"
-        : inferPromptTaskMode(parsedRequest.messages)
-    const promptTaskMode = inferredPromptTaskMode
+    const promptTaskMode = inferPromptTaskMode(parsedRequest.messages)
     const systemInstruction = buildAgentSystemInstruction(
       {
         id: session.user.id,
@@ -179,9 +169,6 @@ export async function POST(request: NextRequest) {
         userTimeZone,
         provider: promptProvider,
         taskMode: promptTaskMode,
-        ...(parsedRequest.runMode === "research"
-          ? { deepResearchMode: true }
-          : {}),
       }
     )
 
@@ -253,7 +240,6 @@ export async function POST(request: NextRequest) {
         aiGatewayApiKey,
         tavilyApiKey,
         userTimeZone,
-        runtimeProfile: resolveRuntimeProfile(parsedRequest.runMode),
         taskMode: promptTaskMode,
         userId: session.user.id,
         featureFlags,

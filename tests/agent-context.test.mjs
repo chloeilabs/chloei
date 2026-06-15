@@ -95,15 +95,9 @@ test("valid user time zone is rendered and invalid is dropped", () => {
   assert.ok(!invalidZone.includes("User time zone:"))
 })
 
-test("deep research mode block toggles with the flag", () => {
-  const off = buildAgentSystemInstruction(viewer, baseContext)
-  assert.ok(!off.includes("--- BEGIN DEEP RESEARCH MODE ---"))
-
-  const on = buildAgentSystemInstruction(viewer, {
-    ...baseContext,
-    deepResearchMode: true,
-  })
-  assert.ok(on.includes("--- BEGIN DEEP RESEARCH MODE ---"))
+test("system prompt never includes a deep research block", () => {
+  const instruction = buildAgentSystemInstruction(viewer, baseContext)
+  assert.ok(!instruction.includes("--- BEGIN DEEP RESEARCH MODE ---"))
 })
 
 test("provider and task-mode overlays respect their toggles", () => {

@@ -159,7 +159,6 @@ test("agent helper validates total size, last-message role, and default model su
   })
 
   assert(!(defaultModeResult instanceof Response))
-  assert.equal(defaultModeResult.parsedRequest.runMode, "chat")
   assert.equal(defaultModeResult.selectedModel, "moonshotai/kimi-k2.6")
 
   const defaultModeWithQwenResult = parseAgentStreamRequest({
@@ -181,51 +180,6 @@ test("agent helper validates total size, last-message role, and default model su
 
   assert(!(defaultModeWithQwenResult instanceof Response))
   assert.equal(defaultModeWithQwenResult.selectedModel, "alibaba/qwen3.7-max")
-
-  const researchModeResult = parseAgentStreamRequest({
-    body: {
-      model: "moonshotai/kimi-k2.6",
-      runMode: "research",
-      messages: [
-        {
-          role: "user",
-          content: "Research this with sources.",
-        },
-      ],
-    },
-    availableModels: [
-      { id: "alibaba/qwen3.7-max" },
-      { id: "moonshotai/kimi-k2.6" },
-      { id: "google/gemini-3.1-pro-preview" },
-    ],
-    requestId: "request-research-mode",
-  })
-
-  assert(!(researchModeResult instanceof Response))
-  assert.equal(researchModeResult.parsedRequest.runMode, "research")
-  assert.equal(researchModeResult.selectedModel, "alibaba/qwen3.7-max")
-
-  const unavailableResearchModelResult = parseAgentStreamRequest({
-    body: {
-      runMode: "research",
-      messages: [
-        {
-          role: "user",
-          content: "Research this with sources.",
-        },
-      ],
-    },
-    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
-    requestId: "request-research-unavailable",
-  })
-
-  assert(unavailableResearchModelResult instanceof Response)
-  assert.equal(unavailableResearchModelResult.status, 400)
-  assert.deepEqual(await unavailableResearchModelResult.json(), {
-    error: "Research mode requires Qwen 3.7 Max model access.",
-    errorCode: "AGENT_RESEARCH_MODEL_UNAVAILABLE",
-    requestId: "request-research-unavailable",
-  })
 
   const standaloneResearchModelResult = parseAgentStreamRequest({
     body: {
@@ -252,26 +206,26 @@ test("agent helper validates total size, last-message role, and default model su
     requestId: "request-standalone-research-model",
   })
 
-  const invalidRunModeResult = parseAgentStreamRequest({
+  const unknownFieldResult = parseAgentStreamRequest({
     body: {
-      runMode: "finance",
+      unknownField: "not allowed",
       messages: [
         {
           role: "user",
-          content: "Finance is inferred from this public-markets task.",
+          content: "The strict schema should reject unknown fields.",
         },
       ],
     },
     availableModels: [{ id: "moonshotai/kimi-k2.6" }],
-    requestId: "request-invalid-mode",
+    requestId: "request-unknown-field",
   })
 
-  assert(invalidRunModeResult instanceof Response)
-  assert.equal(invalidRunModeResult.status, 400)
-  assert.deepEqual(await invalidRunModeResult.json(), {
+  assert(unknownFieldResult instanceof Response)
+  assert.equal(unknownFieldResult.status, 400)
+  assert.deepEqual(await unknownFieldResult.json(), {
     error: "Invalid request payload.",
     errorCode: "AGENT_INVALID_REQUEST",
-    requestId: "request-invalid-mode",
+    requestId: "request-unknown-field",
   })
 
   const tooManyMessagesResult = parseAgentStreamRequest({
@@ -391,7 +345,6 @@ test("agent helper streams fallback output when the model yields no content", as
     requestId: "request-1",
     timeoutMs: 30_000,
     selectedModel: "moonshotai/kimi-k2.6",
-    runMode: "chat",
     aiGatewayApiKey: "ai-gateway-key",
     tavilyApiKey: "tavily-key",
     messages: [{ role: "user", content: "Hello" }],
@@ -446,7 +399,6 @@ test("agent helper marks tool-backed partial output incomplete when a tool call 
     requestId: "request-unresolved-tool",
     timeoutMs: 30_000,
     selectedModel: "moonshotai/kimi-k2.6",
-    runMode: "chat",
     aiGatewayApiKey: "ai-gateway-key",
     tavilyApiKey: "tavily-key",
     messages: [{ role: "user", content: "Search latest docs" }],
@@ -502,7 +454,6 @@ test("agent helper does not add an incomplete fallback when a meaningful answer 
     requestId: "request-tool-error",
     timeoutMs: 30_000,
     selectedModel: "moonshotai/kimi-k2.6",
-    runMode: "chat",
     aiGatewayApiKey: "ai-gateway-key",
     tavilyApiKey: "tavily-key",
     messages: [{ role: "user", content: "Search latest docs" }],
@@ -550,7 +501,6 @@ test("agent helper turns upstream body timeouts into visible timeout output", as
     requestId: "request-body-timeout",
     timeoutMs: 30_000,
     selectedModel: "moonshotai/kimi-k2.6",
-    runMode: "chat",
     aiGatewayApiKey: "ai-gateway-key",
     messages: [{ role: "user", content: "Latest AI news" }],
     systemInstruction: "system",
@@ -579,29 +529,6 @@ test("agent helper turns upstream body timeouts into visible timeout output", as
   assert.equal(recorded.loggerInfos[0]?.details?.outcome, "timeout")
 })
 
-test("agent helper forwards the deep research runtime profile", async () => {
-  const response = createAgentStreamResponse({
-    request: createRequest(),
-    requestId: "request-research",
-    timeoutMs: 30_000,
-    selectedModel: "alibaba/qwen3.7-max",
-    runMode: "research",
-    aiGatewayApiKey: "ai-gateway-key",
-    runtimeProfile: "deep_research",
-    messages: [{ role: "user", content: "Research with sources" }],
-    systemInstruction: "system",
-  })
-
-  await readNdjsonEvents(response)
-
-  assert.equal(
-    response.headers.get("X-Agent-Effective-Model"),
-    "alibaba/qwen3.7-max"
-  )
-  assert.equal(recorded.streamParams[0]?.model, "alibaba/qwen3.7-max")
-  assert.equal(recorded.streamParams[0]?.runtimeProfile, "deep_research")
-})
-
 test("agent helper returns an auth-key fallback when provider auth fails", async () => {
   setTestMocks({
     gatewayResponses: {
@@ -620,7 +547,6 @@ test("agent helper returns an auth-key fallback when provider auth fails", async
     requestId: "request-2",
     timeoutMs: 30_000,
     selectedModel: "moonshotai/kimi-k2.6",
-    runMode: "chat",
     aiGatewayApiKey: "ai-gateway-key",
     messages: [{ role: "user", content: "Hello" }],
     systemInstruction: "system",

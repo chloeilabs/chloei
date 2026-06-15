@@ -128,7 +128,6 @@ test("follow-up generation uses GPT-5.1 Instant and tags the source model", asyn
       },
     ],
     model: "moonshotai/kimi-k2.6",
-    runMode: "chat",
     userId: "user-1",
   })
 
@@ -137,7 +136,6 @@ test("follow-up generation uses GPT-5.1 Instant and tags the source model", asyn
     "feature:follow_up_questions",
     "generation_model:openai/gpt-5.1-instant",
     "source_model:moonshotai/kimi-k2.6",
-    "run_mode:chat",
   ])
   assert.equal(followUps.length, 3)
 })

@@ -1,6 +1,5 @@
 import {
   type AuthViewer,
-  DEEP_RESEARCH_SYSTEM_INSTRUCTION,
   DEFAULT_OPERATING_INSTRUCTION,
   DEFAULT_SOUL_FALLBACK_INSTRUCTION,
 } from "@/lib/shared"
@@ -14,7 +13,6 @@ import {
 interface RuntimePromptContext {
   now: Date
   userTimeZone?: string
-  deepResearchMode?: boolean
   provider?: PromptProvider
   taskMode?: PromptTaskMode
 }
@@ -125,12 +123,6 @@ function composeSystemInstruction(params: {
 
   for (const block of promptSteeringBlocks) {
     blocks.push(formatPromptBlock(block.label, block.body))
-  }
-
-  if (params.runtimeContext.deepResearchMode) {
-    blocks.push(
-      formatPromptBlock("DEEP RESEARCH MODE", DEEP_RESEARCH_SYSTEM_INSTRUCTION)
-    )
   }
 
   blocks.push(

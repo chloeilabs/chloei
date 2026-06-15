@@ -13,7 +13,6 @@ import { useMemo, useState } from "react"
 import { LogoHover } from "@/components/graphics/logo/logo-hover"
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard"
 import {
-  type AgentRunMode,
   type FollowUpQuestion,
   isModelType,
   type Message,
@@ -190,7 +189,6 @@ export function AssistantMessage({
   onFollowUpQuestionClick?: (params: {
     model: ModelType
     question: string
-    runMode: AgentRunMode
   }) => void
   onRegenerate?: () => void
 }) {
@@ -227,7 +225,6 @@ export function AssistantMessage({
   const followUpModel = isModelType(message.llmModel)
     ? message.llmModel
     : message.metadata?.selectedModel
-  const followUpRunMode = message.metadata?.runMode ?? "chat"
   const followUpQuestions = isAssistantStreaming
     ? []
     : (message.metadata?.followUpQuestions ?? []).filter(
@@ -409,7 +406,6 @@ export function AssistantMessage({
                   onFollowUpQuestionClick({
                     model: followUpModel,
                     question,
-                    runMode: followUpRunMode,
                   })
                 }}
               />

@@ -1,5 +1,4 @@
 import {
-  type AgentRunMode,
   type FollowUpQuestion,
   type Message as AgentMessage,
   type ModelType,
@@ -31,14 +30,12 @@ export function createAssistantMessageFromAccumulator({
   createdAt,
   accumulator,
   model,
-  runMode,
   isStreaming,
 }: {
   id: string
   createdAt: string
   accumulator: AgentStreamAccumulator
   model: ModelType
-  runMode: AgentRunMode
   isStreaming: boolean
 }): AgentMessage {
   return {
@@ -49,7 +46,6 @@ export function createAssistantMessageFromAccumulator({
     createdAt,
     metadata: {
       isStreaming,
-      runMode,
       parts: [{ type: "text", text: accumulator.content }],
       ...(accumulator.agentStatus
         ? { agentStatus: accumulator.agentStatus }

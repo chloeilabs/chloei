@@ -47,12 +47,6 @@ test("shared model registry includes the curated gateway models", async () => {
   )
 
   assert.match(
-    source,
-    /RESEARCH_MODEL = AvailableModels\.ALIBABA_QWEN3_7_MAX/,
-    "Expected Research mode to use Qwen 3.7 Max."
-  )
-
-  assert.match(
     source.replace(/\s+/g, " "),
     /MODEL_SELECTOR_MODELS = \[ AvailableModels\.ALIBABA_QWEN3_7_MAX, AvailableModels\.MOONSHOTAI_KIMI_K2_6, AvailableModels\.XIAOMI_MIMO_V2_5_PRO, \] as const/,
     "Expected the chat model selector to default to Qwen 3.7 Max before Kimi K2.6 and MiMo V2.5 Pro."

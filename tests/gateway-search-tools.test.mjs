@@ -7,9 +7,6 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import "./register-ts-path-hooks.mjs"
 
 const cwd = fileURLToPath(new URL("..", import.meta.url))
-const gatewayProviderOptionsUrl = pathToFileURL(
-  path.join(cwd, "src/lib/server/llm/ai-sdk-gateway-provider-options.ts")
-).href
 const tavilyToolsPath = path.join(
   cwd,
   "src/lib/server/llm/ai-sdk-tavily-tools.ts"
@@ -18,10 +15,6 @@ const persistentSelectedModelUrl = pathToFileURL(
   path.join(cwd, "src/hooks/agent/persistent-selected-model-utils.ts")
 ).href
 
-const {
-  getAiSdkGatewayProviderOptions,
-  getAiSdkGatewayProviderOptionsForMode,
-} = await import(gatewayProviderOptionsUrl)
 const {
   parseStoredSelectedModel,
   resolvePersistedSelectedModel,
@@ -40,25 +33,6 @@ test("tavily search tool results derive source links", async () => {
     source,
     /id: `\$\{toolName\}-\$\{requestId\}-\$\{String\(index\)\}`/,
     "Expected Tavily source ids to be stable per tool call and result index."
-  )
-})
-
-test("legacy deep-research provider options preserve Gemini high thinking", () => {
-  assert.deepEqual(getAiSdkGatewayProviderOptions(), {})
-  assert.deepEqual(
-    getAiSdkGatewayProviderOptionsForMode({ deepResearch: false }),
-    {}
-  )
-  assert.deepEqual(
-    getAiSdkGatewayProviderOptionsForMode({ deepResearch: true }),
-    {
-      google: {
-        thinkingConfig: {
-          thinkingLevel: "high",
-          includeThoughts: true,
-        },
-      },
-    }
   )
 })
 
