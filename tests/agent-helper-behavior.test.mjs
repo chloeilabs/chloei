@@ -173,7 +173,6 @@ test("agent helper validates total size, last-message role, and default model su
     availableModels: [
       { id: "alibaba/qwen3.7-max" },
       { id: "moonshotai/kimi-k2.6" },
-      { id: "xiaomi/mimo-v2.5-pro" },
     ],
     requestId: "request-default-mode-qwen",
   })
@@ -181,29 +180,26 @@ test("agent helper validates total size, last-message role, and default model su
   assert(!(defaultModeWithQwenResult instanceof Response))
   assert.equal(defaultModeWithQwenResult.selectedModel, "alibaba/qwen3.7-max")
 
-  const standaloneResearchModelResult = parseAgentStreamRequest({
+  const unavailableModelResult = parseAgentStreamRequest({
     body: {
-      model: "google/gemini-3.1-pro-preview",
+      model: "alibaba/qwen3.7-max",
       messages: [
         {
           role: "user",
-          content: "Use Gemini as a normal chat model.",
+          content: "Use a model the caller cannot access.",
         },
       ],
     },
-    availableModels: [
-      { id: "moonshotai/kimi-k2.6" },
-      { id: "google/gemini-3.1-pro-preview" },
-    ],
-    requestId: "request-standalone-research-model",
+    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
+    requestId: "request-unavailable-model",
   })
 
-  assert(standaloneResearchModelResult instanceof Response)
-  assert.equal(standaloneResearchModelResult.status, 400)
-  assert.deepEqual(await standaloneResearchModelResult.json(), {
+  assert(unavailableModelResult instanceof Response)
+  assert.equal(unavailableModelResult.status, 400)
+  assert.deepEqual(await unavailableModelResult.json(), {
     error: "Unsupported model selected.",
     errorCode: "AGENT_UNSUPPORTED_MODEL",
-    requestId: "request-standalone-research-model",
+    requestId: "request-unavailable-model",
   })
 
   const unknownFieldResult = parseAgentStreamRequest({

@@ -182,20 +182,8 @@ test("inferPromptTaskMode userExpertise=writing routes ambiguous prompts to writ
 })
 
 test("provider overlays are differentiated across providers", () => {
-  const google = createPromptSteeringBlocks({
-    provider: "google",
-    taskMode: "research",
-  })
-    .map((block) => block.body)
-    .join("\n\n")
   const moonshot = createPromptSteeringBlocks({
     provider: "moonshotai",
-    taskMode: "research",
-  })
-    .map((block) => block.body)
-    .join("\n\n")
-  const xiaomi = createPromptSteeringBlocks({
-    provider: "xiaomi",
     taskMode: "research",
   })
     .map((block) => block.body)
@@ -207,26 +195,25 @@ test("provider overlays are differentiated across providers", () => {
     .map((block) => block.body)
     .join("\n\n")
 
-  assert.match(google, /thinking budget/i)
+  assert.match(moonshot, /Use Kimi reasoning mode/i)
   assert.match(moonshot, /long context/i)
-  assert.match(xiaomi, /streaming latency/i)
-  assert.match(alibaba, /Qwen reasoning mode/i)
+  assert.match(alibaba, /Use Qwen reasoning mode/i)
   assert.notEqual(
-    google.split("Use Gemini")[1],
-    moonshot.split("Use Kimi")[1],
-    "Gemini and Kimi overlays should not be byte-identical."
+    alibaba,
+    moonshot,
+    "Qwen and Kimi overlays should not be byte-identical."
   )
 })
 
 test("debugging and writing overlays appear when their task modes are selected", () => {
   const debugging = createPromptSteeringBlocks({
-    provider: "google",
+    provider: "moonshotai",
     taskMode: "debugging",
   })
     .map((block) => block.body)
     .join("\n\n")
   const writing = createPromptSteeringBlocks({
-    provider: "google",
+    provider: "moonshotai",
     taskMode: "writing",
   })
     .map((block) => block.body)

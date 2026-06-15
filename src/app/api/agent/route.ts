@@ -240,7 +240,6 @@ export async function POST(request: NextRequest) {
         aiGatewayApiKey,
         tavilyApiKey,
         userTimeZone,
-        taskMode: promptTaskMode,
         userId: session.user.id,
         featureFlags,
         messages: parsedRequest.messages,

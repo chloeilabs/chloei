@@ -71,10 +71,6 @@ test("stale and fallback-only model ids fall back to Qwen 3.7 Max", () => {
           name: "Qwen 3.7 Max",
         },
         {
-          id: "google/gemini-3.1-pro-preview",
-          name: "Gemini 3.1 Pro Preview",
-        },
-        {
           id: "moonshotai/kimi-k2.6",
           name: "Kimi K2.6",
         },

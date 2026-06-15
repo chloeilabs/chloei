@@ -112,7 +112,7 @@ test("agent system prompt places the identity block after task steering", () => 
     },
     {
       now: new Date("2026-05-03T12:34:56.000Z"),
-      provider: "google",
+      provider: "moonshotai",
       taskMode: "coding",
     }
   )

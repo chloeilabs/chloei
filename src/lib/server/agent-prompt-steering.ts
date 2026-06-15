@@ -7,7 +7,7 @@ import {
   type PromptTextMessage,
 } from "./prompt-message-utils"
 
-export type PromptProvider = "alibaba" | "google" | "moonshotai" | "xiaomi"
+export type PromptProvider = "alibaba" | "moonshotai"
 
 export type PromptTaskMode =
   | "general"
@@ -65,25 +65,9 @@ Use Qwen reasoning mode efficiently.
 - Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
 - After tool use, synthesize the result and stop. Do not replay raw tool traces.
 `.trim(),
-  google: `
-Use Gemini reasoning mode efficiently.
-- Spend the thinking budget on the parts of the task that are actually uncertain; do not narrate planning that adds no information.
-- Prefer direct execution and verification over speculative narration.
-- On format-sensitive tasks, do a literal final-format check before finishing.
-- Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
-- After tool use, synthesize the result and stop. Do not replay raw tool traces.
-`.trim(),
   moonshotai: `
 Use Kimi reasoning mode efficiently.
 - Take advantage of the long context window: skim and cite earlier turns before re-asking the user for information already present.
-- Prefer direct execution and verification over speculative narration.
-- On format-sensitive tasks, do a literal final-format check before finishing.
-- Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
-- After tool use, synthesize the result and stop. Do not replay raw tool traces.
-`.trim(),
-  xiaomi: `
-Use MiMo reasoning mode efficiently.
-- Optimize for streaming latency: start producing the user-facing answer as soon as you have a defensible thread; refine in-line.
 - Prefer direct execution and verification over speculative narration.
 - On format-sensitive tasks, do a literal final-format check before finishing.
 - Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
@@ -157,16 +141,8 @@ export function resolvePromptProvider(model: ModelType): PromptProvider {
     return "alibaba"
   }
 
-  if (model.startsWith("google/")) {
-    return "google"
-  }
-
   if (model.startsWith("moonshotai/")) {
     return "moonshotai"
-  }
-
-  if (model.startsWith("xiaomi/")) {
-    return "xiaomi"
   }
 
   throw new Error(`Unsupported model provider for model: ${model}`)

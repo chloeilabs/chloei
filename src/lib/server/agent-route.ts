@@ -15,7 +15,6 @@ import {
   resolveDefaultModelSelectorModel,
 } from "@/lib/shared"
 
-import type { PromptTaskMode } from "./agent-prompt-steering"
 import {
   AGENT_MAX_MESSAGE_CHARS,
   AGENT_MAX_MESSAGES,
@@ -102,7 +101,6 @@ interface CreateAgentStreamResponseParams {
   aiGatewayApiKey: string
   tavilyApiKey?: string
   userTimeZone?: string
-  taskMode: PromptTaskMode
   userId?: string
   featureFlags?: AgentFeatureFlags
   messages: AgentStreamRequest["messages"]
@@ -517,7 +515,6 @@ export function createAgentStreamResponse(
           aiGatewayApiKey: params.aiGatewayApiKey,
           tavilyApiKey: params.tavilyApiKey,
           userTimeZone: params.userTimeZone,
-          taskMode: params.taskMode,
           userId: params.userId,
           featureFlags: params.featureFlags,
           messages: params.messages,
