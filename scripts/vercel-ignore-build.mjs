@@ -2,17 +2,10 @@
 
 import { execFileSync } from "node:child_process"
 
-const explicitSkipFiles = new Set([
-  "README.md",
-  "AGENTS.md",
-  "CLAUDE.md",
-  "skills-lock.json",
-])
+const explicitSkipFiles = new Set(["README.md", "CLAUDE.md"])
 
 const skipPrefixes = [
-  ".agents/",
   ".claude/",
-  ".cursor/",
   ".github/",
   "dist/",
   "docs/",

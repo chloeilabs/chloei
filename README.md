@@ -5,7 +5,6 @@ Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently expose
 ## Documentation
 
 - **[CLAUDE.md](CLAUDE.md)** — architecture reference and conventions (request flow, agent runtime, tools, storage, auth, env vars). The best starting point for understanding the codebase; also read by Claude Code.
-- **[AGENTS.md](AGENTS.md)** — environment setup for coding agents (Cursor Cloud specifics, build/test commands, gotchas).
 - **[docs/vercel-production-launch-readiness.md](docs/vercel-production-launch-readiness.md)** — production launch checklist (security, reliability, performance, rollback).
 - **[docs/managed-integrations-rollout.md](docs/managed-integrations-rollout.md)** — managed-integration rollout/rollback runbook (Neon, feature flags).
 
@@ -21,7 +20,7 @@ Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently expose
 pnpm install
 cp .env.example .env.local
 # Fill DATABASE_URL, BETTER_AUTH_SECRET, BETTER_AUTH_URL, and AI_GATEWAY_API_KEY.
-# Cursor Cloud sets up native PostgreSQL; local machines must start PostgreSQL first.
+# Start PostgreSQL locally before running migrate.
 pnpm migrate
 pnpm dev
 ```

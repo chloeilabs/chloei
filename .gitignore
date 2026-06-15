@@ -44,7 +44,3 @@ npm-debug.log*
 # Claude local session state
 .claude/scheduled_tasks.lock
 .claude/settings.local.json
-
-# Codex local skills
-.agents/
-skills-lock.json
