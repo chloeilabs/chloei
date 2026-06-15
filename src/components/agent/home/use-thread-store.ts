@@ -17,8 +17,6 @@ import {
   type ThreadSummary,
 } from "@/lib/shared"
 
-import { deleteThreadAttachments } from "./agent-attachment-store"
-
 const THREAD_SYNC_DEBOUNCE_MS = 800
 const THREAD_SYNC_RETRY_MS = 3_000
 const THREAD_SYNC_ERROR_TOAST_ID = "thread-sync-error"
@@ -503,7 +501,6 @@ export function useThreadStore(initialThreadSummaries: ThreadSummary[] = []) {
             )
           }
 
-          void deleteThreadAttachments(id)
           toast.dismiss(THREAD_DELETE_ERROR_TOAST_ID)
         } catch (error) {
           if (isAbortError(error)) {

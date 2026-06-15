@@ -1,5 +1,3 @@
-import { Buffer } from "node:buffer"
-
 import { type NextRequest } from "next/server"
 import { z } from "zod"
 
@@ -9,19 +7,10 @@ import { createLogger } from "@/lib/logger"
 import { resolveRequestIdFromHeaders } from "@/lib/request-id"
 import type { AgentFeatureFlags } from "@/lib/server/integration-flags"
 import {
-  AGENT_ATTACHMENT_MAX_DATA_URL_CHARS,
-  AGENT_ATTACHMENT_MAX_FILE_BYTES,
-  AGENT_ATTACHMENT_MAX_FILES,
-  AGENT_ATTACHMENT_MAX_PREVIEW_DATA_URL_CHARS,
-  AGENT_ATTACHMENT_MAX_TOTAL_BYTES,
-  AGENT_ATTACHMENT_MIME_TYPES,
-  AGENT_IMAGE_DETAIL_VALUES,
   AGENT_RUN_MODES,
   type AgentRunMode,
   type AgentStreamEvent,
   ALL_MODELS,
-  getAgentAttachmentKind,
-  getDataUrlMediaType,
   MODEL_SELECTOR_MODELS,
   type ModelInfo,
   type ModelType,
@@ -51,9 +40,6 @@ const TOOL_OUTPUT_ONLY_FALLBACK_TEXT =
 const TOOL_CALL_INCOMPLETE_FALLBACK_TEXT =
   "A tool request started, but no tool result was returned before the model stopped. Please retry or narrow the request."
 
-const DATA_URL_BASE64_PREFIX_PATTERN = /^data:([^;,]+);base64,/i
-const BASE64_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/
-const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/i
 const TIMEOUT_ERROR_CODES = new Set([
   "UND_ERR_BODY_TIMEOUT",
   "UND_ERR_CONNECT_TIMEOUT",
@@ -67,40 +53,10 @@ const TIMEOUT_ERROR_NAMES = new Set([
   "TimeoutError",
 ])
 
-const agentAttachmentSchema = z
-  .object({
-    id: z.string().trim().min(1).max(200),
-    kind: z.enum(["image", "pdf"]),
-    filename: z.string().trim().min(1).max(500),
-    mediaType: z.enum(AGENT_ATTACHMENT_MIME_TYPES),
-    sizeBytes: z.number().int().positive().max(AGENT_ATTACHMENT_MAX_FILE_BYTES),
-    detail: z.enum(AGENT_IMAGE_DETAIL_VALUES).optional(),
-    previewDataUrl: z
-      .string()
-      .trim()
-      .min(1)
-      .max(AGENT_ATTACHMENT_MAX_PREVIEW_DATA_URL_CHARS)
-      .refine(isValidAttachmentPreviewDataUrl, {
-        message: "Attachment preview must be a supported image data URL.",
-      })
-      .optional(),
-    dataUrl: z
-      .string()
-      .trim()
-      .min(1)
-      .max(AGENT_ATTACHMENT_MAX_DATA_URL_CHARS)
-      .optional(),
-    blobPathname: z.string().trim().min(1).max(800).optional(),
-    sha256: z.string().trim().regex(SHA256_HEX_PATTERN).optional(),
-    downloadUrl: z.string().trim().min(1).max(2048).optional(),
-  })
-  .strict()
-
 const agentMessageSchema = z
   .object({
     role: z.enum(["user", "assistant"]),
     content: z.string().trim().min(1),
-    attachments: z.array(agentAttachmentSchema).optional(),
   })
   .strict()
 
@@ -314,219 +270,6 @@ function getTotalMessageChars(
   return messages.reduce((total, message) => total + message.content.length, 0)
 }
 
-function getMessageAttachments(messages: AgentStreamRequest["messages"]) {
-  return messages.flatMap((message) => message.attachments ?? [])
-}
-
-function getTotalAttachmentBytes(
-  attachments: readonly { sizeBytes: number }[]
-): number {
-  return attachments.reduce(
-    (total, attachment) => total + attachment.sizeBytes,
-    0
-  )
-}
-
-function getBase64Payload(dataUrl: string): string | null {
-  const match = DATA_URL_BASE64_PREFIX_PATTERN.exec(dataUrl)
-  if (!match) {
-    return null
-  }
-
-  return dataUrl.slice(match[0].length)
-}
-
-function normalizeBase64Payload(value: string): string | null {
-  const normalized = value.replace(/\s/g, "")
-  if (normalized.length === 0 || normalized.length % 4 !== 0) {
-    return null
-  }
-
-  if (!BASE64_PATTERN.test(normalized)) {
-    return null
-  }
-
-  try {
-    const decoded = Buffer.from(normalized, "base64")
-    return decoded.length > 0 && decoded.toString("base64") === normalized
-      ? normalized
-      : null
-  } catch {
-    return null
-  }
-}
-
-function isValidBase64Payload(value: string): boolean {
-  return normalizeBase64Payload(value) !== null
-}
-
-function isValidBlobPathname(value: string): boolean {
-  const normalized = value.trim().replaceAll("\\", "/")
-  if (
-    !normalized ||
-    normalized.startsWith("/") ||
-    normalized.startsWith("~/") ||
-    normalized.includes("\0") ||
-    /^[A-Za-z]:\//.test(normalized)
-  ) {
-    return false
-  }
-
-  return normalized
-    .split("/")
-    .every((segment) => segment && segment !== "." && segment !== "..")
-}
-
-function isValidAttachmentPreviewDataUrl(dataUrl: string): boolean {
-  const mediaType = getDataUrlMediaType(dataUrl)
-  if (!mediaType) {
-    return false
-  }
-
-  try {
-    if (getAgentAttachmentKind(mediaType) !== "image") {
-      return false
-    }
-  } catch {
-    return false
-  }
-
-  const base64Payload = getBase64Payload(dataUrl)
-  return Boolean(base64Payload && normalizeBase64Payload(base64Payload))
-}
-
-function createAttachmentValidationError(params: {
-  requestId: string
-  rateLimitDecision?: AgentRateLimitDecision
-}) {
-  return createJsonErrorResponse({
-    requestId: params.requestId,
-    error: "Invalid file attachment payload.",
-    errorCode: "AGENT_ATTACHMENT_INVALID",
-    status: 400,
-    rateLimitDecision: params.rateLimitDecision,
-  })
-}
-
-function validateAgentRequestAttachments(
-  params: Pick<
-    ParseAgentStreamRequestParams,
-    "requestId" | "rateLimitDecision"
-  > & {
-    messages: AgentStreamRequest["messages"]
-  }
-): Response | null {
-  const attachments = getMessageAttachments(params.messages)
-  if (attachments.length === 0) {
-    return null
-  }
-
-  for (const message of params.messages) {
-    const messageAttachments = message.attachments ?? []
-
-    if (messageAttachments.length > 0 && message.role !== "user") {
-      return createJsonErrorResponse({
-        requestId: params.requestId,
-        error: "Only user messages can include file attachments.",
-        errorCode: "AGENT_ATTACHMENT_ROLE_INVALID",
-        status: 400,
-        rateLimitDecision: params.rateLimitDecision,
-      })
-    }
-
-    if (
-      message.role === "user" &&
-      messageAttachments.length > AGENT_ATTACHMENT_MAX_FILES
-    ) {
-      return createJsonErrorResponse({
-        requestId: params.requestId,
-        error: "Too many file attachments.",
-        errorCode: "AGENT_TOO_MANY_ATTACHMENTS",
-        status: 400,
-        rateLimitDecision: params.rateLimitDecision,
-      })
-    }
-
-    if (
-      message.role === "user" &&
-      getTotalAttachmentBytes(messageAttachments) >
-        AGENT_ATTACHMENT_MAX_TOTAL_BYTES
-    ) {
-      return createJsonErrorResponse({
-        requestId: params.requestId,
-        error: "Attached files are too large.",
-        errorCode: "AGENT_ATTACHMENTS_TOO_LARGE",
-        status: 413,
-        rateLimitDecision: params.rateLimitDecision,
-      })
-    }
-  }
-
-  for (const message of params.messages) {
-    for (const attachment of message.attachments ?? []) {
-      if (attachment.kind !== getAgentAttachmentKind(attachment.mediaType)) {
-        return createAttachmentValidationError(params)
-      }
-
-      if (attachment.kind !== "image" && attachment.detail) {
-        return createAttachmentValidationError(params)
-      }
-
-      if (
-        attachment.previewDataUrl &&
-        (attachment.kind !== "image" ||
-          !isValidAttachmentPreviewDataUrl(attachment.previewDataUrl))
-      ) {
-        return createAttachmentValidationError(params)
-      }
-
-      const hasInlinePayload = Boolean(attachment.dataUrl)
-      const hasBlobPathname = Boolean(attachment.blobPathname)
-      const hasBlobSha256 = Boolean(attachment.sha256)
-      const hasBlobPayload = hasBlobPathname && hasBlobSha256
-      if (
-        hasInlinePayload === hasBlobPayload ||
-        hasBlobPathname !== hasBlobSha256
-      ) {
-        return createAttachmentValidationError(params)
-      }
-
-      if (
-        attachment.blobPathname &&
-        !isValidBlobPathname(attachment.blobPathname)
-      ) {
-        return createAttachmentValidationError(params)
-      }
-
-      if (attachment.dataUrl) {
-        if (getDataUrlMediaType(attachment.dataUrl) !== attachment.mediaType) {
-          return createAttachmentValidationError(params)
-        }
-
-        const base64Payload = getBase64Payload(attachment.dataUrl)
-        const normalizedBase64Payload = base64Payload
-          ? normalizeBase64Payload(base64Payload)
-          : null
-        if (
-          !normalizedBase64Payload ||
-          !isValidBase64Payload(normalizedBase64Payload)
-        ) {
-          return createAttachmentValidationError(params)
-        }
-
-        if (
-          Buffer.byteLength(normalizedBase64Payload, "base64") !==
-          attachment.sizeBytes
-        ) {
-          return createAttachmentValidationError(params)
-        }
-      }
-    }
-  }
-
-  return null
-}
-
 function applyRateLimitHeaders(
   headers: Headers,
   rateLimitDecision: AgentRateLimitDecision
@@ -604,15 +347,6 @@ export function parseAgentStreamRequest(
       status: 413,
       rateLimitDecision: params.rateLimitDecision,
     })
-  }
-
-  const attachmentValidationError = validateAgentRequestAttachments({
-    messages: parsed.data.messages,
-    requestId: params.requestId,
-    rateLimitDecision: params.rateLimitDecision,
-  })
-  if (attachmentValidationError) {
-    return attachmentValidationError
   }
 
   const lastMessage = parsed.data.messages[parsed.data.messages.length - 1]

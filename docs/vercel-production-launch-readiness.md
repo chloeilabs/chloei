@@ -97,7 +97,7 @@ Vercel dashboard/CLI checks:
 - A custom WAF rule blocks common scanner paths.
 - Error tracking is via Vercel runtime logs (structured JSON from `src/lib/logger.ts`); there is no Sentry/PostHog/OpenTelemetry integration.
 - No IP blocks are configured yet.
-- Production env has required app secrets, including `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `AI_GATEWAY_API_KEY`, and `BLOB_READ_WRITE_TOKEN`.
+- Production env has required app secrets, including `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, and `AI_GATEWAY_API_KEY`.
 
 WAF follow-up:
 

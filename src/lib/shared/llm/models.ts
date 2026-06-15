@@ -81,29 +81,3 @@ export const ModelInfos: Record<ModelType, ModelInfo> = {
     name: "MiMo V2.5 Pro",
   },
 }
-
-// Native AI SDK attachment parts require Gateway endpoints that accept those
-// part types at runtime; some model tags can appear before that support works.
-const VISION_CAPABLE_MODEL_SET: ReadonlySet<ModelType> = new Set([
-  AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW,
-  AvailableModels.MOONSHOTAI_KIMI_K2_6,
-])
-
-export function modelSupportsImageInput(model: ModelType): boolean {
-  return VISION_CAPABLE_MODEL_SET.has(model)
-}
-
-const FILE_INPUT_CAPABLE_MODEL_SET: ReadonlySet<ModelType> = new Set([
-  AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW,
-  AvailableModels.MOONSHOTAI_KIMI_K2_6,
-])
-
-export function modelSupportsFileInput(model: ModelType): boolean {
-  return FILE_INPUT_CAPABLE_MODEL_SET.has(model)
-}
-
-export const VISION_PREPROCESSOR_MODEL: ModelType =
-  AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW
-
-export const PDF_PREPROCESSOR_MODEL: ModelType =
-  AvailableModels.GOOGLE_GEMINI_3_1_PRO_PREVIEW

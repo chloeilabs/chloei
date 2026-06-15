@@ -1,6 +1,6 @@
 # Chloei
 
-Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently exposes a curated model selector that defaults to Qwen 3.7 Max and also includes Kimi K2.6 and MiMo V2.5 Pro, routes Research mode to Qwen 3.7 Max with a dedicated Deep Research instruction template, and offers private Blob-backed file attachments, local code execution, optional Tavily retrieval, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
+Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently exposes a curated model selector that defaults to Qwen 3.7 Max and also includes Kimi K2.6 and MiMo V2.5 Pro, routes Research mode to Qwen 3.7 Max with a dedicated Deep Research instruction template, and offers local code execution, optional Tavily retrieval, and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
 
 ## Documentation
 
@@ -90,7 +90,6 @@ Managed integration rollout, rollback, duplicate-cleanup, and smoke-test steps l
 Optional feature-enabling variables:
 
 - `TAVILY_API_KEY`: enables Tavily search and extract callable tools for chat requests
-- `BLOB_READ_WRITE_TOKEN`: enables private Blob attachment upload/download
 - `AGENT_TELEMETRY_RECORD_IO`: feature gate; defaults off unless explicitly set or synced through Edge Config
 
 Agent request limits, timeouts, tool-step budgets, and the rate-limit window/concurrency are fixed safe constants in `src/lib/server/agent-runtime-config.ts` (no env knobs). `AGENT_RATE_LIMIT_STORE` defaults to `auto`, which uses PostgreSQL when `DATABASE_URL` is configured and falls back to process memory for local/no-database runs (allowed values: `auto`, `postgres`, `memory`); `AGENT_RATE_LIMIT_ENABLED` is a kill switch.

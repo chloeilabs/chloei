@@ -13,12 +13,12 @@ function buildContentSecurityPolicy() {
     "frame-ancestors 'none'",
     "form-action 'self'",
     "font-src 'self' data:",
-    "img-src 'self' blob: data: https://www.google.com https://t0.gstatic.com https://t1.gstatic.com https://t2.gstatic.com https://t3.gstatic.com",
-    "media-src 'self' blob: data:",
+    "img-src 'self' data: https://www.google.com https://t0.gstatic.com https://t1.gstatic.com https://t2.gstatic.com https://t3.gstatic.com",
+    "media-src 'self' data:",
     "connect-src 'self' https://va.vercel-scripts.com",
     "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com",
     "style-src 'self' 'unsafe-inline'",
-    "worker-src 'self' blob:",
+    "worker-src 'self'",
     "manifest-src 'self'",
     "upgrade-insecure-requests",
   ]
@@ -53,7 +53,6 @@ const securityHeaders = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
-  serverExternalPackages: ["@napi-rs/canvas"],
   experimental: {
     serverActions: {
       bodySizeLimit: serverActionsBodySizeLimit,

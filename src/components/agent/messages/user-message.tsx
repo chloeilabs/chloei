@@ -1,19 +1,10 @@
-import {
-  Check,
-  Copy,
-  CornerRightUp,
-  FileText,
-  ImageIcon,
-  Loader2,
-  X,
-} from "lucide-react"
+import { Check, Copy, CornerRightUp, Loader2, X } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { useModels } from "@/hooks/agent/use-models"
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard"
 import {
-  type AgentAttachmentMetadata,
   type AgentRunMode,
   getModelSelectorModels,
   isModelSelectorModel,
@@ -27,7 +18,6 @@ import { cn } from "@/lib/utils"
 import { Button } from "../../ui/button"
 import { Textarea } from "../../ui/textarea"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip"
-import { formatFileSize } from "../prompt-form/attachments"
 import { ModelSelector } from "../prompt-form/model-selector"
 import { ResearchModeToggle } from "../prompt-form/research-mode-toggle"
 import {
@@ -39,52 +29,6 @@ import {
 } from "../shared/shell-styles"
 
 const MAX_CONTENT_HEIGHT = 128
-
-function UserAttachmentChip({
-  attachment,
-}: {
-  attachment: AgentAttachmentMetadata
-}) {
-  return (
-    <div
-      className={cn(
-        agentShellFrameClass,
-        "user-message-border max-w-72 shrink-0"
-      )}
-    >
-      <div
-        className={cn(
-          agentSurfaceClass,
-          "flex h-10 min-w-0 items-center gap-2 px-2 text-xs"
-        )}
-      >
-        <div className={agentSurfaceBackgroundClass} />
-        <div className="flex size-7 shrink-0 items-center justify-center overflow-hidden bg-muted text-muted-foreground">
-          {attachment.kind === "image" ? (
-            attachment.previewDataUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={attachment.previewDataUrl}
-                alt=""
-                className="size-full object-cover"
-              />
-            ) : (
-              <ImageIcon className="size-3.5" />
-            )
-          ) : (
-            <FileText className="size-3.5" />
-          )}
-        </div>
-        <div className="min-w-0 leading-tight">
-          <div className="truncate text-foreground">{attachment.filename}</div>
-          <div className="text-muted-foreground">
-            {formatFileSize(attachment.sizeBytes)}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 export function UserMessage({
   message,
@@ -134,7 +78,6 @@ export function UserMessage({
   const messageContentRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [isContentOverflowing, setIsContentOverflowing] = useState(false)
-  const attachments = message.metadata?.attachments ?? []
   const { copyToClipboard, isCopied } = useCopyToClipboard()
   const hasCopyableContent = message.content.trim().length > 0
 
@@ -330,17 +273,6 @@ export function UserMessage({
         </div>
       ) : (
         <>
-          {attachments.length > 0 ? (
-            <div className="flex max-w-full flex-wrap justify-end gap-2">
-              {attachments.map((attachment) => (
-                <UserAttachmentChip
-                  key={attachment.id}
-                  attachment={attachment}
-                />
-              ))}
-            </div>
-          ) : null}
-
           <div
             className={cn(
               "max-w-full",

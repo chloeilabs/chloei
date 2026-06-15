@@ -10,61 +10,6 @@ const promptFormPath = path.join(
   "src/components/agent/prompt-form/prompt-form.tsx"
 )
 
-test("prompt form queues submit while attachment files are still reading", async () => {
-  const source = await readFile(promptFormPath, "utf8")
-
-  assert.match(
-    source,
-    /const \[isReadingAttachments, setIsReadingAttachments\] = useState\(false\)/,
-    "Expected PromptForm to track in-flight attachment reads."
-  )
-  assert.match(
-    source,
-    /isFormPending \|\|\s+isReadingAttachments \|\|\s+!resolvedSelectedModel/,
-    "Expected submit disabled state to include attachment reads."
-  )
-  assert.match(
-    source,
-    /const submitAfterAttachmentsRef = useRef\(false\)/,
-    "Expected PromptForm to track submit intent during attachment reads."
-  )
-  assert.match(
-    source,
-    /if \(isReadingAttachmentsRef\.current\) \{\s+submitAfterAttachmentsRef\.current = true\s+return\s+\}/,
-    "Expected submit handling to queue submits while attachment reads are in flight."
-  )
-})
-
-test("prompt form keeps text input visually active while attachments upload", async () => {
-  const source = await readFile(promptFormPath, "utf8")
-
-  assert.match(
-    source,
-    /isFormPending && "opacity-50"/,
-    "Expected the prompt shell to dim only for form submission transitions."
-  )
-  assert.doesNotMatch(
-    source,
-    /\(isFormPending \|\| isReadingAttachments\) && "opacity-50"/,
-    "Expected attachment uploads not to dim the whole prompt input."
-  )
-})
-
-test("prompt form always handles browser drag/drop defaults", async () => {
-  const source = await readFile(promptFormPath, "utf8")
-
-  assert.match(
-    source,
-    /onDragOver=\{\(event\) => \{\s+event\.preventDefault\(\)\s+if \(isFormPending \|\| isReadingAttachments\)/,
-    "Expected drag over to prevent browser navigation before pending checks."
-  )
-  assert.match(
-    source,
-    /onDrop=\{\(event\) => \{\s+event\.preventDefault\(\)\s+setIsDragActive\(false\)\s+if \(isFormPending \|\| isReadingAttachments\)/,
-    "Expected drop to reset drag state before pending checks."
-  )
-})
-
 test("prompt form research shortcut does not close the tools popover", async () => {
   const source = await readFile(promptFormPath, "utf8")
   const shortcutSource = source.match(
@@ -90,7 +35,7 @@ test("prompt form research shortcut does not close the tools popover", async () 
 test("prompt form preserves Research mode after submit", async () => {
   const source = await readFile(promptFormPath, "utf8")
   const submitSource = source.match(
-    /const submitPrompt = useCallback\([\s\S]*?const handleFiles = useCallback/
+    /const submitPrompt = useCallback\([\s\S]*?const handleSubmit = useCallback/
   )?.[0]
 
   assert.ok(submitSource, "Expected PromptForm to define submitPrompt.")

@@ -1,5 +1,4 @@
 import type { ModelType } from "../llm/models"
-import type { AgentAttachmentMetadata } from "./attachments"
 
 interface TextMessagePart {
   type: "text"
@@ -189,7 +188,6 @@ export interface Message {
 
 interface MessageMetadata {
   parts?: AssistantMessagePart[]
-  attachments?: AgentAttachmentMetadata[]
   isStreaming?: boolean
   selectedModel?: ModelType
   runMode?: AgentRunMode

@@ -1,5 +1,4 @@
 import {
-  type AgentRequestAttachment,
   type AgentRunMode,
   type FollowUpQuestion,
   type Message as AgentMessage,
@@ -8,58 +7,12 @@ import {
 
 import type { AgentStreamAccumulator } from "./agent-stream-state"
 
-export type AttachmentPayloadsByThread = Map<
-  string,
-  Map<string, AgentRequestAttachment[]>
->
-
 function withoutPendingFollowUpQuestions(
   metadata: AgentMessage["metadata"]
 ): NonNullable<AgentMessage["metadata"]> {
   const nextMetadata = { ...metadata }
   delete nextMetadata.followUpQuestionsPending
   return nextMetadata
-}
-
-export function getThreadAttachmentPayloads(
-  payloadsByThread: AttachmentPayloadsByThread,
-  threadId: string
-) {
-  let payloads = payloadsByThread.get(threadId)
-
-  if (!payloads) {
-    payloads = new Map<string, AgentRequestAttachment[]>()
-    payloadsByThread.set(threadId, payloads)
-  }
-
-  return payloads
-}
-
-export function pruneThreadAttachmentPayloads(
-  payloadsByThread: AttachmentPayloadsByThread,
-  threadId: string,
-  messages: readonly AgentMessage[]
-) {
-  const payloads = payloadsByThread.get(threadId)
-  if (!payloads) {
-    return
-  }
-
-  const messageIds = new Set(
-    messages
-      .filter((message) => message.role === "user")
-      .map((message) => message.id)
-  )
-
-  for (const messageId of payloads.keys()) {
-    if (!messageIds.has(messageId)) {
-      payloads.delete(messageId)
-    }
-  }
-
-  if (payloads.size === 0) {
-    payloadsByThread.delete(threadId)
-  }
 }
 
 export function hasVisibleStructuredOutput(

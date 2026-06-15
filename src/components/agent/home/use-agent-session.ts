@@ -11,7 +11,6 @@ import {
 } from "@/lib/http-error"
 import { getRequestIdFromHeaders } from "@/lib/request-id"
 import {
-  type AgentRequestAttachment,
   type AgentRunMode,
   type FollowUpQuestion,
   isModelType,
@@ -21,16 +20,8 @@ import {
 } from "@/lib/shared"
 
 import {
-  loadThreadAttachmentPayloads,
-  persistMessageAttachments,
-  pruneThreadAttachmentsToMessages,
-} from "./agent-attachment-store"
-import {
-  type AttachmentPayloadsByThread,
   createAssistantMessageFromAccumulator,
-  getThreadAttachmentPayloads,
   hasVisibleStructuredOutput,
-  pruneThreadAttachmentPayloads,
   upsertAgentMessage,
 } from "./agent-session-state"
 import {
@@ -78,7 +69,6 @@ interface QueuedSubmission {
   message: string
   model: ModelType
   runMode: AgentRunMode
-  attachments: AgentRequestAttachment[]
 }
 
 const INITIAL_STATE: AgentSessionState = {
@@ -99,7 +89,6 @@ export function useAgentSession({
     useState<QueuedSubmission | null>(null)
   const submitLockRef = useRef(false)
   const messagesRef = useRef<AgentMessage[]>([])
-  const attachmentPayloadsRef = useRef<AttachmentPayloadsByThread>(new Map())
   const abortControllerRef = useRef<AbortController | null>(null)
   const currentThreadIdRef = useRef(currentThreadId)
 
@@ -114,40 +103,6 @@ export function useAgentSession({
   useEffect(() => {
     if (currentThreadId !== currentThreadIdRef.current) {
       currentThreadIdRef.current = currentThreadId
-    }
-  }, [currentThreadId])
-
-  useEffect(() => {
-    if (!currentThreadId) {
-      return
-    }
-
-    if (attachmentPayloadsRef.current.has(currentThreadId)) {
-      return
-    }
-
-    const hydration = { cancelled: false }
-    void (async () => {
-      const stored = await loadThreadAttachmentPayloads(currentThreadId)
-      if (hydration.cancelled || stored.size === 0) {
-        return
-      }
-
-      const existing = attachmentPayloadsRef.current.get(currentThreadId)
-      if (!existing) {
-        attachmentPayloadsRef.current.set(currentThreadId, stored)
-        return
-      }
-
-      for (const [messageId, attachments] of stored) {
-        if (!existing.has(messageId)) {
-          existing.set(messageId, attachments)
-        }
-      }
-    })()
-
-    return () => {
-      hydration.cancelled = true
     }
   }, [currentThreadId])
 
@@ -190,25 +145,11 @@ export function useAgentSession({
         isStreaming: false,
       })
       messagesRef.current = activeThread.messages
-      pruneThreadAttachmentPayloads(
-        attachmentPayloadsRef.current,
-        currentThreadId,
-        activeThread.messages
-      )
-      void pruneThreadAttachmentsToMessages(
-        currentThreadId,
-        new Set(
-          activeThread.messages
-            .filter((message) => message.role === "user")
-            .map((message) => message.id)
-        )
-      )
       return
     }
 
     setState(INITIAL_STATE)
     messagesRef.current = []
-    attachmentPayloadsRef.current.clear()
   }, [activeThread, currentThreadId])
 
   useEffect(() => {
@@ -278,7 +219,6 @@ export function useAgentSession({
     setQueuedSubmission(null)
     setState(INITIAL_STATE)
     messagesRef.current = []
-    attachmentPayloadsRef.current.clear()
     requestedFollowUpMessageIdsRef.current.clear()
     parallelFollowUpMessageIdsRef.current.clear()
     pendingFollowUpQuestionsRef.current.clear()
@@ -656,16 +596,7 @@ export function useAgentSession({
     ) => {
       const activeThreadId = threadId ?? ensureCurrentThreadId()
 
-      pruneThreadAttachmentPayloads(
-        attachmentPayloadsRef.current,
-        activeThreadId,
-        nextMessages
-      )
-
-      const requestMessages = toRequestMessages(nextMessages, {
-        attachmentsByMessageId:
-          attachmentPayloadsRef.current.get(activeThreadId),
-      })
+      const requestMessages = toRequestMessages(nextMessages)
 
       return streamAgentRequest({
         endpoint: "/api/agent",
@@ -689,8 +620,7 @@ export function useAgentSession({
     async (
       message: string,
       model: ModelType,
-      runMode: AgentRunMode = "chat",
-      attachments: AgentRequestAttachment[] = []
+      runMode: AgentRunMode = "chat"
     ) => {
       const trimmedMessage = message.trim()
       if (!trimmedMessage) {
@@ -709,22 +639,8 @@ export function useAgentSession({
         messagesRef.current,
         trimmedMessage,
         model,
-        runMode,
-        attachments
+        runMode
       )
-
-      const userMessage = nextMessages[nextMessages.length - 1]
-      if (userMessage?.role === "user" && attachments.length > 0) {
-        getThreadAttachmentPayloads(
-          attachmentPayloadsRef.current,
-          activeThreadId
-        ).set(userMessage.id, attachments)
-        void persistMessageAttachments(
-          activeThreadId,
-          userMessage.id,
-          attachments
-        )
-      }
 
       await runAgentRequest(nextMessages, model, runMode, activeThreadId)
     },
@@ -778,20 +694,6 @@ export function useAgentSession({
 
       const activeThreadId = currentThreadIdRef.current
       if (activeThreadId) {
-        pruneThreadAttachmentPayloads(
-          attachmentPayloadsRef.current,
-          activeThreadId,
-          nextMessages
-        )
-        void pruneThreadAttachmentsToMessages(
-          activeThreadId,
-          new Set(
-            nextMessages
-              .filter((message) => message.role === "user")
-              .map((message) => message.id)
-          )
-        )
-
         saveThread(
           createThreadSnapshot(activeThreadId, nextMessages, newModel),
           {
@@ -811,12 +713,7 @@ export function useAgentSession({
   )
 
   const handlePromptSubmit = useCallback(
-    (
-      message: string,
-      model: ModelType,
-      runMode: AgentRunMode = "chat",
-      attachments: AgentRequestAttachment[] = []
-    ) => {
+    (message: string, model: ModelType, runMode: AgentRunMode = "chat") => {
       const trimmedMessage = message.trim()
       if (!trimmedMessage) {
         return
@@ -827,12 +724,11 @@ export function useAgentSession({
           message: trimmedMessage,
           model,
           runMode,
-          attachments,
         })
         return
       }
 
-      void handleSubmit(trimmedMessage, model, runMode, attachments)
+      void handleSubmit(trimmedMessage, model, runMode)
     },
     [handleSubmit]
   )
@@ -846,8 +742,7 @@ export function useAgentSession({
     void handleSubmit(
       queuedSubmission.message,
       queuedSubmission.model,
-      queuedSubmission.runMode,
-      queuedSubmission.attachments
+      queuedSubmission.runMode
     )
   }, [streamingState, queuedSubmission, handleSubmit])
 
