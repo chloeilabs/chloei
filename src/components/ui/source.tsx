@@ -33,9 +33,7 @@ export function Source({ href, children }: SourceProps) {
 
   return (
     <SourceContext.Provider value={sourceLink}>
-      <HoverCard openDelay={150} closeDelay={0}>
-        {children}
-      </HoverCard>
+      <HoverCard>{children}</HoverCard>
     </SourceContext.Provider>
   )
 }
@@ -56,7 +54,7 @@ export function SourceTrigger({
   const labelToShow = label ?? defaultLabel
 
   return (
-    <HoverCardTrigger asChild>
+    <HoverCardTrigger asChild delay={150} closeDelay={0}>
       <a
         href={href}
         target="_blank"

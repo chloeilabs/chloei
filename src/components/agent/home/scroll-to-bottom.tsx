@@ -32,7 +32,7 @@ export function ScrollToBottom() {
   }, [stickToBottom])
 
   return (
-    <Tooltip disableHoverableContent={isAtBottom}>
+    <Tooltip>
       <TooltipTrigger asChild>
         <button
           disabled={isAtBottom}

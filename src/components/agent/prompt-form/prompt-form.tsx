@@ -671,14 +671,14 @@ export function PromptForm({
                   side="bottom"
                   align="start"
                   sideOffset={2}
-                  onCloseAutoFocus={(event) => {
+                  finalFocus={() => {
                     if (!shouldPreventToolsCloseAutoFocusRef.current) {
-                      return
+                      return true
                     }
 
-                    event.preventDefault()
                     shouldPreventToolsCloseAutoFocusRef.current = false
                     textareaRef.current?.focus({ preventScroll: true })
+                    return false
                   }}
                   className="flex w-56 flex-col gap-0.5 rounded-none p-1.5"
                 >

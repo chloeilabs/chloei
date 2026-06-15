@@ -1,71 +1,92 @@
 "use client"
 
-import { Tooltip as TooltipPrimitive } from "radix-ui"
+import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip"
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
 function TooltipProvider({
-  delayDuration = 0,
+  delay = 0,
   ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
-  return (
-    <TooltipPrimitive.Provider
-      data-slot="tooltip-provider"
-      disableHoverableContent
-      delayDuration={delayDuration}
-      {...props}
-    />
-  )
+}: TooltipPrimitive.Provider.Props) {
+  return <TooltipPrimitive.Provider delay={delay} {...props} />
 }
 
-function Tooltip({
-  ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Root>) {
+function Tooltip({ ...props }: TooltipPrimitive.Root.Props) {
   return (
     <TooltipProvider>
-      <TooltipPrimitive.Root data-slot="tooltip" {...props} />
+      <TooltipPrimitive.Root {...props} />
     </TooltipProvider>
   )
 }
 
 function TooltipTrigger({
+  asChild,
+  children,
   ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
-  return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />
+}: TooltipPrimitive.Trigger.Props & { asChild?: boolean }) {
+  if (asChild && React.isValidElement(children)) {
+    return (
+      <TooltipPrimitive.Trigger
+        data-slot="tooltip-trigger"
+        render={children}
+        {...props}
+      />
+    )
+  }
+
+  return (
+    <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props}>
+      {children}
+    </TooltipPrimitive.Trigger>
+  )
 }
 
 function TooltipContent({
   className,
+  side = "top",
+  align = "center",
   sideOffset = 4,
+  alignOffset,
   lighter = false,
   children,
   shortcut = "",
   ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Content> & {
-  shortcut?: string
-  lighter?: boolean
-}) {
+}: TooltipPrimitive.Popup.Props &
+  Pick<
+    TooltipPrimitive.Positioner.Props,
+    "side" | "align" | "sideOffset" | "alignOffset"
+  > & {
+    shortcut?: string
+    lighter?: boolean
+  }) {
   return (
     <TooltipPrimitive.Portal>
-      <TooltipPrimitive.Content
-        data-slot="tooltip-content"
+      <TooltipPrimitive.Positioner
+        side={side}
+        align={align}
         sideOffset={sideOffset}
-        className={cn(
-          "z-50 hidden h-7 w-fit origin-(--radix-tooltip-content-transform-origin) animate-in items-center gap-2 rounded-none border bg-card px-2 py-0.5 text-xs text-balance text-muted-foreground fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 md:flex",
-          shortcut && "pr-1",
-          lighter && "border-sidebar-border! bg-sidebar-accent!",
-          className
-        )}
-        {...props}
+        alignOffset={alignOffset}
+        className="z-50"
       >
-        {children}
-        {shortcut && (
-          <span className="flex h-5 items-center rounded border border-b-2 border-sidebar-border bg-gradient-to-t from-transparent to-sidebar-accent px-1">
-            {shortcut}
-          </span>
-        )}
-      </TooltipPrimitive.Content>
+        <TooltipPrimitive.Popup
+          data-slot="tooltip-content"
+          className={cn(
+            "hidden h-7 w-fit origin-(--transform-origin) items-center gap-2 rounded-none border bg-card px-2 py-0.5 text-xs text-balance text-muted-foreground transition duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 md:flex",
+            shortcut && "pr-1",
+            lighter && "border-sidebar-border! bg-sidebar-accent!",
+            className
+          )}
+          {...props}
+        >
+          {children}
+          {shortcut && (
+            <span className="flex h-5 items-center rounded border border-b-2 border-sidebar-border bg-gradient-to-t from-transparent to-sidebar-accent px-1">
+              {shortcut}
+            </span>
+          )}
+        </TooltipPrimitive.Popup>
+      </TooltipPrimitive.Positioner>
     </TooltipPrimitive.Portal>
   )
 }

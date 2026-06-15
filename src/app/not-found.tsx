@@ -1,7 +1,8 @@
 import Link from "next/link"
 
 import { ChloeiLogoSvg } from "@/components/graphics/logo/logo-svg"
-import { Button } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 export default function NotFound() {
   return (
@@ -12,9 +13,12 @@ export default function NotFound() {
         </span>
         Page Not Found
       </div>
-      <Button variant="secondary" size="lg" asChild>
-        <Link href="/">Go To Home</Link>
-      </Button>
+      <Link
+        href="/"
+        className={cn(buttonVariants({ variant: "secondary", size: "lg" }))}
+      >
+        Go To Home
+      </Link>
     </div>
   )
 }
