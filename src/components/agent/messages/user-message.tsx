@@ -5,7 +5,6 @@ import { toast } from "sonner"
 import { useModels } from "@/hooks/agent/use-models"
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard"
 import {
-  type AgentRunMode,
   getModelSelectorModels,
   isModelSelectorModel,
   isModelType,
@@ -19,7 +18,6 @@ import { Button } from "../../ui/button"
 import { Textarea } from "../../ui/textarea"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip"
 import { ModelSelector } from "../prompt-form/model-selector"
-import { ResearchModeToggle } from "../prompt-form/research-mode-toggle"
 import {
   agentShellFrameClass,
   agentShellHighlightClass,
@@ -45,7 +43,6 @@ export function UserMessage({
     messageId: string
     newContent: string
     newModel: ModelType
-    newRunMode: AgentRunMode
   }) => Promise<void> | void
 }) {
   const { data: availableModels } = useModels()
@@ -72,8 +69,6 @@ export function UserMessage({
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState(message.content)
   const [selectedModel, setSelectedModel] = useState<ModelType>(initialModel)
-  const initialRunMode = message.metadata?.runMode ?? "chat"
-  const [runMode, setRunMode] = useState<AgentRunMode>(initialRunMode)
   const [isEditPending, setIsEditPending] = useState(false)
   const messageContentRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -107,16 +102,14 @@ export function UserMessage({
   const handleStartEditing = useCallback(() => {
     setEditValue(message.content)
     setSelectedModel(initialModel)
-    setRunMode(initialRunMode)
     setIsEditing(true)
-  }, [initialModel, initialRunMode, message.content])
+  }, [initialModel, message.content])
 
   const handleStopEditing = useCallback(() => {
     setIsEditing(false)
     setEditValue(message.content)
     setSelectedModel(initialModel)
-    setRunMode(initialRunMode)
-  }, [message.content, initialModel, initialRunMode])
+  }, [message.content, initialModel])
 
   const handleSubmit = useCallback(async () => {
     const trimmedValue = editValue.trim()
@@ -137,7 +130,6 @@ export function UserMessage({
         messageId: message.id,
         newContent: trimmedValue,
         newModel: selectedModel,
-        newRunMode: runMode,
       })
       setIsEditing(false)
     } catch (error) {
@@ -147,14 +139,7 @@ export function UserMessage({
     } finally {
       setIsEditPending(false)
     }
-  }, [
-    editValue,
-    handleStopEditing,
-    message.id,
-    onEditMessage,
-    runMode,
-    selectedModel,
-  ])
+  }, [editValue, handleStopEditing, message.id, onEditMessage, selectedModel])
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -241,11 +226,6 @@ export function UserMessage({
                 <ModelSelector
                   selectedModel={selectedModel}
                   handleSelectModel={handleSelectModel}
-                />
-                <ResearchModeToggle
-                  runMode={runMode}
-                  onRunModeChange={setRunMode}
-                  disabled={isEditPending}
                 />
               </div>
 

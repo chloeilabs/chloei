@@ -39,7 +39,6 @@ function createRequest(overrides = {}) {
     json: async () => ({
       assistantMessageId: "assistant-1",
       model: "moonshotai/kimi-k2.6",
-      runMode: "chat",
       threadId: "thread-1",
       messages: [
         { role: "user", content: "Explain love" },

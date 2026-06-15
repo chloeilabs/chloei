@@ -33,9 +33,6 @@ export const AGENT_RUN_STATUSES = [
 ] as const
 export type AgentRunStatus = (typeof AGENT_RUN_STATUSES)[number]
 
-export const AGENT_RUN_MODES = ["chat", "research"] as const
-export type AgentRunMode = (typeof AGENT_RUN_MODES)[number]
-
 export interface MessageSource {
   id: string
   url: string
@@ -190,7 +187,6 @@ interface MessageMetadata {
   parts?: AssistantMessagePart[]
   isStreaming?: boolean
   selectedModel?: ModelType
-  runMode?: AgentRunMode
   agentStatus?: AgentRunStatus
   interactionId?: string
   lastEventId?: string

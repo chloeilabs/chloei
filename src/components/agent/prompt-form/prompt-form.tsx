@@ -2,7 +2,7 @@
 
 import "../shared/shell-styles.css"
 
-import { CornerRightUp, Loader2, Plus, Square, Telescope } from "lucide-react"
+import { CornerRightUp, Loader2, Square } from "lucide-react"
 import {
   type CSSProperties,
   type TransitionStartFunction,
@@ -15,20 +15,10 @@ import {
 
 import { RefreshGlow } from "@/components/graphics/effects/refresh-glow"
 import { Button } from "@/components/ui/button"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
 import { Textarea } from "@/components/ui/textarea"
 import { useModels } from "@/hooks/agent/use-models"
-import { usePersistentRunMode } from "@/hooks/agent/use-persistent-run-mode"
 import { usePersistentSelectedModel } from "@/hooks/agent/use-persistent-selected-model"
-import {
-  type AgentRunMode,
-  getModelSelectorModels,
-  type ModelType,
-} from "@/lib/shared"
+import { getModelSelectorModels, type ModelType } from "@/lib/shared"
 import { cn } from "@/lib/utils"
 
 import { QueuedAction } from "../messages/queued-message"
@@ -44,7 +34,6 @@ import { ModelSelector } from "./model-selector"
 interface QueuedPromptSubmission {
   message: string
   model: ModelType
-  runMode: AgentRunMode
 }
 
 export function PromptForm({
@@ -63,12 +52,7 @@ export function PromptForm({
   transition,
   viewTransitionName,
 }: {
-  onSubmit?: (
-    message: string,
-    model: ModelType,
-    queue: boolean,
-    runMode: AgentRunMode
-  ) => void
+  onSubmit?: (message: string, model: ModelType, queue: boolean) => void
   onStopStream?: () => void
   isStreaming?: boolean
   isHome?: boolean
@@ -92,11 +76,8 @@ export function PromptForm({
   const shouldShowRefreshAnimation = isHome && !dockToBottomOnHome
 
   const [message, setMessage] = useState("")
-  const [isToolsOpen, setIsToolsOpen] = useState(false)
-  const { runMode, setRunMode } = usePersistentRunMode()
   const trimmedMessage = useMemo(() => message.trim(), [message])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const shouldPreventToolsCloseAutoFocusRef = useRef(false)
 
   const { data: availableModels } = useModels()
   const modelSelectorModels = useMemo(
@@ -118,7 +99,6 @@ export function PromptForm({
   )
 
   const resolvedSelectedModel = selectedModel
-  const isResearchMode = runMode === "research"
 
   const handleSelectModel = useCallback(
     (model: ModelType | null) => {
@@ -133,7 +113,6 @@ export function PromptForm({
     }
 
     setMessage(queuedSubmission.message)
-    setRunMode(queuedSubmission.runMode)
     setSelectedModel(queuedSubmission.model)
     onClearQueuedMessage?.()
 
@@ -148,22 +127,7 @@ export function PromptForm({
       textarea.setSelectionRange(cursorPosition, cursorPosition)
       textarea.scrollTop = textarea.scrollHeight
     })
-  }, [onClearQueuedMessage, queuedSubmission, setRunMode, setSelectedModel])
-
-  const handleSetRunMode = useCallback(
-    (nextRunMode: AgentRunMode) => {
-      if (isFormPending) {
-        return
-      }
-
-      shouldPreventToolsCloseAutoFocusRef.current = true
-      setRunMode((currentRunMode) =>
-        currentRunMode === nextRunMode ? "chat" : nextRunMode
-      )
-      setIsToolsOpen(false)
-    },
-    [isFormPending, setRunMode]
-  )
+  }, [onClearQueuedMessage, queuedSubmission, setSelectedModel])
 
   const submitPrompt = useCallback(() => {
     const nextMessage = message.trim()
@@ -185,8 +149,7 @@ export function PromptForm({
       }
     }
 
-    const activeRunMode = runMode
-    onSubmit?.(nextMessage, resolvedSelectedModel, isStreaming, activeRunMode)
+    onSubmit?.(nextMessage, resolvedSelectedModel, isStreaming)
     setMessage("")
 
     return true
@@ -198,7 +161,6 @@ export function PromptForm({
     onStopStream,
     onSubmit,
     resolvedSelectedModel,
-    runMode,
   ])
 
   const handleSubmit = useCallback(
@@ -236,26 +198,6 @@ export function PromptForm({
       window.removeEventListener("keydown", handleGlobalKeyDown)
     }
   }, [isStreaming, onStopStream])
-
-  useEffect(() => {
-    const handleResearchShortcut = (event: KeyboardEvent) => {
-      if (
-        !isFormPending &&
-        event.code === "Slash" &&
-        (event.metaKey || event.ctrlKey)
-      ) {
-        event.preventDefault()
-        setRunMode((currentRunMode) =>
-          currentRunMode === "research" ? "chat" : "research"
-        )
-      }
-    }
-
-    window.addEventListener("keydown", handleResearchShortcut)
-    return () => {
-      window.removeEventListener("keydown", handleResearchShortcut)
-    }
-  }, [isFormPending, setRunMode])
 
   const isSubmitButtonDisabled =
     isFormPending || !resolvedSelectedModel || (!isStreaming && !trimmedMessage)
@@ -312,85 +254,10 @@ export function PromptForm({
 
           <div className="grid grid-cols-2 items-center px-2 py-2">
             <div className="flex min-w-0 items-center justify-start gap-1">
-              <Popover
-                open={isToolsOpen}
-                onOpenChange={(open) => {
-                  if (!isFormPending) {
-                    setIsToolsOpen(open)
-                  }
-                }}
-              >
-                <PopoverTrigger asChild aria-controls={undefined}>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="iconSm"
-                    disabled={isFormPending}
-                    aria-label="Tools"
-                    className="shrink-0 text-muted-foreground hover:bg-sidebar-border hover:text-foreground"
-                  >
-                    <Plus className="size-4" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  side="bottom"
-                  align="start"
-                  sideOffset={2}
-                  finalFocus={() => {
-                    if (!shouldPreventToolsCloseAutoFocusRef.current) {
-                      return true
-                    }
-
-                    shouldPreventToolsCloseAutoFocusRef.current = false
-                    textareaRef.current?.focus({ preventScroll: true })
-                    return false
-                  }}
-                  className="flex w-56 flex-col gap-0.5 rounded-none p-1.5"
-                >
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={isFormPending}
-                    aria-pressed={isResearchMode}
-                    className={cn(
-                      "w-full justify-start px-2 font-normal text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:border-transparent focus-visible:ring-0",
-                      isResearchMode &&
-                        "bg-accent text-foreground hover:bg-accent aria-pressed:bg-accent aria-pressed:text-foreground"
-                    )}
-                    onClick={() => {
-                      handleSetRunMode("research")
-                    }}
-                  >
-                    <Telescope className="size-3.5" />
-                    <span>Research</span>
-                    <span className="ml-auto text-[10px] text-muted-foreground">
-                      ⌘/
-                    </span>
-                  </Button>
-                </PopoverContent>
-              </Popover>
-              {isResearchMode ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  disabled={isFormPending}
-                  aria-pressed="true"
-                  className="bg-accent px-2 font-normal text-foreground hover:bg-accent focus-visible:border-transparent focus-visible:ring-0"
-                  onClick={() => {
-                    handleSetRunMode("research")
-                  }}
-                >
-                  <Telescope className="size-3.5" />
-                  <span>Research</span>
-                </Button>
-              ) : (
-                <ModelSelector
-                  selectedModel={resolvedSelectedModel}
-                  handleSelectModel={handleSelectModel}
-                />
-              )}
+              <ModelSelector
+                selectedModel={resolvedSelectedModel}
+                handleSelectModel={handleSelectModel}
+              />
             </div>
 
             <div className="flex min-w-0 items-center justify-end gap-[8px]">

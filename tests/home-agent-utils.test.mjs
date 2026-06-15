@@ -72,14 +72,12 @@ test("agent request messages trim oversized existing message content", () => {
   assert.match(requestMessages[0].content, /truncated/)
 })
 
-test("appended user messages preserve the requested run mode", () => {
+test("appended user messages record the selected model", () => {
   const messages = appendUserMessage(
     [],
     "Research Apple supply chain risk.",
-    "moonshotai/kimi-k2.6",
-    "research"
+    "moonshotai/kimi-k2.6"
   )
 
   assert.equal(messages[0]?.metadata?.selectedModel, "moonshotai/kimi-k2.6")
-  assert.equal(messages[0]?.metadata?.runMode, "research")
 })

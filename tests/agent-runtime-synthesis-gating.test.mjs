@@ -21,7 +21,7 @@ test("shouldForceFinalSynthesisStep fires only on the last step", () => {
 })
 
 test("shouldNudgeMidBudgetSynthesis kicks in around one-third budget", () => {
-  // deep_research budget = 20 → threshold = floor(20/3) = 6
+  // budget = 20 → threshold = floor(20/3) = 6
   assert.equal(shouldNudgeMidBudgetSynthesis(5, 20), false)
   assert.equal(shouldNudgeMidBudgetSynthesis(6, 20), true)
   assert.equal(shouldNudgeMidBudgetSynthesis(12, 20), true)
@@ -29,8 +29,8 @@ test("shouldNudgeMidBudgetSynthesis kicks in around one-third budget", () => {
   assert.equal(shouldNudgeMidBudgetSynthesis(19, 20), false)
 })
 
-test("shouldNudgeMidBudgetSynthesis fires for chat_default budget too", () => {
-  // chat_default budget = 12 → threshold = floor(12/3) = 4
+test("shouldNudgeMidBudgetSynthesis fires for the default 12-step budget too", () => {
+  // budget = 12 → threshold = floor(12/3) = 4
   assert.equal(shouldNudgeMidBudgetSynthesis(3, 12), false)
   assert.equal(shouldNudgeMidBudgetSynthesis(4, 12), true)
   assert.equal(shouldNudgeMidBudgetSynthesis(10, 12), true)

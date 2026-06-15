@@ -1,5 +1,4 @@
 import {
-  type AgentRunMode,
   type FollowUpQuestion,
   isModelType,
   type Message as AgentMessage,
@@ -19,7 +18,6 @@ interface FollowUpQuestionRequestTarget {
   assistantMessageId: string
   messages: AgentMessage[]
   model: ModelType
-  runMode: AgentRunMode
 }
 
 type FollowUpQuestionRequestKind = "backfill" | "final" | "parallel"
@@ -29,7 +27,6 @@ export interface FollowUpQuestionRequestParams {
   requestKind: FollowUpQuestionRequestKind
   messages: AgentMessage[]
   model: ModelType
-  runMode: AgentRunMode
   threadId: string
 }
 
@@ -148,7 +145,6 @@ export function getFollowUpQuestionRequestTargets(
       assistantMessageId: message.id,
       messages: messages.slice(0, index + 1),
       model,
-      runMode: message.metadata.runMode ?? "chat",
     })
   })
 

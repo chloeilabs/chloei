@@ -18,8 +18,8 @@ test("agent route validates model, threadId, and messages", async () => {
 
   assert.match(
     source,
-    /const agentStreamRequestSchema = z[\s\S]*model: z\.string\(\)\.trim\(\)\.min\(1\)\.max\(200\)\.optional\(\),[\s\S]*runMode: z\.enum\(AGENT_RUN_MODES\)\.optional\(\),[\s\S]*threadId: z\.string\(\)\.trim\(\)\.min\(1\)\.max\(200\)\.optional\(\),[\s\S]*messages: z\.array\(agentMessageSchema\)\.min\(1\),[\s\S]*\.strict\(\)/,
-    "Expected /api/agent to validate model, runMode, threadId, and messages."
+    /const agentStreamRequestSchema = z[\s\S]*model: z\.string\(\)\.trim\(\)\.min\(1\)\.max\(200\)\.optional\(\),[\s\S]*threadId: z\.string\(\)\.trim\(\)\.min\(1\)\.max\(200\)\.optional\(\),[\s\S]*messages: z\.array\(agentMessageSchema\)\.min\(1\),[\s\S]*\.strict\(\)/,
+    "Expected /api/agent to validate model, threadId, and messages."
   )
 
   assert.match(
@@ -69,10 +69,10 @@ test("agent route streams through the extracted AI Gateway helper path", async (
     "Expected the helper to drop the removed finance tooling augmentation options."
   )
 
-  assert.match(
+  assert.doesNotMatch(
     routeSource,
-    /runtimeProfile: resolveRuntimeProfile\(\s*parsedRequest\.runMode\s*\)/,
-    "Expected /api/agent to select a runtime profile from the requested run mode."
+    /runMode|resolveRuntimeProfile/,
+    "Expected /api/agent to drop run-mode and runtime-profile selection."
   )
 })
 
@@ -102,7 +102,7 @@ test("agent runtime reserves the final loop step for synthesis", async () => {
   )
   assert.match(
     runtimeSource,
-    /prepareStep:\s*\(\{[\s\S]*stepNumber[\s\S]*\}\)[\s\S]*shouldForceFinalSynthesisStep\(\s*stepNumber,\s*runtimeProfile\.toolMaxSteps\s*\)[\s\S]*toolChoice:\s*"none"/,
+    /prepareStep:\s*\(\{[\s\S]*stepNumber[\s\S]*\}\)[\s\S]*shouldForceFinalSynthesisStep\(\s*stepNumber,\s*AGENT_TOOL_MAX_STEPS\s*\)[\s\S]*toolChoice:\s*"none"/,
     "Expected the last permitted model step to disable tools."
   )
   assert.match(

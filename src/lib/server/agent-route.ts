@@ -7,14 +7,11 @@ import { createLogger } from "@/lib/logger"
 import { resolveRequestIdFromHeaders } from "@/lib/request-id"
 import type { AgentFeatureFlags } from "@/lib/server/integration-flags"
 import {
-  AGENT_RUN_MODES,
-  type AgentRunMode,
   type AgentStreamEvent,
   ALL_MODELS,
   MODEL_SELECTOR_MODELS,
   type ModelInfo,
   type ModelType,
-  RESEARCH_MODEL,
   resolveDefaultModelSelectorModel,
 } from "@/lib/shared"
 
@@ -25,7 +22,6 @@ import {
   AGENT_MAX_TOTAL_CHARS,
 } from "./agent-runtime-config"
 import { createApiErrorBody, createApiHeaders } from "./api-response"
-import type { AgentRuntimeProfileId } from "./llm/agent-runtime"
 import { startGatewayResponseStream } from "./llm/gateway-responses"
 import { withAiSdkInlineCitationInstruction } from "./llm/system-instruction-augmentations"
 
@@ -63,16 +59,12 @@ const agentMessageSchema = z
 export const agentStreamRequestSchema = z
   .object({
     model: z.string().trim().min(1).max(200).optional(),
-    runMode: z.enum(AGENT_RUN_MODES).optional(),
     threadId: z.string().trim().min(1).max(200).optional(),
     messages: z.array(agentMessageSchema).min(1),
   })
   .strict()
 
 type AgentStreamRequest = z.infer<typeof agentStreamRequestSchema>
-type ParsedAgentStreamRequestData = Omit<AgentStreamRequest, "runMode"> & {
-  runMode: AgentRunMode
-}
 interface AgentRateLimitDecision {
   allowed: boolean
   limit: number
@@ -81,7 +73,7 @@ interface AgentRateLimitDecision {
   resetAtEpochSeconds: number
 }
 interface ParsedAgentStreamRequest {
-  parsedRequest: ParsedAgentStreamRequestData
+  parsedRequest: AgentStreamRequest
   selectedModel: ModelType
 }
 
@@ -110,8 +102,7 @@ interface CreateAgentStreamResponseParams {
   aiGatewayApiKey: string
   tavilyApiKey?: string
   userTimeZone?: string
-  runtimeProfile?: AgentRuntimeProfileId
-  taskMode?: PromptTaskMode
+  taskMode: PromptTaskMode
   userId?: string
   featureFlags?: AgentFeatureFlags
   messages: AgentStreamRequest["messages"]
@@ -360,21 +351,6 @@ export function parseAgentStreamRequest(
     })
   }
 
-  const runMode = parsed.data.runMode ?? "chat"
-
-  if (
-    runMode === "research" &&
-    !isAvailableModel(params.availableModels, RESEARCH_MODEL)
-  ) {
-    return createJsonErrorResponse({
-      requestId: params.requestId,
-      error: "Research mode requires Qwen 3.7 Max model access.",
-      errorCode: "AGENT_RESEARCH_MODEL_UNAVAILABLE",
-      status: 400,
-      rateLimitDecision: params.rateLimitDecision,
-    })
-  }
-
   const availableModelIds = new Set(
     params.availableModels.map((model) => model.id)
   )
@@ -382,9 +358,7 @@ export function parseAgentStreamRequest(
     availableModelIds.has(modelId) ? [{ id: modelId }] : []
   )
   const selectedModelCandidate =
-    runMode === "research"
-      ? RESEARCH_MODEL
-      : (parsed.data.model ?? resolveDefaultModelSelectorModel(chatModels))
+    parsed.data.model ?? resolveDefaultModelSelectorModel(chatModels)
 
   if (!isSupportedModel(selectedModelCandidate)) {
     return createJsonErrorResponse({
@@ -396,10 +370,7 @@ export function parseAgentStreamRequest(
     })
   }
 
-  if (
-    runMode !== "research" &&
-    !isAvailableModel(chatModels, selectedModelCandidate)
-  ) {
+  if (!isAvailableModel(chatModels, selectedModelCandidate)) {
     return createJsonErrorResponse({
       requestId: params.requestId,
       error: "Unsupported model selected.",
@@ -410,10 +381,7 @@ export function parseAgentStreamRequest(
   }
 
   return {
-    parsedRequest: {
-      ...parsed.data,
-      runMode,
-    },
+    parsedRequest: parsed.data,
     selectedModel: selectedModelCandidate,
   }
 }
@@ -549,8 +517,7 @@ export function createAgentStreamResponse(
           aiGatewayApiKey: params.aiGatewayApiKey,
           tavilyApiKey: params.tavilyApiKey,
           userTimeZone: params.userTimeZone,
-          runtimeProfile: params.runtimeProfile,
-          ...(params.taskMode ? { taskMode: params.taskMode } : {}),
+          taskMode: params.taskMode,
           userId: params.userId,
           featureFlags: params.featureFlags,
           messages: params.messages,

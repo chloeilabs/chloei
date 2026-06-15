@@ -71,7 +71,6 @@ test("assistant session state builds assistant messages from stream accumulators
     createdAt: "2026-04-30T12:00:00.000Z",
     accumulator,
     model: "moonshotai/kimi-k2.6",
-    runMode: "research",
     isStreaming: true,
   })
 
@@ -79,7 +78,6 @@ test("assistant session state builds assistant messages from stream accumulators
   assert.equal(message.role, "assistant")
   assert.equal(message.content, "Done.")
   assert.equal(message.metadata?.isStreaming, true)
-  assert.equal(message.metadata?.runMode, "research")
   assert.deepEqual(message.metadata?.parts, [{ type: "text", text: "Done." }])
   assert.equal(message.metadata?.reasoning, "Checked the source.")
   assert.equal(message.metadata?.agentStatus, "completed")
@@ -96,7 +94,6 @@ test("assistant session state omits empty structured fields and upserts by id", 
     createdAt: "2026-04-30T12:00:00.000Z",
     accumulator: createAccumulator({ content: "Partial" }),
     model: "moonshotai/kimi-k2.6",
-    runMode: "chat",
     isStreaming: true,
   })
   const finalMessage = createAssistantMessageFromAccumulator({
@@ -104,7 +101,6 @@ test("assistant session state omits empty structured fields and upserts by id", 
     createdAt: "2026-04-30T12:00:00.000Z",
     accumulator: createAccumulator({ content: "Final" }),
     model: "moonshotai/kimi-k2.6",
-    runMode: "chat",
     isStreaming: false,
   })
 
@@ -122,7 +118,6 @@ test("assistant session state attaches follow-up questions without changing cont
     createdAt: "2026-04-30T12:00:00.000Z",
     accumulator: createAccumulator({ content: "Final answer." }),
     model: "moonshotai/kimi-k2.6",
-    runMode: "chat",
     isStreaming: false,
   })
   const updatedMessages = attachFollowUpQuestionsToMessage(
@@ -154,7 +149,6 @@ test("assistant session state tracks pending follow-up questions", () => {
     createdAt: "2026-04-30T12:00:00.000Z",
     accumulator: createAccumulator({ content: "Final answer." }),
     model: "moonshotai/kimi-k2.6",
-    runMode: "chat",
     isStreaming: false,
   })
 

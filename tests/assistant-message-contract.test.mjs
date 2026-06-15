@@ -44,7 +44,7 @@ test("assistant regenerate action reuses the prior user message", async () => {
   )
   assert.match(
     source,
-    /const handleRegenerate =[\s\S]*onEditMessage\?\.\(\{[\s\S]*messageId: userMessage\.id,[\s\S]*newContent: userMessage\.content,[\s\S]*newModel: regenerateModel,[\s\S]*newRunMode: regenerateRunMode,[\s\S]*\}\)[\s\S]*onRegenerate=\{handleRegenerate\}/,
+    /const handleRegenerate =[\s\S]*onEditMessage\?\.\(\{[\s\S]*messageId: userMessage\.id,[\s\S]*newContent: userMessage\.content,[\s\S]*newModel: regenerateModel,[\s\S]*\}\)[\s\S]*onRegenerate=\{handleRegenerate\}/,
     "Expected regenerate to rerun the previous user prompt through the existing edit-regenerate path."
   )
 })

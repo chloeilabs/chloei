@@ -53,10 +53,9 @@ Client (useAgentSession)
   → POST /api/agent (app/api/agent/route.ts)
     → Auth check (isAuthConfigured → getRequestSession)   [routes self-guard; see Middleware]
     → Sliding-window rate limit (rate-limit.ts, key user:<userId>)
-    → Zod validation (parseAgentStreamRequest) — incl. runMode (chat|research) and model
+    → Zod validation (parseAgentStreamRequest) — model + messages
     → Concurrency slot acquire (max 4 in-flight per user)
     → System prompt assembly (buildAgentSystemInstruction)
-    → Runtime profile resolution (chat_default | deep_research)
     → AI Gateway stream via Vercel AI SDK (startGatewayResponseStream → runAgentStream)
     → NDJSON chunks (application/x-ndjson) → client
       → readResponseStreamLines / parseStreamEventLine
@@ -77,14 +76,9 @@ Before the model sees them, messages pass through `toModelMessages` (`agent-runt
 
 This boundary is **enforced by Next.js bundling at build time** (importing `pg`/`better-auth`/server modules into a client bundle is a build error), **not** by an ESLint rule. Keep it in mind when adding imports.
 
-### Runtime Profiles vs. Task Modes (two independent axes)
+### Task Modes
 
-These are easy to confuse. They are orthogonal:
-
-- **Runtime profile** (`resolveRuntimeProfile` in `app/api/agent/route.ts`, `AGENT_RUNTIME_PROFILES` in `agent-runtime.ts`) — one of `chat_default`, `deep_research`. The profile drives the **tool-step budget** (the tool set itself is the same for both).
-- **Task mode** (`inferPromptTaskMode` in `agent-prompt-steering.ts`) — inferred from message content; drives only the **prompt overlay text** and the Gemini thinking level. Modes: `general`, `coding`, `debugging`, `writing`, `research`, `high_stakes`, `closed_answer`, `instruction_following`.
-
-Research mode is a **request flag** (`runMode: "research"`), not an inference. It selects the `deep_research` profile and `RESEARCH_MODEL` (Qwen 3.7 Max); if that model is unavailable the route returns 400 `AGENT_RESEARCH_MODEL_UNAVAILABLE`.
+**Task mode** (`inferPromptTaskMode` in `agent-prompt-steering.ts`) is inferred from message content and drives only the **prompt overlay text** (`TASK MODE OVERLAY: <MODE>`) and the Gemini thinking level. Modes: `general`, `coding`, `debugging`, `writing`, `research`, `high_stakes`, `closed_answer`, `instruction_following`. The tool-step budget is a single fixed constant (`AGENT_TOOL_MAX_STEPS`) — there is no per-request runtime-profile selection. (The `research` task mode is an automatic content-based overlay, not a user-facing toggle.)
 
 ### System Prompt Composition
 
@@ -94,9 +88,8 @@ Research mode is a **request flag** (`runMode: "research"`), not an inference. I
 2. `RUNTIME DATE CONTEXT` — current UTC timestamp + user timezone (from `X-User-Timezone` header)
 3. **Provider overlay** (`PROVIDER OVERLAY: ALIBABA|GOOGLE|MOONSHOTAI|XIAOMI`) — keyed by the model's **provider org**, not its nickname (alibaba=Qwen, google=Gemini, moonshotai=Kimi, xiaomi=MiMo). Always applied for a supported model.
 4. **Task mode overlay** (`TASK MODE OVERLAY: <MODE>`)
-5. `DEEP RESEARCH MODE` — only for `runMode: "research"`
-6. `IDENTITY AND TONE CONTEXT` — `DEFAULT_SOUL_FALLBACK_INSTRUCTION` (`src/lib/shared/llm/system-instructions.ts`)
-7. `AUTH USER CONTEXT` — authenticated user id, name, email
+5. `IDENTITY AND TONE CONTEXT` — `DEFAULT_SOUL_FALLBACK_INSTRUCTION` (`src/lib/shared/llm/system-instructions.ts`)
+6. `AUTH USER CONTEXT` — authenticated user id, name, email
 
 Inline-citation rules are appended **later**, by `withAiSdkInlineCitationInstruction` (`system-instruction-augmentations.ts`), inside `createAgentStreamResponse` — not by `buildAgentSystemInstruction`.
 
@@ -155,7 +148,7 @@ Each tool is only registered when its requirements are met.
 - **Restricted backend** (the only backend): computation-only Python imports (`math`, `collections`, `itertools`, …).
 - **Limits**: timeout default **10 s**, max **60 s**; code input and output each capped at **12,000 chars**.
 
-**Max tool steps** (constants in `agent-runtime-config.ts`): 12 default; 20 for research runs.
+**Max tool steps** (`AGENT_TOOL_MAX_STEPS` in `agent-runtime-config.ts`): 12.
 
 ### Model Registry
 
@@ -169,7 +162,6 @@ All models are defined in `src/lib/shared/llm/models.ts`:
 | `XIAOMI_MIMO_V2_5_PRO`          | `xiaomi/mimo-v2.5-pro`          | MiMo V2.5 Pro          |
 
 - `MODEL_SELECTOR_MODELS` — the chat selector subset: Qwen 3.7 Max, Kimi K2.6, MiMo V2.5 Pro.
-- `RESEARCH_MODEL` — Qwen 3.7 Max (Research mode also injects the Deep Research prompt block).
 - Gemini stays in `SUPPORTED_MODELS` for Gateway availability but is not a standalone chat selector option.
 - The agent is text-only: all chat input is plain text (no image, file, or PDF input).
 - Adding a model means updating `AvailableModels`, `ModelInfos`, `SUPPORTED_MODELS`, and optionally `MODEL_SELECTOR_MODELS`. `/api/models` filters this registry by configured keys (`getModels()` in `src/lib/actions/api-keys.ts`).
@@ -272,7 +264,7 @@ src/
                         #   follow-up-questions
     agent/messages/     # Message rendering (user, assistant, queued, activity timeline)
     agent/markdown/     # Memoized markdown renderer
-    agent/prompt-form/  # PromptForm (inline Research + Tools popover), ModelSelector
+    agent/prompt-form/  # PromptForm, ModelSelector
     app-sidebar.tsx     # Sidebar shell (lazy-loads SearchChats + NavThreads)
     nav-threads.tsx     # Thread list + client-side pinning (localStorage)
     nav-user.tsx        # Account menu + sign-out
@@ -282,8 +274,8 @@ src/
     layout/             # route group layout
     ui/                 # shadcn/ui primitives (base-lyra/stone) + ShikiCode
   hooks/
-    agent/              # use-models (server-seeded models context), use-persistent-selected-model,
-                        #   use-persistent-run-mode (both localStorage-backed)
+    agent/              # use-models (server-seeded models context),
+                        #   use-persistent-selected-model (localStorage-backed)
   lib/
     actions/api-keys.ts # getModels() server action
     brand/colors.ts     # App brand colors (used by layout/manifest)
@@ -312,7 +304,7 @@ src/
         initial-reasoning-chunk-sanitizer.ts # Redacted-reasoning filtering
         system-instruction-augmentations.ts  # Citation rules appended to prompt
     shared/
-      agent/messages.ts          # AgentStreamEvent, Message, ToolInvocation, run modes/statuses
+      agent/messages.ts          # AgentStreamEvent, Message, ToolInvocation, run statuses
       agent/reasoning-privacy.ts # sanitizeReasoningForDisplay
       agent-request-limits.ts    # Message/char limit defaults
       llm/models.ts              # AvailableModels, ModelInfos, SUPPORTED/SELECTOR/RESEARCH
@@ -394,5 +386,5 @@ Request size limits, stream/gateway timeouts, tool-step budgets, the rate-limit 
 - The **mock smoke test uses the production server** (`next start`), so build first.
 - `pnpm.onlyBuiltDependencies` already approves the `sharp` build script — do not run `pnpm approve-builds`.
 - Don't reintroduce Sentry/PostHog/OpenTelemetry; they were intentionally removed in favor of Vercel Analytics/Speed Insights + structured logs.
-- Pinning, selected model, and run mode are **client-side localStorage** — there are no server columns or APIs for them.
+- Pinning and selected model are **client-side localStorage** — there are no server columns or APIs for them.
 - After signing up via `/api/auth/sign-up/email`, the session cookie is set automatically; no separate sign-in is needed.

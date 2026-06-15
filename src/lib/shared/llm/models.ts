@@ -28,8 +28,6 @@ export const SUPPORTED_MODELS = [
 
 export const ALL_MODELS = [...SUPPORTED_MODELS] as const
 
-export const RESEARCH_MODEL = AvailableModels.ALIBABA_QWEN3_7_MAX
-
 export const MODEL_SELECTOR_MODELS = [
   AvailableModels.ALIBABA_QWEN3_7_MAX,
   AvailableModels.MOONSHOTAI_KIMI_K2_6,

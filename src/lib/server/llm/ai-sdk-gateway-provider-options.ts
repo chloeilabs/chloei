@@ -16,8 +16,6 @@ function buildGeminiThinkingOptions(level: GeminiThinkingLevel) {
   } as const
 }
 
-const GEMINI_HIGH_THINKING_PROVIDER_OPTIONS = buildGeminiThinkingOptions("high")
-
 /**
  * Map a (provider, taskMode) pair to AI SDK provider options.
  *
@@ -58,18 +56,4 @@ export function getAiSdkGatewayProviderOptionsForTaskMode(params: {
   const _unhandledTaskMode: never = params.taskMode
   void _unhandledTaskMode
   return {}
-}
-
-export function getAiSdkGatewayProviderOptions() {
-  return getAiSdkGatewayProviderOptionsForMode()
-}
-
-// Legacy shim for callers that only know about the deep-research flag (eval
-// harness, etc.). Prefer getAiSdkGatewayProviderOptionsForTaskMode for new code.
-export function getAiSdkGatewayProviderOptionsForMode({
-  deepResearch = false,
-}: {
-  deepResearch?: boolean
-} = {}) {
-  return deepResearch ? GEMINI_HIGH_THINKING_PROVIDER_OPTIONS : {}
 }

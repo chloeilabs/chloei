@@ -28,11 +28,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { useIsMobile } from "@/hooks/use-mobile"
-import {
-  type AgentRunMode,
-  type AuthViewer,
-  type ModelType,
-} from "@/lib/shared"
+import { type AuthViewer, type ModelType } from "@/lib/shared"
 import { cn } from "@/lib/utils"
 
 import { PromptForm } from "../prompt-form/prompt-form"
@@ -85,28 +81,15 @@ export function HomePageContent({
   } = useAgentSession(threadStore)
 
   const handlePromptFormSubmit = useCallback(
-    (
-      message: string,
-      model: ModelType,
-      _isStreaming: boolean,
-      runMode: AgentRunMode
-    ) => {
-      handlePromptSubmit(message, model, runMode)
+    (message: string, model: ModelType) => {
+      handlePromptSubmit(message, model)
     },
     [handlePromptSubmit]
   )
 
   const handleFollowUpQuestionClick = useCallback(
-    ({
-      model,
-      question,
-      runMode,
-    }: {
-      model: ModelType
-      question: string
-      runMode: AgentRunMode
-    }) => {
-      handlePromptSubmit(question, model, runMode)
+    ({ model, question }: { model: ModelType; question: string }) => {
+      handlePromptSubmit(question, model)
     },
     [handlePromptSubmit]
   )
@@ -221,15 +204,10 @@ export function HomePageContent({
   }, [fallbackTransitionMs])
 
   const handleAnimatedPromptSubmit = useCallback(
-    (
-      message: string,
-      model: ModelType,
-      _isStreaming: boolean,
-      runMode: AgentRunMode
-    ) => {
+    (message: string, model: ModelType) => {
       if (isMobile) {
         startFallbackConversationTransition()
-        handlePromptSubmit(message, model, runMode)
+        handlePromptSubmit(message, model)
         return
       }
 
@@ -244,13 +222,13 @@ export function HomePageContent({
 
       if (!startViewTransition) {
         startFallbackConversationTransition()
-        handlePromptSubmit(message, model, runMode)
+        handlePromptSubmit(message, model)
         return
       }
 
       startViewTransition(() => {
         flushSync(() => {
-          handlePromptSubmit(message, model, runMode)
+          handlePromptSubmit(message, model)
         })
       })
     },

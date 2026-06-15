@@ -10,27 +10,9 @@ const providerOptionsUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/llm/ai-sdk-gateway-provider-options.ts")
 ).href
 
-const {
-  getAiSdkGatewayProviderOptionsForMode,
-  getAiSdkGatewayProviderOptionsForTaskMode,
-} = await import(providerOptionsUrl)
-
-test("getAiSdkGatewayProviderOptionsForMode preserves legacy deep-research behavior", () => {
-  assert.deepEqual(getAiSdkGatewayProviderOptionsForMode(), {})
-  assert.deepEqual(getAiSdkGatewayProviderOptionsForMode({}), {})
-  assert.deepEqual(
-    getAiSdkGatewayProviderOptionsForMode({ deepResearch: false }),
-    {}
-  )
-  assert.deepEqual(
-    getAiSdkGatewayProviderOptionsForMode({ deepResearch: true }),
-    {
-      google: {
-        thinkingConfig: { thinkingLevel: "high", includeThoughts: true },
-      },
-    }
-  )
-})
+const { getAiSdkGatewayProviderOptionsForTaskMode } = await import(
+  providerOptionsUrl
+)
 
 test("Gemini gets high thinking for research, high_stakes, debugging", () => {
   for (const taskMode of ["research", "high_stakes", "debugging"]) {

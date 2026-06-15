@@ -288,7 +288,6 @@ export function useFollowUpQuestions({
             headers: createAgentRequestHeaders(),
             body: JSON.stringify({
               model: params.model,
-              runMode: params.runMode,
               threadId: params.threadId,
               assistantMessageId: params.assistantMessageId,
               messages: toRequestMessages(params.messages),
