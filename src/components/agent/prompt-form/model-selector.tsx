@@ -82,13 +82,13 @@ export function ModelSelector({
         side="bottom"
         align="start"
         sideOffset={2}
-        onCloseAutoFocus={(event) => {
+        finalFocus={() => {
           if (!shouldPreventCloseAutoFocusRef.current) {
-            return
+            return true
           }
 
-          event.preventDefault()
           shouldPreventCloseAutoFocusRef.current = false
+          return false
         }}
         className="flex w-fit flex-col gap-0.5 overflow-hidden rounded-none p-0"
       >

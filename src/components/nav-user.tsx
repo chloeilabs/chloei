@@ -83,7 +83,7 @@ export function NavUser({ viewer }: { viewer: AuthViewer }) {
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            className="w-(--radix-dropdown-menu-trigger-width)"
+            className="w-(--anchor-width)"
             side="top"
             align="end"
             sideOffset={4}
