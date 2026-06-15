@@ -38,9 +38,9 @@ node --test tests/agent-route-contract.test.mjs  # Single test file
 
 ESLint runs with `--max-warnings=0`, so any warning fails the build. CI also enforces `pnpm format:check`. Run `pnpm lint && pnpm format:check && pnpm typecheck` before committing.
 
-## Local / Cursor Cloud setup
+## Local / Claude Code setup
 
-`README.md` covers generic local setup. Cursor Cloud-specific setup lives in `AGENTS.md`, `.cursor/setup.sh`, `.cursor/environment.json`, and `.cursor/Dockerfile`; Cloud agents use native PostgreSQL 16 by default, not Docker. The Claude Code SessionStart hook (`.claude/hooks/session-start.sh`, wired by `.claude/settings.json`) provisions the local database, runs migrations, and installs Playwright Chromium so web sessions can build and test immediately.
+`README.md` covers generic local setup. The Claude Code SessionStart hook (`.claude/hooks/session-start.sh`, wired by `.claude/settings.json`) provisions the local database, runs migrations, and installs Playwright Chromium so web sessions can build and test immediately.
 
 For Vercel-backed local envs, run `vercel login`, approve the device-login URL, confirm `.vercel/project.json` links to the Chloei Labs `chloei` project, then `vercel env pull .env.local --yes`.
 
