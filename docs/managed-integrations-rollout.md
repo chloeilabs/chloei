@@ -5,7 +5,7 @@ Last verified: June 14, 2026.
 This runbook covers the Chloei managed integration stack for financial-services
 agent capabilities. The default posture is privacy-first: all new production
 capabilities stay off unless a documented rollout step enables them, and raw
-prompts, completions, attachment contents, account data, credentials, and PII
+prompts, completions, account data, credentials, and PII
 must not be sent to telemetry providers.
 
 > Telemetry note: Chloei no longer ships a third-party error/analytics SDK.
@@ -131,11 +131,9 @@ Expected results:
 Authenticated rollout smoke after internal production flags are enabled:
 
 1. Sign in as an internal user.
-2. Upload a non-sensitive test document and confirm it is stored through private
-   Blob metadata only.
-3. Run a finance-analysis chat and confirm the financial-services workflow block
+2. Run a finance-analysis chat and confirm the financial-services workflow block
    resolves for the internal user (and not for an external test user).
-4. Confirm Vercel runtime logs capture the request/outcome without raw prompts,
+3. Confirm Vercel runtime logs capture the request/outcome without raw prompts,
    completions, or PII (`vercel logs https://chloei.ai --since 30m`).
 
 ## Quality Gates
@@ -180,9 +178,7 @@ Also restore the `chloei-flags` Edge Config values to false.
 
 - Keep Neon as the only PostgreSQL system of record.
 - Live financial facts stay routed through `finance_data`, SEC, and Tavily.
-- Private Blob downloads must go through authenticated app routes, never direct
-  public URLs.
-- Raw prompts, completions, attachment contents, and PII must never be written
+- Raw prompts, completions, and PII must never be written
   to logs or telemetry; `AGENT_TELEMETRY_RECORD_IO` must stay `false` outside an
   approved, controlled eval cohort.
 

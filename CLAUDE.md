@@ -66,7 +66,7 @@ Client (useAgentSession)
 
 Key route files: `src/app/api/agent/route.ts` (HTTP entry, auth, rate limit, validation) → `src/lib/server/agent-route.ts` (`parseAgentStreamRequest`, `createAgentStreamResponse`, NDJSON writing, fallback handling) → `src/lib/server/llm/agent-runtime.ts` (the tool loop) → `src/lib/server/llm/gateway-responses.ts` (`startGatewayResponseStream`).
 
-Before the model sees them, messages pass through the attachment pipeline (`hydrateBlobBackedAttachments` → `preparePdfAttachmentsForModel` → `describeImagesForTextOnlyModel` for text-only models → `toModelMessages`). System-role messages are rejected in `toModelMessages` — system content must come via `systemInstruction`.
+Before the model sees them, messages pass through `toModelMessages` (`agent-runtime-messages.ts`). System-role messages are rejected there — system content must come via `systemInstruction`.
 
 ### Server / Client / Shared Boundary
 
@@ -135,7 +135,7 @@ Streamed reasoning is filtered through three layers so the hidden prompt never l
 2. Leading `thinking:` / `reasoning:` labels are stripped (buffered across chunk boundaries).
 3. `sanitizeReasoningForDisplay` (`src/lib/shared/agent/reasoning-privacy.ts`) redacts prompt-internal terms (`soul.md`, "system prompt", "operating instructions", "provider overlay", "task mode overlay", "auth user context", etc.). `getPrivateReasoningCarryLength` holds back a trailing partial token across chunk boundaries so a split secret can't slip through. Applied both at stream time and on thread persistence.
 
-User ids are never written into blob storage paths: `hashUserId` (`src/lib/server/privacy.ts`) produces a `sha256:<hex>` digest used as the storage prefix.
+User ids are never logged in the clear: `hashUserId` (`src/lib/server/privacy.ts`) produces a `sha256:<hex>` digest used for telemetry user-hashing.
 
 ### Agent Tools
 
@@ -170,8 +170,8 @@ All models are defined in `src/lib/shared/llm/models.ts`:
 
 - `MODEL_SELECTOR_MODELS` — the chat selector subset: Qwen 3.7 Max, Kimi K2.6, MiMo V2.5 Pro.
 - `RESEARCH_MODEL` — Qwen 3.7 Max (Research mode also injects the Deep Research prompt block).
-- Gemini stays in `SUPPORTED_MODELS` for Gateway availability and is the **image/PDF preprocessor model** (`VISION_PREPROCESSOR_MODEL` / `PDF_PREPROCESSOR_MODEL`), but it is not a standalone chat selector option.
-- Native image + file input is enabled only for Gemini and Kimi (`modelSupportsImageInput` / `modelSupportsFileInput`); other models get text descriptions of attachments instead.
+- Gemini stays in `SUPPORTED_MODELS` for Gateway availability but is not a standalone chat selector option.
+- The agent is text-only: all chat input is plain text (no image, file, or PDF input).
 - Adding a model means updating `AvailableModels`, `ModelInfos`, `SUPPORTED_MODELS`, and optionally `MODEL_SELECTOR_MODELS`. `/api/models` filters this registry by configured keys (`getModels()` in `src/lib/actions/api-keys.ts`).
 
 ### Thread Storage
@@ -231,14 +231,6 @@ Better Auth handles sessions. `getRequestSession` (`src/lib/server/auth-session.
 - Not authenticated → redirect to `/sign-in`.
 - **Fail-open**: if `getRequestSession` throws, the middleware logs and calls `next()` (lets the request through).
 
-### Attachments (Vercel Blob + IndexedDB)
-
-Image and PDF attachments use a two-tier client flow plus private server storage:
-
-- **Upload**: on submit, files are read as data URLs and best-effort uploaded to private Blob via `POST /api/uploads` (`src/lib/server/private-blob-storage.ts`). On upload failure they fall back to an inline `dataUrl`. Blob objects are `access: private`, tenant-isolated under `users/<sha256(userId)>/…`; downloads go only through the authenticated route `/api/uploads/<segments>`.
-- **Client persistence**: per-message attachment payloads are stored in **IndexedDB** (`chloei-attachments`, keyed by `(threadId, messageId, attachmentId)`), hydrated on thread open and pruned to surviving messages.
-- **Model preparation**: `hydrateBlobBackedAttachments` fetches blob bytes at run time; PDFs are text-extracted (`pdf-text-extraction.ts`); images on text-only models are described via the Gemini vision preprocessor.
-
 ### Feature Flags
 
 `src/lib/server/integration-flags.ts` resolves one default-off flag: `telemetryRecordIo`. Precedence:
@@ -256,7 +248,7 @@ Image and PDF attachments use a two-tier client flow plus private server storage
 
 ### Integrations
 
-- **File attachments / feature flags** — see the dedicated sections above.
+- **Feature flags** — see the dedicated section above.
 
 ## File Structure
 
@@ -272,16 +264,15 @@ src/
       auth/[...all]/       # Better Auth catch-all
       models/route.ts      # GET /api/models — available models for configured keys
       threads/route.ts     # GET/PUT/DELETE /api/threads — thread CRUD
-      uploads/             # Private Blob attachment upload + download
     layout.tsx          # Root layout: fonts, dark theme, Analytics + SpeedInsights, dev cache-reset
     manifest.ts         # PWA manifest (production-only standalone)
   components/
     agent/home/         # Chat core: use-agent-session, agent-stream-state/-events,
                         #   thread-store-context, use-thread-store, home-content,
-                        #   agent-attachment-store (IndexedDB), follow-up-questions
+                        #   follow-up-questions
     agent/messages/     # Message rendering (user, assistant, queued, activity timeline)
     agent/markdown/     # Memoized markdown renderer
-    agent/prompt-form/  # PromptForm (inline Research + Tools popover), ModelSelector, attachments
+    agent/prompt-form/  # PromptForm (inline Research + Tools popover), ModelSelector
     app-sidebar.tsx     # Sidebar shell (lazy-loads SearchChats + NavThreads)
     nav-threads.tsx     # Thread list + client-side pinning (localStorage)
     nav-user.tsx        # Account menu + sign-out
@@ -302,10 +293,9 @@ src/
       agent-prompt-steering.ts  # Task-mode inference + provider/task overlays
       agent-route.ts            # parseAgentStreamRequest, createAgentStreamResponse
       agent-runtime-config.ts   # Runtime constants + a few operational env switches
-      agent-attachment-blobs.ts # Blob-backed attachment hydration
       auth.ts / auth-session.ts # isAuthConfigured, getRequestSession
       integration-flags.ts      # Default-off feature flags (env + Edge Config)
-      privacy.ts                # hashUserId (blob path prefixes)
+      privacy.ts                # hashUserId (telemetry user hashing)
       rate-limit.ts             # Sliding window + concurrency slot
       route-observability.ts    # createRouteObservation, observeRouteResponse
       threads.ts / thread-payload.ts  # Thread CRUD + Zod parsing
@@ -319,13 +309,10 @@ src/
         ai-sdk-gateway-provider-options.ts # Per-model provider options (Gemini thinking)
         ai-sdk-tavily-tools.ts            # tavily_search / tavily_extract
         code-execution-tools.ts           # Sandboxed JS/Python execution
-        image-vision-preprocessor.ts      # Image → text via Gateway vision
-        pdf-attachment-preprocessor.ts    # PDF → text for the model
         initial-reasoning-chunk-sanitizer.ts # Redacted-reasoning filtering
         system-instruction-augmentations.ts  # Citation rules appended to prompt
     shared/
       agent/messages.ts          # AgentStreamEvent, Message, ToolInvocation, run modes/statuses
-      agent/attachments.ts       # Attachment metadata types
       agent/reasoning-privacy.ts # sanitizeReasoningForDisplay
       agent-request-limits.ts    # Message/char limit defaults
       llm/models.ts              # AvailableModels, ModelInfos, SUPPORTED/SELECTOR/RESEARCH
@@ -393,7 +380,6 @@ All others are optional with safe defaults. See `.env.example` for the annotated
 | `BETTER_AUTH_TRUSTED_ORIGINS` | Comma-separated additional trusted origins                          |
 | `BETTER_AUTH_COOKIE_DOMAIN`   | Shared cookie domain for cross-subdomain auth                       |
 | `TAVILY_API_KEY`              | Enables `tavily_search` + `tavily_extract`                          |
-| `BLOB_READ_WRITE_TOKEN`       | Private Vercel Blob store for attachments                           |
 | `EDGE_CONFIG`                 | Vercel Edge Config connection for remote feature flags              |
 | `AGENT_TELEMETRY_RECORD_IO`   | Feature flag: record prompt/output IO in telemetry (default off)    |
 | `AGENT_RATE_LIMIT_ENABLED`    | Rate-limit kill switch (default true)                               |

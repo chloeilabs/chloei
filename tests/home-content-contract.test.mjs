@@ -10,30 +10,6 @@ const homeContentPath = path.join(
   "src/components/agent/home/home-content.tsx"
 )
 
-test("home animated prompt forwards attachments from the initial prompt", async () => {
-  const source = await readFile(homeContentPath, "utf8")
-
-  assert.match(
-    source,
-    /attachments:\s*AgentRequestAttachment\[\]\s*=\s*\[\]/,
-    "Expected the animated initial prompt submit handler to accept attachments."
-  )
-
-  const forwardedCalls = source.match(
-    /handlePromptSubmit\(message,\s*model,\s*runMode,\s*attachments\)/g
-  )
-  assert.equal(
-    forwardedCalls?.length,
-    4,
-    "Expected every animated prompt branch to forward attachments."
-  )
-  assert.match(
-    source,
-    /const handlePromptFormSubmit = useCallback\([\s\S]*handlePromptSubmit\(message,\s*model,\s*runMode,\s*attachments\)/,
-    "Expected PromptForm's streaming argument to be adapted outside the session hook."
-  )
-})
-
 test("prompt submissions queue while the submit lock is still active", async () => {
   const source = await readFile(
     path.join(cwd, "src/components/agent/home/use-agent-session.ts"),

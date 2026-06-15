@@ -13,9 +13,7 @@ const moduleUrl = pathToFileURL(
 const {
   attachFollowUpQuestionsToMessage,
   createAssistantMessageFromAccumulator,
-  getThreadAttachmentPayloads,
   hasVisibleStructuredOutput,
-  pruneThreadAttachmentPayloads,
   setFollowUpQuestionsPendingForMessage,
   upsertAgentMessage,
 } = await import(moduleUrl)
@@ -176,49 +174,4 @@ test("assistant session state tracks pending follow-up questions", () => {
     clearedMessages[0]?.metadata?.followUpQuestionsPending,
     undefined
   )
-})
-
-test("assistant session state prunes stale raw attachment payloads by thread", () => {
-  const payloadsByThread = new Map()
-  const threadPayloads = getThreadAttachmentPayloads(
-    payloadsByThread,
-    "thread-1"
-  )
-  threadPayloads.set("user-keep", [
-    {
-      id: "attachment-1",
-      kind: "image",
-      filename: "chart.png",
-      mediaType: "image/png",
-      sizeBytes: 5,
-      detail: "auto",
-      dataUrl: "data:image/png;base64,aGVsbG8=",
-    },
-  ])
-  threadPayloads.set("user-drop", [
-    {
-      id: "attachment-2",
-      kind: "pdf",
-      filename: "report.pdf",
-      mediaType: "application/pdf",
-      sizeBytes: 5,
-      dataUrl: "data:application/pdf;base64,aGVsbG8=",
-    },
-  ])
-
-  pruneThreadAttachmentPayloads(payloadsByThread, "thread-1", [
-    {
-      id: "user-keep",
-      role: "user",
-      content: "Analyze this.",
-      createdAt: "2026-04-30T12:00:00.000Z",
-    },
-  ])
-
-  assert.equal(payloadsByThread.get("thread-1")?.has("user-keep"), true)
-  assert.equal(payloadsByThread.get("thread-1")?.has("user-drop"), false)
-
-  pruneThreadAttachmentPayloads(payloadsByThread, "thread-1", [])
-
-  assert.equal(payloadsByThread.has("thread-1"), false)
 })

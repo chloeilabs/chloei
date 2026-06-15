@@ -1,52 +1,11 @@
-import { type AgentRequestAttachment } from "@/lib/shared"
-
 export interface AgentInputMessage {
   role: "system" | "user" | "assistant"
   content: string
-  attachments?: AgentRequestAttachment[]
 }
-
-interface AgentTextModelMessagePart {
-  type: "text"
-  text: string
-}
-
-function toModelMessageAttachmentPart(attachment: AgentRequestAttachment) {
-  if (!attachment.dataUrl) {
-    throw new Error("Attachment payload is missing.")
-  }
-
-  if (attachment.kind === "image") {
-    return {
-      type: "image" as const,
-      image: attachment.dataUrl,
-      mediaType: attachment.mediaType,
-      providerOptions: {
-        openai: {
-          imageDetail: attachment.detail ?? "auto",
-        },
-      },
-    }
-  }
-
-  return {
-    type: "file" as const,
-    data: attachment.dataUrl,
-    mediaType: attachment.mediaType,
-    filename: attachment.filename,
-  }
-}
-
-type AgentAttachmentModelMessagePart = ReturnType<
-  typeof toModelMessageAttachmentPart
->
-type AgentUserModelMessagePart =
-  | AgentTextModelMessagePart
-  | AgentAttachmentModelMessagePart
 
 interface AgentUserModelMessage {
   role: "user"
-  content: string | AgentUserModelMessagePart[]
+  content: string
 }
 
 interface AgentAssistantModelMessage {
@@ -55,23 +14,6 @@ interface AgentAssistantModelMessage {
 }
 
 type AgentModelMessage = AgentUserModelMessage | AgentAssistantModelMessage
-
-function getUserMessageContent(
-  content: string,
-  attachments: AgentRequestAttachment[]
-): AgentUserModelMessage["content"] {
-  if (attachments.length === 0) {
-    return content
-  }
-
-  return [
-    {
-      type: "text",
-      text: content,
-    },
-    ...attachments.map(toModelMessageAttachmentPart),
-  ]
-}
 
 export function toModelMessages(
   messages: AgentInputMessage[]
@@ -100,7 +42,7 @@ export function toModelMessages(
 
     inputMessages.push({
       role: "user",
-      content: getUserMessageContent(content, message.attachments ?? []),
+      content,
     })
   }
 

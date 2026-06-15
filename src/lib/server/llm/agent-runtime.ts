@@ -7,7 +7,6 @@ import {
 } from "ai"
 
 import { createLogger } from "@/lib/logger"
-import { hydrateBlobBackedAttachments } from "@/lib/server/agent-attachment-blobs"
 import {
   type PromptTaskMode,
   resolvePromptProvider,
@@ -21,12 +20,7 @@ import {
   getDefaultAgentFeatureFlags,
 } from "@/lib/server/integration-flags"
 import { hashUserId } from "@/lib/server/privacy"
-import {
-  type AgentStreamEvent,
-  modelSupportsFileInput,
-  modelSupportsImageInput,
-  type ModelType,
-} from "@/lib/shared"
+import { type AgentStreamEvent, type ModelType } from "@/lib/shared"
 
 import {
   type AgentInputMessage,
@@ -53,9 +47,7 @@ import {
   isAiSdkCodeExecutionToolName,
 } from "./code-execution-tools"
 import { aiGatewayFetch } from "./gateway-client"
-import { describeImagesForTextOnlyModel } from "./image-vision-preprocessor"
 import { createReasoningDisplaySanitizer } from "./initial-reasoning-chunk-sanitizer"
-import { preparePdfAttachmentsForModel } from "./pdf-attachment-preprocessor"
 
 const logger = createLogger("agent-runtime")
 
@@ -248,27 +240,7 @@ export async function* startAgentRuntimeStream(
     fetch: aiGatewayFetch,
   })
 
-  const blobHydratedMessages = await hydrateBlobBackedAttachments({
-    messages: params.messages,
-    userId,
-    signal: params.signal,
-  })
-
-  const pdfPreparedMessages = await preparePdfAttachmentsForModel({
-    messages: blobHydratedMessages,
-    aiGatewayApiKey: params.aiGatewayApiKey,
-    signal: params.signal,
-    preservePdfAttachments: modelSupportsFileInput(params.model),
-  })
-  const inputMessages = modelSupportsImageInput(params.model)
-    ? pdfPreparedMessages
-    : await describeImagesForTextOnlyModel({
-        messages: pdfPreparedMessages,
-        aiGatewayApiKey: params.aiGatewayApiKey,
-        signal: params.signal,
-      })
-
-  const messages = toModelMessages(inputMessages)
+  const messages = toModelMessages(params.messages)
   if (messages.length === 0) {
     return
   }

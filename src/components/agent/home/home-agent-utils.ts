@@ -1,12 +1,9 @@
 import { ASSISTANT_EMPTY_RESPONSE_FALLBACK } from "@/lib/constants"
 import { createRequestHeaders } from "@/lib/request-id"
 import {
-  type AgentAttachmentMetadata,
-  type AgentRequestAttachment,
   type AgentRunMode,
   type Message as AgentMessage,
   type ModelType,
-  toAgentAttachmentMetadata,
 } from "@/lib/shared"
 import {
   AGENT_REQUEST_MAX_MESSAGE_CHARS,
@@ -23,17 +20,12 @@ const TRUNCATED_MESSAGE_SUFFIX =
 interface AgentRequestMessage {
   role: "user" | "assistant"
   content: string
-  attachments?: AgentRequestAttachment[]
 }
 
 interface AgentRequestMessageDraft {
   id: string
   role: "user" | "assistant"
   content: string
-}
-
-interface ToRequestMessagesOptions {
-  attachmentsByMessageId?: ReadonlyMap<string, AgentRequestAttachment[]>
 }
 
 function getClientTimeZone(): string | undefined {
@@ -76,8 +68,7 @@ function trimMessageContent(content: string): string {
 }
 
 export function toRequestMessages(
-  messages: AgentMessage[],
-  options: ToRequestMessagesOptions = {}
+  messages: AgentMessage[]
 ): AgentRequestMessage[] {
   const requestMessageDrafts: AgentRequestMessageDraft[] = messages
     .filter(
@@ -107,33 +98,18 @@ export function toRequestMessages(
     boundedMessages.shift()
   }
 
-  return boundedMessages.map((message) => {
-    const attachments =
-      message.role === "user"
-        ? (options.attachmentsByMessageId?.get(message.id) ?? [])
-        : []
-
-    return {
-      role: message.role,
-      content: message.content,
-      ...(attachments.length > 0 ? { attachments } : {}),
-    }
-  })
+  return boundedMessages.map((message) => ({
+    role: message.role,
+    content: message.content,
+  }))
 }
 
 export function appendUserMessage(
   currentMessages: AgentMessage[],
   content: string,
   model: ModelType,
-  runMode: AgentRunMode = "chat",
-  attachments: readonly (
-    | AgentAttachmentMetadata
-    | AgentRequestAttachment
-  )[] = []
+  runMode: AgentRunMode = "chat"
 ): AgentMessage[] {
-  const attachmentMetadata = attachments.map((attachment) =>
-    "dataUrl" in attachment ? toAgentAttachmentMetadata(attachment) : attachment
-  )
   const userMessage: AgentMessage = {
     id: createClientMessageId(),
     role: "user",
@@ -144,18 +120,12 @@ export function appendUserMessage(
       isStreaming: false,
       selectedModel: model,
       runMode,
-      ...(attachmentMetadata.length > 0
-        ? { attachments: attachmentMetadata }
-        : {}),
     },
   }
 
   const lastMessage = currentMessages[currentMessages.length - 1]
   const shouldReplaceLastUnansweredMessage =
-    lastMessage?.role === "user" &&
-    lastMessage.content.trim() === content &&
-    attachmentMetadata.length === 0 &&
-    (lastMessage.metadata?.attachments?.length ?? 0) === 0
+    lastMessage?.role === "user" && lastMessage.content.trim() === content
 
   const baseMessages = shouldReplaceLastUnansweredMessage
     ? currentMessages.slice(0, -1)

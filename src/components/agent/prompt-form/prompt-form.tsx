@@ -2,17 +2,7 @@
 
 import "../shared/shell-styles.css"
 
-import {
-  CornerRightUp,
-  FileText,
-  ImageIcon,
-  Loader2,
-  Paperclip,
-  Plus,
-  Square,
-  Telescope,
-  X,
-} from "lucide-react"
+import { CornerRightUp, Loader2, Plus, Square, Telescope } from "lucide-react"
 import {
   type CSSProperties,
   type TransitionStartFunction,
@@ -22,7 +12,6 @@ import {
   useRef,
   useState,
 } from "react"
-import { toast } from "sonner"
 
 import { RefreshGlow } from "@/components/graphics/effects/refresh-glow"
 import { Button } from "@/components/ui/button"
@@ -36,13 +25,7 @@ import { useModels } from "@/hooks/agent/use-models"
 import { usePersistentRunMode } from "@/hooks/agent/use-persistent-run-mode"
 import { usePersistentSelectedModel } from "@/hooks/agent/use-persistent-selected-model"
 import {
-  AGENT_ATTACHMENT_MAX_FILE_BYTES,
-  AGENT_ATTACHMENT_MAX_FILES,
-  AGENT_ATTACHMENT_MAX_TOTAL_BYTES,
-  type AgentRequestAttachment,
   type AgentRunMode,
-  getAgentAttachmentAcceptAttribute,
-  getAgentAttachmentKind,
   getModelSelectorModels,
   type ModelType,
 } from "@/lib/shared"
@@ -58,25 +41,10 @@ import {
 } from "../shared/shell-styles"
 import { ModelSelector } from "./model-selector"
 
-const DEFAULT_ATTACHMENT_PROMPT = "Analyze the attached file(s)."
-
 interface QueuedPromptSubmission {
   message: string
   model: ModelType
   runMode: AgentRunMode
-  attachments: AgentRequestAttachment[]
-}
-
-function formatAttachmentSize(sizeBytes: number): string {
-  if (sizeBytes < 1024) {
-    return `${String(sizeBytes)} B`
-  }
-
-  if (sizeBytes < 1024 * 1024) {
-    return `${(sizeBytes / 1024).toFixed(1)} KB`
-  }
-
-  return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 export function PromptForm({
@@ -99,8 +67,7 @@ export function PromptForm({
     message: string,
     model: ModelType,
     queue: boolean,
-    runMode: AgentRunMode,
-    attachments: AgentRequestAttachment[]
+    runMode: AgentRunMode
   ) => void
   onStopStream?: () => void
   isStreaming?: boolean
@@ -125,31 +92,11 @@ export function PromptForm({
   const shouldShowRefreshAnimation = isHome && !dockToBottomOnHome
 
   const [message, setMessage] = useState("")
-  const [pendingAttachments, setPendingAttachments] = useState<
-    AgentRequestAttachment[]
-  >([])
-  const [isReadingAttachments, setIsReadingAttachments] = useState(false)
-  const [isDragActive, setIsDragActive] = useState(false)
   const [isToolsOpen, setIsToolsOpen] = useState(false)
   const { runMode, setRunMode } = usePersistentRunMode()
   const trimmedMessage = useMemo(() => message.trim(), [message])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const isReadingAttachmentsRef = useRef(false)
-  const submitAfterAttachmentsRef = useRef(false)
   const shouldPreventToolsCloseAutoFocusRef = useRef(false)
-  const attachmentAccept = useMemo(
-    () => getAgentAttachmentAcceptAttribute(),
-    []
-  )
-  const pendingAttachmentBytes = useMemo(
-    () =>
-      pendingAttachments.reduce(
-        (total, attachment) => total + attachment.sizeBytes,
-        0
-      ),
-    [pendingAttachments]
-  )
 
   const { data: availableModels } = useModels()
   const modelSelectorModels = useMemo(
@@ -186,7 +133,6 @@ export function PromptForm({
     }
 
     setMessage(queuedSubmission.message)
-    setPendingAttachments(queuedSubmission.attachments)
     setRunMode(queuedSubmission.runMode)
     setSelectedModel(queuedSubmission.model)
     onClearQueuedMessage?.()
@@ -204,28 +150,6 @@ export function PromptForm({
     })
   }, [onClearQueuedMessage, queuedSubmission, setRunMode, setSelectedModel])
 
-  const removeAttachment = useCallback((attachmentId: string) => {
-    setPendingAttachments((current) =>
-      current.filter((attachment) => attachment.id !== attachmentId)
-    )
-  }, [])
-
-  const clearFileInput = useCallback(() => {
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
-    }
-  }, [])
-
-  const handleAttachClick = useCallback(() => {
-    if (isFormPending || isReadingAttachmentsRef.current) {
-      return
-    }
-
-    shouldPreventToolsCloseAutoFocusRef.current = true
-    setIsToolsOpen(false)
-    fileInputRef.current?.click()
-  }, [isFormPending])
-
   const handleSetRunMode = useCallback(
     (nextRunMode: AgentRunMode) => {
       if (isFormPending) {
@@ -241,202 +165,45 @@ export function PromptForm({
     [isFormPending, setRunMode]
   )
 
-  const submitPrompt = useCallback(
-    (attachmentsOverride?: AgentRequestAttachment[]) => {
-      const nextMessage = message.trim()
-      const nextAttachments = attachmentsOverride ?? pendingAttachments
+  const submitPrompt = useCallback(() => {
+    const nextMessage = message.trim()
 
-      if (isStreaming && !nextMessage && nextAttachments.length === 0) {
-        onStopStream?.()
-        return true
-      }
-
-      if (
-        (!nextMessage && nextAttachments.length === 0) ||
-        !resolvedSelectedModel ||
-        isFormPending
-      ) {
-        return false
-      }
-
-      if (dismissKeyboardOnSubmit) {
-        textareaRef.current?.blur()
-
-        if (document.activeElement instanceof HTMLElement) {
-          document.activeElement.blur()
-        }
-      }
-
-      const activeRunMode = runMode
-      onSubmit?.(
-        nextMessage || DEFAULT_ATTACHMENT_PROMPT,
-        resolvedSelectedModel,
-        isStreaming,
-        activeRunMode,
-        nextAttachments
-      )
-      setMessage("")
-      setPendingAttachments([])
-      clearFileInput()
-
+    if (isStreaming && !nextMessage) {
+      onStopStream?.()
       return true
-    },
-    [
-      clearFileInput,
-      dismissKeyboardOnSubmit,
-      isFormPending,
-      isStreaming,
-      message,
-      onStopStream,
-      onSubmit,
-      pendingAttachments,
-      resolvedSelectedModel,
-      runMode,
-    ]
-  )
+    }
 
-  const handleFiles = useCallback(
-    async (files: FileList | File[]) => {
-      if (isFormPending || isReadingAttachmentsRef.current) {
-        return
+    if (!nextMessage || !resolvedSelectedModel || isFormPending) {
+      return false
+    }
+
+    if (dismissKeyboardOnSubmit) {
+      textareaRef.current?.blur()
+
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur()
       }
+    }
 
-      const fileArray = Array.from(files)
-      if (fileArray.length === 0) {
-        return
-      }
+    const activeRunMode = runMode
+    onSubmit?.(nextMessage, resolvedSelectedModel, isStreaming, activeRunMode)
+    setMessage("")
 
-      const nextAttachments: AgentRequestAttachment[] = []
-      let nextCount = pendingAttachments.length
-      let nextTotalBytes = pendingAttachmentBytes
-
-      isReadingAttachmentsRef.current = true
-      setIsReadingAttachments(true)
-
-      try {
-        const {
-          createImagePreviewDataUrl,
-          getNormalizedFileMediaType,
-          readFileAsDataUrl,
-          uploadAttachmentFile,
-        } = await import("./attachments")
-
-        for (const file of fileArray) {
-          if (nextCount >= AGENT_ATTACHMENT_MAX_FILES) {
-            toast.error("Too many attachments", {
-              description: `Attach up to ${String(AGENT_ATTACHMENT_MAX_FILES)} files per request.`,
-            })
-            break
-          }
-
-          const mediaType = getNormalizedFileMediaType(file)
-          if (!mediaType) {
-            toast.error("Unsupported file type", {
-              description:
-                "Attach a PDF, PNG, JPEG, WEBP, or non-animated GIF.",
-            })
-            continue
-          }
-
-          if (file.size <= 0) {
-            toast.error("Empty file", {
-              description: `${file.name || "This file"} has no content.`,
-            })
-            continue
-          }
-
-          if (file.size > AGENT_ATTACHMENT_MAX_FILE_BYTES) {
-            toast.error("File too large", {
-              description: `${file.name || "This file"} must be ${formatAttachmentSize(AGENT_ATTACHMENT_MAX_FILE_BYTES)} or smaller.`,
-            })
-            continue
-          }
-
-          if (nextTotalBytes + file.size > AGENT_ATTACHMENT_MAX_TOTAL_BYTES) {
-            toast.error("Attachments too large", {
-              description: `Keep all attachments under ${formatAttachmentSize(AGENT_ATTACHMENT_MAX_TOTAL_BYTES)} per request.`,
-            })
-            break
-          }
-
-          try {
-            const dataUrl = await readFileAsDataUrl(file)
-            const kind = getAgentAttachmentKind(mediaType)
-            const previewDataUrl =
-              kind === "image"
-                ? await createImagePreviewDataUrl(dataUrl)
-                : undefined
-            const attachmentId = crypto.randomUUID()
-            let blobBackedAttachment: AgentRequestAttachment | null = null
-            try {
-              blobBackedAttachment = await uploadAttachmentFile({
-                file,
-                attachmentId,
-                ...(previewDataUrl ? { previewDataUrl } : {}),
-              })
-            } catch {
-              blobBackedAttachment = null
-            }
-            nextAttachments.push({
-              ...(blobBackedAttachment ?? {}),
-              id: attachmentId,
-              kind,
-              filename: file.name || "attachment",
-              mediaType,
-              sizeBytes: file.size,
-              ...(kind === "image" ? { detail: "auto" } : {}),
-              ...(previewDataUrl ? { previewDataUrl } : {}),
-              ...(blobBackedAttachment ? {} : { dataUrl }),
-            })
-            nextCount += 1
-            nextTotalBytes += file.size
-          } catch {
-            toast.error("File could not be read", {
-              description: file.name || "Please try another file.",
-            })
-          }
-        }
-
-        const shouldSubmitAfterAttachments = submitAfterAttachmentsRef.current
-        submitAfterAttachmentsRef.current = false
-
-        if (nextAttachments.length > 0) {
-          const attachmentsToSubmit = [
-            ...pendingAttachments,
-            ...nextAttachments,
-          ]
-          if (!shouldSubmitAfterAttachments) {
-            setPendingAttachments((current) => [...current, ...nextAttachments])
-          } else if (!submitPrompt(attachmentsToSubmit)) {
-            setPendingAttachments((current) => [...current, ...nextAttachments])
-          }
-        } else if (shouldSubmitAfterAttachments) {
-          void submitPrompt()
-        }
-      } finally {
-        isReadingAttachmentsRef.current = false
-        setIsReadingAttachments(false)
-        clearFileInput()
-      }
-    },
-    [
-      clearFileInput,
-      isFormPending,
-      pendingAttachmentBytes,
-      pendingAttachments,
-      submitPrompt,
-    ]
-  )
+    return true
+  }, [
+    dismissKeyboardOnSubmit,
+    isFormPending,
+    isStreaming,
+    message,
+    onStopStream,
+    onSubmit,
+    resolvedSelectedModel,
+    runMode,
+  ])
 
   const handleSubmit = useCallback(
     (e: { preventDefault: () => void }) => {
       e.preventDefault()
-
-      if (isReadingAttachmentsRef.current) {
-        submitAfterAttachmentsRef.current = true
-        return
-      }
-
       void submitPrompt()
     },
     [submitPrompt]
@@ -471,24 +238,6 @@ export function PromptForm({
   }, [isStreaming, onStopStream])
 
   useEffect(() => {
-    const handleAttachmentShortcut = (event: KeyboardEvent) => {
-      if (
-        !isFormPending &&
-        event.code === "Semicolon" &&
-        (event.metaKey || event.ctrlKey)
-      ) {
-        event.preventDefault()
-        handleAttachClick()
-      }
-    }
-
-    window.addEventListener("keydown", handleAttachmentShortcut)
-    return () => {
-      window.removeEventListener("keydown", handleAttachmentShortcut)
-    }
-  }, [handleAttachClick, isFormPending])
-
-  useEffect(() => {
     const handleResearchShortcut = (event: KeyboardEvent) => {
       if (
         !isFormPending &&
@@ -509,10 +258,7 @@ export function PromptForm({
   }, [isFormPending, setRunMode])
 
   const isSubmitButtonDisabled =
-    isFormPending ||
-    isReadingAttachments ||
-    !resolvedSelectedModel ||
-    (!isStreaming && !trimmedMessage && pendingAttachments.length === 0)
+    isFormPending || !resolvedSelectedModel || (!isStreaming && !trimmedMessage)
 
   return (
     <form
@@ -539,96 +285,15 @@ export function PromptForm({
       )}
 
       <div
-        onDragOver={(event) => {
-          event.preventDefault()
-          if (isFormPending || isReadingAttachments) {
-            return
-          }
-          setIsDragActive(true)
-        }}
-        onDragLeave={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget as Node)) {
-            setIsDragActive(false)
-          }
-        }}
-        onDrop={(event) => {
-          event.preventDefault()
-          setIsDragActive(false)
-          if (isFormPending || isReadingAttachments) {
-            return
-          }
-          void handleFiles(event.dataTransfer.files)
-        }}
         className={cn(
           agentShellFrameClass,
           agentShellInteractiveClass,
           agentShellHighlightClass,
-          isDragActive && "ring-1 ring-ring/70",
           isFormPending && "opacity-50"
         )}
       >
         <div className={cn(agentSurfaceClass, "flex min-h-24 flex-col")}>
           <div className={agentSurfaceBackgroundClass} />
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept={attachmentAccept}
-            className="sr-only"
-            tabIndex={-1}
-            onChange={(event) => {
-              void handleFiles(event.target.files ?? [])
-            }}
-          />
-
-          {pendingAttachments.length > 0 ? (
-            <div className="relative z-10 flex flex-wrap gap-2 px-2 pt-2">
-              {pendingAttachments.map((attachment) => (
-                <div
-                  key={attachment.id}
-                  className="flex h-9 max-w-64 min-w-0 items-center gap-2 rounded-md border border-border/70 bg-background/70 px-1.5 text-xs"
-                >
-                  <div className="flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-muted text-muted-foreground">
-                    {attachment.kind === "image" ? (
-                      attachment.previewDataUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={attachment.previewDataUrl}
-                          alt=""
-                          className="size-full object-cover"
-                        />
-                      ) : (
-                        <ImageIcon className="size-3.5" />
-                      )
-                    ) : (
-                      <FileText className="size-3.5" />
-                    )}
-                  </div>
-                  <div className="min-w-0 leading-tight">
-                    <div className="truncate text-foreground">
-                      {attachment.filename}
-                    </div>
-                    <div className="text-muted-foreground">
-                      {formatAttachmentSize(attachment.sizeBytes)}
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="iconXs"
-                    disabled={isFormPending || isReadingAttachments}
-                    className="ml-auto shrink-0 p-0 text-muted-foreground hover:bg-sidebar-border hover:text-foreground"
-                    aria-label={`Remove ${attachment.filename}`}
-                    onClick={() => {
-                      removeAttachment(attachment.id)
-                    }}
-                  >
-                    <X className="size-3.5" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          ) : null}
 
           <Textarea
             ref={textareaRef}
@@ -660,7 +325,7 @@ export function PromptForm({
                     type="button"
                     variant="ghost"
                     size="iconSm"
-                    disabled={isFormPending || isReadingAttachments}
+                    disabled={isFormPending}
                     aria-label="Tools"
                     className="shrink-0 text-muted-foreground hover:bg-sidebar-border hover:text-foreground"
                   >
@@ -682,20 +347,6 @@ export function PromptForm({
                   }}
                   className="flex w-56 flex-col gap-0.5 rounded-none p-1.5"
                 >
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={isFormPending}
-                    className="w-full justify-start px-2 font-normal text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:border-transparent focus-visible:ring-0"
-                    onClick={handleAttachClick}
-                  >
-                    <Paperclip className="size-3.5" />
-                    <span>Attach PDF or image</span>
-                    <span className="ml-auto text-[10px] text-muted-foreground">
-                      ⌘;
-                    </span>
-                  </Button>
                   <Button
                     type="button"
                     variant="ghost"
@@ -747,13 +398,18 @@ export function PromptForm({
                 type="submit"
                 size="iconSm"
                 disabled={isSubmitButtonDisabled}
+                aria-label={
+                  isFormPending
+                    ? "Sending message"
+                    : isStreaming && !trimmedMessage
+                      ? "Stop response"
+                      : "Send message"
+                }
                 className="shrink-0 ring-offset-background"
               >
-                {isFormPending || isReadingAttachments ? (
+                {isFormPending ? (
                   <Loader2 className="size-4 animate-spin" />
-                ) : isStreaming &&
-                  !trimmedMessage &&
-                  pendingAttachments.length === 0 ? (
+                ) : isStreaming && !trimmedMessage ? (
                   <div className="p-0.5">
                     <Square className="size-3 fill-primary-foreground" />
                   </div>

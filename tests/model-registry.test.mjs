@@ -81,46 +81,4 @@ test("shared model registry includes the curated gateway models", async () => {
     /\[AvailableModels\.XIAOMI_MIMO_V2_5_PRO\]:\s*\{[\s\S]*name:\s*"MiMo V2\.5 Pro"/,
     "Expected ModelInfos to define display metadata for XIAOMI_MIMO_V2_5_PRO."
   )
-
-  const visionSetSource =
-    source.match(/const VISION_CAPABLE_MODEL_SET[\s\S]*?\]\)/)?.[0] ?? ""
-  for (const modelKey of [
-    "MOONSHOTAI_KIMI_K2_6",
-    "GOOGLE_GEMINI_3_1_PRO_PREVIEW",
-  ]) {
-    assert.match(
-      visionSetSource,
-      new RegExp(`AvailableModels\\.${modelKey}`),
-      `Expected ${modelKey} to be treated as native image-capable.`
-    )
-  }
-
-  for (const modelKey of ["ALIBABA_QWEN3_7_MAX", "XIAOMI_MIMO_V2_5_PRO"]) {
-    assert.doesNotMatch(
-      visionSetSource,
-      new RegExp(`AvailableModels\\.${modelKey}`),
-      `Expected ${modelKey} image attachments to use preprocessing until Gateway accepts native image parts.`
-    )
-  }
-
-  const fileInputSetSource =
-    source.match(/const FILE_INPUT_CAPABLE_MODEL_SET[\s\S]*?\]\)/)?.[0] ?? ""
-  for (const modelKey of [
-    "GOOGLE_GEMINI_3_1_PRO_PREVIEW",
-    "MOONSHOTAI_KIMI_K2_6",
-  ]) {
-    assert.match(
-      fileInputSetSource,
-      new RegExp(`AvailableModels\\.${modelKey}`),
-      `Expected ${modelKey} to receive native PDF file parts.`
-    )
-  }
-
-  for (const modelKey of ["ALIBABA_QWEN3_7_MAX", "XIAOMI_MIMO_V2_5_PRO"]) {
-    assert.doesNotMatch(
-      fileInputSetSource,
-      new RegExp(`AvailableModels\\.${modelKey}`),
-      `Expected ${modelKey} PDFs to use text extraction until Gateway accepts native file parts.`
-    )
-  }
 })

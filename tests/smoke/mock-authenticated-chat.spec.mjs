@@ -1,5 +1,3 @@
-import { Buffer } from "node:buffer"
-
 import { expect, test } from "@playwright/test"
 
 const smokePrompt =
@@ -177,40 +175,6 @@ test.describe("mock authenticated chat smoke", () => {
     )
     await expect(page.locator("[data-message-role='user']")).not.toContainText(
       originalPrompt
-    )
-    await expect(page.locator("[data-message-role='assistant']")).toContainText(
-      expectedAssistantText,
-      { timeout: 30_000 }
-    )
-  })
-
-  test("attaches and submits a PDF in the mocked chat flow", async ({
-    baseURL,
-    context,
-    page,
-  }) => {
-    await openMockChat({ baseURL, context, page })
-
-    await page.locator("input[type='file']").setInputFiles({
-      name: "smoke-report.pdf",
-      mimeType: "application/pdf",
-      buffer: Buffer.from("%PDF-1.4\n%EOF\n"),
-    })
-    await expect(page.getByText("smoke-report.pdf")).toBeVisible()
-
-    await page.getByRole("button", { name: "Remove smoke-report.pdf" }).click()
-    await expect(page.getByText("smoke-report.pdf")).toHaveCount(0)
-
-    await page.locator("input[type='file']").setInputFiles({
-      name: "smoke-report.pdf",
-      mimeType: "application/pdf",
-      buffer: Buffer.from("%PDF-1.4\n%EOF\n"),
-    })
-    await expect(page.getByText("smoke-report.pdf")).toBeVisible()
-    await page.getByPlaceholder("Ask anything").press("Enter")
-
-    await expect(page.locator("[data-message-role='user']")).toContainText(
-      "Analyze the attached file(s)."
     )
     await expect(page.locator("[data-message-role='assistant']")).toContainText(
       expectedAssistantText,
