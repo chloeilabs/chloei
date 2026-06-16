@@ -102,7 +102,7 @@ export function NavUser({ viewer }: { viewer: AuthViewer }) {
             <DropdownMenuItem
               variant="destructive"
               disabled={isPending}
-              onSelect={handleSignOut}
+              onClick={handleSignOut}
             >
               <SquareArrowRightExit className="size-4" />
               {isPending ? "Signing out…" : "Sign out"}
