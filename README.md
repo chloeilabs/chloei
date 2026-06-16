@@ -6,7 +6,6 @@ Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently expose
 
 - **[CLAUDE.md](CLAUDE.md)** — architecture reference and conventions (request flow, agent runtime, tools, storage, auth, env vars). The best starting point for understanding the codebase; also read by Claude Code.
 - **[docs/vercel-production-launch-readiness.md](docs/vercel-production-launch-readiness.md)** — production launch checklist (security, reliability, performance, rollback).
-- **[docs/managed-integrations-rollout.md](docs/managed-integrations-rollout.md)** — managed-integration rollout/rollback runbook (Neon, feature flags).
 
 ## Requirements
 
@@ -72,8 +71,6 @@ pnpm exec playwright install --with-deps chromium
 4. Smoke test the preview deployment: sign in, confirm models load, send one prompt, and verify thread persistence.
 5. Merge to `main` after the preview passes, then confirm production is aliased to [chloei.ai](https://chloei.ai).
 6. Run one authenticated production smoke test: sign in, load models, send a prompt, and verify an existing thread still reopens cleanly.
-
-Managed integration rollout, rollback, duplicate-cleanup, and smoke-test steps live in [docs/managed-integrations-rollout.md](docs/managed-integrations-rollout.md).
 
 ## Environment
 
