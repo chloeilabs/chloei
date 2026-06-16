@@ -64,13 +64,6 @@ export const agentStreamRequestSchema = z
   .strict()
 
 type AgentStreamRequest = z.infer<typeof agentStreamRequestSchema>
-interface AgentRateLimitDecision {
-  allowed: boolean
-  limit: number
-  remaining: number
-  retryAfterSeconds: number | null
-  resetAtEpochSeconds: number
-}
 interface ParsedAgentStreamRequest {
   parsedRequest: AgentStreamRequest
   selectedModel: ModelType
@@ -81,21 +74,17 @@ interface JsonErrorResponseParams {
   error: string
   errorCode: string
   status: number
-  rateLimitDecision?: AgentRateLimitDecision
-  retryAfterSeconds?: number | null
 }
 
 interface ParseAgentStreamRequestParams {
   body: unknown
   availableModels: readonly Pick<ModelInfo, "id">[]
   requestId: string
-  rateLimitDecision?: AgentRateLimitDecision
 }
 
 interface CreateAgentStreamResponseParams {
   request: NextRequest
   requestId: string
-  rateLimitDecision?: AgentRateLimitDecision
   timeoutMs: number
   selectedModel: ModelType
   aiGatewayApiKey: string
@@ -105,7 +94,6 @@ interface CreateAgentStreamResponseParams {
   featureFlags?: AgentFeatureFlags
   messages: AgentStreamRequest["messages"]
   systemInstruction: string
-  onStreamSettled?: () => Promise<void> | void
 }
 
 export function resolveUserTimeZone(request: NextRequest): string | undefined {
@@ -259,29 +247,11 @@ function getTotalMessageChars(
   return messages.reduce((total, message) => total + message.content.length, 0)
 }
 
-function applyRateLimitHeaders(
-  headers: Headers,
-  rateLimitDecision: AgentRateLimitDecision
-) {
-  headers.set("X-RateLimit-Limit", String(rateLimitDecision.limit))
-  headers.set("X-RateLimit-Remaining", String(rateLimitDecision.remaining))
-  headers.set(
-    "X-RateLimit-Reset",
-    String(rateLimitDecision.resetAtEpochSeconds)
-  )
-}
-
 export function createJsonErrorResponse(params: JsonErrorResponseParams) {
   const headers = createApiHeaders({
     requestId: params.requestId,
   })
   headers.set("X-Error-Code", params.errorCode)
-  if (params.rateLimitDecision) {
-    applyRateLimitHeaders(headers, params.rateLimitDecision)
-  }
-  if (params.retryAfterSeconds && params.retryAfterSeconds > 0) {
-    headers.set("Retry-After", String(params.retryAfterSeconds))
-  }
 
   return Response.json(createApiErrorBody(params), {
     status: params.status,
@@ -300,7 +270,6 @@ export function parseAgentStreamRequest(
       error: "Invalid request payload.",
       errorCode: "AGENT_INVALID_REQUEST",
       status: 400,
-      rateLimitDecision: params.rateLimitDecision,
     })
   }
 
@@ -310,7 +279,6 @@ export function parseAgentStreamRequest(
       error: "Conversation has too many messages.",
       errorCode: "AGENT_TOO_MANY_MESSAGES",
       status: 400,
-      rateLimitDecision: params.rateLimitDecision,
     })
   }
 
@@ -323,7 +291,6 @@ export function parseAgentStreamRequest(
       error: "A conversation message is too large.",
       errorCode: "AGENT_MESSAGE_TOO_LARGE",
       status: 413,
-      rateLimitDecision: params.rateLimitDecision,
     })
   }
 
@@ -334,7 +301,6 @@ export function parseAgentStreamRequest(
       error: "Conversation payload is too large.",
       errorCode: "AGENT_PAYLOAD_TOO_LARGE",
       status: 413,
-      rateLimitDecision: params.rateLimitDecision,
     })
   }
 
@@ -345,7 +311,6 @@ export function parseAgentStreamRequest(
       error: "The final message must be from the user.",
       errorCode: "AGENT_FINAL_MESSAGE_INVALID",
       status: 400,
-      rateLimitDecision: params.rateLimitDecision,
     })
   }
 
@@ -364,7 +329,6 @@ export function parseAgentStreamRequest(
       error: "Unsupported model selected.",
       errorCode: "AGENT_UNSUPPORTED_MODEL",
       status: 400,
-      rateLimitDecision: params.rateLimitDecision,
     })
   }
 
@@ -374,7 +338,6 @@ export function parseAgentStreamRequest(
       error: "Unsupported model selected.",
       errorCode: "AGENT_UNSUPPORTED_MODEL",
       status: 400,
-      rateLimitDecision: params.rateLimitDecision,
     })
   }
 
@@ -393,24 +356,6 @@ export function createAgentStreamResponse(
     params.timeoutMs
   )
   const startedAt = Date.now()
-  let settlePromise: Promise<void> | null = null
-  const settleStream = () => {
-    if (settlePromise) {
-      return settlePromise
-    }
-
-    settlePromise = (async () => {
-      try {
-        await params.onStreamSettled?.()
-      } catch (error) {
-        logger.warn("Agent stream settlement callback failed.", {
-          error,
-          requestId: params.requestId,
-        })
-      }
-    })()
-    return settlePromise
-  }
 
   const encoder = new TextEncoder()
   let streamClosed = false
@@ -640,13 +585,11 @@ export function createAgentStreamResponse(
           toolErrorCount: streamState.toolErrorCount,
           unresolvedToolCallCount: getUnresolvedToolCallCount(),
         })
-        await settleStream()
         closeController()
       }
     },
-    async cancel() {
+    cancel() {
       streamClosed = true
-      await settleStream()
     },
   })
 
@@ -656,9 +599,6 @@ export function createAgentStreamResponse(
   responseHeaders.set("Content-Type", "application/x-ndjson; charset=utf-8")
   responseHeaders.set("Cache-Control", "no-store, no-transform")
   responseHeaders.set("X-Agent-Effective-Model", params.selectedModel)
-  if (params.rateLimitDecision) {
-    applyRateLimitHeaders(responseHeaders, params.rateLimitDecision)
-  }
 
   return new Response(textStream, {
     headers: responseHeaders,

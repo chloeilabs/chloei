@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Chloei is a **Next.js 16 / React 19** authenticated AI chat app backed by the **Vercel AI Gateway**. A single streaming agent endpoint (`/api/agent`) runs a multi-step tool-using loop (Tavily web search) and streams NDJSON to the browser. Auth, sessions, threads, and rate limiting are **PostgreSQL-backed** (Better Auth + Kysely/`pg`).
+Chloei is a **Next.js 16 / React 19** authenticated AI chat app backed by the **Vercel AI Gateway**. A single streaming agent endpoint (`/api/agent`) runs a multi-step tool-using loop (Tavily web search) and streams NDJSON to the browser. Auth, sessions, and threads are **PostgreSQL-backed** (Better Auth + Kysely/`pg`).
 
 > **Maintaining this file:** keep it accurate and concise — stale or bloated guidance makes Claude ignore the parts that matter. Cite durable anchors (file paths + symbol names), not line numbers. When you change a subsystem, update the matching section here in the same PR.
 
@@ -17,7 +17,7 @@ pnpm start                # Start the production Next.js server
 # Database (must run before first request — storage does NOT self-initialize)
 pnpm migrate              # Run both auth + app migrations
 pnpm auth:migrate         # Better Auth schema only
-pnpm app:migrate          # thread + agent_rate_limit tables (also drops legacy tables)
+pnpm app:migrate          # thread table (also drops legacy tables)
 pnpm threads:migrate      # Alias for pnpm app:migrate
 
 # Quality checks (run before committing)
@@ -52,9 +52,7 @@ For Vercel-backed local envs, run `vercel login`, approve the device-login URL, 
 Client (useAgentSession)
   → POST /api/agent (app/api/agent/route.ts)
     → Auth check (isAuthConfigured → getRequestSession)   [routes self-guard; see Middleware]
-    → Sliding-window rate limit (rate-limit.ts, key user:<userId>)
     → Zod validation (parseAgentStreamRequest) — model + messages
-    → Concurrency slot acquire (max 4 in-flight per user)
     → System prompt assembly (buildAgentSystemInstruction)
     → AI Gateway stream via Vercel AI SDK (startGatewayResponseStream → runAgentStream)
     → NDJSON chunks (application/x-ndjson) → client
@@ -63,7 +61,7 @@ Client (useAgentSession)
   → Thread upsert (useThreadStore → PUT /api/threads → upsertThreadForUser → PostgreSQL JSONB)
 ```
 
-Key route files: `src/app/api/agent/route.ts` (HTTP entry, auth, rate limit, validation) → `src/lib/server/agent-route.ts` (`parseAgentStreamRequest`, `createAgentStreamResponse`, NDJSON writing, fallback handling) → `src/lib/server/llm/agent-runtime.ts` (the tool loop) → `src/lib/server/llm/gateway-responses.ts` (`startGatewayResponseStream`).
+Key route files: `src/app/api/agent/route.ts` (HTTP entry, auth, validation) → `src/lib/server/agent-route.ts` (`parseAgentStreamRequest`, `createAgentStreamResponse`, NDJSON writing, fallback handling) → `src/lib/server/llm/agent-runtime.ts` (the tool loop) → `src/lib/server/llm/gateway-responses.ts` (`startGatewayResponseStream`).
 
 Before the model sees them, messages pass through `toModelMessages` (`agent-runtime-messages.ts`). System-role messages are rejected there — system content must come via `systemInstruction`.
 
@@ -169,7 +167,7 @@ CREATE TABLE thread (
 -- Index: thread_user_updated_at_idx ON ("userId", "updatedAt" DESC)
 ```
 
-`app-migrate.mjs` also creates `agent_rate_limit`, backfills `title`, and drops legacy tables/columns.
+`app-migrate.mjs` backfills `title` and drops legacy tables/columns (including the former `agent_rate_limit`).
 
 **Pinning is client-side only** — there is no server column. Pinned thread ids live in `localStorage` (`chloei:pinned-thread-ids`, `src/components/nav-threads.tsx`) and pinned-first ordering happens in the sidebar render, not in the API.
 
@@ -184,14 +182,9 @@ CREATE TABLE thread (
 
 ### Rate Limiting
 
-Default store is `auto` (PostgreSQL-backed when `DATABASE_URL` is set; in-memory otherwise). Override with `AGENT_RATE_LIMIT_STORE=postgres|memory`. Two independent agent controls (`src/lib/server/rate-limit.ts`):
+The agent endpoints (`/api/agent`, `/api/agent/follow-ups`) are **not** rate-limited.
 
-- **Sliding window**: 60 req / 60 s per user (key `user:<userId>`).
-- **Concurrency slots**: max 4 in-flight requests per user.
-
-Persistent state lives in the `agent_rate_limit` table (`identifier` PK, `hits` jsonb, `inFlight`, `lastSeenAt`); stale rows are cleaned opportunistically; the store fails open to memory on DB error. The window/limit/concurrency magnitudes are fixed constants (`src/lib/server/agent-runtime-config.ts`); only the kill switch (`AGENT_RATE_LIMIT_ENABLED`) and the store selector (`AGENT_RATE_LIMIT_STORE`) stay env-configurable.
-
-Separately, **Better Auth has its own credential-route limits** (`auth.ts`): ~100 req / 10 s globally, with `/sign-in/email` and `/sign-up/email` capped at 5 req / 15 min. This is independent of the agent limiter.
+**Better Auth has its own credential-route limits** (`src/lib/server/auth.ts`, `rateLimit`): ~100 req / 10 s globally, with `/sign-in/email` and `/sign-up/email` capped at 5 req / 15 min — brute-force protection on authentication.
 
 ### Authentication and Middleware
 
@@ -267,11 +260,10 @@ src/
       agent-context.ts          # buildAgentSystemInstruction
       agent-prompt-steering.ts  # Provider overlays (Qwen/Kimi tuning)
       agent-route.ts            # parseAgentStreamRequest, createAgentStreamResponse
-      agent-runtime-config.ts   # Runtime constants + a few operational env switches
+      agent-runtime-config.ts   # Runtime constants (no env knobs)
       auth.ts / auth-session.ts # isAuthConfigured, getRequestSession
       integration-flags.ts      # Default-off feature flags (env + Edge Config)
       privacy.ts                # hashUserId (telemetry user hashing)
-      rate-limit.ts             # Sliding window + concurrency slot
       route-observability.ts    # createRouteObservation, observeRouteResponse
       threads.ts / thread-payload.ts  # Thread CRUD + Zod parsing
       postgres.ts               # getDatabase() Kysely instance
@@ -308,7 +300,7 @@ node --test tests/agent-route-contract.test.mjs    # Single file
 ```
 
 - `pnpm test` runs **unit tests only** — the Playwright `*.spec.mjs` files under `tests/smoke/` run via `test:smoke*` scripts.
-- Stubs in `tests/stubs/` mock server-only modules (postgres, auth-session, rate-limit, …) so tests run without a database.
+- Stubs in `tests/stubs/` mock server-only modules (postgres, auth-session, …) so tests run without a database.
 - `tests/register-ts-path-hooks.mjs` wires `@/` path resolution and supports per-test module stub injection (`setTestModuleStubs`).
 - Smoke: `tests/smoke/mock-authenticated-chat.spec.mjs` is credential-free (used by CI); `authenticated-chat.spec.mjs` needs `SMOKE_EMAIL`/`SMOKE_PASSWORD`.
 
@@ -322,7 +314,7 @@ node --test tests/agent-route-contract.test.mjs    # Single file
 
 **Prettier**: `semi: false`, double quotes, `tabWidth: 2`, `printWidth: 80`, `trailingComma: es5`. Only `prettier-plugin-tailwindcss` is configured (`tailwindFunctions: ["cn", "cva"]`); import sorting is ESLint's job, not Prettier's.
 
-**API error shape**: all errors return `{ error, errorCode }` with `X-Request-Id` and `X-Error-Code` headers. Rate-limit responses add `X-RateLimit-*` and `Retry-After`.
+**API error shape**: all errors return `{ error, errorCode }` with `X-Request-Id` and `X-Error-Code` headers.
 
 **Zod v4** (`zod@^4`): API differs from v3 (`.strict()` behavior, `z.iso.datetime()`, error formatting).
 
@@ -355,10 +347,8 @@ All others are optional with safe defaults. See `.env.example` for the annotated
 | `TAVILY_API_KEY`              | Enables `tavily_search` + `tavily_extract`                          |
 | `EDGE_CONFIG`                 | Vercel Edge Config connection for remote feature flags              |
 | `AGENT_TELEMETRY_RECORD_IO`   | Feature flag: record prompt/output IO in telemetry (default off)    |
-| `AGENT_RATE_LIMIT_ENABLED`    | Rate-limit kill switch (default true)                               |
-| `AGENT_RATE_LIMIT_STORE`      | `auto` (default), `memory`, or `postgres`                           |
 
-Request size limits, stream/gateway timeouts, tool-step budgets, the rate-limit window/concurrency magnitudes, and body-size limits are **fixed constants** in `src/lib/server/agent-runtime-config.ts` / `next.config.mjs` — not env-configurable. Change them in code if needed.
+Request size limits, stream/gateway timeouts, tool-step budgets, and body-size limits are **fixed constants** in `src/lib/server/agent-runtime-config.ts` / `next.config.mjs` — not env-configurable. Change them in code if needed.
 
 ## Gotchas
 

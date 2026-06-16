@@ -24,7 +24,6 @@ setTestModuleStubs({
   ),
   "@/lib/server/auth": toProjectFileUrl("tests/stubs/auth.mjs"),
   "@/lib/server/auth-session": toProjectFileUrl("tests/stubs/auth-session.mjs"),
-  "@/lib/server/rate-limit": toProjectFileUrl("tests/stubs/rate-limit.mjs"),
   "next/server": toProjectFileUrl("tests/stubs/next-server.mjs"),
 })
 
@@ -81,26 +80,6 @@ beforeEach(() => {
         }
       },
     },
-    rateLimit: {
-      evaluateAndConsumeSlidingWindowRateLimit() {
-        return {
-          allowed: true,
-          limit: 5,
-          remaining: 4,
-          resetAtEpochSeconds: 123,
-          retryAfterSeconds: null,
-        }
-      },
-      tryAcquireConcurrencySlot() {
-        return {
-          allowed: true,
-          inFlight: 1,
-          limit: 2,
-          release() {},
-          retryAfterSeconds: null,
-        }
-      },
-    },
   })
 })
 
@@ -126,72 +105,4 @@ test("follow-ups route returns a 400 for invalid JSON", async () => {
     error: "Invalid JSON payload.",
     errorCode: "FOLLOW_UPS_INVALID_JSON",
   })
-})
-
-test("follow-ups route rate-limits before reading the request body", async () => {
-  setTestMocks({
-    rateLimit: {
-      evaluateAndConsumeSlidingWindowRateLimit() {
-        return {
-          allowed: false,
-          limit: 5,
-          remaining: 0,
-          resetAtEpochSeconds: 123,
-          retryAfterSeconds: 12,
-        }
-      },
-      tryAcquireConcurrencySlot() {
-        throw new Error("Concurrency should not be checked when rate-limited.")
-      },
-    },
-  })
-
-  const response = await POST(
-    createRequest({
-      json: async () => {
-        throw new Error("Body should not be read when rate-limited.")
-      },
-    })
-  )
-
-  await assertErrorResponse(response, {
-    status: 429,
-    error: "Too many requests. Please retry shortly.",
-    errorCode: "FOLLOW_UPS_RATE_LIMITED",
-  })
-  assert.equal(response.headers.get("Retry-After"), "12")
-})
-
-test("follow-ups route rejects concurrent generation before Gateway calls", async () => {
-  setTestMocks({
-    rateLimit: {
-      evaluateAndConsumeSlidingWindowRateLimit() {
-        return {
-          allowed: true,
-          limit: 5,
-          remaining: 4,
-          resetAtEpochSeconds: 123,
-          retryAfterSeconds: null,
-        }
-      },
-      tryAcquireConcurrencySlot() {
-        return {
-          allowed: false,
-          inFlight: 2,
-          limit: 2,
-          release() {},
-          retryAfterSeconds: 1,
-        }
-      },
-    },
-  })
-
-  const response = await POST(createRequest())
-
-  await assertErrorResponse(response, {
-    status: 429,
-    error: "Too many concurrent requests. Please retry shortly.",
-    errorCode: "FOLLOW_UPS_CONCURRENCY_LIMITED",
-  })
-  assert.equal(response.headers.get("Retry-After"), "1")
 })

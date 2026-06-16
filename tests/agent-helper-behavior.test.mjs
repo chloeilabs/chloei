@@ -27,7 +27,6 @@ setTestModuleStubs({
 
 const {
   createAgentStreamResponse,
-  createJsonErrorResponse,
   parseAgentStreamRequest,
   resolveRequestId,
   resolveUserTimeZone,
@@ -62,7 +61,6 @@ beforeEach(() => {
     loggerInfos: [],
     loggerErrors: [],
     loggerWarnings: [],
-    settledCount: 0,
   }
 
   resetTestMocks()
@@ -112,36 +110,6 @@ test("agent helper resolves request ids and time zones from headers", () => {
     resolveUserTimeZone(createRequest({ "x-user-timezone": "Not/AZone" })),
     undefined
   )
-})
-
-test("agent helper error responses include rate-limit headers", async () => {
-  const response = createJsonErrorResponse({
-    requestId: "request-1",
-    error: "Too many requests.",
-    errorCode: "AGENT_RATE_LIMITED",
-    status: 429,
-    retryAfterSeconds: 9,
-    rateLimitDecision: {
-      allowed: false,
-      retryAfterSeconds: 9,
-      limit: 5,
-      remaining: 0,
-      resetAtEpochSeconds: 123,
-    },
-  })
-
-  assert.equal(response.status, 429)
-  assert.equal(response.headers.get("X-Error-Code"), "AGENT_RATE_LIMITED")
-  assert.equal(response.headers.get("X-Request-Id"), "request-1")
-  assert.equal(response.headers.get("Retry-After"), "9")
-  assert.equal(response.headers.get("X-RateLimit-Limit"), "5")
-  assert.equal(response.headers.get("X-RateLimit-Remaining"), "0")
-  assert.equal(response.headers.get("X-RateLimit-Reset"), "123")
-  assert.deepEqual(await response.json(), {
-    error: "Too many requests.",
-    errorCode: "AGENT_RATE_LIMITED",
-    requestId: "request-1",
-  })
 })
 
 test("agent helper validates total size, last-message role, and default model support", async () => {
@@ -345,9 +313,6 @@ test("agent helper streams fallback output when the model yields no content", as
     tavilyApiKey: "tavily-key",
     messages: [{ role: "user", content: "Hello" }],
     systemInstruction: "system",
-    onStreamSettled() {
-      recorded.settledCount += 1
-    },
   })
 
   const events = await readNdjsonEvents(response)
@@ -361,7 +326,6 @@ test("agent helper streams fallback output when the model yields no content", as
     },
     { type: "agent_status", status: "completed" },
   ])
-  assert.equal(recorded.settledCount, 1)
   assert.equal(recorded.streamParams[0]?.systemInstruction, "system::cited")
   assert.deepEqual(recorded.augmentedInstructions[0], {
     instruction: "system",

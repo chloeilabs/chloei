@@ -11,7 +11,7 @@ Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently expose
 
 - Node.js 24.x
 - pnpm 10.32.1
-- PostgreSQL 16 for local auth, sessions, thread storage, and rate limiting
+- PostgreSQL 16 for local auth, sessions, and thread storage
 
 ## Getting started
 
@@ -89,7 +89,7 @@ Optional feature-enabling variables:
 - `TAVILY_API_KEY`: enables Tavily search and extract callable tools for chat requests
 - `AGENT_TELEMETRY_RECORD_IO`: feature gate; defaults off unless explicitly set or synced through Edge Config
 
-Agent request limits, timeouts, tool-step budgets, and the rate-limit window/concurrency are fixed safe constants in `src/lib/server/agent-runtime-config.ts` (no env knobs). `AGENT_RATE_LIMIT_STORE` defaults to `auto`, which uses PostgreSQL when `DATABASE_URL` is configured and falls back to process memory for local/no-database runs (allowed values: `auto`, `postgres`, `memory`); `AGENT_RATE_LIMIT_ENABLED` is a kill switch.
+Agent request limits, timeouts, and tool-step budgets are fixed safe constants in `src/lib/server/agent-runtime-config.ts` (no env knobs).
 
 ## Important paths
 
@@ -100,14 +100,13 @@ Agent request limits, timeouts, tool-step budgets, and the rate-limit window/con
 - `src/app/api/agent/route.ts`: streaming agent endpoint
 - `src/app/api/models/route.ts`: available-models endpoint
 - `src/components/agent`: chat UI, prompt form, markdown rendering, and session state
-- `src/lib/server`: Better Auth config, PostgreSQL setup, runtime config, rate limiting, and model streaming
+- `src/lib/server`: Better Auth config, PostgreSQL setup, runtime config, and model streaming
 
 ## Notes
 
 - The current model list is defined in `src/lib/shared/llm/models.ts`.
 - `/`, `/api/agent`, and `/api/models` require an authenticated Better Auth session.
 - To share logins with another Chloei app, point both apps at the same Better Auth database and secret, set `BETTER_AUTH_COOKIE_DOMAIN` to the shared parent domain, and include every live subdomain in `BETTER_AUTH_TRUSTED_ORIGINS`.
-- Rate limiting and concurrency protection are PostgreSQL-backed when `DATABASE_URL` is configured. Local/no-database runs fall back to in-memory limits unless `AGENT_RATE_LIMIT_STORE=postgres` is set.
 - App storage does not self-initialize on live requests. Vercel deployments in this repo run `pnpm migrate` before `next build`.
 
 ## Browser smoke tests
