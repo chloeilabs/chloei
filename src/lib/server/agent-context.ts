@@ -7,20 +7,17 @@ import {
 import {
   createPromptSteeringBlocks,
   type PromptProvider,
-  type PromptTaskMode,
 } from "./agent-prompt-steering"
 
 interface RuntimePromptContext {
   now: Date
   userTimeZone?: string
   provider?: PromptProvider
-  taskMode?: PromptTaskMode
 }
 
 interface AgentContextOverrides {
   operatingInstruction?: string
   providerOverlaysEnabled?: boolean
-  taskModeOverlaysEnabled?: boolean
 }
 
 function formatPromptBlock(label: string, body: string): string {
@@ -101,7 +98,6 @@ function composeSystemInstruction(params: {
   runtimeContext: RuntimePromptContext
   operatingInstruction?: string
   providerOverlaysEnabled?: boolean
-  taskModeOverlaysEnabled?: boolean
 }): string {
   const blocks = [
     formatPromptBlock(
@@ -116,9 +112,7 @@ function composeSystemInstruction(params: {
 
   const promptSteeringBlocks = createPromptSteeringBlocks({
     provider: params.runtimeContext.provider,
-    taskMode: params.runtimeContext.taskMode,
     providerOverlaysEnabled: params.providerOverlaysEnabled,
-    taskModeOverlaysEnabled: params.taskModeOverlaysEnabled,
   })
 
   for (const block of promptSteeringBlocks) {
@@ -147,6 +141,5 @@ export function buildAgentSystemInstruction(
     runtimeContext,
     operatingInstruction: overrides.operatingInstruction,
     providerOverlaysEnabled: overrides.providerOverlaysEnabled,
-    taskModeOverlaysEnabled: overrides.taskModeOverlaysEnabled,
   })
 }

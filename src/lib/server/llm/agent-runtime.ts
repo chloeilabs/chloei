@@ -29,12 +29,6 @@ import {
   getAiSdkTavilyToolResultMetadata,
   isAiSdkTavilyToolName,
 } from "./ai-sdk-tavily-tools"
-import {
-  createAiSdkCodeExecutionTools,
-  getAiSdkCodeExecutionToolCallMetadata,
-  getAiSdkCodeExecutionToolResultMetadata,
-  isAiSdkCodeExecutionToolName,
-} from "./code-execution-tools"
 import { aiGatewayFetch } from "./gateway-client"
 import { createReasoningDisplaySanitizer } from "./initial-reasoning-chunk-sanitizer"
 
@@ -229,7 +223,6 @@ export async function* startAgentRuntimeStream(
   }
 
   const tools = {
-    ...createAiSdkCodeExecutionTools(),
     ...createAiSdkTavilyTools(normalizedTavilyApiKey),
   } as ToolSet
   const toolNames = Object.keys(tools)
@@ -349,9 +342,7 @@ export async function* startAgentRuntimeStream(
     }
 
     if (part.type === "tool-call") {
-      const metadata =
-        getAiSdkCodeExecutionToolCallMetadata(part) ??
-        getAiSdkTavilyToolCallMetadata(part)
+      const metadata = getAiSdkTavilyToolCallMetadata(part)
       if (!metadata || seenToolCalls.has(metadata.callId)) {
         continue
       }
@@ -380,9 +371,7 @@ export async function* startAgentRuntimeStream(
         continue
       }
 
-      const metadata =
-        getAiSdkCodeExecutionToolResultMetadata(part) ??
-        getAiSdkTavilyToolResultMetadata(part)
+      const metadata = getAiSdkTavilyToolResultMetadata(part)
       if (!metadata || finalizedToolCalls.has(metadata.callId)) {
         continue
       }
@@ -398,9 +387,6 @@ export async function* startAgentRuntimeStream(
           : {}),
         ...("provider" in metadata && metadata.provider
           ? { provider: metadata.provider }
-          : {}),
-        ...("durationMs" in metadata && metadata.durationMs !== undefined
-          ? { durationMs: metadata.durationMs }
           : {}),
         ...("errorCode" in metadata && metadata.errorCode
           ? { errorCode: metadata.errorCode }
@@ -426,8 +412,7 @@ export async function* startAgentRuntimeStream(
 
     if (
       part.type === "tool-error" &&
-      (isAiSdkCodeExecutionToolName(part.toolName) ||
-        isAiSdkTavilyToolName(part.toolName)) &&
+      isAiSdkTavilyToolName(part.toolName) &&
       !finalizedToolCalls.has(part.toolCallId)
     ) {
       finalizedToolCalls.add(part.toolCallId)

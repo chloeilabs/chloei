@@ -27,7 +27,7 @@ const PRIVATE_REASONING_REPLACEMENTS: readonly PrivateReasoningReplacement[] = [
   },
   {
     pattern:
-      /\b(?:operating instructions|auth user context|runtime date context|provider overlay|task mode overlay|long-term memory context|long-term memory capability)\b/gi,
+      /\b(?:operating instructions|auth user context|runtime date context|provider overlay|long-term memory context|long-term memory capability)\b/gi,
     replacement: "private context",
   },
 ]
@@ -56,7 +56,6 @@ const PRIVATE_REASONING_TOKENS = [
   "auth user context",
   "runtime date context",
   "provider overlay",
-  "task mode overlay",
   "long-term memory context",
   "long-term memory capability",
 ] as const

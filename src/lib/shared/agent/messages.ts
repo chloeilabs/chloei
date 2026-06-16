@@ -12,11 +12,7 @@ export interface FollowUpQuestion {
   text: string
 }
 
-export const TOOL_NAMES = [
-  "code_execution",
-  "tavily_search",
-  "tavily_extract",
-] as const
+export const TOOL_NAMES = ["tavily_search", "tavily_extract"] as const
 export type ToolName = (typeof TOOL_NAMES)[number]
 
 export const SEARCH_TOOL_NAMES = [
