@@ -11,12 +11,6 @@ import {
   validateFollowUpMessages,
 } from "@/lib/server/agent-follow-ups"
 import {
-  AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT,
-  AGENT_RATE_LIMIT_ENABLED,
-  AGENT_RATE_LIMIT_MAX_REQUESTS,
-  AGENT_RATE_LIMIT_WINDOW_MS,
-} from "@/lib/server/agent-runtime-config"
-import {
   createApiHeaders,
   createErrorResponse,
 } from "@/lib/server/api-response"
@@ -29,10 +23,6 @@ import {
   createE2eFollowUpQuestionsResponse,
   isE2eMockModeEnabled,
 } from "@/lib/server/e2e-test-mode"
-import {
-  evaluateAndConsumeSlidingWindowRateLimit,
-  tryAcquireConcurrencySlot,
-} from "@/lib/server/rate-limit"
 import {
   createRouteObservation,
   observeRouteResponse,
@@ -50,21 +40,8 @@ function createEmptyFollowUpResponse(requestId: string) {
   )
 }
 
-function createRetryAfterHeaders(retryAfterSeconds: number | null): Headers {
-  const headers = new Headers()
-  if (retryAfterSeconds !== null) {
-    headers.set("Retry-After", String(retryAfterSeconds))
-  }
-
-  return headers
-}
-
 function isAvailableModel(model: ModelType): boolean {
   return getModels().some((availableModel) => availableModel.id === model)
-}
-
-function resolveRateLimitIdentifier(userId: string): string {
-  return `user:${userId}`
 }
 
 export async function POST(request: NextRequest) {
@@ -107,32 +84,6 @@ export async function POST(request: NextRequest) {
     }
 
     const isE2eMockRequest = isE2eMockModeEnabled()
-    const clientIdentifier = resolveRateLimitIdentifier(session.user.id)
-    const rateLimitDecision =
-      AGENT_RATE_LIMIT_ENABLED && !isE2eMockRequest
-        ? await evaluateAndConsumeSlidingWindowRateLimit({
-            identifier: clientIdentifier,
-            maxRequests: AGENT_RATE_LIMIT_MAX_REQUESTS,
-            windowMs: AGENT_RATE_LIMIT_WINDOW_MS,
-          })
-        : null
-
-    if (rateLimitDecision && !rateLimitDecision.allowed) {
-      return observeRouteResponse(
-        observation,
-        createErrorResponse(
-          requestId,
-          "Too many requests. Please retry shortly.",
-          "FOLLOW_UPS_RATE_LIMITED",
-          429,
-          createRetryAfterHeaders(rateLimitDecision.retryAfterSeconds)
-        ),
-        {
-          errorCode: "FOLLOW_UPS_RATE_LIMITED",
-          outcome: "rate_limited",
-        }
-      )
-    }
 
     let body: unknown
     try {
@@ -207,55 +158,26 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const concurrencySlot = AGENT_RATE_LIMIT_ENABLED
-      ? await tryAcquireConcurrencySlot({
-          identifier: clientIdentifier,
-          maxConcurrent: AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT,
-          windowMs: AGENT_RATE_LIMIT_WINDOW_MS,
-        })
-      : null
+    const followUpQuestions = await generateFollowUpQuestions({
+      aiGatewayApiKey,
+      messages: parsed.messages,
+      model: parsed.model,
+      signal: request.signal,
+      userId: session.user.id,
+    })
 
-    if (concurrencySlot && !concurrencySlot.allowed) {
-      return observeRouteResponse(
-        observation,
-        createErrorResponse(
-          requestId,
-          "Too many concurrent requests. Please retry shortly.",
-          "FOLLOW_UPS_CONCURRENCY_LIMITED",
-          429,
-          createRetryAfterHeaders(concurrencySlot.retryAfterSeconds)
-        ),
+    return observeRouteResponse(
+      observation,
+      NextResponse.json(
+        followUpQuestionsResponseSchema.parse({ followUpQuestions }),
         {
-          errorCode: "FOLLOW_UPS_CONCURRENCY_LIMITED",
-          outcome: "rate_limited",
+          headers: createApiHeaders({ requestId }),
         }
-      )
-    }
-
-    try {
-      const followUpQuestions = await generateFollowUpQuestions({
-        aiGatewayApiKey,
-        messages: parsed.messages,
-        model: parsed.model,
-        signal: request.signal,
-        userId: session.user.id,
-      })
-
-      return observeRouteResponse(
-        observation,
-        NextResponse.json(
-          followUpQuestionsResponseSchema.parse({ followUpQuestions }),
-          {
-            headers: createApiHeaders({ requestId }),
-          }
-        ),
-        {
-          outcome: "success",
-        }
-      )
-    } finally {
-      await concurrencySlot?.release()
-    }
+      ),
+      {
+        outcome: "success",
+      }
+    )
   } catch (error) {
     if (error instanceof ZodError) {
       return observeRouteResponse(

@@ -35,7 +35,6 @@ setTestModuleStubs({
   ),
   "@/lib/server/auth": toProjectFileUrl("tests/stubs/auth.mjs"),
   "@/lib/server/auth-session": toProjectFileUrl("tests/stubs/auth-session.mjs"),
-  "@/lib/server/rate-limit": toProjectFileUrl("tests/stubs/rate-limit.mjs"),
   "@/lib/server/threads": toProjectFileUrl("tests/stubs/threads.mjs"),
   "next/server": toProjectFileUrl("tests/stubs/next-server.mjs"),
 })
@@ -187,14 +186,6 @@ beforeEach(() => {
         }
       },
     },
-    rateLimit: {
-      evaluateAndConsumeSlidingWindowRateLimit() {
-        return null
-      },
-      tryAcquireConcurrencySlot() {
-        return null
-      },
-    },
     threads: {
       isThreadStoreNotInitializedError(error) {
         return error?.code === "THREAD_INIT"
@@ -233,41 +224,6 @@ test("agent route returns auth unavailable when auth is disabled", async () => {
   )
 })
 
-test("agent route returns a rate-limit error before reading the body", async () => {
-  setTestMocks({
-    rateLimit: {
-      evaluateAndConsumeSlidingWindowRateLimit() {
-        return {
-          allowed: false,
-          retryAfterSeconds: 12,
-          limit: 5,
-          remaining: 0,
-          resetAtEpochSeconds: 123,
-        }
-      },
-      tryAcquireConcurrencySlot() {
-        return null
-      },
-    },
-  })
-
-  const response = await POST(
-    createRequest({
-      json: async () => {
-        throw new Error("Body should not be read when rate-limited.")
-      },
-    })
-  )
-
-  await assertErrorResponse(response, {
-    status: 429,
-    error: "Too many requests. Please retry shortly.",
-    errorCode: "AGENT_RATE_LIMITED",
-    requestId: "request-1",
-  })
-  assert.equal(recorded.jsonErrors[0]?.retryAfterSeconds, 12)
-})
-
 test("agent route rejects invalid JSON payloads", async () => {
   const response = await POST(
     createRequest({
@@ -287,33 +243,6 @@ test("agent route rejects invalid JSON payloads", async () => {
 })
 
 test("agent route passes the resolved prompt context into stream creation", async () => {
-  const released = []
-
-  setTestMocks({
-    rateLimit: {
-      evaluateAndConsumeSlidingWindowRateLimit(params) {
-        recorded.rateLimitParams = params
-        return {
-          allowed: true,
-          retryAfterSeconds: null,
-          limit: 5,
-          remaining: 4,
-          resetAtEpochSeconds: 123,
-        }
-      },
-      tryAcquireConcurrencySlot(params) {
-        recorded.concurrencyParams = params
-        return {
-          allowed: true,
-          retryAfterSeconds: null,
-          release() {
-            released.push("released")
-          },
-        }
-      },
-    },
-  })
-
   const response = await POST(
     createRequest({
       headers: {
@@ -350,8 +279,4 @@ test("agent route passes the resolved prompt context into stream creation", asyn
   assert.equal(recorded.streamCalls[0]?.aiGatewayApiKey, "ai-gateway-key")
   assert.equal(recorded.streamCalls[0]?.tavilyApiKey, "tavily-key")
   assert.equal(recorded.streamCalls[0]?.systemInstruction, "system-instruction")
-  assert.equal(typeof recorded.streamCalls[0]?.onStreamSettled, "function")
-
-  recorded.streamCalls[0].onStreamSettled()
-  assert.deepEqual(released, ["released"])
 })

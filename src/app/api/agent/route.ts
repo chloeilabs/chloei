@@ -11,13 +11,7 @@ import {
   resolveRequestId,
   resolveUserTimeZone,
 } from "@/lib/server/agent-route"
-import {
-  AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT,
-  AGENT_RATE_LIMIT_ENABLED,
-  AGENT_RATE_LIMIT_MAX_REQUESTS,
-  AGENT_RATE_LIMIT_WINDOW_MS,
-  AGENT_STREAM_TIMEOUT_MS,
-} from "@/lib/server/agent-runtime-config"
+import { AGENT_STREAM_TIMEOUT_MS } from "@/lib/server/agent-runtime-config"
 import {
   createAuthUnavailableResponse,
   isAuthConfigured,
@@ -29,10 +23,6 @@ import {
 } from "@/lib/server/e2e-test-mode"
 import { resolveAgentFeatureFlags } from "@/lib/server/integration-flags"
 import {
-  evaluateAndConsumeSlidingWindowRateLimit,
-  tryAcquireConcurrencySlot,
-} from "@/lib/server/rate-limit"
-import {
   createRouteObservation,
   observeRouteResponse,
 } from "@/lib/server/route-observability"
@@ -40,10 +30,6 @@ import { isThreadStoreNotInitializedError } from "@/lib/server/threads"
 
 export const runtime = "nodejs"
 export const maxDuration = 800
-
-function resolveRateLimitIdentifier(userId: string): string {
-  return `user:${userId}`
-}
 
 export async function POST(request: NextRequest) {
   const requestId = resolveRequestId(request)
@@ -88,34 +74,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const clientIdentifier = resolveRateLimitIdentifier(session.user.id)
-    const rateLimitDecision =
-      AGENT_RATE_LIMIT_ENABLED && !isE2eMockRequest
-        ? await evaluateAndConsumeSlidingWindowRateLimit({
-            identifier: clientIdentifier,
-            maxRequests: AGENT_RATE_LIMIT_MAX_REQUESTS,
-            windowMs: AGENT_RATE_LIMIT_WINDOW_MS,
-          })
-        : null
-
-    if (rateLimitDecision && !rateLimitDecision.allowed) {
-      return observeRouteResponse(
-        observation,
-        createJsonErrorResponse({
-          requestId,
-          error: "Too many requests. Please retry shortly.",
-          errorCode: "AGENT_RATE_LIMITED",
-          status: 429,
-          retryAfterSeconds: rateLimitDecision.retryAfterSeconds,
-          rateLimitDecision,
-        }),
-        {
-          errorCode: "AGENT_RATE_LIMITED",
-          outcome: "rate_limited",
-        }
-      )
-    }
-
     let body: unknown
     try {
       body = await request.json()
@@ -127,7 +85,6 @@ export async function POST(request: NextRequest) {
           error: "Invalid JSON payload.",
           errorCode: "AGENT_INVALID_JSON",
           status: 400,
-          rateLimitDecision: rateLimitDecision ?? undefined,
         }),
         {
           errorCode: "AGENT_INVALID_JSON",
@@ -140,7 +97,6 @@ export async function POST(request: NextRequest) {
       body,
       availableModels: getModels(),
       requestId,
-      rateLimitDecision: rateLimitDecision ?? undefined,
     })
     if (parsedRequestResult instanceof Response) {
       return observeRouteResponse(observation, parsedRequestResult, {
@@ -189,37 +145,10 @@ export async function POST(request: NextRequest) {
           error: "Missing AI_GATEWAY_API_KEY on the server.",
           errorCode: "AGENT_AI_GATEWAY_API_KEY_MISSING",
           status: 500,
-          rateLimitDecision: rateLimitDecision ?? undefined,
         }),
         {
           errorCode: "AGENT_AI_GATEWAY_API_KEY_MISSING",
           outcome: "error",
-        }
-      )
-    }
-
-    const concurrencySlot = AGENT_RATE_LIMIT_ENABLED
-      ? await tryAcquireConcurrencySlot({
-          identifier: clientIdentifier,
-          maxConcurrent: AGENT_MAX_CONCURRENT_REQUESTS_PER_CLIENT,
-          windowMs: AGENT_RATE_LIMIT_WINDOW_MS,
-        })
-      : null
-
-    if (concurrencySlot && !concurrencySlot.allowed) {
-      return observeRouteResponse(
-        observation,
-        createJsonErrorResponse({
-          requestId,
-          error: "Too many concurrent requests. Please retry shortly.",
-          errorCode: "AGENT_CONCURRENCY_LIMITED",
-          status: 429,
-          retryAfterSeconds: concurrencySlot.retryAfterSeconds,
-          rateLimitDecision: rateLimitDecision ?? undefined,
-        }),
-        {
-          errorCode: "AGENT_CONCURRENCY_LIMITED",
-          outcome: "rate_limited",
         }
       )
     }
@@ -229,7 +158,6 @@ export async function POST(request: NextRequest) {
       createAgentStreamResponse({
         request,
         requestId,
-        rateLimitDecision: rateLimitDecision ?? undefined,
         timeoutMs: AGENT_STREAM_TIMEOUT_MS,
         selectedModel,
         aiGatewayApiKey,
@@ -239,7 +167,6 @@ export async function POST(request: NextRequest) {
         featureFlags,
         messages: parsedRequest.messages,
         systemInstruction,
-        onStreamSettled: concurrencySlot?.release,
       }),
       {
         outcome: "stream_started",

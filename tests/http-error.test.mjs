@@ -88,14 +88,14 @@ test("http error helpers hide html error documents", async () => {
 
 test("http error helpers fall back when responses are empty", async () => {
   const response = new Response(null, {
-    status: 429,
+    status: 500,
     headers: {
-      "X-Error-Code": "AGENT_RATE_LIMITED",
+      "X-Error-Code": "AGENT_REQUEST_FAILED",
     },
   })
 
   const error = await createHttpErrorFromResponse(response)
 
-  assert.equal(getHttpErrorMessage(error), "Request failed (429)")
-  assert.equal(error.errorCode, "AGENT_RATE_LIMITED")
+  assert.equal(getHttpErrorMessage(error), "Request failed (500)")
+  assert.equal(error.errorCode, "AGENT_REQUEST_FAILED")
 })
