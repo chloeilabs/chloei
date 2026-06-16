@@ -110,9 +110,6 @@ beforeEach(() => {
       },
     },
     agentPromptSteering: {
-      inferPromptTaskMode(messages) {
-        return messages.length > 1 ? "multi-turn" : "single-turn"
-      },
       resolvePromptProvider(model) {
         return `provider:${model}`
       },
@@ -344,7 +341,6 @@ test("agent route passes the resolved prompt context into stream creation", asyn
       now: recorded.buildInstructionCalls[0].context.now,
       userTimeZone: "America/Chicago",
       provider: "provider:moonshotai/kimi-k2.6",
-      taskMode: "multi-turn",
     },
   })
   assert.deepEqual(recorded.streamCalls[0]?.messages, [

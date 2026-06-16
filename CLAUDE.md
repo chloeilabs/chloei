@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Chloei is a **Next.js 16 / React 19** authenticated AI chat app backed by the **Vercel AI Gateway**. A single streaming agent endpoint (`/api/agent`) runs a multi-step tool-using loop (web search, code execution) and streams NDJSON to the browser. Auth, sessions, threads, and rate limiting are **PostgreSQL-backed** (Better Auth + Kysely/`pg`).
+Chloei is a **Next.js 16 / React 19** authenticated AI chat app backed by the **Vercel AI Gateway**. A single streaming agent endpoint (`/api/agent`) runs a multi-step tool-using loop (Tavily web search) and streams NDJSON to the browser. Auth, sessions, threads, and rate limiting are **PostgreSQL-backed** (Better Auth + Kysely/`pg`).
 
 > **Maintaining this file:** keep it accurate and concise — stale or bloated guidance makes Claude ignore the parts that matter. Cite durable anchors (file paths + symbol names), not line numbers. When you change a subsystem, update the matching section here in the same PR.
 
@@ -76,10 +76,6 @@ Before the model sees them, messages pass through `toModelMessages` (`agent-runt
 
 This boundary is **enforced by Next.js bundling at build time** (importing `pg`/`better-auth`/server modules into a client bundle is a build error), **not** by an ESLint rule. Keep it in mind when adding imports.
 
-### Task Modes
-
-**Task mode** (`inferPromptTaskMode` in `agent-prompt-steering.ts`) is inferred from message content and drives only the **prompt overlay text** (`TASK MODE OVERLAY: <MODE>`). Modes: `general`, `coding`, `debugging`, `writing`, `research`, `high_stakes`, `closed_answer`, `instruction_following`. The tool-step budget is a single fixed constant (`AGENT_TOOL_MAX_STEPS`) — there is no per-request runtime-profile selection. (The `research` task mode is an automatic content-based overlay, not a user-facing toggle.)
-
 ### System Prompt Composition
 
 `buildAgentSystemInstruction` (`src/lib/server/agent-context.ts`) assembles the prompt per-request from labeled blocks delimited by `--- BEGIN <LABEL> ---` / `--- END <LABEL> ---`, in this order:
@@ -87,9 +83,8 @@ This boundary is **enforced by Next.js bundling at build time** (importing `pg`/
 1. `OPERATING INSTRUCTIONS` — `DEFAULT_OPERATING_INSTRUCTION` (`src/lib/shared/llm/system-instructions.ts`)
 2. `RUNTIME DATE CONTEXT` — current UTC timestamp + user timezone (from `X-User-Timezone` header)
 3. **Provider overlay** (`PROVIDER OVERLAY: ALIBABA|MOONSHOTAI`) — keyed by the model's **provider org**, not its nickname (alibaba=Qwen, moonshotai=Kimi). Always applied for a supported model.
-4. **Task mode overlay** (`TASK MODE OVERLAY: <MODE>`)
-5. `IDENTITY AND TONE CONTEXT` — `DEFAULT_SOUL_FALLBACK_INSTRUCTION` (`src/lib/shared/llm/system-instructions.ts`)
-6. `AUTH USER CONTEXT` — authenticated user id, name, email
+4. `IDENTITY AND TONE CONTEXT` — `DEFAULT_SOUL_FALLBACK_INSTRUCTION` (`src/lib/shared/llm/system-instructions.ts`)
+5. `AUTH USER CONTEXT` — authenticated user id, name, email
 
 Inline-citation rules are appended **later**, by `withAiSdkInlineCitationInstruction` (`system-instruction-augmentations.ts`), inside `createAgentStreamResponse` — not by `buildAgentSystemInstruction`.
 
@@ -126,27 +121,18 @@ Streamed reasoning is filtered through three layers so the hidden prompt never l
 
 1. Literal `[REDACTED]` reasoning chunks are dropped (`initial-reasoning-chunk-sanitizer.ts`).
 2. Leading `thinking:` / `reasoning:` labels are stripped (buffered across chunk boundaries).
-3. `sanitizeReasoningForDisplay` (`src/lib/shared/agent/reasoning-privacy.ts`) redacts prompt-internal terms (`soul.md`, "system prompt", "operating instructions", "provider overlay", "task mode overlay", "auth user context", etc.). `getPrivateReasoningCarryLength` holds back a trailing partial token across chunk boundaries so a split secret can't slip through. Applied both at stream time and on thread persistence.
+3. `sanitizeReasoningForDisplay` (`src/lib/shared/agent/reasoning-privacy.ts`) redacts prompt-internal terms (`soul.md`, "system prompt", "operating instructions", "provider overlay", "auth user context", etc.). `getPrivateReasoningCarryLength` holds back a trailing partial token across chunk boundaries so a split secret can't slip through. Applied both at stream time and on thread persistence.
 
 User ids are never logged in the clear: `hashUserId` (`src/lib/server/privacy.ts`) produces a `sha256:<hex>` digest used for telemetry user-hashing.
 
 ### Agent Tools
 
-Each tool is only registered when its requirements are met.
+The only tools are the two Tavily web-search tools, and both are registered together when `TAVILY_API_KEY` is set. There are no other internal or external tools.
 
 | Tool             | Requirement      | Tool id / operations                                                                                                                     |
 | ---------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `tavily_search`  | `TAVILY_API_KEY` | Web search. `topic: general\|news\|finance`, `timeRange`, `includeDomains`, `excludeDomains`, `country`; up to **8** results (default 5) |
 | `tavily_extract` | `TAVILY_API_KEY` | Extract content from up to **5** URLs; `extractDepth: basic\|advanced` (default advanced), `format: markdown\|text`                      |
-| `code_execution` | always on        | `language: javascript\|python`; runs on the restricted computation-only backend                                                          |
-
-**Code execution** (`src/lib/server/llm/code-execution-tools.ts`):
-
-- Runs in a temp directory; network/filesystem/subprocess access blocked.
-- JavaScript: runs via the Node binary (`process.execPath`) with `--input-type=module --eval`.
-- Python: runs via `python3 -I -c` (the `python3` binary on `PATH`).
-- **Restricted backend** (the only backend): computation-only Python imports (`math`, `collections`, `itertools`, …).
-- **Limits**: timeout default **10 s**, max **60 s**; code input and output each capped at **12,000 chars**.
 
 **Max tool steps** (`AGENT_TOOL_MAX_STEPS` in `agent-runtime-config.ts`): 12.
 
@@ -279,7 +265,7 @@ src/
     editor/highlighter.ts
     server/
       agent-context.ts          # buildAgentSystemInstruction
-      agent-prompt-steering.ts  # Task-mode inference + provider/task overlays
+      agent-prompt-steering.ts  # Provider overlays (Qwen/Kimi tuning)
       agent-route.ts            # parseAgentStreamRequest, createAgentStreamResponse
       agent-runtime-config.ts   # Runtime constants + a few operational env switches
       auth.ts / auth-session.ts # isAuthConfigured, getRequestSession
@@ -296,7 +282,6 @@ src/
         gateway-responses.ts              # startGatewayResponseStream
         gateway-client.ts                 # undici dispatcher for AI Gateway
         ai-sdk-tavily-tools.ts            # tavily_search / tavily_extract
-        code-execution-tools.ts           # Sandboxed JS/Python execution
         initial-reasoning-chunk-sanitizer.ts # Redacted-reasoning filtering
         system-instruction-augmentations.ts  # Citation rules appended to prompt
     shared/

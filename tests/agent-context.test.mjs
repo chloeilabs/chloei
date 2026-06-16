@@ -100,29 +100,19 @@ test("system prompt never includes a deep research block", () => {
   assert.ok(!instruction.includes("--- BEGIN DEEP RESEARCH MODE ---"))
 })
 
-test("provider and task-mode overlays respect their toggles", () => {
-  const withOverlays = buildAgentSystemInstruction(viewer, {
+test("provider overlay respects its toggle", () => {
+  const withOverlay = buildAgentSystemInstruction(viewer, {
     ...baseContext,
     provider: "moonshotai",
-    taskMode: "coding",
   })
-  assert.ok(withOverlays.includes("PROVIDER OVERLAY: MOONSHOTAI"))
-  assert.ok(withOverlays.includes("TASK MODE OVERLAY: CODING"))
-
-  const generalMode = buildAgentSystemInstruction(viewer, {
-    ...baseContext,
-    provider: "moonshotai",
-    taskMode: "general",
-  })
-  assert.ok(!generalMode.includes("TASK MODE OVERLAY"))
+  assert.ok(withOverlay.includes("PROVIDER OVERLAY: MOONSHOTAI"))
 
   const disabled = buildAgentSystemInstruction(
     viewer,
-    { ...baseContext, provider: "moonshotai", taskMode: "coding" },
-    { providerOverlaysEnabled: false, taskModeOverlaysEnabled: false }
+    { ...baseContext, provider: "moonshotai" },
+    { providerOverlaysEnabled: false }
   )
   assert.ok(!disabled.includes("PROVIDER OVERLAY"))
-  assert.ok(!disabled.includes("TASK MODE OVERLAY"))
 })
 
 test("operatingInstruction override replaces the default body", () => {

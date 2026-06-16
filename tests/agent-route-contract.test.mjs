@@ -148,11 +148,6 @@ test("agent runtime gives supported chat models the same runtime toolset", async
   )
   assert.match(
     runtimeSource,
-    /createAiSdkCodeExecutionTools\(\)/,
-    "Expected code execution tools to be created for all chat models."
-  )
-  assert.match(
-    runtimeSource,
     /createAiSdkTavilyTools\(normalizedTavilyApiKey\)/,
     "Expected Tavily tools to be created for all chat models."
   )

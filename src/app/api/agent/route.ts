@@ -3,10 +3,7 @@ import { type NextRequest } from "next/server"
 import { getModels } from "@/lib/actions/api-keys"
 import { createLogger } from "@/lib/logger"
 import { buildAgentSystemInstruction } from "@/lib/server/agent-context"
-import {
-  inferPromptTaskMode,
-  resolvePromptProvider,
-} from "@/lib/server/agent-prompt-steering"
+import { resolvePromptProvider } from "@/lib/server/agent-prompt-steering"
 import {
   createAgentStreamResponse,
   createJsonErrorResponse,
@@ -157,7 +154,6 @@ export async function POST(request: NextRequest) {
     const userTimeZone = resolveUserTimeZone(request)
     const featureFlags = await resolveAgentFeatureFlags()
     const promptProvider = resolvePromptProvider(selectedModel)
-    const promptTaskMode = inferPromptTaskMode(parsedRequest.messages)
     const systemInstruction = buildAgentSystemInstruction(
       {
         id: session.user.id,
@@ -168,7 +164,6 @@ export async function POST(request: NextRequest) {
         now: requestNow,
         userTimeZone,
         provider: promptProvider,
-        taskMode: promptTaskMode,
       }
     )
 
