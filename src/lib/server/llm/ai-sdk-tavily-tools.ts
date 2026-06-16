@@ -86,20 +86,77 @@ interface AiSdkTavilyToolResultMetadata {
 }
 
 const tavilySearchInputSchema = z.object({
-  query: z.string().trim().min(1),
-  topic: z.enum(["general", "news", "finance"]).optional(),
-  timeRange: z.enum(["day", "week", "month", "year"]).optional(),
-  includeDomains: z.array(z.string().trim().min(1)).optional(),
-  excludeDomains: z.array(z.string().trim().min(1)).optional(),
-  country: z.string().trim().min(1).optional(),
-  maxResults: z.number().int().min(1).max(TAVILY_SEARCH_MAX_RESULTS).optional(),
+  query: z
+    .string()
+    .trim()
+    .min(1)
+    .describe(
+      "Focused, natural-language search query for the information you need."
+    ),
+  topic: z
+    .enum(["general", "news", "finance"])
+    .optional()
+    .describe(
+      "Search topic. Use 'news' for current events and 'finance' for markets or company financials; defaults to 'general'."
+    ),
+  timeRange: z
+    .enum(["day", "week", "month", "year"])
+    .optional()
+    .describe(
+      "Restrict results to a recent time window. Use for time-sensitive or 'latest' queries."
+    ),
+  includeDomains: z
+    .array(z.string().trim().min(1))
+    .optional()
+    .describe(
+      "Only return results from these domains (e.g. ['sec.gov']). Omit unless the user wants specific sources."
+    ),
+  excludeDomains: z
+    .array(z.string().trim().min(1))
+    .optional()
+    .describe("Exclude results from these domains."),
+  country: z
+    .string()
+    .trim()
+    .min(1)
+    .optional()
+    .describe(
+      "Bias results toward a country (ISO name, e.g. 'united states'). Use only when locale matters."
+    ),
+  maxResults: z
+    .number()
+    .int()
+    .min(1)
+    .max(TAVILY_SEARCH_MAX_RESULTS)
+    .optional()
+    .describe("Maximum number of search results to return."),
 })
 
 const tavilyExtractInputSchema = z.object({
-  urls: z.array(z.string().trim().min(1)).min(1),
-  query: z.string().trim().min(1).optional(),
-  extractDepth: z.enum(["basic", "advanced"]).optional(),
-  format: z.enum(["markdown", "text"]).optional(),
+  urls: z
+    .array(z.string().trim().min(1))
+    .min(1)
+    .describe(
+      "Page URLs to read and extract content from. Provide URLs you already discovered via search."
+    ),
+  query: z
+    .string()
+    .trim()
+    .min(1)
+    .optional()
+    .describe(
+      "Optional focus for extraction — what to prioritize when reading the pages."
+    ),
+  extractDepth: z
+    .enum(["basic", "advanced"])
+    .optional()
+    .describe(
+      "Extraction depth; 'advanced' pulls more complete content. Defaults to 'advanced'."
+    ),
+  format: z
+    .enum(["markdown", "text"])
+    .optional()
+    .describe("Output format for extracted content. Defaults to 'markdown'."),
 })
 
 function createTavilyClient(apiKey: string): TavilyClient {
