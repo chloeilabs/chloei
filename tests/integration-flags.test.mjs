@@ -3,7 +3,16 @@ import path from "node:path"
 import test from "node:test"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
-import "./register-ts-path-hooks.mjs"
+import {
+  setTestModuleStubs,
+  toProjectFileUrl,
+} from "./register-ts-path-hooks.mjs"
+
+setTestModuleStubs({
+  "@vercel/edge-config": toProjectFileUrl("tests/stubs/edge-config.mjs"),
+})
+
+const edgeConfigStoreKey = Symbol.for("chloei.tests.edge-config-store")
 
 const cwd = fileURLToPath(new URL("..", import.meta.url))
 const moduleUrl = pathToFileURL(
@@ -116,5 +125,41 @@ test("resolveAgentFeatureFlags applies per-flag env overrides", async () => {
   await withEnv({ AGENT_TELEMETRY_RECORD_IO: "1" }, async () => {
     const flags = await resolveAgentFeatureFlags()
     assert.equal(flags.telemetryRecordIo, true)
+  })
+})
+
+test("resolveAgentFeatureFlags reads the Vercel/Flags-SDK Edge Config shape", async () => {
+  await withEnv({ EDGE_CONFIG: "test-edge-config-connection" }, async () => {
+    globalThis[edgeConfigStoreKey] = {
+      flags: {
+        "agent-telemetry-record-io": true,
+      },
+    }
+    try {
+      const flags = await resolveAgentFeatureFlags()
+      assert.equal(flags.telemetryRecordIo, true)
+    } finally {
+      delete globalThis[edgeConfigStoreKey]
+    }
+  })
+})
+
+test("resolveIntegrationBooleanFlag reads the Edge Config map shape", async () => {
+  await withEnv({ EDGE_CONFIG: "test-edge-config-connection" }, async () => {
+    globalThis[edgeConfigStoreKey] = {
+      agent_flags: {
+        "agent.telemetry.record_io": true,
+      },
+    }
+    try {
+      assert.equal(
+        await resolveIntegrationBooleanFlag({
+          key: "agent.telemetry.record_io",
+        }),
+        true
+      )
+    } finally {
+      delete globalThis[edgeConfigStoreKey]
+    }
   })
 })
