@@ -159,7 +159,7 @@ export function NavThreads({
                         className="min-w-40"
                       >
                         <DropdownMenuItem
-                          onSelect={() => {
+                          onClick={() => {
                             togglePin(thread.id)
                           }}
                         >
@@ -178,7 +178,7 @@ export function NavThreads({
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           variant="destructive"
-                          onSelect={() => {
+                          onClick={() => {
                             onDeleteThread(thread.id)
                             if (isPinned) togglePin(thread.id)
                           }}
