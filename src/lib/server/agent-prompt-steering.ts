@@ -1,6 +1,6 @@
 import type { ModelType } from "@/lib/shared"
 
-export type PromptProvider = "alibaba" | "moonshotai"
+export type PromptProvider = "alibaba" | "moonshotai" | "zai"
 
 interface PromptSteeringBlock {
   label: string
@@ -29,6 +29,14 @@ Use Kimi reasoning mode efficiently.
 - Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
 - After tool use, synthesize the result and stop. Do not replay raw tool traces.
 `.trim(),
+  zai: `
+Use GLM reasoning mode efficiently.
+- Take advantage of the long context window: skim and cite earlier turns before re-asking the user for information already present.
+- Prefer direct execution and verification over speculative narration.
+- On format-sensitive tasks, do a literal final-format check before finishing.
+- Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
+- After tool use, synthesize the result and stop. Do not replay raw tool traces.
+`.trim(),
 }
 
 export function resolvePromptProvider(model: ModelType): PromptProvider {
@@ -38,6 +46,10 @@ export function resolvePromptProvider(model: ModelType): PromptProvider {
 
   if (model.startsWith("moonshotai/")) {
     return "moonshotai"
+  }
+
+  if (model.startsWith("zai/")) {
+    return "zai"
   }
 
   throw new Error(`Unsupported model provider for model: ${model}`)
