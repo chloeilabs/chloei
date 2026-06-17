@@ -109,8 +109,8 @@ beforeEach(() => {
       },
     },
     agentPromptSteering: {
-      resolvePromptProvider(model) {
-        return `provider:${model}`
+      resolvePromptProvider() {
+        return "zai"
       },
     },
     agentRoute: {
@@ -126,7 +126,7 @@ beforeEach(() => {
           parsedRequest: {
             messages: body.messages,
           },
-          selectedModel: "moonshotai/kimi-k2.6",
+          selectedModel: "zai/glm-5.2",
         }
       },
       createAgentStreamResponse(params) {
@@ -269,7 +269,7 @@ test("agent route passes the resolved prompt context into stream creation", asyn
     context: {
       now: recorded.buildInstructionCalls[0].context.now,
       userTimeZone: "America/Chicago",
-      provider: "provider:moonshotai/kimi-k2.6",
+      provider: "zai",
     },
   })
   assert.deepEqual(recorded.streamCalls[0]?.messages, [

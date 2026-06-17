@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
     const requestNow = new Date()
     const userTimeZone = resolveUserTimeZone(request)
     const featureFlags = await resolveAgentFeatureFlags()
-    const promptProvider = resolvePromptProvider(selectedModel)
+    const promptProvider = resolvePromptProvider()
     const systemInstruction = buildAgentSystemInstruction(
       {
         id: session.user.id,

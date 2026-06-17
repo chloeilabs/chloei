@@ -37,7 +37,7 @@ test("thread payload sanitizes private prompt terminology in reasoning", () => {
         id: "message-1",
         role: "assistant",
         content: "Done.",
-        llmModel: "moonshotai/kimi-k2.6",
+        llmModel: "zai/glm-5.2",
         createdAt: "2026-04-26T00:00:00.000Z",
         metadata: {
           reasoning: "Use SOUL.md and the system prompt.",
@@ -76,7 +76,7 @@ test("thread payload truncates sanitized activity reasoning to the schema limit"
         id: "message-1",
         role: "assistant",
         content: "Done.",
-        llmModel: "moonshotai/kimi-k2.6",
+        llmModel: "zai/glm-5.2",
         createdAt: "2026-04-26T00:00:00.000Z",
         metadata: {
           activityTimeline: [
@@ -126,16 +126,16 @@ test("thread store delegates parsing and persistence shaping to the payload help
 test("thread payload drops legacy run-mode metadata from stored threads", () => {
   const parsed = parseThreadPayload({
     id: "thread-1",
-    model: "alibaba/qwen3.7-max",
+    model: "zai/glm-5.2",
     messages: [
       {
         id: "message-1",
         role: "user",
         content: "Research this.",
-        llmModel: "moonshotai/kimi-k2.6",
+        llmModel: "zai/glm-5.2",
         createdAt: "2026-04-26T00:00:00.000Z",
         metadata: {
-          selectedModel: "moonshotai/kimi-k2.6",
+          selectedModel: "zai/glm-5.2",
           runMode: "research",
         },
       },
@@ -144,9 +144,6 @@ test("thread payload drops legacy run-mode metadata from stored threads", () => 
     updatedAt: "2026-04-26T00:00:01.000Z",
   })
 
-  assert.equal(
-    parsed.messages[0]?.metadata?.selectedModel,
-    "moonshotai/kimi-k2.6"
-  )
+  assert.equal(parsed.messages[0]?.metadata?.selectedModel, "zai/glm-5.2")
   assert.equal(parsed.messages[0]?.metadata?.runMode, undefined)
 })

@@ -103,13 +103,13 @@ test("system prompt never includes a deep research block", () => {
 test("provider overlay respects its toggle", () => {
   const withOverlay = buildAgentSystemInstruction(viewer, {
     ...baseContext,
-    provider: "moonshotai",
+    provider: "zai",
   })
-  assert.ok(withOverlay.includes("PROVIDER OVERLAY: MOONSHOTAI"))
+  assert.ok(withOverlay.includes("PROVIDER OVERLAY: ZAI"))
 
   const disabled = buildAgentSystemInstruction(
     viewer,
-    { ...baseContext, provider: "moonshotai" },
+    { ...baseContext, provider: "zai" },
     { providerOverlaysEnabled: false }
   )
   assert.ok(!disabled.includes("PROVIDER OVERLAY"))

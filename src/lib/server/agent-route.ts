@@ -9,10 +9,9 @@ import type { AgentFeatureFlags } from "@/lib/server/integration-flags"
 import {
   type AgentStreamEvent,
   ALL_MODELS,
-  MODEL_SELECTOR_MODELS,
+  DEFAULT_MODEL,
   type ModelInfo,
   type ModelType,
-  resolveDefaultModelSelectorModel,
 } from "@/lib/shared"
 
 import {
@@ -238,7 +237,8 @@ function isAvailableModel(
   models: readonly Pick<ModelInfo, "id">[],
   targetModel: ModelType
 ): boolean {
-  return models.some((model) => model.id === targetModel)
+  const availableIds = new Set<string>(models.map((model) => model.id))
+  return availableIds.has(targetModel)
 }
 
 function getTotalMessageChars(
@@ -314,14 +314,7 @@ export function parseAgentStreamRequest(
     })
   }
 
-  const availableModelIds = new Set(
-    params.availableModels.map((model) => model.id)
-  )
-  const chatModels = MODEL_SELECTOR_MODELS.flatMap((modelId) =>
-    availableModelIds.has(modelId) ? [{ id: modelId }] : []
-  )
-  const selectedModelCandidate =
-    parsed.data.model ?? resolveDefaultModelSelectorModel(chatModels)
+  const selectedModelCandidate = parsed.data.model ?? DEFAULT_MODEL
 
   if (!isSupportedModel(selectedModelCandidate)) {
     return createJsonErrorResponse({
@@ -332,7 +325,7 @@ export function parseAgentStreamRequest(
     })
   }
 
-  if (!isAvailableModel(chatModels, selectedModelCandidate)) {
+  if (!isAvailableModel(params.availableModels, selectedModelCandidate)) {
     return createJsonErrorResponse({
       requestId: params.requestId,
       error: "Unsupported model selected.",

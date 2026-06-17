@@ -122,35 +122,16 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
+    availableModels: [{ id: "zai/glm-5.2" }],
     requestId: "request-default-mode",
   })
 
   assert(!(defaultModeResult instanceof Response))
-  assert.equal(defaultModeResult.selectedModel, "moonshotai/kimi-k2.6")
-
-  const defaultModeWithQwenResult = parseAgentStreamRequest({
-    body: {
-      messages: [
-        {
-          role: "user",
-          content: "Use the default model.",
-        },
-      ],
-    },
-    availableModels: [
-      { id: "alibaba/qwen3.7-max" },
-      { id: "moonshotai/kimi-k2.6" },
-    ],
-    requestId: "request-default-mode-qwen",
-  })
-
-  assert(!(defaultModeWithQwenResult instanceof Response))
-  assert.equal(defaultModeWithQwenResult.selectedModel, "alibaba/qwen3.7-max")
+  assert.equal(defaultModeResult.selectedModel, "zai/glm-5.2")
 
   const unavailableModelResult = parseAgentStreamRequest({
     body: {
-      model: "alibaba/qwen3.7-max",
+      model: "zai/glm-5.2",
       messages: [
         {
           role: "user",
@@ -158,7 +139,7 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
+    availableModels: [],
     requestId: "request-unavailable-model",
   })
 
@@ -180,7 +161,7 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
+    availableModels: [{ id: "zai/glm-5.2" }],
     requestId: "request-unknown-field",
   })
 
@@ -199,7 +180,7 @@ test("agent helper validates total size, last-message role, and default model su
         content: "hello",
       })),
     },
-    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
+    availableModels: [{ id: "zai/glm-5.2" }],
     requestId: "request-too-many",
   })
 
@@ -220,7 +201,7 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
+    availableModels: [{ id: "zai/glm-5.2" }],
     requestId: "request-message-too-large",
   })
 
@@ -239,7 +220,7 @@ test("agent helper validates total size, last-message role, and default model su
         content: `${String(index).padStart(2, "0")}${"x".repeat(10_998)}`,
       })),
     },
-    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
+    availableModels: [{ id: "zai/glm-5.2" }],
     requestId: "request-1",
   })
 
@@ -260,7 +241,7 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
+    availableModels: [{ id: "zai/glm-5.2" }],
     requestId: "request-2",
   })
 
@@ -308,7 +289,7 @@ test("agent helper streams fallback output when the model yields no content", as
     request: createRequest(),
     requestId: "request-1",
     timeoutMs: 30_000,
-    selectedModel: "moonshotai/kimi-k2.6",
+    selectedModel: "zai/glm-5.2",
     aiGatewayApiKey: "ai-gateway-key",
     tavilyApiKey: "tavily-key",
     messages: [{ role: "user", content: "Hello" }],
@@ -358,7 +339,7 @@ test("agent helper marks tool-backed partial output incomplete when a tool call 
     request: createRequest(),
     requestId: "request-unresolved-tool",
     timeoutMs: 30_000,
-    selectedModel: "moonshotai/kimi-k2.6",
+    selectedModel: "zai/glm-5.2",
     aiGatewayApiKey: "ai-gateway-key",
     tavilyApiKey: "tavily-key",
     messages: [{ role: "user", content: "Search latest docs" }],
@@ -413,7 +394,7 @@ test("agent helper does not add an incomplete fallback when a meaningful answer 
     request: createRequest(),
     requestId: "request-tool-error",
     timeoutMs: 30_000,
-    selectedModel: "moonshotai/kimi-k2.6",
+    selectedModel: "zai/glm-5.2",
     aiGatewayApiKey: "ai-gateway-key",
     tavilyApiKey: "tavily-key",
     messages: [{ role: "user", content: "Search latest docs" }],
@@ -460,7 +441,7 @@ test("agent helper turns upstream body timeouts into visible timeout output", as
     request: createRequest(),
     requestId: "request-body-timeout",
     timeoutMs: 30_000,
-    selectedModel: "moonshotai/kimi-k2.6",
+    selectedModel: "zai/glm-5.2",
     aiGatewayApiKey: "ai-gateway-key",
     messages: [{ role: "user", content: "Latest AI news" }],
     systemInstruction: "system",
@@ -506,7 +487,7 @@ test("agent helper returns an auth-key fallback when provider auth fails", async
     request: createRequest(),
     requestId: "request-2",
     timeoutMs: 30_000,
-    selectedModel: "moonshotai/kimi-k2.6",
+    selectedModel: "zai/glm-5.2",
     aiGatewayApiKey: "ai-gateway-key",
     messages: [{ role: "user", content: "Hello" }],
     systemInstruction: "system",

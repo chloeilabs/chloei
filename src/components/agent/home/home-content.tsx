@@ -51,13 +51,7 @@ const Messages = dynamic(
   }
 )
 
-export function HomePageContent({
-  initialSelectedModel,
-  viewer,
-}: {
-  initialSelectedModel?: ModelType | null
-  viewer: AuthViewer
-}) {
+export function HomePageContent({ viewer }: { viewer: AuthViewer }) {
   const [isPending, startTransition] = useTransition()
   const [isFallbackEnteringConversation, setIsFallbackEnteringConversation] =
     useState(false)
@@ -375,7 +369,6 @@ export function HomePageContent({
                 onStopStream={handleStopStream}
                 isStreaming={streamingState}
                 dismissKeyboardOnSubmit={isMobile}
-                initialSelectedModel={initialSelectedModel}
                 transition={{ isPending, startTransition }}
                 viewTransitionName={promptViewTransitionName}
               />
@@ -426,7 +419,6 @@ export function HomePageContent({
                   onClearQueuedMessage={clearQueuedSubmission}
                   isStreaming={streamingState}
                   dismissKeyboardOnSubmit={isMobile}
-                  initialSelectedModel={initialSelectedModel}
                   transition={{ isPending, startTransition }}
                   viewTransitionName={promptViewTransitionName}
                 />

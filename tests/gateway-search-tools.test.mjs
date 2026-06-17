@@ -2,24 +2,13 @@ import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 import test from "node:test"
-import { fileURLToPath, pathToFileURL } from "node:url"
-
-import "./register-ts-path-hooks.mjs"
+import { fileURLToPath } from "node:url"
 
 const cwd = fileURLToPath(new URL("..", import.meta.url))
 const tavilyToolsPath = path.join(
   cwd,
   "src/lib/server/llm/ai-sdk-tavily-tools.ts"
 )
-const persistentSelectedModelUrl = pathToFileURL(
-  path.join(cwd, "src/hooks/agent/persistent-selected-model-utils.ts")
-).href
-
-const {
-  parseStoredSelectedModel,
-  resolvePersistedSelectedModel,
-  serializeStoredSelectedModel,
-} = await import(persistentSelectedModelUrl)
 
 test("tavily search tool results derive source links", async () => {
   const source = await readFile(tavilyToolsPath, "utf8")
@@ -48,38 +37,5 @@ test("inline citation instructions avoid separate sources sections", async () =>
     source,
     /Do not add a separate "Sources", "References", or bibliography section/,
     "Expected source-backed answers to rely on inline citations and Activity instead of a footer."
-  )
-})
-
-test("stale and fallback-only model ids fall back to GLM 5.2", () => {
-  assert.equal(parseStoredSelectedModel("qwen/qwen3.6-plus"), null)
-  assert.equal(
-    parseStoredSelectedModel(
-      JSON.stringify(serializeStoredSelectedModel("openai/gpt-5.5"))
-    ),
-    null
-  )
-
-  assert.equal(
-    resolvePersistedSelectedModel({
-      storedModel: null,
-      currentModel: null,
-      initialSelectedModel: null,
-      availableModels: [
-        {
-          id: "zai/glm-5.2",
-          name: "GLM 5.2",
-        },
-        {
-          id: "alibaba/qwen3.7-max",
-          name: "Qwen 3.7 Max",
-        },
-        {
-          id: "moonshotai/kimi-k2.6",
-          name: "Kimi K2.6",
-        },
-      ],
-    }),
-    "zai/glm-5.2"
   )
 })

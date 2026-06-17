@@ -80,7 +80,7 @@ This boundary is **enforced by Next.js bundling at build time** (importing `pg`/
 
 1. `OPERATING INSTRUCTIONS` — `DEFAULT_OPERATING_INSTRUCTION` (`src/lib/shared/llm/system-instructions.ts`)
 2. `RUNTIME DATE CONTEXT` — current UTC timestamp + user timezone (from `X-User-Timezone` header)
-3. **Provider overlay** (`PROVIDER OVERLAY: ALIBABA|MOONSHOTAI`) — keyed by the model's **provider org**, not its nickname (alibaba=Qwen, moonshotai=Kimi). Always applied for a supported model.
+3. **Provider overlay** (`PROVIDER OVERLAY: ZAI`) — keyed by the model's **provider org** (zai=GLM). Always applied for the supported model. `resolvePromptProvider()` is param-less and always returns `"zai"`.
 4. `IDENTITY AND TONE CONTEXT` — `DEFAULT_SOUL_FALLBACK_INSTRUCTION` (`src/lib/shared/llm/system-instructions.ts`)
 5. `AUTH USER CONTEXT` — authenticated user id, name, email
 
@@ -136,16 +136,15 @@ The only tools are the two Tavily web-search tools, and both are registered toge
 
 ### Model Registry
 
-All models are defined in `src/lib/shared/llm/models.ts`:
+The app runs on a **single model**, defined in `src/lib/shared/llm/models.ts`:
 
-| Key                    | Model ID               | Display Name |
-| ---------------------- | ---------------------- | ------------ |
-| `ALIBABA_QWEN3_7_MAX`  | `alibaba/qwen3.7-max`  | Qwen 3.7 Max |
-| `MOONSHOTAI_KIMI_K2_6` | `moonshotai/kimi-k2.6` | Kimi K2.6    |
+| Key           | Model ID      | Display Name |
+| ------------- | ------------- | ------------ |
+| `ZAI_GLM_5_2` | `zai/glm-5.2` | GLM 5.2      |
 
-- `MODEL_SELECTOR_MODELS` — the chat selector subset: Qwen 3.7 Max and Kimi K2.6.
+- `DEFAULT_MODEL` (`= AvailableModels.ZAI_GLM_5_2`) is the single model used everywhere. There is **no model-selector UI** and no per-user model persistence — the client always submits `DEFAULT_MODEL`, and the model still flows through requests/threads so the API can validate it.
 - The agent is text-only: all chat input is plain text (no image, file, or PDF input).
-- Adding a model means updating `AvailableModels`, `ModelInfos`, `SUPPORTED_MODELS`, and optionally `MODEL_SELECTOR_MODELS`. `/api/models` filters this registry by configured keys (`getModels()` in `src/lib/actions/api-keys.ts`).
+- Adding a model means updating `AvailableModels`, `ModelInfos`, and `SUPPORTED_MODELS` (and re-introducing selector UI if more than one model is ever exposed). `/api/models` filters this registry by configured keys (`getModels()` in `src/lib/actions/api-keys.ts`).
 
 ### Thread Storage
 
@@ -240,7 +239,7 @@ src/
                         #   follow-up-questions
     agent/messages/     # Message rendering (user, assistant, queued, activity timeline)
     agent/markdown/     # Memoized markdown renderer
-    agent/prompt-form/  # PromptForm, ModelSelector
+    agent/prompt-form/  # PromptForm (single model; no selector)
     app-sidebar.tsx     # Sidebar shell (lazy-loads SearchChats + NavThreads)
     nav-threads.tsx     # Thread list + client-side pinning (localStorage)
     nav-user.tsx        # Account menu + sign-out
@@ -250,15 +249,14 @@ src/
     layout/             # route group layout
     ui/                 # shadcn/ui primitives (base-lyra/stone) + ShikiCode
   hooks/
-    agent/              # use-models (server-seeded models context),
-                        #   use-persistent-selected-model (localStorage-backed)
+    agent/              # use-models (server-seeded models context)
   lib/
     actions/api-keys.ts # getModels() server action
     brand/colors.ts     # App brand colors (used by layout/manifest)
     editor/highlighter.ts
     server/
       agent-context.ts          # buildAgentSystemInstruction
-      agent-prompt-steering.ts  # Provider overlays (Qwen/Kimi tuning)
+      agent-prompt-steering.ts  # Provider overlay (GLM tuning)
       agent-route.ts            # parseAgentStreamRequest, createAgentStreamResponse
       agent-runtime-config.ts   # Runtime constants (no env knobs)
       auth.ts / auth-session.ts # isAuthConfigured, getRequestSession
@@ -280,7 +278,7 @@ src/
       agent/messages.ts          # AgentStreamEvent, Message, ToolInvocation, run statuses
       agent/reasoning-privacy.ts # sanitizeReasoningForDisplay
       agent-request-limits.ts    # Message/char limit defaults
-      llm/models.ts              # AvailableModels, ModelInfos, SUPPORTED/SELECTOR/RESEARCH
+      llm/models.ts              # AvailableModels, ModelInfos, SUPPORTED_MODELS, DEFAULT_MODEL
       llm/system-instructions.ts # DEFAULT_OPERATING_INSTRUCTION, DEFAULT_SOUL_FALLBACK_INSTRUCTION
       threads.ts                 # Thread type, sort/normalize/deriveThreadTitle
   proxy.ts                # Next.js middleware (named export `proxy` + `config`)
@@ -357,5 +355,5 @@ Request size limits, stream/gateway timeouts, tool-step budgets, and body-size l
 - The **mock smoke test uses the production server** (`next start`), so build first.
 - `pnpm.onlyBuiltDependencies` already approves the `sharp` build script — do not run `pnpm approve-builds`.
 - Don't reintroduce Sentry/PostHog/OpenTelemetry; they were intentionally removed in favor of Vercel Analytics/Speed Insights + structured logs.
-- Pinning and selected model are **client-side localStorage** — there are no server columns or APIs for them.
+- Pinning is **client-side localStorage** — there is no server column or API for it. There is no model selection or persistence: the app runs on the single `DEFAULT_MODEL` (GLM 5.2).
 - After signing up via `/api/auth/sign-up/email`, the session cookie is set automatically; no separate sign-in is needed.

@@ -1,23 +1,14 @@
 import { Check, Copy, CornerRightUp, Loader2, X } from "lucide-react"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 
-import { useModels } from "@/hooks/agent/use-models"
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard"
-import {
-  getModelSelectorModels,
-  isModelSelectorModel,
-  isModelType,
-  type Message,
-  type ModelType,
-  resolveDefaultModelSelectorModel,
-} from "@/lib/shared"
+import { DEFAULT_MODEL, type Message, type ModelType } from "@/lib/shared"
 import { cn } from "@/lib/utils"
 
 import { Button } from "../../ui/button"
 import { Textarea } from "../../ui/textarea"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip"
-import { ModelSelector } from "../prompt-form/model-selector"
 import {
   agentShellFrameClass,
   agentShellHighlightClass,
@@ -45,30 +36,8 @@ export function UserMessage({
     newModel: ModelType
   }) => Promise<void> | void
 }) {
-  const { data: availableModels } = useModels()
-  const modelSelectorModels = useMemo(
-    () => getModelSelectorModels(availableModels),
-    [availableModels]
-  )
-  const initialModel = useMemo(() => {
-    const selectedModel = message.metadata?.selectedModel
-    if (isModelType(selectedModel) && isModelSelectorModel(selectedModel)) {
-      return selectedModel
-    }
-
-    if (
-      isModelType(message.llmModel) &&
-      isModelSelectorModel(message.llmModel)
-    ) {
-      return message.llmModel
-    }
-
-    return resolveDefaultModelSelectorModel(modelSelectorModels)
-  }, [message.llmModel, message.metadata?.selectedModel, modelSelectorModels])
-
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState(message.content)
-  const [selectedModel, setSelectedModel] = useState<ModelType>(initialModel)
   const [isEditPending, setIsEditPending] = useState(false)
   const messageContentRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -93,23 +62,15 @@ export function UserMessage({
     }
   }, [isEditing])
 
-  const handleSelectModel = useCallback((model: ModelType | null) => {
-    if (model) {
-      setSelectedModel(model)
-    }
-  }, [])
-
   const handleStartEditing = useCallback(() => {
     setEditValue(message.content)
-    setSelectedModel(initialModel)
     setIsEditing(true)
-  }, [initialModel, message.content])
+  }, [message.content])
 
   const handleStopEditing = useCallback(() => {
     setIsEditing(false)
     setEditValue(message.content)
-    setSelectedModel(initialModel)
-  }, [message.content, initialModel])
+  }, [message.content])
 
   const handleSubmit = useCallback(async () => {
     const trimmedValue = editValue.trim()
@@ -129,7 +90,7 @@ export function UserMessage({
       await onEditMessage({
         messageId: message.id,
         newContent: trimmedValue,
-        newModel: selectedModel,
+        newModel: DEFAULT_MODEL,
       })
       setIsEditing(false)
     } catch (error) {
@@ -139,7 +100,7 @@ export function UserMessage({
     } finally {
       setIsEditPending(false)
     }
-  }, [editValue, handleStopEditing, message.id, onEditMessage, selectedModel])
+  }, [editValue, handleStopEditing, message.id, onEditMessage])
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -221,14 +182,7 @@ export function UserMessage({
               onKeyDown={onKeyDown}
             />
 
-            <div className="grid grid-cols-2 items-center px-2 py-2">
-              <div className="flex min-w-0 items-center justify-start gap-1">
-                <ModelSelector
-                  selectedModel={selectedModel}
-                  handleSelectModel={handleSelectModel}
-                />
-              </div>
-
+            <div className="flex items-center justify-end px-2 py-2">
               <div className="flex min-w-0 items-center justify-end gap-[8px]">
                 <Button
                   onClick={() => {
@@ -236,9 +190,7 @@ export function UserMessage({
                   }}
                   size="iconSm"
                   variant="default"
-                  disabled={
-                    !editValue.trim() || isEditPending || !selectedModel
-                  }
+                  disabled={!editValue.trim() || isEditPending}
                   className="shrink-0 ring-offset-background"
                 >
                   {isEditPending ? (

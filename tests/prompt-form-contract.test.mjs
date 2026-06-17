@@ -10,7 +10,7 @@ const promptFormPath = path.join(
   "src/components/agent/prompt-form/prompt-form.tsx"
 )
 
-test("prompt form drops the tools popover and research mode controls", async () => {
+test("prompt form drops the tools popover, research mode, and model selector controls", async () => {
   const source = await readFile(promptFormPath, "utf8")
 
   assert.doesNotMatch(
@@ -18,9 +18,9 @@ test("prompt form drops the tools popover and research mode controls", async () 
     /runMode|usePersistentRunMode|Research|Telescope|Popover|setIsToolsOpen/,
     "Expected PromptForm to drop the Tools popover and Research mode controls."
   )
-  assert.match(
+  assert.doesNotMatch(
     source,
-    /<ModelSelector/,
-    "Expected PromptForm to render the model selector in the footer."
+    /ModelSelector|usePersistentSelectedModel|getModelSelectorModels/,
+    "Expected PromptForm to no longer render the model selector or use selection persistence."
   )
 })

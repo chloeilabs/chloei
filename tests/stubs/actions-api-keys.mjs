@@ -3,8 +3,7 @@ import { getTestMocks } from "./mock-state.mjs"
 export function getModels() {
   return (
     getTestMocks().apiKeys?.getModels?.() ?? [
-      { id: "alibaba/qwen3.7-max" },
-      { id: "moonshotai/kimi-k2.6" },
+      { id: "zai/glm-5.2", name: "GLM 5.2" },
     ]
   )
 }

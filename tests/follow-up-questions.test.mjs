@@ -25,7 +25,7 @@ const {
 const { AvailableModels } = await import(modelsUrl)
 const { ASSISTANT_EMPTY_RESPONSE_FALLBACK } = await import(constantsUrl)
 
-const MODEL = AvailableModels.MOONSHOTAI_KIMI_K2_6
+const MODEL = AvailableModels.ZAI_GLM_5_2
 
 function assistantMessage(overrides = {}) {
   const { metadata = {}, ...rest } = overrides

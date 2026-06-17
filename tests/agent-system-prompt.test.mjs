@@ -50,15 +50,13 @@ test("agent system prompt composes trusted blocks in priority order", () => {
     {
       now: new Date("2026-05-03T12:34:56.000Z"),
       userTimeZone: "America/Chicago",
-      provider: "alibaba",
+      provider: "zai",
     }
   )
 
   const operatingIndex = prompt.indexOf("--- BEGIN OPERATING INSTRUCTIONS ---")
   const dateIndex = prompt.indexOf("--- BEGIN RUNTIME DATE CONTEXT ---")
-  const providerIndex = prompt.indexOf(
-    "--- BEGIN PROVIDER OVERLAY: ALIBABA ---"
-  )
+  const providerIndex = prompt.indexOf("--- BEGIN PROVIDER OVERLAY: ZAI ---")
   const identityIndex = prompt.indexOf(
     "--- BEGIN IDENTITY AND TONE CONTEXT ---"
   )
@@ -89,7 +87,7 @@ test("agent system prompt composes trusted blocks in priority order", () => {
 
   assert.match(prompt, /Current UTC timestamp: 2026-05-03T12:34:56.000Z/)
   assert.match(prompt, /User time zone: America\/Chicago/)
-  assert.match(prompt, /Use Qwen reasoning mode efficiently/)
+  assert.match(prompt, /Use GLM reasoning mode efficiently/)
   assert.match(prompt, /Email: user@example.com/)
   assert(prompt.includes(DEFAULT_SOUL_FALLBACK_INSTRUCTION))
   assert.equal(prompt.includes("SOUL.md"), false)
@@ -104,14 +102,12 @@ test("agent system prompt places the identity block after provider steering", ()
     },
     {
       now: new Date("2026-05-03T12:34:56.000Z"),
-      provider: "moonshotai",
+      provider: "zai",
     }
   )
 
   const operatingIndex = prompt.indexOf("--- BEGIN OPERATING INSTRUCTIONS ---")
-  const providerIndex = prompt.indexOf(
-    "--- BEGIN PROVIDER OVERLAY: MOONSHOTAI ---"
-  )
+  const providerIndex = prompt.indexOf("--- BEGIN PROVIDER OVERLAY: ZAI ---")
   const identityIndex = prompt.indexOf(
     "--- BEGIN IDENTITY AND TONE CONTEXT ---"
   )

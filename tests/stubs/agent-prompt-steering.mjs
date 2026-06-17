@@ -1,8 +1,5 @@
 import { getTestMocks } from "./mock-state.mjs"
 
-export function resolvePromptProvider(model) {
-  return (
-    getTestMocks().agentPromptSteering?.resolvePromptProvider?.(model) ??
-    "moonshotai"
-  )
+export function resolvePromptProvider() {
+  return getTestMocks().agentPromptSteering?.resolvePromptProvider?.() ?? "zai"
 }

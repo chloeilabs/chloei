@@ -16,9 +16,9 @@ export function shouldNudgeMidBudgetSynthesis(
   if (toolMaxSteps <= 3) {
     return false
   }
-  // Kick in at one-third of budget. The failing 10-K tasks (e.g. Kimi K2.6)
-  // tend to stop naturally with empty text after only 5-8 tool calls
-  // (~steps 4-7 of 20); half-budget fires too late to reach them.
+  // Kick in at one-third of budget. The failing 10-K tasks tend to stop
+  // naturally with empty text after only 5-8 tool calls (~steps 4-7 of 20);
+  // half-budget fires too late to reach them.
   const threshold = Math.max(2, Math.floor(toolMaxSteps / 3))
   return stepNumber >= threshold && stepNumber < toolMaxSteps - 1
 }

@@ -107,7 +107,7 @@ test("follow-up generation uses GPT-5.1 Instant and tags the source model", asyn
         return {
           output: {
             questions: [
-              "How does Kimi handle the repair-after-conflict point?",
+              "How does a couple handle the repair-after-conflict point?",
               "What tradeoff matters most for commitment over time?",
               "How would care over time change the recommendation?",
             ],
@@ -127,7 +127,7 @@ test("follow-up generation uses GPT-5.1 Instant and tags the source model", asyn
           "Love includes intimacy, commitment, repair after conflict, and care over time.",
       },
     ],
-    model: "moonshotai/kimi-k2.6",
+    model: "zai/glm-5.2",
     userId: "user-1",
   })
 
@@ -135,7 +135,7 @@ test("follow-up generation uses GPT-5.1 Instant and tags the source model", asyn
   assert.deepEqual(recordedParams?.providerOptions?.gateway?.tags, [
     "feature:follow_up_questions",
     "generation_model:openai/gpt-5.1-instant",
-    "source_model:moonshotai/kimi-k2.6",
+    "source_model:zai/glm-5.2",
   ])
   assert.equal(followUps.length, 3)
 })

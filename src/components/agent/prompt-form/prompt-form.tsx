@@ -17,8 +17,7 @@ import { RefreshGlow } from "@/components/graphics/effects/refresh-glow"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { useModels } from "@/hooks/agent/use-models"
-import { usePersistentSelectedModel } from "@/hooks/agent/use-persistent-selected-model"
-import { getModelSelectorModels, type ModelType } from "@/lib/shared"
+import { DEFAULT_MODEL, type ModelType } from "@/lib/shared"
 import { cn } from "@/lib/utils"
 
 import { QueuedAction } from "../messages/queued-message"
@@ -29,7 +28,6 @@ import {
   agentSurfaceBackgroundClass,
   agentSurfaceClass,
 } from "../shared/shell-styles"
-import { ModelSelector } from "./model-selector"
 
 interface QueuedPromptSubmission {
   message: string
@@ -44,7 +42,6 @@ export function PromptForm({
   dismissKeyboardOnSubmit = false,
   onFocus,
   onBlur,
-  initialSelectedModel,
   dockToBottomOnHome = false,
   queuedSubmission,
   onClearQueuedMessage,
@@ -59,7 +56,6 @@ export function PromptForm({
   dismissKeyboardOnSubmit?: boolean
   onFocus?: () => void
   onBlur?: () => void
-  initialSelectedModel?: ModelType | null
   dockToBottomOnHome?: boolean
   queuedSubmission?: QueuedPromptSubmission | null
   onClearQueuedMessage?: () => void
@@ -80,14 +76,7 @@ export function PromptForm({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const { data: availableModels } = useModels()
-  const modelSelectorModels = useMemo(
-    () => getModelSelectorModels(availableModels),
-    [availableModels]
-  )
-  const { selectedModel, setSelectedModel } = usePersistentSelectedModel(
-    initialSelectedModel,
-    modelSelectorModels
-  )
+  const isModelConfigured = availableModels.length > 0
   const formStyle = useMemo<CSSProperties | undefined>(
     () =>
       viewTransitionName
@@ -98,22 +87,12 @@ export function PromptForm({
     [viewTransitionName]
   )
 
-  const resolvedSelectedModel = selectedModel
-
-  const handleSelectModel = useCallback(
-    (model: ModelType | null) => {
-      setSelectedModel(model)
-    },
-    [setSelectedModel]
-  )
-
   const restoreQueuedSubmission = useCallback(() => {
     if (!queuedSubmission) {
       return
     }
 
     setMessage(queuedSubmission.message)
-    setSelectedModel(queuedSubmission.model)
     onClearQueuedMessage?.()
 
     window.requestAnimationFrame(() => {
@@ -127,7 +106,7 @@ export function PromptForm({
       textarea.setSelectionRange(cursorPosition, cursorPosition)
       textarea.scrollTop = textarea.scrollHeight
     })
-  }, [onClearQueuedMessage, queuedSubmission, setSelectedModel])
+  }, [onClearQueuedMessage, queuedSubmission])
 
   const submitPrompt = useCallback(() => {
     const nextMessage = message.trim()
@@ -137,7 +116,7 @@ export function PromptForm({
       return true
     }
 
-    if (!nextMessage || !resolvedSelectedModel || isFormPending) {
+    if (!nextMessage || !isModelConfigured || isFormPending) {
       return false
     }
 
@@ -149,18 +128,18 @@ export function PromptForm({
       }
     }
 
-    onSubmit?.(nextMessage, resolvedSelectedModel, isStreaming)
+    onSubmit?.(nextMessage, DEFAULT_MODEL, isStreaming)
     setMessage("")
 
     return true
   }, [
     dismissKeyboardOnSubmit,
     isFormPending,
+    isModelConfigured,
     isStreaming,
     message,
     onStopStream,
     onSubmit,
-    resolvedSelectedModel,
   ])
 
   const handleSubmit = useCallback(
@@ -200,7 +179,7 @@ export function PromptForm({
   }, [isStreaming, onStopStream])
 
   const isSubmitButtonDisabled =
-    isFormPending || !resolvedSelectedModel || (!isStreaming && !trimmedMessage)
+    isFormPending || !isModelConfigured || (!isStreaming && !trimmedMessage)
 
   return (
     <form
@@ -252,14 +231,7 @@ export function PromptForm({
             className="max-h-48 flex-1 resize-none border-0 bg-transparent! shadow-none placeholder:text-muted-foreground/50 focus-visible:ring-0"
           />
 
-          <div className="grid grid-cols-2 items-center px-2 py-2">
-            <div className="flex min-w-0 items-center justify-start gap-1">
-              <ModelSelector
-                selectedModel={resolvedSelectedModel}
-                handleSelectModel={handleSelectModel}
-              />
-            </div>
-
+          <div className="flex items-center justify-end px-2 py-2">
             <div className="flex min-w-0 items-center justify-end gap-[8px]">
               <Button
                 type="submit"
@@ -289,7 +261,7 @@ export function PromptForm({
         </div>
       </div>
 
-      {!resolvedSelectedModel && (
+      {!isModelConfigured && (
         <p className="mt-2 text-xs text-muted-foreground">
           Configure `AI_GATEWAY_API_KEY` on the server to enable model access.
         </p>

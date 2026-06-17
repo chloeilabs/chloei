@@ -41,7 +41,8 @@ function createEmptyFollowUpResponse(requestId: string) {
 }
 
 function isAvailableModel(model: ModelType): boolean {
-  return getModels().some((availableModel) => availableModel.id === model)
+  const availableIds = new Set<string>(getModels().map((m) => m.id))
+  return availableIds.has(model)
 }
 
 export async function POST(request: NextRequest) {
