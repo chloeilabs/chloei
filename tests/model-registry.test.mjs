@@ -35,15 +35,21 @@ test("shared model registry includes the curated gateway models", async () => {
   )
 
   assert.match(
-    source.replace(/\s+/g, " "),
-    /SUPPORTED_MODELS = \[ AvailableModels\.ALIBABA_QWEN3_7_MAX, AvailableModels\.MOONSHOTAI_KIMI_K2_6, \] as const/,
-    "Expected SUPPORTED_MODELS to list Qwen 3.7 Max and Kimi K2.6."
+    source,
+    /ZAI_GLM_5_2:\s*"zai\/glm-5\.2"/,
+    "Expected AvailableModels to include ZAI_GLM_5_2."
   )
 
   assert.match(
     source.replace(/\s+/g, " "),
-    /MODEL_SELECTOR_MODELS = \[ AvailableModels\.ALIBABA_QWEN3_7_MAX, AvailableModels\.MOONSHOTAI_KIMI_K2_6, \] as const/,
-    "Expected the chat model selector to default to Qwen 3.7 Max before Kimi K2.6."
+    /SUPPORTED_MODELS = \[ AvailableModels\.ZAI_GLM_5_2, AvailableModels\.ALIBABA_QWEN3_7_MAX, AvailableModels\.MOONSHOTAI_KIMI_K2_6, \] as const/,
+    "Expected SUPPORTED_MODELS to list GLM 5.2, Qwen 3.7 Max, and Kimi K2.6."
+  )
+
+  assert.match(
+    source.replace(/\s+/g, " "),
+    /MODEL_SELECTOR_MODELS = \[ AvailableModels\.ZAI_GLM_5_2, AvailableModels\.ALIBABA_QWEN3_7_MAX, AvailableModels\.MOONSHOTAI_KIMI_K2_6, \] as const/,
+    "Expected the chat model selector to default to GLM 5.2, then Qwen 3.7 Max and Kimi K2.6."
   )
 
   assert.match(
@@ -56,5 +62,11 @@ test("shared model registry includes the curated gateway models", async () => {
     source,
     /\[AvailableModels\.MOONSHOTAI_KIMI_K2_6\]:\s*\{[\s\S]*name:\s*"Kimi K2\.6"/,
     "Expected ModelInfos to define display metadata for MOONSHOTAI_KIMI_K2_6."
+  )
+
+  assert.match(
+    source,
+    /\[AvailableModels\.ZAI_GLM_5_2\]:\s*\{[\s\S]*name:\s*"GLM 5\.2"/,
+    "Expected ModelInfos to define display metadata for ZAI_GLM_5_2."
   )
 })

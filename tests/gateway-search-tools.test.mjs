@@ -51,7 +51,7 @@ test("inline citation instructions avoid separate sources sections", async () =>
   )
 })
 
-test("stale and fallback-only model ids fall back to Qwen 3.7 Max", () => {
+test("stale and fallback-only model ids fall back to GLM 5.2", () => {
   assert.equal(parseStoredSelectedModel("qwen/qwen3.6-plus"), null)
   assert.equal(
     parseStoredSelectedModel(
@@ -67,6 +67,10 @@ test("stale and fallback-only model ids fall back to Qwen 3.7 Max", () => {
       initialSelectedModel: null,
       availableModels: [
         {
+          id: "zai/glm-5.2",
+          name: "GLM 5.2",
+        },
+        {
           id: "alibaba/qwen3.7-max",
           name: "Qwen 3.7 Max",
         },
@@ -76,6 +80,6 @@ test("stale and fallback-only model ids fall back to Qwen 3.7 Max", () => {
         },
       ],
     }),
-    "alibaba/qwen3.7-max"
+    "zai/glm-5.2"
   )
 })

@@ -1,6 +1,7 @@
 export const AvailableModels = {
   ALIBABA_QWEN3_7_MAX: "alibaba/qwen3.7-max",
   MOONSHOTAI_KIMI_K2_6: "moonshotai/kimi-k2.6",
+  ZAI_GLM_5_2: "zai/glm-5.2",
 } as const
 
 export type ModelType = (typeof AvailableModels)[keyof typeof AvailableModels]
@@ -18,6 +19,7 @@ export interface ModelInfo {
 }
 
 export const SUPPORTED_MODELS = [
+  AvailableModels.ZAI_GLM_5_2,
   AvailableModels.ALIBABA_QWEN3_7_MAX,
   AvailableModels.MOONSHOTAI_KIMI_K2_6,
 ] as const
@@ -25,6 +27,7 @@ export const SUPPORTED_MODELS = [
 export const ALL_MODELS = [...SUPPORTED_MODELS] as const
 
 export const MODEL_SELECTOR_MODELS = [
+  AvailableModels.ZAI_GLM_5_2,
   AvailableModels.ALIBABA_QWEN3_7_MAX,
   AvailableModels.MOONSHOTAI_KIMI_K2_6,
 ] as const
@@ -64,5 +67,9 @@ export const ModelInfos: Record<ModelType, ModelInfo> = {
   [AvailableModels.MOONSHOTAI_KIMI_K2_6]: {
     id: AvailableModels.MOONSHOTAI_KIMI_K2_6,
     name: "Kimi K2.6",
+  },
+  [AvailableModels.ZAI_GLM_5_2]: {
+    id: AvailableModels.ZAI_GLM_5_2,
+    name: "GLM 5.2",
   },
 }
