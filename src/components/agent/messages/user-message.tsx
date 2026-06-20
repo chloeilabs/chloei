@@ -245,7 +245,7 @@ export function UserMessage({
               "max-w-full",
               agentShellFrameClass,
               agentShellInteractiveClass,
-              agentShellHighlightClass,
+              "rounded-3xl",
               !disableEditing && "cursor-pointer"
             )}
             role="button"
@@ -265,15 +265,20 @@ export function UserMessage({
             <div
               className={cn(
                 agentSurfaceClass,
-                "w-full overflow-clip px-3 py-2 text-sm"
+                "w-full overflow-clip rounded-3xl bg-[#212121] bg-none px-3 py-2 text-sm"
               )}
               style={{
                 maxHeight: `${String(MAX_CONTENT_HEIGHT)}px`,
               }}
             >
-              <div className={agentSurfaceBackgroundClass} />
+              <div
+                className={cn(
+                  agentSurfaceBackgroundClass,
+                  "rounded-3xl bg-[#212121]"
+                )}
+              />
               {isContentOverflowing && (
-                <div className="absolute bottom-0 left-0 h-1/3 w-full animate-in bg-gradient-to-t from-background via-background/80 to-card/0 fade-in" />
+                <div className="absolute bottom-0 left-0 h-1/3 w-full animate-in bg-gradient-to-t from-[#212121] via-[#212121]/80 to-transparent fade-in" />
               )}
               <div ref={messageContentRef} className="whitespace-pre-wrap">
                 {message.content}
