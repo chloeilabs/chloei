@@ -11,6 +11,7 @@ import dynamic from "next/dynamic"
 import { useMemo, useState } from "react"
 
 import { LogoHover } from "@/components/graphics/logo/logo-hover"
+import { Skeleton } from "@/components/ui/skeleton"
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard"
 import {
   type FollowUpQuestion,
@@ -19,6 +20,7 @@ import {
   type ModelType,
   type ToolInvocationStatus,
 } from "@/lib/shared"
+import { cn } from "@/lib/utils"
 
 import { Button } from "../../ui/button"
 import { Source, SourceContent, SourceTrigger } from "../../ui/source"
@@ -34,9 +36,7 @@ const MemoizedMarkdown = dynamic(
       (module) => module.MemoizedMarkdown
     ),
   {
-    loading: () => (
-      <div className="h-5 w-32 animate-pulse rounded-sm bg-muted/50" />
-    ),
+    loading: () => <Skeleton className="h-5 w-32" />,
     ssr: false,
   }
 )
@@ -58,7 +58,7 @@ function getAssistantContent(message: Message): string {
 }
 
 const activityLabelClassName =
-  "inline-flex items-center bg-transparent p-0 font-departureMono text-[11px] font-medium tracking-wide text-muted-foreground/80"
+  "inline-flex items-center bg-transparent p-0 text-[11px] font-medium tracking-wide text-muted-foreground/80"
 
 function getSearchToolLabel(): string {
   return "Tavily"
@@ -88,7 +88,7 @@ function ToolStatusIcon({ status }: { status: ToolInvocationStatus }) {
     return <CircleCheck className="size-3.5 shrink-0 text-green-600" />
   }
 
-  return <CircleX className="size-3.5 shrink-0 text-red-600" />
+  return <CircleX className="size-3.5 shrink-0 text-destructive" />
 }
 
 function SourceList({
@@ -166,15 +166,15 @@ function FollowUpQuestionsPending() {
     >
       <div className="-mx-2 flex h-7 max-w-full items-center gap-1.5 px-2 py-1">
         <CornerDownRight className="mt-0.5 size-3 shrink-0 text-muted-foreground/30" />
-        <span className="h-3 w-72 max-w-[70vw] animate-pulse rounded-sm bg-muted/60 dark:bg-muted/40" />
+        <Skeleton className="h-3 w-72 max-w-[70vw]" />
       </div>
       <div className="-mx-2 flex h-7 max-w-full items-center gap-1.5 px-2 py-1">
         <CornerDownRight className="mt-0.5 size-3 shrink-0 text-muted-foreground/30" />
-        <span className="h-3 w-64 max-w-[64vw] animate-pulse rounded-sm bg-muted/60 dark:bg-muted/40" />
+        <Skeleton className="h-3 w-64 max-w-[64vw]" />
       </div>
       <div className="-mx-2 flex h-7 max-w-full items-center gap-1.5 px-2 py-1">
         <CornerDownRight className="mt-0.5 size-3 shrink-0 text-muted-foreground/30" />
-        <span className="h-3 w-80 max-w-[74vw] animate-pulse rounded-sm bg-muted/60 dark:bg-muted/40" />
+        <Skeleton className="h-3 w-80 max-w-[74vw]" />
       </div>
     </div>
   )
@@ -259,7 +259,10 @@ export function AssistantMessage({
           <div className="mb-1">
             <button
               type="button"
-              className={`${activityLabelClassName} cursor-pointer gap-1 transition-colors hover:text-foreground`}
+              className={cn(
+                activityLabelClassName,
+                "cursor-pointer gap-1 transition-colors hover:text-foreground"
+              )}
               aria-expanded={!isActivityCollapsed}
               onClick={() => {
                 setActivityVisibility((current) => {
@@ -275,9 +278,10 @@ export function AssistantMessage({
                 Activity
               </span>
               <ChevronDown
-                className={`size-3.5 transition-transform ${
+                className={cn(
+                  "size-3.5 transition-transform",
                   isActivityCollapsed ? "-rotate-90" : "rotate-0"
-                }`}
+                )}
               />
             </button>
           </div>
@@ -288,7 +292,7 @@ export function AssistantMessage({
                   return (
                     <div
                       key={entry.id}
-                      className="rounded-none border bg-muted/30 px-2.5 py-2 text-xs text-muted-foreground"
+                      className="rounded-md border bg-muted/30 px-2.5 py-2 text-xs text-muted-foreground"
                     >
                       <div className="leading-relaxed whitespace-pre-wrap">
                         {entry.text}
@@ -317,7 +321,7 @@ export function AssistantMessage({
                   return (
                     <div
                       key={entry.id}
-                      className="rounded-none border bg-muted/40 px-2.5 py-2"
+                      className="rounded-md border bg-muted/40 px-2.5 py-2"
                     >
                       <SourceList
                         sources={entry.sources}
@@ -330,7 +334,7 @@ export function AssistantMessage({
                 return (
                   <div
                     key={entry.id}
-                    className="rounded-none border bg-muted/40 px-2.5 py-1.5 text-xs text-muted-foreground"
+                    className="rounded-md border bg-muted/40 px-2.5 py-1.5 text-xs text-muted-foreground"
                   >
                     <div className="flex items-center gap-1.5">
                       <ToolStatusIcon status={entry.status} />
@@ -360,7 +364,7 @@ export function AssistantMessage({
                     aria-label={isCopied ? "Response copied" : "Copy response"}
                     type="button"
                     variant="ghost"
-                    size="iconXs"
+                    size="icon-xs"
                     className="text-muted-foreground hover:text-foreground"
                     onClick={() => {
                       void copyToClipboard(content)
@@ -382,7 +386,7 @@ export function AssistantMessage({
                       aria-label="Regenerate response"
                       type="button"
                       variant="ghost"
-                      size="iconXs"
+                      size="icon-xs"
                       className="text-muted-foreground hover:text-foreground"
                       onClick={onRegenerate}
                     >

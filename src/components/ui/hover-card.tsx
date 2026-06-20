@@ -1,22 +1,22 @@
 "use client"
 
-import { PreviewCard as HoverCardPrimitive } from "@base-ui/react/preview-card"
+import { PreviewCard as PreviewCardPrimitive } from "@base-ui/react/preview-card"
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-function HoverCard({ ...props }: HoverCardPrimitive.Root.Props) {
-  return <HoverCardPrimitive.Root {...props} />
+function HoverCard({ ...props }: PreviewCardPrimitive.Root.Props) {
+  return <PreviewCardPrimitive.Root data-slot="hover-card" {...props} />
 }
 
 function HoverCardTrigger({
   asChild,
   children,
   ...props
-}: HoverCardPrimitive.Trigger.Props & { asChild?: boolean }) {
+}: PreviewCardPrimitive.Trigger.Props & { asChild?: boolean }) {
   if (asChild && React.isValidElement(children)) {
     return (
-      <HoverCardPrimitive.Trigger
+      <PreviewCardPrimitive.Trigger
         data-slot="hover-card-trigger"
         render={children}
         {...props}
@@ -25,43 +25,43 @@ function HoverCardTrigger({
   }
 
   return (
-    <HoverCardPrimitive.Trigger data-slot="hover-card-trigger" {...props}>
+    <PreviewCardPrimitive.Trigger data-slot="hover-card-trigger" {...props}>
       {children}
-    </HoverCardPrimitive.Trigger>
+    </PreviewCardPrimitive.Trigger>
   )
 }
 
 function HoverCardContent({
   className,
-  side,
-  align = "center",
+  side = "bottom",
   sideOffset = 4,
-  alignOffset,
+  align = "center",
+  alignOffset = 4,
   ...props
-}: HoverCardPrimitive.Popup.Props &
+}: PreviewCardPrimitive.Popup.Props &
   Pick<
-    HoverCardPrimitive.Positioner.Props,
-    "side" | "align" | "sideOffset" | "alignOffset"
+    PreviewCardPrimitive.Positioner.Props,
+    "align" | "alignOffset" | "side" | "sideOffset"
   >) {
   return (
-    <HoverCardPrimitive.Portal>
-      <HoverCardPrimitive.Positioner
-        side={side}
+    <PreviewCardPrimitive.Portal data-slot="hover-card-portal">
+      <PreviewCardPrimitive.Positioner
         align={align}
-        sideOffset={sideOffset}
         alignOffset={alignOffset}
-        className="z-50"
+        side={side}
+        sideOffset={sideOffset}
+        className="isolate z-50"
       >
-        <HoverCardPrimitive.Popup
+        <PreviewCardPrimitive.Popup
           data-slot="hover-card-content"
           className={cn(
-            "w-64 origin-(--transform-origin) rounded-none border bg-popover p-4 text-popover-foreground shadow-md outline-hidden transition duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0",
+            "z-50 w-72 origin-(--transform-origin) rounded-2xl bg-popover p-4 text-sm text-popover-foreground shadow-2xl ring-1 ring-foreground/5 outline-hidden duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
             className
           )}
           {...props}
         />
-      </HoverCardPrimitive.Positioner>
-    </HoverCardPrimitive.Portal>
+      </PreviewCardPrimitive.Positioner>
+    </PreviewCardPrimitive.Portal>
   )
 }
 

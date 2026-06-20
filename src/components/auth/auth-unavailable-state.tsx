@@ -1,3 +1,4 @@
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AUTH_REQUIRED_ENV_NAMES } from "@/lib/server/auth"
 
 export function AuthUnavailableState() {
@@ -8,14 +9,16 @@ export function AuthUnavailableState() {
         required environment variables.
       </p>
 
-      <div className="border border-border bg-muted/30 p-4">
-        <p className="text-sm font-medium">Required server variables</p>
-        <ul className="mt-3 space-y-1 font-mono text-xs text-muted-foreground">
-          {AUTH_REQUIRED_ENV_NAMES.map((name) => (
-            <li key={name}>{name}</li>
-          ))}
-        </ul>
-      </div>
+      <Alert>
+        <AlertTitle>Required server variables</AlertTitle>
+        <AlertDescription>
+          <ul className="flex flex-col gap-1 font-mono text-xs">
+            {AUTH_REQUIRED_ENV_NAMES.map((name) => (
+              <li key={name}>{name}</li>
+            ))}
+          </ul>
+        </AlertDescription>
+      </Alert>
     </div>
   )
 }

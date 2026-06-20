@@ -70,7 +70,7 @@ export function SearchChats({
               onChange={(event) => {
                 setQuery(event.target.value)
               }}
-              className="rounded-none border-0 shadow-none focus-visible:ring-0"
+              className="h-12 rounded-md border-0 bg-transparent px-4 text-base shadow-none focus-visible:ring-0 md:text-base"
             />
           </div>
           <div className="max-h-[60vh] overflow-y-auto p-1">
@@ -90,7 +90,7 @@ export function SearchChats({
                   onClick={() => {
                     handleSelect(thread.id)
                   }}
-                  className="flex w-full min-w-0 cursor-pointer items-center rounded-none px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                  className="flex w-full min-w-0 cursor-pointer items-center rounded-md px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
                 >
                   <span className="min-w-0 flex-1 truncate">
                     {thread.title}

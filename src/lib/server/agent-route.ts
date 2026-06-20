@@ -238,7 +238,8 @@ function isAvailableModel(
   models: readonly Pick<ModelInfo, "id">[],
   targetModel: ModelType
 ): boolean {
-  return models.some((model) => model.id === targetModel)
+  const availableModelIds: readonly string[] = models.map((model) => model.id)
+  return availableModelIds.includes(targetModel)
 }
 
 function getTotalMessageChars(

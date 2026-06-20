@@ -29,7 +29,6 @@ import {
   agentSurfaceBackgroundClass,
   agentSurfaceClass,
 } from "../shared/shell-styles"
-import { ModelSelector } from "./model-selector"
 
 interface QueuedPromptSubmission {
   message: string
@@ -84,7 +83,7 @@ export function PromptForm({
     () => getModelSelectorModels(availableModels),
     [availableModels]
   )
-  const { selectedModel, setSelectedModel } = usePersistentSelectedModel(
+  const { selectedModel } = usePersistentSelectedModel(
     initialSelectedModel,
     modelSelectorModels
   )
@@ -100,20 +99,12 @@ export function PromptForm({
 
   const resolvedSelectedModel = selectedModel
 
-  const handleSelectModel = useCallback(
-    (model: ModelType | null) => {
-      setSelectedModel(model)
-    },
-    [setSelectedModel]
-  )
-
   const restoreQueuedSubmission = useCallback(() => {
     if (!queuedSubmission) {
       return
     }
 
     setMessage(queuedSubmission.message)
-    setSelectedModel(queuedSubmission.model)
     onClearQueuedMessage?.()
 
     window.requestAnimationFrame(() => {
@@ -127,7 +118,7 @@ export function PromptForm({
       textarea.setSelectionRange(cursorPosition, cursorPosition)
       textarea.scrollTop = textarea.scrollHeight
     })
-  }, [onClearQueuedMessage, queuedSubmission, setSelectedModel])
+  }, [onClearQueuedMessage, queuedSubmission])
 
   const submitPrompt = useCallback(() => {
     const nextMessage = message.trim()
@@ -231,15 +222,27 @@ export function PromptForm({
           agentShellFrameClass,
           agentShellInteractiveClass,
           agentShellHighlightClass,
+          "rounded-3xl",
           isFormPending && "opacity-50"
         )}
       >
-        <div className={cn(agentSurfaceClass, "flex min-h-24 flex-col")}>
-          <div className={agentSurfaceBackgroundClass} />
+        <div
+          className={cn(
+            agentSurfaceClass,
+            "flex items-end gap-1 rounded-3xl bg-[#212121] bg-none pr-2"
+          )}
+        >
+          <div
+            className={cn(
+              agentSurfaceBackgroundClass,
+              "rounded-3xl bg-[#212121]"
+            )}
+          />
 
           <Textarea
             ref={textareaRef}
             value={message}
+            rows={1}
             onChange={(e) => {
               if (!isFormPending) {
                 setMessage(e.target.value)
@@ -249,43 +252,32 @@ export function PromptForm({
             onFocus={onFocus}
             onBlur={onBlur}
             placeholder="Ask anything"
-            className="max-h-48 flex-1 resize-none border-0 bg-transparent! shadow-none placeholder:text-muted-foreground/50 focus-visible:ring-0"
+            className="no-scrollbar max-h-48 min-h-0 flex-1 resize-none border-0 bg-transparent! py-3.5 pl-4 shadow-none placeholder:text-muted-foreground focus-visible:ring-0 md:text-base"
           />
 
-          <div className="grid grid-cols-2 items-center px-2 py-2">
-            <div className="flex min-w-0 items-center justify-start gap-1">
-              <ModelSelector
-                selectedModel={resolvedSelectedModel}
-                handleSelectModel={handleSelectModel}
-              />
-            </div>
-
-            <div className="flex min-w-0 items-center justify-end gap-[8px]">
-              <Button
-                type="submit"
-                size="iconSm"
-                disabled={isSubmitButtonDisabled}
-                aria-label={
-                  isFormPending
-                    ? "Sending message"
-                    : isStreaming && !trimmedMessage
-                      ? "Stop response"
-                      : "Send message"
-                }
-                className="shrink-0 ring-offset-background"
-              >
-                {isFormPending ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : isStreaming && !trimmedMessage ? (
-                  <div className="p-0.5">
-                    <Square className="size-3 fill-primary-foreground" />
-                  </div>
-                ) : (
-                  <CornerRightUp className="size-4" />
-                )}
-              </Button>
-            </div>
-          </div>
+          <Button
+            type="submit"
+            size="icon"
+            disabled={isSubmitButtonDisabled}
+            aria-label={
+              isFormPending
+                ? "Sending message"
+                : isStreaming && !trimmedMessage
+                  ? "Stop response"
+                  : "Send message"
+            }
+            className="mb-2 shrink-0 ring-offset-background"
+          >
+            {isFormPending ? (
+              <Loader2 className="size-5 animate-spin" />
+            ) : isStreaming && !trimmedMessage ? (
+              <div className="p-0.5">
+                <Square className="size-3.5 fill-primary-foreground" />
+              </div>
+            ) : (
+              <CornerRightUp className="size-5" />
+            )}
+          </Button>
         </div>
       </div>
 

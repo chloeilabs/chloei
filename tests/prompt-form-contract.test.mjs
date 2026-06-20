@@ -18,9 +18,9 @@ test("prompt form drops the tools popover and research mode controls", async () 
     /runMode|usePersistentRunMode|Research|Telescope|Popover|setIsToolsOpen/,
     "Expected PromptForm to drop the Tools popover and Research mode controls."
   )
-  assert.match(
+  assert.doesNotMatch(
     source,
     /<ModelSelector/,
-    "Expected PromptForm to render the model selector in the footer."
+    "Expected PromptForm to no longer render a model selector (GLM 5.2 only)."
   )
 })

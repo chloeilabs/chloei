@@ -17,7 +17,6 @@ import { cn } from "@/lib/utils"
 import { Button } from "../../ui/button"
 import { Textarea } from "../../ui/textarea"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip"
-import { ModelSelector } from "../prompt-form/model-selector"
 import {
   agentShellFrameClass,
   agentShellHighlightClass,
@@ -92,12 +91,6 @@ export function UserMessage({
       textarea.scrollTop = textarea.scrollHeight
     }
   }, [isEditing])
-
-  const handleSelectModel = useCallback((model: ModelType | null) => {
-    if (model) {
-      setSelectedModel(model)
-    }
-  }, [])
 
   const handleStartEditing = useCallback(() => {
     setEditValue(message.content)
@@ -192,7 +185,7 @@ export function UserMessage({
                     <Button
                       type="button"
                       variant="ghost"
-                      size="iconXs"
+                      size="icon-xs"
                       tabIndex={-1}
                       className="p-0 text-muted-foreground hover:bg-sidebar-border hover:text-foreground"
                       onClick={handleStopEditing}
@@ -208,33 +201,27 @@ export function UserMessage({
             </div>
           </div>
 
-          <div className={cn(agentSurfaceClass, "flex min-h-24 flex-col")}>
+          <div className={cn(agentSurfaceClass, "flex flex-col")}>
             <div className={agentSurfaceBackgroundClass} />
             <Textarea
               ref={textareaRef}
               value={editValue}
+              rows={1}
               onChange={(e) => {
                 setEditValue(e.target.value)
               }}
               placeholder="Ask anything"
-              className="max-h-48 flex-1 resize-none border-0 bg-transparent! text-base shadow-none placeholder:text-muted-foreground/50 focus-visible:ring-0 md:text-sm"
+              className="max-h-48 min-h-0 resize-none border-0 bg-transparent! text-base shadow-none placeholder:text-muted-foreground/50 focus-visible:ring-0 md:text-sm"
               onKeyDown={onKeyDown}
             />
 
-            <div className="grid grid-cols-2 items-center px-2 py-2">
-              <div className="flex min-w-0 items-center justify-start gap-1">
-                <ModelSelector
-                  selectedModel={selectedModel}
-                  handleSelectModel={handleSelectModel}
-                />
-              </div>
-
+            <div className="flex items-center justify-end px-2 py-2">
               <div className="flex min-w-0 items-center justify-end gap-[8px]">
                 <Button
                   onClick={() => {
                     void handleSubmit()
                   }}
-                  size="iconSm"
+                  size="icon-sm"
                   variant="default"
                   disabled={
                     !editValue.trim() || isEditPending || !selectedModel
@@ -301,7 +288,7 @@ export function UserMessage({
                   <Button
                     type="button"
                     variant="ghost"
-                    size="iconXs"
+                    size="icon-xs"
                     aria-label={isCopied ? "Copied message" : "Copy message"}
                     className="text-muted-foreground hover:text-foreground"
                     onClick={() => {

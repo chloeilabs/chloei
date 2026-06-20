@@ -60,7 +60,7 @@ export function SourceTrigger({
         target="_blank"
         rel="noopener noreferrer"
         className={cn(
-          "inline-flex h-5 max-w-32 cursor-pointer items-center gap-1 overflow-hidden rounded-none bg-muted py-0 text-xs text-muted-foreground no-underline transition-colors duration-150 hover:bg-muted-foreground/30 hover:text-primary",
+          "inline-flex h-5 max-w-32 cursor-pointer items-center gap-1 overflow-hidden rounded-md bg-muted py-0 text-xs text-muted-foreground no-underline transition-colors duration-150 hover:bg-muted-foreground/30 hover:text-primary",
           showFavicon ? "pr-2 pl-1" : "px-1",
           className
         )}
@@ -71,7 +71,7 @@ export function SourceTrigger({
             alt="favicon"
             width={14}
             height={14}
-            className="size-3.5 rounded-none"
+            className="size-3.5 rounded-md"
           />
         )}
         <span className="truncate text-center font-normal tabular-nums">
@@ -111,7 +111,7 @@ export function SourceContent({
             <Image
               src={faviconUrl}
               alt="favicon"
-              className="size-4 rounded-none"
+              className="size-4 rounded-md"
               width={16}
               height={16}
             />

@@ -29,6 +29,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   sortThreadSummariesNewestFirst,
   type ThreadSummary,
@@ -113,10 +114,10 @@ export function NavThreads({
           <SidebarMenu>
             {isLoading && ordered.length === 0 ? (
               <SidebarMenuItem>
-                <div className="space-y-1 px-2 py-1.5">
-                  <div className="h-6 animate-pulse bg-sidebar-accent/60" />
-                  <div className="h-6 animate-pulse bg-sidebar-accent/40" />
-                  <div className="h-6 animate-pulse bg-sidebar-accent/30" />
+                <div className="flex flex-col gap-1 px-2 py-1.5">
+                  <Skeleton className="h-6" />
+                  <Skeleton className="h-6" />
+                  <Skeleton className="h-6" />
                 </div>
               </SidebarMenuItem>
             ) : ordered.length === 0 ? (
