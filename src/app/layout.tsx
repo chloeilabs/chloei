@@ -4,7 +4,6 @@ import { Analytics } from "@vercel/analytics/next"
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import type { Metadata, Viewport } from "next"
 import { Geist } from "next/font/google"
-import localFont from "next/font/local"
 import Script from "next/script"
 
 import { appBackgroundColor } from "@/lib/brand/colors"
@@ -81,11 +80,6 @@ const geistSans = Geist({
   subsets: ["latin"],
 })
 
-const departureMono = localFont({
-  src: "./fonts/DepartureMono-Regular.woff2",
-  variable: "--font-departure-mono",
-})
-
 export const viewport: Viewport = {
   colorScheme: "dark",
   themeColor: appBackgroundColor,
@@ -135,9 +129,7 @@ export default function RootLayout({
       suppressHydrationWarning
       className={cn("dark font-sans", geistSans.variable)}
     >
-      <body
-        className={cn(departureMono.variable, "overscroll-none antialiased")}
-      >
+      <body className="overscroll-none antialiased">
         {isProduction ? null : (
           <Script id="localhost-dev-cache-reset" strategy="beforeInteractive">
             {localhostDevCacheResetScript}

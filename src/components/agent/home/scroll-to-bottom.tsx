@@ -2,6 +2,7 @@ import { ArrowDown } from "lucide-react"
 import { useCallback, useRef } from "react"
 import { useStickToBottomContext } from "use-stick-to-bottom"
 
+import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip"
@@ -34,21 +35,20 @@ export function ScrollToBottom() {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button
+        <Button
+          variant="secondary"
+          size="icon-sm"
           disabled={isAtBottom}
           className={cn(
-            "sticky z-20 rounded-none border border-border bg-background p-1.5 text-muted-foreground transition-all hover:bg-accent hover:text-foreground",
-            isAtBottom
-              ? "translate-y-2 opacity-0"
-              : "translate-y-0 cursor-pointer opacity-100",
-            "bottom-[9.5rem]"
+            "sticky bottom-[9.5rem] z-20 border border-border text-muted-foreground transition-all hover:text-foreground disabled:opacity-0",
+            isAtBottom ? "translate-y-2 opacity-0" : "translate-y-0 opacity-100"
           )}
           onClick={() => {
             void handleScrollToBottom()
           }}
         >
-          <ArrowDown className="size-4" />
-        </button>
+          <ArrowDown />
+        </Button>
       </TooltipTrigger>
       {!isAtBottom && <TooltipContent>Scroll to Bottom</TooltipContent>}
     </Tooltip>

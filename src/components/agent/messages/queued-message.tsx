@@ -14,7 +14,7 @@ export function QueuedAction({
   const previewText = message.trim()
 
   return (
-    <div className="absolute -top-12 left-0 flex w-full animate-in items-center justify-between gap-2 rounded-none border border-border bg-card py-1.5 pr-1.5 pl-3 text-sm duration-150 fade-in">
+    <div className="absolute -top-12 left-0 flex w-full animate-in items-center justify-between gap-2 rounded-md border border-border bg-card py-1.5 pr-1.5 pl-3 text-sm duration-150 fade-in">
       <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
         <ListEnd className="size-4 shrink-0" />
         <span className="whitespace-nowrap select-none">Queued Message</span>
@@ -25,7 +25,7 @@ export function QueuedAction({
           <Button
             type="button"
             variant="ghost"
-            size="iconXs"
+            size="icon-xs"
             aria-label="Edit queued message"
             className="p-0 text-muted-foreground hover:bg-sidebar-border hover:text-foreground"
             onClick={onRestore}
@@ -36,7 +36,7 @@ export function QueuedAction({
         <Button
           type="button"
           variant="ghost"
-          size="iconXs"
+          size="icon-xs"
           aria-label="Clear queued message"
           className="p-0 text-muted-foreground hover:bg-sidebar-border hover:text-foreground"
           onClick={onClear}

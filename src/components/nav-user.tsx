@@ -6,6 +6,7 @@ import { useTransition } from "react"
 import { toast } from "sonner"
 
 import { getAuthErrorMessage } from "@/components/auth/auth-form-utils"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -71,9 +72,11 @@ export function NavUser({ viewer }: { viewer: AuthViewer }) {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton size="lg" className="aria-expanded:bg-muted">
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-xs font-semibold text-primary-foreground">
-                {getInitials(viewer)}
-              </div>
+              <Avatar className="size-8 rounded-lg after:rounded-lg">
+                <AvatarFallback className="rounded-lg bg-primary text-xs font-semibold text-primary-foreground">
+                  {getInitials(viewer)}
+                </AvatarFallback>
+              </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 {viewer.name ? (
                   <span className="truncate font-medium">{viewer.name}</span>
@@ -104,7 +107,7 @@ export function NavUser({ viewer }: { viewer: AuthViewer }) {
               disabled={isPending}
               onClick={handleSignOut}
             >
-              <SquareArrowRightExit className="size-4" />
+              <SquareArrowRightExit />
               {isPending ? "Signing out…" : "Sign out"}
             </DropdownMenuItem>
           </DropdownMenuContent>

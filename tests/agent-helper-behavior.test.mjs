@@ -122,31 +122,12 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
+    availableModels: [{ id: "zai/glm-5.2" }],
     requestId: "request-default-mode",
   })
 
   assert(!(defaultModeResult instanceof Response))
-  assert.equal(defaultModeResult.selectedModel, "moonshotai/kimi-k2.6")
-
-  const defaultModeWithQwenResult = parseAgentStreamRequest({
-    body: {
-      messages: [
-        {
-          role: "user",
-          content: "Use the default model.",
-        },
-      ],
-    },
-    availableModels: [
-      { id: "alibaba/qwen3.7-max" },
-      { id: "moonshotai/kimi-k2.6" },
-    ],
-    requestId: "request-default-mode-qwen",
-  })
-
-  assert(!(defaultModeWithQwenResult instanceof Response))
-  assert.equal(defaultModeWithQwenResult.selectedModel, "alibaba/qwen3.7-max")
+  assert.equal(defaultModeResult.selectedModel, "zai/glm-5.2")
 
   const unavailableModelResult = parseAgentStreamRequest({
     body: {
@@ -158,7 +139,7 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
+    availableModels: [{ id: "zai/glm-5.2" }],
     requestId: "request-unavailable-model",
   })
 
@@ -180,7 +161,7 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
+    availableModels: [{ id: "zai/glm-5.2" }],
     requestId: "request-unknown-field",
   })
 
@@ -199,7 +180,7 @@ test("agent helper validates total size, last-message role, and default model su
         content: "hello",
       })),
     },
-    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
+    availableModels: [{ id: "zai/glm-5.2" }],
     requestId: "request-too-many",
   })
 
@@ -220,7 +201,7 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
+    availableModels: [{ id: "zai/glm-5.2" }],
     requestId: "request-message-too-large",
   })
 
@@ -239,7 +220,7 @@ test("agent helper validates total size, last-message role, and default model su
         content: `${String(index).padStart(2, "0")}${"x".repeat(10_998)}`,
       })),
     },
-    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
+    availableModels: [{ id: "zai/glm-5.2" }],
     requestId: "request-1",
   })
 
@@ -260,7 +241,7 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "moonshotai/kimi-k2.6" }],
+    availableModels: [{ id: "zai/glm-5.2" }],
     requestId: "request-2",
   })
 

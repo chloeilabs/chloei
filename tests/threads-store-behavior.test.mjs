@@ -140,7 +140,7 @@ test("listThreadSummariesForUser avoids selecting message payloads", async () =>
             {
               id: "summary-thread",
               title: "Stored summary",
-              model: "moonshotai/kimi-k2.6",
+              model: "zai/glm-5.2",
               createdAt: "2026-04-15T10:00:00.000Z",
               updatedAt: "2026-04-15T10:05:00.000Z",
             },
@@ -156,7 +156,7 @@ test("listThreadSummariesForUser avoids selecting message payloads", async () =>
     {
       id: "summary-thread",
       title: "Stored summary",
-      model: "moonshotai/kimi-k2.6",
+      model: "zai/glm-5.2",
       createdAt: "2026-04-15T10:00:00.000Z",
       updatedAt: "2026-04-15T10:05:00.000Z",
     },

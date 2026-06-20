@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 
 import { Button } from "@/components/ui/button"
+import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { getAuthClient } from "@/lib/auth-client"
 
@@ -73,10 +74,8 @@ export function SignInForm({ redirectTo }: { redirectTo: string }) {
 
   return (
     <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-      <div className="flex flex-col gap-2">
-        <label htmlFor="sign-in-email" className="text-sm font-medium">
-          Email
-        </label>
+      <Field>
+        <FieldLabel htmlFor="sign-in-email">Email</FieldLabel>
         <Input
           id="sign-in-email"
           type="email"
@@ -87,12 +86,10 @@ export function SignInForm({ redirectTo }: { redirectTo: string }) {
             setEmail(event.target.value)
           }}
         />
-      </div>
+      </Field>
 
-      <div className="flex flex-col gap-2">
-        <label htmlFor="sign-in-password" className="text-sm font-medium">
-          Password
-        </label>
+      <Field>
+        <FieldLabel htmlFor="sign-in-password">Password</FieldLabel>
         <PasswordInput
           id="sign-in-password"
           value={password}
@@ -102,11 +99,9 @@ export function SignInForm({ redirectTo }: { redirectTo: string }) {
             setPassword(event.target.value)
           }}
         />
-      </div>
+      </Field>
 
-      {errorMessage ? (
-        <p className="text-sm text-destructive">{errorMessage}</p>
-      ) : null}
+      {errorMessage ? <FieldError>{errorMessage}</FieldError> : null}
 
       <Button type="submit" size="lg" disabled={isPending}>
         {isPending ? "Signing In..." : "Sign In"}

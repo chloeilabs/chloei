@@ -3,9 +3,9 @@
     circle at 50% 0%,
     var(--background) 0%,
     var(--background) 32%,
-    color-mix(in oklab, var(--vesper-orange) 88%, var(--background)) 46%,
-    color-mix(in oklab, var(--vesper-orange) 76%, transparent) 58%,
-    color-mix(in oklab, var(--vesper-teal) 82%, transparent) 74%,
+    color-mix(in oklab, var(--glow-primary) 88%, var(--background)) 46%,
+    color-mix(in oklab, var(--glow-primary) 76%, transparent) 58%,
+    color-mix(in oklab, var(--glow-secondary) 82%, transparent) 74%,
     transparent 94%
   );
   filter: blur(132px) saturate(126%);

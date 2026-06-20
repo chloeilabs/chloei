@@ -330,7 +330,7 @@ export function HomePageContent({
                   <Button
                     type="button"
                     variant="ghost"
-                    size="iconSm"
+                    size="icon-sm"
                     className="text-muted-foreground hover:text-foreground"
                     onClick={handleNewChat}
                     aria-label="Start a new chat"
@@ -358,13 +358,13 @@ export function HomePageContent({
           >
             <div
               className={cn(
-                "mx-auto flex w-full flex-1 flex-col items-center gap-10 px-4 pt-[20vh] sm:px-6",
+                "mx-auto flex w-full flex-1 flex-col items-center gap-10 px-4 pt-[28vh] sm:px-6",
                 conversationWidthClass
               )}
             >
               <div
                 style={homeHeroTransitionStyle}
-                className="text-center font-departureMono text-2xl font-medium tracking-tighter select-none"
+                className="text-center text-2xl font-medium tracking-tighter select-none"
               >
                 Welcome to <span className="text-muted-foreground">Chloei</span>
               </div>

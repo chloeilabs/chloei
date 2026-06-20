@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 
 import { Button } from "@/components/ui/button"
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { getAuthClient } from "@/lib/auth-client"
 
@@ -86,10 +92,8 @@ export function SignUpForm({ redirectTo }: { redirectTo: string }) {
 
   return (
     <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-      <div className="flex flex-col gap-2">
-        <label htmlFor="sign-up-name" className="text-sm font-medium">
-          Full Name
-        </label>
+      <Field>
+        <FieldLabel htmlFor="sign-up-name">Full Name</FieldLabel>
         <Input
           id="sign-up-name"
           type="text"
@@ -100,12 +104,10 @@ export function SignUpForm({ redirectTo }: { redirectTo: string }) {
             setName(event.target.value)
           }}
         />
-      </div>
+      </Field>
 
-      <div className="flex flex-col gap-2">
-        <label htmlFor="sign-up-email" className="text-sm font-medium">
-          Email
-        </label>
+      <Field>
+        <FieldLabel htmlFor="sign-up-email">Email</FieldLabel>
         <Input
           id="sign-up-email"
           type="email"
@@ -116,12 +118,10 @@ export function SignUpForm({ redirectTo }: { redirectTo: string }) {
             setEmail(event.target.value)
           }}
         />
-      </div>
+      </Field>
 
-      <div className="flex flex-col gap-2">
-        <label htmlFor="sign-up-password" className="text-sm font-medium">
-          Password
-        </label>
+      <Field>
+        <FieldLabel htmlFor="sign-up-password">Password</FieldLabel>
         <PasswordInput
           id="sign-up-password"
           value={password}
@@ -131,15 +131,13 @@ export function SignUpForm({ redirectTo }: { redirectTo: string }) {
             setPassword(event.target.value)
           }}
         />
-      </div>
+        <FieldDescription>Use at least 8 characters.</FieldDescription>
+      </Field>
 
-      <div className="flex flex-col gap-2">
-        <label
-          htmlFor="sign-up-confirm-password"
-          className="text-sm font-medium"
-        >
+      <Field>
+        <FieldLabel htmlFor="sign-up-confirm-password">
           Confirm Password
-        </label>
+        </FieldLabel>
         <PasswordInput
           id="sign-up-confirm-password"
           value={confirmPassword}
@@ -150,11 +148,9 @@ export function SignUpForm({ redirectTo }: { redirectTo: string }) {
             setConfirmPassword(event.target.value)
           }}
         />
-      </div>
+      </Field>
 
-      {errorMessage ? (
-        <p className="text-sm text-destructive">{errorMessage}</p>
-      ) : null}
+      {errorMessage ? <FieldError>{errorMessage}</FieldError> : null}
 
       <Button type="submit" size="lg" disabled={isPending}>
         {isPending ? "Creating Account..." : "Create Account"}

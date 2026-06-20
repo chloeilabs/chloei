@@ -1,5 +1,6 @@
 "use client"
 
+import { Eye, EyeOff } from "lucide-react"
 import { type ComponentProps, useState } from "react"
 
 import { Button } from "@/components/ui/button"
@@ -26,22 +27,22 @@ export function PasswordInput({
         id={id}
         disabled={disabled}
         type={isVisible ? "text" : "password"}
-        className={cn("pr-14", className)}
+        className={cn("pr-11", className)}
       />
       <Button
         type="button"
         variant="ghost"
-        size="sm"
+        size="icon-sm"
         disabled={disabled}
         aria-controls={id}
         aria-label={`${isVisible ? "Hide" : "Show"} ${revealLabel}`}
         aria-pressed={isVisible}
-        className="absolute top-1/2 right-1 h-7 -translate-y-1/2 px-2 text-[11px] text-muted-foreground hover:bg-transparent hover:text-foreground"
+        className="absolute inset-y-0 right-1.5 my-auto text-muted-foreground hover:text-foreground"
         onClick={() => {
           setIsVisible((currentValue) => !currentValue)
         }}
       >
-        {isVisible ? "Hide" : "Show"}
+        {isVisible ? <EyeOff /> : <Eye />}
       </Button>
     </div>
   )

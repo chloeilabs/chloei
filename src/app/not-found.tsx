@@ -2,23 +2,34 @@ import Link from "next/link"
 
 import { ChloeiLogoSvg } from "@/components/graphics/logo/logo-svg"
 import { buttonVariants } from "@/components/ui/button"
+import {
+  Empty,
+  EmptyContent,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
 import { cn } from "@/lib/utils"
 
 export default function NotFound() {
   return (
-    <div className="flex grow flex-col items-center justify-center gap-6 p-6">
-      <div className="flex items-center gap-4 font-departureMono text-3xl font-medium tracking-tighter">
-        <span className="block size-[25px] shrink-0 overflow-hidden">
-          <ChloeiLogoSvg />
-        </span>
-        Page Not Found
-      </div>
-      <Link
-        href="/"
-        className={cn(buttonVariants({ variant: "secondary", size: "lg" }))}
-      >
-        Go To Home
-      </Link>
-    </div>
+    <Empty className="grow">
+      <EmptyHeader>
+        <EmptyMedia variant="default">
+          <span className="block size-10 shrink-0 overflow-hidden">
+            <ChloeiLogoSvg />
+          </span>
+        </EmptyMedia>
+        <EmptyTitle>Page Not Found</EmptyTitle>
+      </EmptyHeader>
+      <EmptyContent>
+        <Link
+          href="/"
+          className={cn(buttonVariants({ variant: "secondary", size: "lg" }))}
+        >
+          Go To Home
+        </Link>
+      </EmptyContent>
+    </Empty>
   )
 }

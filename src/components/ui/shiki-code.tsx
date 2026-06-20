@@ -129,7 +129,7 @@ export function ShikiCode({
   }
 
   const codeFrameClassName =
-    "not-prose my-3 w-full min-w-0 overflow-hidden rounded-none border border-border bg-background font-mono text-xs"
+    "not-prose my-3 w-full min-w-0 overflow-hidden rounded-md border border-border bg-background font-mono text-xs"
   const codeHeaderClassName =
     "flex items-center justify-between gap-3 border-b border-border bg-muted/40 px-3 py-2 text-[11px] tracking-wide text-muted-foreground"
   const codeViewportClassName =
@@ -140,7 +140,7 @@ export function ShikiCode({
       <Button
         type="button"
         variant="ghost"
-        size="iconXs"
+        size="icon-xs"
         aria-label={isCopied ? "Copied" : "Copy code"}
         className="translate-x-[3px] text-muted-foreground hover:text-foreground"
         onClick={() => {
