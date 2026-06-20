@@ -237,6 +237,11 @@ export async function* startAgentRuntimeStream(
 
   const result = streamText({
     model: gatewayProvider(params.model),
+    // GLM only emits reasoning when an effort level is requested; without this
+    // it skips thinking on many turns, so the activity timeline shows none.
+    providerOptions: {
+      zai: { reasoningEffort: "high" },
+    },
     system: systemInstruction,
     messages,
     abortSignal: params.signal,

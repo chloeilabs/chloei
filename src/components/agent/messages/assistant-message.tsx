@@ -1,14 +1,13 @@
 import {
   Check,
-  ChevronDown,
-  CircleCheck,
   CircleX,
   Copy,
   CornerDownRight,
   RefreshCcw,
+  Wrench,
 } from "lucide-react"
 import dynamic from "next/dynamic"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
 import { LogoHover } from "@/components/graphics/logo/logo-hover"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -18,7 +17,6 @@ import {
   isModelType,
   type Message,
   type ModelType,
-  type ToolInvocationStatus,
 } from "@/lib/shared"
 import { cn } from "@/lib/utils"
 
@@ -57,11 +55,19 @@ function getAssistantContent(message: Message): string {
   return text.length > 0 ? text : message.content
 }
 
-const activityLabelClassName =
-  "inline-flex items-center bg-transparent p-0 text-[11px] font-medium tracking-wide text-muted-foreground/80"
+function formatActivityDuration(ms: number): string {
+  const totalSeconds = Math.max(1, Math.round(ms / 1000))
 
-function getSearchToolLabel(): string {
-  return "Tavily"
+  if (totalSeconds < 60) {
+    return `${String(totalSeconds)}s`
+  }
+
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+
+  return seconds > 0
+    ? `${String(minutes)}m ${String(seconds)}s`
+    : `${String(minutes)}m`
 }
 
 export function CraftingShimmer() {
@@ -77,19 +83,125 @@ export function CraftingShimmer() {
   )
 }
 
-function ToolStatusIcon({ status }: { status: ToolInvocationStatus }) {
-  if (status === "running") {
-    return (
-      <LogoHover forceAnimate size="xs" className="shrink-0 text-foreground" />
-    )
-  }
+type ActivityEntry = ReturnType<
+  typeof normalizeAssistantActivityTimeline
+>[number]
 
-  if (status === "success") {
-    return <CircleCheck className="size-3.5 shrink-0 text-green-600" />
+function activityStepLabel(entry: ActivityEntry): string {
+  switch (entry.kind) {
+    case "reasoning":
+      return "Thinking"
+    case "search":
+      return entry.status === "running"
+        ? "Searching the web"
+        : "Searched the web"
+    case "sources":
+      return "Sources"
+    default:
+      return entry.label
   }
-
-  return <CircleX className="size-3.5 shrink-0 text-destructive" />
 }
+
+// Exact replicas of onyx's @opal/icons used in its agent timeline.
+function TimelineCircleIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+    >
+      <circle cx="8" cy="8" r="4" strokeWidth={1.5} />
+    </svg>
+  )
+}
+
+function TimelineGlobeIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+    >
+      <path
+        d="M14.6667 8C14.6667 11.6819 11.6819 14.6667 8 14.6667M14.6667 8C14.6667 4.3181 11.6819 1.33333 8 1.33333M14.6667 8H1.33334M8 14.6667C4.31811 14.6667 1.33334 11.6819 1.33334 8M8 14.6667C9.66753 12.8411 10.6152 10.472 10.6667 8C10.6152 5.52802 9.66753 3.1589 8 1.33333M8 14.6667C6.33249 12.8411 5.38484 10.472 5.33334 8C5.38484 5.52802 6.33249 3.1589 8 1.33333M1.33334 8C1.33334 4.3181 4.31811 1.33333 8 1.33333"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function TimelineFoldIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+    >
+      <path
+        d="M11 3.25L8.47136 5.77857C8.21103 6.0389 7.78889 6.0389 7.52856 5.77857L4.99999 3.25M11 12.75L8.47136 10.2214C8.21103 9.96103 7.78889 9.96103 7.52856 10.2214L4.99999 12.75"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function TimelineExpandIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+    >
+      <path
+        d="M4.99994 5.49995L7.52858 2.97131C7.78891 2.71098 8.21105 2.71098 8.47138 2.97131L11 5.49995M5.00024 10.5L7.5288 13.0286C7.78914 13.2889 8.21127 13.2889 8.4716 13.0286L11.0002 10.5"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function ActivityStepIcon({ entry }: { entry: ActivityEntry }) {
+  if (
+    (entry.kind === "tool" || entry.kind === "search") &&
+    entry.status === "running"
+  ) {
+    return <LogoHover forceAnimate size="xs" className="text-foreground" />
+  }
+
+  if (
+    (entry.kind === "tool" || entry.kind === "search") &&
+    entry.status === "error"
+  ) {
+    return <CircleX className="size-3 text-destructive" />
+  }
+
+  if (entry.kind === "search") {
+    return <TimelineGlobeIcon className="size-3 text-muted-foreground" />
+  }
+
+  // Onyx renders the fetch step (which surfaces sources) with the same circle.
+  if (entry.kind === "sources" || entry.kind === "reasoning") {
+    return <TimelineCircleIcon className="size-3 text-muted-foreground" />
+  }
+
+  return <Wrench className="size-3 text-muted-foreground" />
+}
+
+const INITIAL_SOURCES_SHOWN = 3
 
 function SourceList({
   sources,
@@ -98,26 +210,53 @@ function SourceList({
   sources: ReturnType<typeof getDedupedSources>
   showFavicon: boolean
 }) {
+  const [showAll, setShowAll] = useState(false)
+
   if (sources.length === 0) {
     return null
   }
 
+  const visibleSources = showAll
+    ? sources
+    : sources.slice(0, INITIAL_SOURCES_SHOWN)
+  const remaining = sources.length - visibleSources.length
+
   return (
     <div className="flex flex-wrap gap-1.5">
-      {sources.map((source) => (
-        <Source href={source.url} key={`${source.id}:${source.url}`}>
-          <SourceTrigger
-            label={source.title}
-            showFavicon={showFavicon}
-            className="max-w-full"
-          />
-          <SourceContent
-            title={source.title}
-            description={source.url}
-            showFavicon={showFavicon}
-          />
-        </Source>
+      {visibleSources.map((source, index) => (
+        <div
+          key={`${source.id}:${source.url}`}
+          className="flex max-w-full min-w-0 animate-in duration-150 fade-in slide-in-from-left-2"
+          style={{
+            animationDelay: `${String(Math.min(index, 8) * 30)}ms`,
+            animationFillMode: "backwards",
+          }}
+        >
+          <Source href={source.url}>
+            <SourceTrigger
+              label={source.title}
+              showFavicon={showFavicon}
+              className="max-w-52"
+            />
+            <SourceContent
+              title={source.title}
+              description={source.url}
+              showFavicon={showFavicon}
+            />
+          </Source>
+        </div>
       ))}
+      {remaining > 0 ? (
+        <button
+          type="button"
+          onClick={() => {
+            setShowAll(true)
+          }}
+          className="inline-flex items-center rounded-full border border-border bg-muted/40 px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          +{remaining} more
+        </button>
+      ) : null}
     </div>
   )
 }
@@ -193,11 +332,33 @@ export function AssistantMessage({
   onRegenerate?: () => void
 }) {
   const content = useMemo(() => getAssistantContent(message), [message])
-  const [activityVisibility, setActivityVisibility] = useState<
-    "auto" | "expanded" | "collapsed"
-  >("auto")
+  // Onyx default: the timeline is collapsed and only expands when the user
+  // clicks the header (collapsed during streaming and after completion).
+  const [isActivityExpanded, setIsActivityExpanded] = useState(false)
 
   const isAssistantStreaming = message.metadata?.isStreaming === true
+
+  const [activityDurationMs, setActivityDurationMs] = useState<number | null>(
+    null
+  )
+  const activityStartRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (!isAssistantStreaming) {
+      return
+    }
+
+    activityStartRef.current ??= Date.now()
+    const intervalId = setInterval(() => {
+      const startedAt = activityStartRef.current
+      if (startedAt != null) {
+        setActivityDurationMs(Date.now() - startedAt)
+      }
+    }, 500)
+
+    return () => {
+      clearInterval(intervalId)
+    }
+  }, [isAssistantStreaming])
 
   const activityTimeline = useMemo(
     () => normalizeAssistantActivityTimeline(message),
@@ -240,9 +401,48 @@ export function AssistantMessage({
   const showActivitySection = hasActivity
   const isActivityShimmering =
     hasRunningActivity || (isAssistantStreaming && !hasContent)
-  const isActivityCollapsed =
-    activityVisibility === "collapsed" ||
-    (activityVisibility === "auto" && !hasActiveActivity)
+  const isActivityCollapsed = !isActivityExpanded
+
+  const lastActivityEntry = activityTimeline.at(-1)
+  const lastEntryHasPreview =
+    lastActivityEntry != null &&
+    ((lastActivityEntry.kind === "reasoning" &&
+      lastActivityEntry.text.length > 0) ||
+      lastActivityEntry.kind === "search" ||
+      lastActivityEntry.kind === "sources")
+  // Onyx keeps the timeline collapsed while streaming and surfaces only a
+  // compact preview of the current step under the shimmer header.
+  const showActivityPreview =
+    hasActiveActivity && !isActivityExpanded && lastEntryHasPreview
+
+  const stepCount = activityTimeline.length
+  const runningEntry = activityTimeline
+    .filter(
+      (entry) =>
+        (entry.kind === "tool" || entry.kind === "search") &&
+        entry.status === "running"
+    )
+    .at(-1)
+  let currentActivityLabel = isAssistantStreaming ? "Thinking" : "Working"
+  if (runningEntry?.kind === "search") {
+    currentActivityLabel = "Searching the web"
+  } else if (runningEntry?.kind === "tool") {
+    currentActivityLabel = runningEntry.label
+  }
+
+  let activityHeaderLabel = "Thought for some time"
+  if (hasActiveActivity) {
+    activityHeaderLabel = currentActivityLabel
+  } else if (activityDurationMs != null) {
+    activityHeaderLabel = `Thought for ${formatActivityDuration(activityDurationMs)}`
+  }
+
+  let activityHeaderMeta = `${String(stepCount)} ${
+    stepCount === 1 ? "step" : "steps"
+  }`
+  if (hasActiveActivity && activityDurationMs != null) {
+    activityHeaderMeta = formatActivityDuration(activityDurationMs)
+  }
 
   if (!hasContent && !hasActivity) {
     return null
@@ -256,95 +456,119 @@ export function AssistantMessage({
     >
       {showActivitySection && (
         <div className="px-3 pt-2">
-          <div className="mb-1">
+          <div
+            className={cn(
+              "overflow-hidden rounded-xl transition-colors duration-200",
+              isActivityExpanded ? "bg-muted/30" : "bg-transparent"
+            )}
+          >
             <button
               type="button"
-              className={cn(
-                activityLabelClassName,
-                "cursor-pointer gap-1 transition-colors hover:text-foreground"
-              )}
               aria-expanded={!isActivityCollapsed}
               onClick={() => {
-                setActivityVisibility((current) => {
-                  if (current === "auto") {
-                    return hasActiveActivity ? "collapsed" : "expanded"
-                  }
-
-                  return current === "collapsed" ? "expanded" : "collapsed"
-                })
+                setIsActivityExpanded((prev) => !prev)
               }}
+              className="flex h-9 w-full items-center justify-between gap-2 px-3"
             >
-              <span className={isActivityShimmering ? "shimmer" : undefined}>
-                Activity
-              </span>
-              <ChevronDown
+              <span
                 className={cn(
-                  "size-3.5 transition-transform",
-                  isActivityCollapsed ? "-rotate-90" : "rotate-0"
+                  "truncate text-[13px] text-muted-foreground",
+                  isActivityShimmering && "shimmer"
                 )}
-              />
+              >
+                {activityHeaderLabel}
+              </span>
+              <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground/60">
+                <span className="tabular-nums">{activityHeaderMeta}</span>
+                {isActivityCollapsed ? (
+                  <TimelineExpandIcon className="size-3.5" />
+                ) : (
+                  <TimelineFoldIcon className="size-3.5" />
+                )}
+              </span>
             </button>
-          </div>
-          {!isActivityCollapsed && (
-            <div className="flex flex-col gap-2">
-              {activityTimeline.map((entry) => {
-                if (entry.kind === "reasoning") {
+
+            {showActivityPreview && (
+              <div className="px-3 pb-2">
+                {lastActivityEntry.kind === "reasoning" && (
+                  <div className="line-clamp-3 text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground/60">
+                    {lastActivityEntry.text}
+                  </div>
+                )}
+                {lastActivityEntry.kind === "search" && (
+                  <span className="inline-block max-w-full truncate rounded-lg bg-muted/60 px-2 py-1 align-middle text-xs text-muted-foreground">
+                    {lastActivityEntry.query}
+                  </span>
+                )}
+                {lastActivityEntry.kind === "sources" && (
+                  <SourceList
+                    sources={lastActivityEntry.sources}
+                    showFavicon={showSourceFavicon}
+                  />
+                )}
+              </div>
+            )}
+
+            {!isActivityCollapsed && (
+              <div className="flex animate-in flex-col pb-1 duration-300 fade-in slide-in-from-top-2">
+                {activityTimeline.map((entry, index) => {
+                  const isFirst = index === 0
+                  const isLast = index === activityTimeline.length - 1
+
                   return (
-                    <div
-                      key={entry.id}
-                      className="rounded-md border bg-muted/30 px-2.5 py-2 text-xs text-muted-foreground"
-                    >
-                      <div className="leading-relaxed whitespace-pre-wrap">
-                        {entry.text}
+                    <div key={entry.id} className="flex gap-2.5 px-3">
+                      <div className="relative flex w-5 shrink-0 flex-col items-center">
+                        <div className="flex h-8 w-full flex-col items-center">
+                          <div
+                            className={cn("h-2 w-px", !isFirst && "bg-border")}
+                          />
+                          <div className="flex size-5 shrink-0 items-center justify-center">
+                            <ActivityStepIcon entry={entry} />
+                          </div>
+                          <div
+                            className={cn(
+                              "w-px flex-1",
+                              !isLast && "bg-border"
+                            )}
+                          />
+                        </div>
+                        {!isLast && <div className="w-px flex-1 bg-border" />}
+                      </div>
+
+                      <div className="min-w-0 flex-1 pb-1">
+                        <div className="flex h-8 items-center">
+                          <span className="truncate text-xs text-muted-foreground/80">
+                            {activityStepLabel(entry)}
+                          </span>
+                        </div>
+                        {entry.kind === "reasoning" &&
+                          entry.text.length > 0 && (
+                            <div className="pb-1 text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground/60">
+                              {entry.text}
+                            </div>
+                          )}
+                        {entry.kind === "search" && (
+                          <div className="pb-1">
+                            <span className="inline-block max-w-full truncate rounded-lg bg-muted/60 px-2 py-1 align-middle text-xs text-muted-foreground">
+                              {entry.query}
+                            </span>
+                          </div>
+                        )}
+                        {entry.kind === "sources" && (
+                          <div className="pb-1">
+                            <SourceList
+                              sources={entry.sources}
+                              showFavicon={showSourceFavicon}
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
                   )
-                }
-
-                if (entry.kind === "search") {
-                  return (
-                    <div
-                      key={entry.id}
-                      className="flex items-center gap-1.5 rounded-md border bg-muted/40 px-2.5 py-1.5 text-xs text-muted-foreground"
-                    >
-                      <ToolStatusIcon status={entry.status} />
-                      <span className="font-medium text-foreground">
-                        {getSearchToolLabel()}
-                      </span>
-                      <span className="text-muted-foreground/60">·</span>
-                      <span className="truncate">{entry.query}</span>
-                    </div>
-                  )
-                }
-
-                if (entry.kind === "sources") {
-                  return (
-                    <div
-                      key={entry.id}
-                      className="rounded-md border bg-muted/40 px-2.5 py-2"
-                    >
-                      <SourceList
-                        sources={entry.sources}
-                        showFavicon={showSourceFavicon}
-                      />
-                    </div>
-                  )
-                }
-
-                return (
-                  <div
-                    key={entry.id}
-                    className="rounded-md border bg-muted/40 px-2.5 py-1.5 text-xs text-muted-foreground"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <ToolStatusIcon status={entry.status} />
-                      <span className="truncate">{entry.label}</span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
