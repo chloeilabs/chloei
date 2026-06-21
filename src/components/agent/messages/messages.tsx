@@ -108,9 +108,7 @@ function MessagesComponent({
             )}
             key={groupIndex}
             style={
-              isLastGroup && messageGroups.length > 1
-                ? { minHeight: "calc(-160px + 100dvh)" }
-                : undefined
+              isLastGroup ? { minHeight: "calc(-160px + 100dvh)" } : undefined
             }
           >
             {messageGroup.map((message) => {

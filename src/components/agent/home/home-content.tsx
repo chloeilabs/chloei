@@ -160,7 +160,6 @@ export function HomePageContent({
       }
 
       const latestTurnId = latestTurnGroup.dataset.userMessageId ?? null
-      const isOnlyTurn = latestTurnGroups.length === 1
       const contentTop = contentElement.getBoundingClientRect().top
       const latestTurnTop = latestTurnGroup.getBoundingClientRect().top
       const anchoredTarget = Math.max(
@@ -187,16 +186,6 @@ export function HomePageContent({
       const latestTurnNearPrompt =
         scrollViewportHeight > 0 &&
         latestVisibleTurnBoundary > scrollViewportHeight - earlyTriggerOffset
-
-      if (
-        isOnlyTurn &&
-        latestTurnId !== null &&
-        (isActiveTurnInProgress ||
-          overflowPinnedTurnIdRef.current === latestTurnId)
-      ) {
-        overflowPinnedTurnIdRef.current = latestTurnId
-        return targetScrollTop
-      }
 
       if (isActiveTurnInProgress && latestTurnNearPrompt && latestTurnId) {
         overflowPinnedTurnIdRef.current = latestTurnId
@@ -429,7 +418,7 @@ export function HomePageContent({
             <StickToBottom.Content className="relative flex min-h-full w-full flex-col">
               <div
                 className={cn(
-                  "relative z-0 mx-auto flex w-full grow flex-col items-center px-4 pt-14 sm:px-6 lg:pt-4",
+                  "relative z-0 mx-auto flex w-full grow flex-col items-center px-4 pt-14 sm:px-6 lg:pt-9",
                   conversationWidthClass
                 )}
               >
