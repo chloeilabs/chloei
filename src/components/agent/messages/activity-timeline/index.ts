@@ -1,18 +1,4 @@
-export {
-  type ActivityEntry,
-  ActivityStepIcon,
-  activityStepLabel,
-  ActivityStepRow,
-} from "./activity-step"
+// Public surface of the activity-timeline module. Internal helpers
+// (steps, tokens, hooks, source-list) are imported directly between siblings,
+// so they are intentionally not re-exported here.
 export { ActivityTimeline } from "./activity-timeline"
-export { SourceList } from "./source-list"
-export {
-  activityTimelineTokenDefaults,
-  type ActivityTimelineTokens,
-  getActivityTimelineStyles,
-} from "./tokens"
-export {
-  formatActivityDuration,
-  useActivityDuration,
-} from "./use-activity-duration"
-export { usePacedReveal } from "./use-paced-reveal"
