@@ -265,7 +265,7 @@ export function UserMessage({
             <div
               className={cn(
                 agentSurfaceClass,
-                "w-full overflow-clip rounded-3xl bg-[#212121] bg-none px-3 py-2 text-sm"
+                "w-full overflow-clip rounded-3xl bg-[#212121] bg-none px-4 py-2 text-base"
               )}
               style={{
                 maxHeight: `${String(MAX_CONTENT_HEIGHT)}px`,

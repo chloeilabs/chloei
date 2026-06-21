@@ -616,7 +616,7 @@ const MemoizedMarkdownBlock = memo(
     return (
       <div
         className={cn(
-          "chloei-markdown prose prose-sm max-w-none min-w-0 text-foreground prose-neutral prose-invert prose-headings:font-medium prose-h1:text-2xl prose-code:rounded-sm prose-code:border prose-code:bg-card prose-code:px-1 prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-pre:bg-background prose-pre:p-0 prose-ol:list-decimal prose-ul:list-disc prose-li:marker:text-muted-foreground",
+          "chloei-markdown prose prose-base max-w-none min-w-0 text-foreground prose-neutral prose-invert prose-headings:font-medium prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-code:rounded-sm prose-code:border prose-code:bg-card prose-code:px-1 prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-pre:bg-background prose-pre:p-0 prose-ol:list-decimal prose-ul:list-disc prose-li:marker:text-muted-foreground",
           className
         )}
       >
