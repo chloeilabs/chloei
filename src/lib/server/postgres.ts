@@ -56,10 +56,6 @@ function isDatabaseConfigured(name: DatabaseUrlEnvName): boolean {
   return getConfiguredDatabaseUrl(name) !== null
 }
 
-export function isPrimaryDatabaseConfigured(): boolean {
-  return isDatabaseConfigured(DATABASE_URL_ENV_NAME)
-}
-
 function getPrimaryDatabaseOrNull(): Kysely<Record<string, never>> | null {
   if (!isDatabaseConfigured(DATABASE_URL_ENV_NAME)) {
     return null
