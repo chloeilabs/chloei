@@ -126,7 +126,7 @@ beforeEach(() => {
           parsedRequest: {
             messages: body.messages,
           },
-          selectedModel: "moonshotai/kimi-k2.6",
+          selectedModel: "zai/glm-5.2",
         }
       },
       createAgentStreamResponse(params) {
@@ -269,7 +269,7 @@ test("agent route passes the resolved prompt context into stream creation", asyn
     context: {
       now: recorded.buildInstructionCalls[0].context.now,
       userTimeZone: "America/Chicago",
-      provider: "provider:moonshotai/kimi-k2.6",
+      provider: "provider:zai/glm-5.2",
     },
   })
   assert.deepEqual(recorded.streamCalls[0]?.messages, [
@@ -279,4 +279,27 @@ test("agent route passes the resolved prompt context into stream creation", asyn
   assert.equal(recorded.streamCalls[0]?.aiGatewayApiKey, "ai-gateway-key")
   assert.equal(recorded.streamCalls[0]?.tavilyApiKey, "tavily-key")
   assert.equal(recorded.streamCalls[0]?.systemInstruction, "system-instruction")
+})
+
+test("agent route returns 500 when the AI gateway key is missing", async () => {
+  // getAiGatewayApiKey() (src/lib/server/env.ts) reads process.env at call time
+  // and maps a missing/blank value to undefined, which must hit the route's
+  // AGENT_AI_GATEWAY_API_KEY_MISSING 500 branch rather than starting a stream.
+  delete process.env.AI_GATEWAY_API_KEY
+
+  const response = await POST(
+    createRequest({
+      json: async () => ({
+        messages: [{ role: "user", content: "What changed?" }],
+      }),
+    })
+  )
+
+  await assertErrorResponse(response, {
+    status: 500,
+    error: "Missing AI_GATEWAY_API_KEY on the server.",
+    errorCode: "AGENT_AI_GATEWAY_API_KEY_MISSING",
+    requestId: "request-1",
+  })
+  assert.equal(recorded.streamCalls.length, 0)
 })

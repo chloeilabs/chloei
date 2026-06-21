@@ -85,8 +85,8 @@ Handled in code:
 - Production includes HSTS and Content Security Policy.
 - `poweredByHeader` is disabled.
 - Auth is required for the app shell and private APIs.
-- Agent requests use sliding-window and concurrency rate limits.
-- Better Auth has credential route rate limiting.
+- Agent requests are bounded by fixed message-size, total-payload, tool-step, and stream-timeout limits (`src/lib/server/agent-runtime-config.ts`); they are not additionally rate-limited.
+- Better Auth has credential-route rate limiting (sign-in/sign-up: 5 requests / 15 min; global: 100 / 10 s).
 - API responses default to `Cache-Control: no-store` and include request ids.
 - Lockfile is committed with `pnpm-lock.yaml`.
 
@@ -184,7 +184,7 @@ Handled:
 
 - Fluid Compute is enabled.
 - Bundle budget checks run in CI.
-- Agent message size, total payload size, tool steps, stream timeout, rate limit, and concurrency limits are bounded by fixed constants in `src/lib/server/agent-runtime-config.ts` (a rate-limit kill switch and store selector remain env-configurable).
+- Agent message size, total payload size, tool steps, and stream timeout are bounded by fixed constants in `src/lib/server/agent-runtime-config.ts`. There is no agent-level rate limiter; only Better Auth credential routes are rate-limited.
 
 Dashboard actions:
 

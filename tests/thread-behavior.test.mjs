@@ -31,7 +31,7 @@ function createMessage(overrides = {}) {
     id: "message-1",
     role: "user",
     content: "First question about streaming behavior",
-    llmModel: "moonshotai/kimi-k2.6",
+    llmModel: "zai/glm-5.2",
     createdAt: "2026-04-15T10:00:00.000Z",
     ...overrides,
   }
@@ -101,7 +101,7 @@ test("parseThreadPayload sanitizes invalid metadata and converts legacy activity
         id: "assistant-1",
         role: "assistant",
         content: "Summarize this thread",
-        llmModel: "moonshotai/kimi-k2.6",
+        llmModel: "zai/glm-5.2",
         createdAt: "2026-04-15T10:00:00.000Z",
         metadata: {
           selectedModel: "not-a-model",
@@ -295,7 +295,7 @@ test("parseThreadPayload keeps generated follow-ups after malformed entries", ()
 test("prepareThreadForPersistence aligns createdAt with the first message", () => {
   const normalizedThread = prepareThreadForPersistence({
     id: "thread-persist",
-    model: "moonshotai/kimi-k2.6",
+    model: "zai/glm-5.2",
     messages: [
       createMessage({
         createdAt: "2026-04-15T09:59:00.000Z",

@@ -45,7 +45,7 @@ test("normalizeAssistantActivityTimeline preserves streamed event order", () => 
     id: "assistant-1",
     role: "assistant",
     content: "",
-    llmModel: "moonshotai/kimi-k2.6",
+    llmModel: "zai/glm-5.2",
     createdAt: "2026-04-20T12:00:00.000Z",
     metadata: {
       activityTimeline: [
@@ -112,7 +112,7 @@ test("normalizeAssistantActivityTimeline repairs legacy reasoning spacing from a
     id: "assistant-legacy-spacing",
     role: "assistant",
     content: "",
-    llmModel: "moonshotai/kimi-k2.6",
+    llmModel: "zai/glm-5.2",
     createdAt: "2026-04-20T12:00:00.000Z",
     metadata: {
       reasoning:
@@ -162,7 +162,7 @@ test("normalizeAssistantActivityTimeline repairs spacing around non-BMP characte
     id: "assistant-legacy-non-bmp",
     role: "assistant",
     content: "",
-    llmModel: "moonshotai/kimi-k2.6",
+    llmModel: "zai/glm-5.2",
     createdAt: "2026-04-20T12:00:00.000Z",
     metadata: {
       reasoning: `Review ${rocket}financial data for MSFT.`,
@@ -187,7 +187,7 @@ test("normalizeAssistantActivityTimeline skips redacted entries before aggregate
     id: "assistant-redacted-repair",
     role: "assistant",
     content: "",
-    llmModel: "moonshotai/kimi-k2.6",
+    llmModel: "zai/glm-5.2",
     createdAt: "2026-04-20T12:00:00.000Z",
     metadata: {
       reasoning: "Visible repaired text for MSFT.",
@@ -220,7 +220,7 @@ test("normalizeAssistantActivityTimeline sanitizes private prompt terminology", 
     id: "assistant-private-prompt",
     role: "assistant",
     content: "",
-    llmModel: "moonshotai/kimi-k2.6",
+    llmModel: "zai/glm-5.2",
     createdAt: "2026-04-20T12:00:00.000Z",
     metadata: {
       activityTimeline: [
@@ -247,7 +247,7 @@ test("normalizeAssistantActivityTimeline appends missing sources after legacy fa
     id: "assistant-2",
     role: "assistant",
     content: "",
-    llmModel: "moonshotai/kimi-k2.6",
+    llmModel: "zai/glm-5.2",
     createdAt: "2026-04-20T12:00:00.000Z",
     metadata: {
       reasoning: "Look up results",
@@ -297,7 +297,7 @@ test("normalizeAssistantActivityTimeline hides tool errors superseded by a later
     id: "assistant-recovered-tool",
     role: "assistant",
     content: "",
-    llmModel: "moonshotai/kimi-k2.6",
+    llmModel: "zai/glm-5.2",
     createdAt: "2026-04-20T12:00:00.000Z",
     metadata: {
       activityTimeline: [
@@ -341,7 +341,7 @@ test("normalizeAssistantActivityTimeline keeps tool errors with a different oper
     id: "assistant-unresolved-tool",
     role: "assistant",
     content: "",
-    llmModel: "moonshotai/kimi-k2.6",
+    llmModel: "zai/glm-5.2",
     createdAt: "2026-04-20T12:00:00.000Z",
     metadata: {
       activityTimeline: [
@@ -383,7 +383,7 @@ test("normalizeAssistantActivityTimeline keeps tool errors for different input q
     id: "assistant-distinct-tools",
     role: "assistant",
     content: "",
-    llmModel: "moonshotai/kimi-k2.6",
+    llmModel: "zai/glm-5.2",
     createdAt: "2026-04-20T12:00:00.000Z",
     metadata: {
       activityTimeline: [

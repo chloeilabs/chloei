@@ -41,7 +41,7 @@ export function parseAgentStreamRequest(params) {
       parsedRequest: {
         messages: params.body?.messages ?? [],
       },
-      selectedModel: "moonshotai/kimi-k2.6",
+      selectedModel: "zai/glm-5.2",
     }
   )
 }

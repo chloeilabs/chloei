@@ -1,10 +1,5 @@
 import { getTestMocks } from "./mock-state.mjs"
 
 export function getModels() {
-  return (
-    getTestMocks().apiKeys?.getModels?.() ?? [
-      { id: "alibaba/qwen3.7-max" },
-      { id: "moonshotai/kimi-k2.6" },
-    ]
-  )
+  return getTestMocks().apiKeys?.getModels?.() ?? [{ id: "zai/glm-5.2" }]
 }
