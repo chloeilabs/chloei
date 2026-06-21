@@ -54,12 +54,12 @@ export function ActivityTimeline({
   // Steps cascade in one at a time (200ms) while streaming; all at once after.
   const visibleCount = usePacedReveal(entries.length, { active: isStreaming })
 
-  // Onyx always shows the agent avatar: a bare avatar row for content-only
-  // messages (DISPLAY_CONTENT_ONLY) and an avatar + shimmer "Thinking" row
-  // before the first step arrives (EMPTY). Render nothing only when there is
-  // neither activity, content, nor an active stream.
+  // With no activity steps, the avatar rail is only meaningful as the live
+  // "Thinking" indicator shown before content begins streaming. A content-only
+  // message — whether still streaming or already complete — renders no bare
+  // logo (this intentionally diverges from Onyx's always-on avatar).
   if (entries.length === 0) {
-    if (!hasContent && !isStreaming) {
+    if (!isStreaming || hasContent) {
       return null
     }
 
@@ -75,11 +75,9 @@ export function ActivityTimeline({
               />
             </div>
             <div className="flex h-full min-w-0 flex-1 items-center px-3">
-              {isStreaming && !hasContent ? (
-                <span className="shimmer truncate text-sm text-muted-foreground">
-                  Thinking
-                </span>
-              ) : null}
+              <span className="shimmer truncate text-sm text-muted-foreground">
+                Thinking
+              </span>
             </div>
           </div>
         </div>
