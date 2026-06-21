@@ -109,7 +109,7 @@ function MessagesComponent({
             key={groupIndex}
             style={
               isLastGroup && messageGroups.length > 1
-                ? { minHeight: "calc(-200px + 100dvh)" }
+                ? { minHeight: "calc(-160px + 100dvh)" }
                 : undefined
             }
           >
