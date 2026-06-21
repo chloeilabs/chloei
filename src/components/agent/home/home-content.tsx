@@ -43,11 +43,10 @@ const DEFAULT_FALLBACK_TRANSITION_MS = 150
 const MOBILE_FALLBACK_TRANSITION_MS = 110
 const STREAMING_SCROLL_EARLY_TRIGGER_PX = 72
 const STREAMING_SCROLL_PROMPT_BUFFER_PX = 24
-// When a turn is anchored to the top while idle (revisiting a thread or after a
-// long answer finishes), leave a little breathing room above the user's bubble
-// instead of pinning it flush to the top edge. Not applied mid-stream, where the
-// turn rides higher to make room for the incoming answer.
-const IDLE_ANCHOR_TOP_GAP_PX = 44
+// Leave a little breathing room above the user's bubble whenever a turn is
+// anchored to the top — both while streaming and when revisiting a thread —
+// instead of pinning it flush against the top edge and the floating controls.
+const ANCHOR_TOP_GAP_PX = 44
 const conversationWidthClass = "max-w-[50rem]"
 
 const Messages = dynamic(
@@ -164,11 +163,8 @@ export function HomePageContent({
       const isOnlyTurn = latestTurnGroups.length === 1
       const contentTop = contentElement.getBoundingClientRect().top
       const latestTurnTop = latestTurnGroup.getBoundingClientRect().top
-      const idleAnchorTopGap = isActiveTurnInProgress
-        ? 0
-        : IDLE_ANCHOR_TOP_GAP_PX
       const anchoredTarget = Math.max(
-        latestTurnTop - contentTop - idleAnchorTopGap,
+        latestTurnTop - contentTop - ANCHOR_TOP_GAP_PX,
         0
       )
       const scrollViewportHeight =
