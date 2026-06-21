@@ -130,9 +130,6 @@ export function AppSidebar({
                   </span>
                 </span>
               </span>
-              <span className="truncate text-sm leading-none font-medium tracking-tight">
-                Chloei
-              </span>
             </SidebarMenuButton>
             <SidebarTrigger className="size-8 shrink-0 text-muted-foreground hover:text-foreground" />
           </SidebarMenuItem>
