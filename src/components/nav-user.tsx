@@ -26,13 +26,7 @@ import type { AuthViewer } from "@/lib/shared"
 function getInitials(viewer: AuthViewer): string {
   const source = viewer.name.trim() || viewer.email
   if (!source) return "?"
-  const parts = source.split(/\s+/).filter(Boolean)
-  const first = parts[0]
-  const second = parts[1]
-  if (first && second) {
-    return (first.charAt(0) + second.charAt(0)).toUpperCase()
-  }
-  return source.slice(0, 2).toUpperCase()
+  return source.charAt(0).toUpperCase()
 }
 
 export function NavUser({ viewer }: { viewer: AuthViewer }) {
@@ -72,12 +66,12 @@ export function NavUser({ viewer }: { viewer: AuthViewer }) {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton size="lg" className="aria-expanded:bg-muted">
-              <Avatar className="size-8 rounded-lg after:rounded-lg">
-                <AvatarFallback className="rounded-lg bg-primary text-xs font-semibold text-primary-foreground">
+              <Avatar className="size-8 rounded-full after:rounded-full">
+                <AvatarFallback className="rounded-full bg-primary text-sm font-semibold text-primary-foreground">
                   {getInitials(viewer)}
                 </AvatarFallback>
               </Avatar>
-              <div className="grid flex-1 text-left text-sm leading-tight">
+              <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
                 {viewer.name ? (
                   <span className="truncate font-medium">{viewer.name}</span>
                 ) : null}

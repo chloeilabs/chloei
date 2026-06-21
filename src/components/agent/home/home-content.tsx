@@ -21,6 +21,7 @@ import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import {
   Tooltip,
@@ -50,6 +51,23 @@ const Messages = dynamic(
     loading: () => <div className="mb-10 flex w-full grow" />,
   }
 )
+
+/**
+ * The main-header sidebar toggle. On desktop the sidebar collapses to an icon
+ * rail whose header always shows the toggle, so the main-header copy is only
+ * needed on mobile (where the sidebar is an off-canvas sheet).
+ */
+function MainSidebarTrigger() {
+  const { isMobile } = useSidebar()
+
+  if (!isMobile) {
+    return null
+  }
+
+  return (
+    <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
+  )
+}
 
 export function HomePageContent({
   initialSelectedModel,
@@ -320,7 +338,7 @@ export function HomePageContent({
                 : undefined
             }
           >
-            <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
+            <MainSidebarTrigger />
           </div>
 
           <div ref={headerActionsRef} className="flex items-center gap-1">

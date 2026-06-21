@@ -19,6 +19,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -110,12 +111,12 @@ export function AppSidebar({
     isThreadSummariesLoading && threadSummaries.length === 0
 
   return (
-    <Sidebar {...props}>
+    <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
         <SidebarMenu>
-          <SidebarMenuItem>
+          <SidebarMenuItem className="flex flex-row items-center gap-1 group-data-[collapsible=icon]:justify-center">
             <SidebarMenuButton
-              className="group/chloei-home h-7 gap-2 hover:bg-transparent hover:text-sidebar-foreground active:bg-transparent active:text-sidebar-foreground"
+              className="group/chloei-home h-7 min-w-0 flex-1 gap-2 group-data-[collapsible=icon]:hidden hover:bg-transparent hover:text-sidebar-foreground active:bg-transparent active:text-sidebar-foreground"
               onClick={handleNewChat}
               render={<Link href="/" aria-label="Chloei home" />}
             >
@@ -133,6 +134,7 @@ export function AppSidebar({
                 Chloei
               </span>
             </SidebarMenuButton>
+            <SidebarTrigger className="size-8 shrink-0 text-muted-foreground hover:text-foreground" />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
@@ -162,17 +164,19 @@ export function AppSidebar({
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
-        {shouldShowThreadLoading ? (
-          <ThreadListSkeleton />
-        ) : (
-          <NavThreads
-            threadSummaries={threadSummaries}
-            isLoading={isThreadSummariesLoading}
-            currentThreadId={currentThreadId}
-            onSelectThread={handleSelectThread}
-            onDeleteThread={onDeleteThread}
-          />
-        )}
+        <div className="min-h-0 group-data-[collapsible=icon]:hidden">
+          {shouldShowThreadLoading ? (
+            <ThreadListSkeleton />
+          ) : (
+            <NavThreads
+              threadSummaries={threadSummaries}
+              isLoading={isThreadSummariesLoading}
+              currentThreadId={currentThreadId}
+              onSelectThread={handleSelectThread}
+              onDeleteThread={onDeleteThread}
+            />
+          )}
+        </div>
       </SidebarContent>
       <SidebarFooter>
         <NavUser viewer={viewer} />
