@@ -65,7 +65,7 @@ function MainSidebarTrigger() {
   }
 
   return (
-    <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
+    <SidebarTrigger className="pointer-events-auto text-muted-foreground hover:text-foreground" />
   )
 }
 
@@ -327,7 +327,7 @@ export function HomePageContent({
         onNewChat={handleNewChat}
       />
       <SidebarInset className="relative flex min-h-0 w-full flex-col overflow-hidden">
-        <div className="z-10 flex shrink-0 items-center justify-between bg-background p-3">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-center justify-between p-3">
           <div
             className="flex min-w-0 items-center justify-start gap-1"
             style={
@@ -349,7 +349,7 @@ export function HomePageContent({
                     type="button"
                     variant="ghost"
                     size="icon-sm"
-                    className="text-muted-foreground hover:text-foreground"
+                    className="pointer-events-auto text-muted-foreground hover:text-foreground"
                     onClick={handleNewChat}
                     aria-label="Start a new chat"
                   >
@@ -363,6 +363,11 @@ export function HomePageContent({
             ) : null}
           </div>
         </div>
+
+        {/* Edge-fade so scrolled content reads cleanly behind the floating
+            top controls on narrow widths, where the conversation column
+            reaches the corners. Hidden on wide screens (corners are empty). */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-14 bg-gradient-to-b from-background via-background/45 to-transparent lg:hidden" />
 
         {showHomeView ? (
           <div
@@ -417,7 +422,7 @@ export function HomePageContent({
             <StickToBottom.Content className="relative flex min-h-full w-full flex-col">
               <div
                 className={cn(
-                  "relative z-0 mx-auto flex w-full grow flex-col items-center px-4 sm:px-6",
+                  "relative z-0 mx-auto flex w-full grow flex-col items-center px-4 pt-14 sm:px-6 lg:pt-4",
                   conversationWidthClass
                 )}
               >
