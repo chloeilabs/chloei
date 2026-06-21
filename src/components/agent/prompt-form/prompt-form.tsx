@@ -190,6 +190,59 @@ export function PromptForm({
     }
   }, [isStreaming, onStopStream])
 
+  // Fade the textarea text where there is more content to scroll towards, so a
+  // long prompt softly dissolves into the composer at the top and/or bottom
+  // edge instead of being cut off hard.
+  const [scrollFade, setScrollFade] = useState({ top: false, bottom: false })
+
+  const syncScrollFades = useCallback(() => {
+    const textarea = textareaRef.current
+    if (!textarea) {
+      return
+    }
+
+    const { scrollTop, scrollHeight, clientHeight } = textarea
+    const top = scrollTop > 1
+    const bottom = scrollTop + clientHeight < scrollHeight - 1
+
+    setScrollFade((previous) =>
+      previous.top === top && previous.bottom === bottom
+        ? previous
+        : { top, bottom }
+    )
+  }, [])
+
+  useEffect(() => {
+    syncScrollFades()
+  }, [message, syncScrollFades])
+
+  useEffect(() => {
+    window.addEventListener("resize", syncScrollFades)
+    return () => {
+      window.removeEventListener("resize", syncScrollFades)
+    }
+  }, [syncScrollFades])
+
+  const textareaMaskStyle = useMemo<CSSProperties | undefined>(() => {
+    if (!scrollFade.top && !scrollFade.bottom) {
+      return undefined
+    }
+
+    const fade = "1.5rem"
+    const stops = [
+      scrollFade.top ? `transparent 0, #000 ${fade}` : "#000 0",
+      scrollFade.bottom
+        ? `#000 calc(100% - ${fade}), transparent 100%`
+        : "#000 100%",
+    ].join(", ")
+    const maskImage = `linear-gradient(to bottom, ${stops})`
+
+    return {
+      maskImage,
+      WebkitMaskImage: maskImage,
+    }
+  }, [scrollFade.top, scrollFade.bottom])
+
   const isSubmitButtonDisabled =
     isFormPending || !resolvedSelectedModel || (!isStreaming && !trimmedMessage)
 
@@ -249,9 +302,11 @@ export function PromptForm({
               }
             }}
             onKeyDown={onKeyDown}
+            onScroll={syncScrollFades}
             onFocus={onFocus}
             onBlur={onBlur}
             placeholder="Ask anything"
+            style={textareaMaskStyle}
             className="no-scrollbar max-h-48 min-h-0 flex-1 resize-none border-0 bg-transparent! py-3.5 pl-4 shadow-none placeholder:text-muted-foreground focus-visible:ring-0 md:text-base"
           />
 
