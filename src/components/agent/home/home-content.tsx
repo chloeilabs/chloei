@@ -43,6 +43,10 @@ const DEFAULT_FALLBACK_TRANSITION_MS = 150
 const MOBILE_FALLBACK_TRANSITION_MS = 110
 const STREAMING_SCROLL_EARLY_TRIGGER_PX = 72
 const STREAMING_SCROLL_PROMPT_BUFFER_PX = 24
+// Leave a little breathing room above the user's bubble whenever a turn is
+// anchored to the top — both while streaming and when revisiting a thread —
+// instead of pinning it flush against the top edge and the floating controls.
+const ANCHOR_TOP_GAP_PX = 44
 const conversationWidthClass = "max-w-[50rem]"
 
 const Messages = dynamic(
@@ -65,7 +69,7 @@ function MainSidebarTrigger() {
   }
 
   return (
-    <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
+    <SidebarTrigger className="pointer-events-auto text-muted-foreground hover:text-foreground" />
   )
 }
 
@@ -156,10 +160,12 @@ export function HomePageContent({
       }
 
       const latestTurnId = latestTurnGroup.dataset.userMessageId ?? null
-      const isOnlyTurn = latestTurnGroups.length === 1
       const contentTop = contentElement.getBoundingClientRect().top
       const latestTurnTop = latestTurnGroup.getBoundingClientRect().top
-      const anchoredTarget = Math.max(latestTurnTop - contentTop, 0)
+      const anchoredTarget = Math.max(
+        latestTurnTop - contentTop - ANCHOR_TOP_GAP_PX,
+        0
+      )
       const scrollViewportHeight =
         contentElement.parentElement?.getBoundingClientRect().height ?? 0
       const latestVisibleTurnElement =
@@ -180,16 +186,6 @@ export function HomePageContent({
       const latestTurnNearPrompt =
         scrollViewportHeight > 0 &&
         latestVisibleTurnBoundary > scrollViewportHeight - earlyTriggerOffset
-
-      if (
-        isOnlyTurn &&
-        latestTurnId !== null &&
-        (isActiveTurnInProgress ||
-          overflowPinnedTurnIdRef.current === latestTurnId)
-      ) {
-        overflowPinnedTurnIdRef.current = latestTurnId
-        return targetScrollTop
-      }
 
       if (isActiveTurnInProgress && latestTurnNearPrompt && latestTurnId) {
         overflowPinnedTurnIdRef.current = latestTurnId
@@ -327,7 +323,7 @@ export function HomePageContent({
         onNewChat={handleNewChat}
       />
       <SidebarInset className="relative flex min-h-0 w-full flex-col overflow-hidden">
-        <div className="z-10 flex shrink-0 items-center justify-between bg-background p-3">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-center justify-between p-3">
           <div
             className="flex min-w-0 items-center justify-start gap-1"
             style={
@@ -349,7 +345,7 @@ export function HomePageContent({
                     type="button"
                     variant="ghost"
                     size="icon-sm"
-                    className="text-muted-foreground hover:text-foreground"
+                    className="pointer-events-auto text-muted-foreground hover:text-foreground"
                     onClick={handleNewChat}
                     aria-label="Start a new chat"
                   >
@@ -363,6 +359,11 @@ export function HomePageContent({
             ) : null}
           </div>
         </div>
+
+        {/* Edge-fade so scrolled content reads cleanly behind the floating
+            top controls on narrow widths, where the conversation column
+            reaches the corners. Hidden on wide screens (corners are empty). */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-14 bg-gradient-to-b from-background via-background/45 to-transparent lg:hidden" />
 
         {showHomeView ? (
           <div
@@ -417,7 +418,7 @@ export function HomePageContent({
             <StickToBottom.Content className="relative flex min-h-full w-full flex-col">
               <div
                 className={cn(
-                  "relative z-0 mx-auto flex w-full grow flex-col items-center px-4 sm:px-6",
+                  "relative z-0 mx-auto flex w-full grow flex-col items-center px-4 pt-14 sm:px-6 lg:pt-9",
                   conversationWidthClass
                 )}
               >

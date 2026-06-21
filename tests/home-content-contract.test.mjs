@@ -28,18 +28,32 @@ test("prompt submissions queue while the submit lock is still active", async () 
   )
 })
 
-test("first active conversation turn stays bottom-pinned during streaming", async () => {
+test("the first conversation turn anchors like every later turn", async () => {
   const source = await readFile(homeContentPath, "utf8")
+  const messagesSource = await readFile(
+    path.join(cwd, "src/components/agent/messages/messages.tsx"),
+    "utf8"
+  )
 
-  assert.match(
+  // The first/only turn is no longer special-cased to stay bottom-pinned; it
+  // anchors through the same path as later turns so a freshly sent first
+  // message rests at the same height as follow-ups and revisited threads.
+  assert.doesNotMatch(
     source,
-    /const isOnlyTurn = latestTurnGroups\.length === 1/,
-    "Expected the scroll target logic to detect the first conversation turn."
+    /isOnlyTurn/,
+    "Expected the first conversation turn to anchor through the normal path, not a special bottom-pin case."
   )
   assert.match(
     source,
-    /isOnlyTurn[\s\S]*isActiveTurnInProgress[\s\S]*return targetScrollTop/,
-    "Expected the first active turn to follow the true bottom target while the first response streams."
+    /const anchoredTarget = Math\.max\(\s*latestTurnTop - contentTop - ANCHOR_TOP_GAP_PX/,
+    "Expected every turn to anchor with the same reserved top gap."
+  )
+  // The screenful reserve applies to the last group regardless of turn count,
+  // so the first turn gets the same room to anchor near the top.
+  assert.match(
+    messagesSource,
+    /isLastGroup\s*\?\s*\{\s*minHeight:/,
+    "Expected the screenful min-height to apply to the only/last turn, including the first."
   )
 })
 
