@@ -23,6 +23,7 @@ import {
   createE2eFollowUpQuestionsResponse,
   isE2eMockModeEnabled,
 } from "@/lib/server/e2e-test-mode"
+import { getAiGatewayApiKey } from "@/lib/server/env"
 import {
   createRouteObservation,
   observeRouteResponse,
@@ -150,7 +151,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const aiGatewayApiKey = process.env.AI_GATEWAY_API_KEY?.trim()
+    const aiGatewayApiKey = getAiGatewayApiKey()
     if (!aiGatewayApiKey || !isAvailableModel(parsed.model)) {
       return observeRouteResponse(
         observation,

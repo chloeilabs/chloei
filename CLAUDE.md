@@ -6,6 +6,17 @@ Chloei is a **Next.js 16 / React 19** authenticated AI chat app backed by the **
 
 > **Maintaining this file:** keep it accurate and concise — stale or bloated guidance makes Claude ignore the parts that matter. Cite durable anchors (file paths + symbol names), not line numbers. When you change a subsystem, update the matching section here in the same PR.
 
+## Working Principles
+
+Behavioral guidelines for changes in this repo (adapted from Karpathy's coding principles). They bias toward caution over speed — use judgment on trivial edits. Merge with the project specifics below.
+
+1. **Think before coding.** State assumptions before implementing; if multiple interpretations exist, surface them instead of choosing silently. If something is unclear, stop and ask. Push back when a simpler approach exists.
+2. **Simplicity first.** Write the minimum code that solves the problem — no speculative abstractions, configurability, or error handling for impossible cases. Match the small, single-purpose module style already here (`src/lib/server/*`, `src/lib/shared/*`). If 200 lines could be 50, rewrite.
+3. **Surgical changes.** Touch only what the request needs. Don't reformat or "improve" adjacent code — Prettier and ESLint (`simple-import-sort`) own formatting and import order, so let them. Match existing conventions (the `@base-ui/react` UI primitives in `src/components/ui`, named exports, Zod v4). Only remove imports/vars your change orphaned; flag unrelated dead code rather than deleting it.
+4. **Goal-driven execution.** Turn tasks into verifiable goals: reproduce a bug with a `node --test` file under `tests/`, then make it pass. Verify with `pnpm lint && pnpm typecheck && pnpm test` (add `pnpm build` for RSC, route, or error-boundary changes) and loop until green. For multi-step work, state a brief step → verify plan first.
+
+**These are working if:** fewer unnecessary changes in diffs, fewer rewrites from overcomplication, and clarifying questions arrive before implementation rather than after mistakes.
+
 ## Commands
 
 ```bash
@@ -80,7 +91,7 @@ This boundary is **enforced by Next.js bundling at build time** (importing `pg`/
 
 1. `OPERATING INSTRUCTIONS` — `DEFAULT_OPERATING_INSTRUCTION` (`src/lib/shared/llm/system-instructions.ts`)
 2. `RUNTIME DATE CONTEXT` — current UTC timestamp + user timezone (from `X-User-Timezone` header)
-3. **Provider overlay** (`PROVIDER OVERLAY: ALIBABA|MOONSHOTAI`) — keyed by the model's **provider org**, not its nickname (alibaba=Qwen, moonshotai=Kimi). Always applied for a supported model.
+3. **Provider overlay** (`PROVIDER OVERLAY: ALIBABA|MOONSHOTAI|ZAI`) — keyed by the model's **provider org**, not its nickname. `agent-prompt-steering.ts` defines overlays for `alibaba`, `moonshotai`, and `zai`, but only `zai` is wired today since GLM 5.2 (`zai/glm-5.2`) is the sole model; the alibaba/moonshotai overlays are dormant. Always applied for a supported model.
 4. `IDENTITY AND TONE CONTEXT` — `DEFAULT_SOUL_FALLBACK_INSTRUCTION` (`src/lib/shared/llm/system-instructions.ts`)
 5. `AUTH USER CONTEXT` — authenticated user id, name, email
 
@@ -138,12 +149,11 @@ The only tools are the two Tavily web-search tools, and both are registered toge
 
 All models are defined in `src/lib/shared/llm/models.ts`:
 
-| Key                    | Model ID               | Display Name |
-| ---------------------- | ---------------------- | ------------ |
-| `ALIBABA_QWEN3_7_MAX`  | `alibaba/qwen3.7-max`  | Qwen 3.7 Max |
-| `MOONSHOTAI_KIMI_K2_6` | `moonshotai/kimi-k2.6` | Kimi K2.6    |
+| Key           | Model ID      | Display Name |
+| ------------- | ------------- | ------------ |
+| `ZAI_GLM_5_2` | `zai/glm-5.2` | GLM 5.2      |
 
-- `MODEL_SELECTOR_MODELS` — the chat selector subset: Qwen 3.7 Max and Kimi K2.6.
+- `MODEL_SELECTOR_MODELS` — the chat selector subset: currently just GLM 5.2 (the only model).
 - The agent is text-only: all chat input is plain text (no image, file, or PDF input).
 - Adding a model means updating `AvailableModels`, `ModelInfos`, `SUPPORTED_MODELS`, and optionally `MODEL_SELECTOR_MODELS`. `/api/models` filters this registry by configured keys (`getModels()` in `src/lib/actions/api-keys.ts`).
 
@@ -248,7 +258,7 @@ src/
     auth/               # Sign-in/up forms, auth shell
     graphics/           # Logo + visual effects
     layout/             # route group layout
-    ui/                 # shadcn/ui primitives (base-lyra/stone) + ShikiCode
+    ui/                 # shadcn/ui primitives (base-maia/neutral) + ShikiCode
   hooks/
     agent/              # use-models (server-seeded models context),
                         #   use-persistent-selected-model (localStorage-backed)
@@ -258,7 +268,7 @@ src/
     editor/highlighter.ts
     server/
       agent-context.ts          # buildAgentSystemInstruction
-      agent-prompt-steering.ts  # Provider overlays (Qwen/Kimi tuning)
+      agent-prompt-steering.ts  # Provider overlays (per-provider tuning; zai/GLM today)
       agent-route.ts            # parseAgentStreamRequest, createAgentStreamResponse
       agent-runtime-config.ts   # Runtime constants (no env knobs)
       auth.ts / auth-session.ts # isAuthConfigured, getRequestSession
@@ -318,11 +328,11 @@ node --test tests/agent-route-contract.test.mjs    # Single file
 
 **Zod v4** (`zod@^4`): API differs from v3 (`.strict()` behavior, `z.iso.datetime()`, error formatting).
 
-**Stack**: React 19, Next.js 16.2.6, Node `24.x`, pnpm `10.32.1`. Client components use `"use client"` by directory convention. UI is shadcn/ui (`base-lyra` style, `stone` base color, lucide icons; see `components.json`).
+**Stack**: React 19, Next.js 16.2.9, Node `24.x`, pnpm `10.32.1`. Client components use `"use client"` by directory convention. UI is shadcn/ui (`base-maia` style, `neutral` base color, lucide icons; see `components.json`).
 
 **Bundle budget**: `pnpm bundle:budget` fails if total `.next/static` JS exceeds 14 MiB or any single chunk exceeds 1 MiB (overridable via `BUNDLE_MAX_STATIC_CHUNKS_BYTES` / `BUNDLE_MAX_STATIC_CHUNK_BYTES`). CI runs both `bundle:budget` and `bundle:report`.
 
-**Security headers**: a strict CSP and full security-header set (`X-Frame-Options: DENY`, HSTS preload, COOP, Permissions-Policy, `poweredByHeader: false`) are configured in `next.config.mjs`; CSP + HSTS apply in production only.
+**Security headers** (`next.config.mjs`): applied to every route — `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-DNS-Prefetch-Control: on`, `Cross-Origin-Opener-Policy: same-origin`, `X-Permitted-Cross-Domain-Policies: none`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`, plus `poweredByHeader: false`. **Production-only**: HSTS (`max-age=63072000; includeSubDomains; preload`) and the Content-Security-Policy. The CSP allows `'unsafe-inline'` for `script-src`/`style-src` (required by Next.js's inline runtime), so it is not nonce-strict.
 
 **CI** (`.github/workflows/ci.yml`): a `checks` job (lint → format:check → test → typecheck → build → bundle:budget → bundle:report), a separate `smoke` job in the Playwright image, and a `vercel-status` job that aggregates both into a single `Vercel` commit status. Vercel build runs `pnpm migrate && pnpm build`; `scripts/vercel-ignore-build.mjs` skips builds for docs/tooling-only diffs.
 

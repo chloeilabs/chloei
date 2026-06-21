@@ -21,6 +21,7 @@ import {
   createE2eAgentStreamResponse,
   isE2eMockModeEnabled,
 } from "@/lib/server/e2e-test-mode"
+import { getAiGatewayApiKey, getTavilyApiKey } from "@/lib/server/env"
 import { resolveAgentFeatureFlags } from "@/lib/server/integration-flags"
 import {
   createRouteObservation,
@@ -53,8 +54,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const aiGatewayApiKey = process.env.AI_GATEWAY_API_KEY
-    const tavilyApiKey = process.env.TAVILY_API_KEY
+    const aiGatewayApiKey = getAiGatewayApiKey()
+    const tavilyApiKey = getTavilyApiKey()
     const isE2eMockRequest = isE2eMockModeEnabled()
     const session = await getRequestSession(request.headers)
 

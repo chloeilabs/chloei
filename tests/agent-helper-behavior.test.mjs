@@ -131,7 +131,7 @@ test("agent helper validates total size, last-message role, and default model su
 
   const unavailableModelResult = parseAgentStreamRequest({
     body: {
-      model: "alibaba/qwen3.7-max",
+      model: "openai/gpt-5.5",
       messages: [
         {
           role: "user",
@@ -289,7 +289,7 @@ test("agent helper streams fallback output when the model yields no content", as
     request: createRequest(),
     requestId: "request-1",
     timeoutMs: 30_000,
-    selectedModel: "moonshotai/kimi-k2.6",
+    selectedModel: "zai/glm-5.2",
     aiGatewayApiKey: "ai-gateway-key",
     tavilyApiKey: "tavily-key",
     messages: [{ role: "user", content: "Hello" }],
@@ -339,7 +339,7 @@ test("agent helper marks tool-backed partial output incomplete when a tool call 
     request: createRequest(),
     requestId: "request-unresolved-tool",
     timeoutMs: 30_000,
-    selectedModel: "moonshotai/kimi-k2.6",
+    selectedModel: "zai/glm-5.2",
     aiGatewayApiKey: "ai-gateway-key",
     tavilyApiKey: "tavily-key",
     messages: [{ role: "user", content: "Search latest docs" }],
@@ -394,7 +394,7 @@ test("agent helper does not add an incomplete fallback when a meaningful answer 
     request: createRequest(),
     requestId: "request-tool-error",
     timeoutMs: 30_000,
-    selectedModel: "moonshotai/kimi-k2.6",
+    selectedModel: "zai/glm-5.2",
     aiGatewayApiKey: "ai-gateway-key",
     tavilyApiKey: "tavily-key",
     messages: [{ role: "user", content: "Search latest docs" }],
@@ -441,7 +441,7 @@ test("agent helper turns upstream body timeouts into visible timeout output", as
     request: createRequest(),
     requestId: "request-body-timeout",
     timeoutMs: 30_000,
-    selectedModel: "moonshotai/kimi-k2.6",
+    selectedModel: "zai/glm-5.2",
     aiGatewayApiKey: "ai-gateway-key",
     messages: [{ role: "user", content: "Latest AI news" }],
     systemInstruction: "system",
@@ -487,7 +487,7 @@ test("agent helper returns an auth-key fallback when provider auth fails", async
     request: createRequest(),
     requestId: "request-2",
     timeoutMs: 30_000,
-    selectedModel: "moonshotai/kimi-k2.6",
+    selectedModel: "zai/glm-5.2",
     aiGatewayApiKey: "ai-gateway-key",
     messages: [{ role: "user", content: "Hello" }],
     systemInstruction: "system",

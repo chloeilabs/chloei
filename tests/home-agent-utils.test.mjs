@@ -76,8 +76,8 @@ test("appended user messages record the selected model", () => {
   const messages = appendUserMessage(
     [],
     "Research Apple supply chain risk.",
-    "moonshotai/kimi-k2.6"
+    "zai/glm-5.2"
   )
 
-  assert.equal(messages[0]?.metadata?.selectedModel, "moonshotai/kimi-k2.6")
+  assert.equal(messages[0]?.metadata?.selectedModel, "zai/glm-5.2")
 })

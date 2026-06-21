@@ -1,6 +1,6 @@
 # Chloei
 
-Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently exposes a curated model selector that defaults to Qwen 3.7 Max and also includes Kimi K2.6, and offers optional Tavily web search and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
+Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently exposes a curated model selector offering GLM 5.2 (`zai/glm-5.2`), and offers optional Tavily web search and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
 
 ## Documentation
 
@@ -49,6 +49,7 @@ pnpm exec playwright install --with-deps chromium
 - `pnpm migrate`: run both Better Auth and app-storage migrations
 - `pnpm auth:migrate`: apply Better Auth schema changes to PostgreSQL
 - `pnpm app:migrate`: apply app storage schema changes to PostgreSQL
+- `pnpm threads:migrate`: alias for `pnpm app:migrate`
 - `pnpm build`: build the production app
 - `pnpm start`: run the production Next.js server
 - `pnpm bundle:budget`: check built static JavaScript chunks against bundle budgets
@@ -90,6 +91,14 @@ Optional feature-enabling variables:
 - `AGENT_TELEMETRY_RECORD_IO`: feature gate; defaults off unless explicitly set or synced through Edge Config
 
 Agent request limits, timeouts, and tool-step budgets are fixed safe constants in `src/lib/server/agent-runtime-config.ts` (no env knobs).
+
+## Troubleshooting
+
+- **`pnpm migrate` can't connect**: make sure local PostgreSQL is running and `DATABASE_URL` points at it (for local dev, a local Postgres such as `postgresql://chloei:chloei_dev@localhost:5432/chloei`, not the hosted DB). `vercel env pull` overwrites `.env.local`, so re-apply any local `DATABASE_URL` override afterward.
+- **"Thread storage is not initialized" (HTTP 500)**: the app tables don't exist yet — run `pnpm app:migrate` (or `pnpm migrate`). Storage does not self-initialize on live requests.
+- **Empty model selector / `/api/models` returns nothing**: sign in, and set `AI_GATEWAY_API_KEY` in `.env.local`.
+- **Auth endpoints return 503**: one of `DATABASE_URL`, `BETTER_AUTH_SECRET`, or `BETTER_AUTH_URL` is missing. Generate a secret with `openssl rand -base64 32`.
+- **Playwright can't find a browser**: run `pnpm exec playwright install --with-deps chromium` once.
 
 ## Important paths
 

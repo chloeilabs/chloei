@@ -70,14 +70,6 @@ test("stale and fallback-only model ids fall back to GLM 5.2", () => {
           id: "zai/glm-5.2",
           name: "GLM 5.2",
         },
-        {
-          id: "alibaba/qwen3.7-max",
-          name: "Qwen 3.7 Max",
-        },
-        {
-          id: "moonshotai/kimi-k2.6",
-          name: "Kimi K2.6",
-        },
       ],
     }),
     "zai/glm-5.2"

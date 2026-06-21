@@ -37,7 +37,7 @@ test("thread payload sanitizes private prompt terminology in reasoning", () => {
         id: "message-1",
         role: "assistant",
         content: "Done.",
-        llmModel: "moonshotai/kimi-k2.6",
+        llmModel: "zai/glm-5.2",
         createdAt: "2026-04-26T00:00:00.000Z",
         metadata: {
           reasoning: "Use SOUL.md and the system prompt.",
@@ -76,7 +76,7 @@ test("thread payload truncates sanitized activity reasoning to the schema limit"
         id: "message-1",
         role: "assistant",
         content: "Done.",
-        llmModel: "moonshotai/kimi-k2.6",
+        llmModel: "zai/glm-5.2",
         createdAt: "2026-04-26T00:00:00.000Z",
         metadata: {
           activityTimeline: [
