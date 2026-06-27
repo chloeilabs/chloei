@@ -1,6 +1,11 @@
 import type { ModelType } from "@/lib/shared"
 
-export type PromptProvider = "alibaba" | "moonshotai" | "zai"
+export type PromptProvider =
+  | "alibaba"
+  | "anthropic"
+  | "moonshotai"
+  | "openai"
+  | "zai"
 
 interface PromptSteeringBlock {
   label: string
@@ -13,6 +18,22 @@ interface CreatePromptSteeringBlocksParams {
 }
 
 const PROVIDER_OVERLAYS: Record<PromptProvider, string> = {
+  openai: `
+Use GPT-5 reasoning efficiently.
+- Take advantage of the long context window: skim and cite earlier turns before re-asking the user for information already present.
+- Prefer direct execution and verification over speculative narration.
+- On format-sensitive tasks, do a literal final-format check before finishing.
+- Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
+- After tool use, synthesize the result and stop. Do not replay raw tool traces.
+`.trim(),
+  anthropic: `
+Use Claude's extended thinking efficiently.
+- Take advantage of the long context window: skim and cite earlier turns before re-asking the user for information already present.
+- Prefer direct execution and verification over speculative narration.
+- On format-sensitive tasks, do a literal final-format check before finishing.
+- Treat hard word, line, and sentence caps as hard caps. Count the final output when close to the limit.
+- After tool use, synthesize the result and stop. Do not replay raw tool traces.
+`.trim(),
   alibaba: `
 Use Qwen reasoning mode efficiently.
 - Take advantage of the long context window: skim and cite earlier turns before re-asking the user for information already present.
@@ -40,6 +61,14 @@ Use GLM reasoning mode efficiently.
 }
 
 export function resolvePromptProvider(model: ModelType): PromptProvider {
+  if (model.startsWith("gpt-")) {
+    return "openai"
+  }
+
+  if (model.startsWith("anthropic/")) {
+    return "anthropic"
+  }
+
   if (model.startsWith("alibaba/")) {
     return "alibaba"
   }

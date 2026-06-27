@@ -12,11 +12,11 @@ export interface FollowUpQuestion {
   text: string
 }
 
-export const TOOL_NAMES = ["tavily_search", "tavily_extract"] as const
+export const TOOL_NAMES = ["exa_search", "exa_get_contents"] as const
 export type ToolName = (typeof TOOL_NAMES)[number]
 
 export const SEARCH_TOOL_NAMES = [
-  "tavily_search",
+  "exa_search",
 ] as const satisfies readonly ToolName[]
 type SearchToolName = (typeof SEARCH_TOOL_NAMES)[number]
 export type ToolInvocationStatus = "running" | "success" | "error"
@@ -179,6 +179,21 @@ export interface Message {
   metadata?: MessageMetadata
 }
 
+export type MessageAttachmentKind = "image" | "pdf"
+
+export interface MessageAttachment {
+  id: string
+  kind: MessageAttachmentKind
+  name: string
+  mediaType: string
+  /**
+   * Base64 data URL of the file. Present in-session (so it can be sent to the
+   * model and previewed), omitted once the thread is persisted to keep stored
+   * threads lean.
+   */
+  url?: string
+}
+
 interface MessageMetadata {
   parts?: AssistantMessagePart[]
   isStreaming?: boolean
@@ -190,6 +205,7 @@ interface MessageMetadata {
   reasoning?: string
   activityTimeline?: ActivityTimelineEntry[]
   sources?: MessageSource[]
+  attachments?: MessageAttachment[]
   followUpQuestions?: FollowUpQuestion[]
   followUpQuestionsPending?: boolean
 }

@@ -23,7 +23,7 @@ import {
   createE2eFollowUpQuestionsResponse,
   isE2eMockModeEnabled,
 } from "@/lib/server/e2e-test-mode"
-import { getAiGatewayApiKey } from "@/lib/server/env"
+import { getOpenAiApiKey } from "@/lib/server/env"
 import {
   createRouteObservation,
   observeRouteResponse,
@@ -151,8 +151,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const aiGatewayApiKey = getAiGatewayApiKey()
-    if (!aiGatewayApiKey || !isAvailableModel(parsed.model)) {
+    const openAiApiKey = getOpenAiApiKey()
+    if (!openAiApiKey || !isAvailableModel(parsed.model)) {
       return observeRouteResponse(
         observation,
         createEmptyFollowUpResponse(requestId),
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
     }
 
     const followUpQuestions = await generateFollowUpQuestions({
-      aiGatewayApiKey,
+      openAiApiKey,
       messages: parsed.messages,
       model: parsed.model,
       signal: request.signal,

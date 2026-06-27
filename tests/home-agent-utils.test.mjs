@@ -76,8 +76,71 @@ test("appended user messages record the selected model", () => {
   const messages = appendUserMessage(
     [],
     "Research Apple supply chain risk.",
-    "zai/glm-5.2"
+    "gpt-5.4-mini"
   )
 
-  assert.equal(messages[0]?.metadata?.selectedModel, "zai/glm-5.2")
+  assert.equal(messages[0]?.metadata?.selectedModel, "gpt-5.4-mini")
+})
+
+const sampleImageAttachment = {
+  id: "att-1",
+  kind: "image",
+  name: "chart.png",
+  mediaType: "image/png",
+  url: "data:image/png;base64,AAAA",
+}
+
+test("appended user messages carry attachments in metadata", () => {
+  const messages = appendUserMessage(
+    [],
+    "Describe this",
+    "gpt-5.5-2026-04-23",
+    [sampleImageAttachment]
+  )
+
+  assert.deepEqual(messages[0]?.metadata?.attachments, [sampleImageAttachment])
+})
+
+test("attachment-only user messages (empty content) are still appended", () => {
+  const messages = appendUserMessage([], "", "gpt-5.5-2026-04-23", [
+    sampleImageAttachment,
+  ])
+
+  assert.equal(messages.length, 1)
+  assert.equal(messages[0]?.content, "")
+  assert.equal(messages[0]?.metadata?.attachments?.length, 1)
+})
+
+test("request messages include attachments and keep attachment-only turns", () => {
+  const [request] = toRequestMessages([
+    {
+      id: "m-att",
+      role: "user",
+      content: "",
+      createdAt: "2026-04-26T00:00:00.000Z",
+      metadata: { attachments: [sampleImageAttachment] },
+    },
+  ])
+
+  assert.equal(request.content, "")
+  assert.equal(request.attachments?.length, 1)
+  assert.equal(request.attachments?.[0]?.url, sampleImageAttachment.url)
+})
+
+test("request messages drop attachments that are missing a data url", () => {
+  const requestMessages = toRequestMessages([
+    {
+      id: "m-nourl",
+      role: "user",
+      content: "Look here",
+      createdAt: "2026-04-26T00:00:00.000Z",
+      metadata: {
+        attachments: [{ ...sampleImageAttachment, url: undefined }],
+      },
+    },
+  ])
+
+  assert.equal(requestMessages.length, 1)
+  assert.equal(requestMessages[0].content, "Look here")
+  assert.equal(requestMessages[0].attachments, undefined)
 })

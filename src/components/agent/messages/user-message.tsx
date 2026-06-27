@@ -1,4 +1,4 @@
-import { Check, Copy, CornerRightUp, Loader2, X } from "lucide-react"
+import { Check, Copy, CornerRightUp, FileText, Loader2, X } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
@@ -74,6 +74,7 @@ export function UserMessage({
   const [isContentOverflowing, setIsContentOverflowing] = useState(false)
   const { copyToClipboard, isCopied } = useCopyToClipboard()
   const hasCopyableContent = message.content.trim().length > 0
+  const attachments = message.metadata?.attachments ?? []
 
   useEffect(() => {
     if (messageContentRef.current) {
@@ -240,51 +241,78 @@ export function UserMessage({
         </div>
       ) : (
         <>
-          <div
-            className={cn(
-              "max-w-full",
-              agentShellFrameClass,
-              agentShellInteractiveClass,
-              "rounded-3xl",
-              !disableEditing && "cursor-pointer"
-            )}
-            role="button"
-            tabIndex={disableEditing || isEditPending ? -1 : 0}
-            onClick={() => {
-              if (!disableEditing) {
-                handleStartEditing()
-              }
-            }}
-            onKeyDown={(e) => {
-              if ((e.key === "Enter" || e.key === " ") && !disableEditing) {
-                e.preventDefault()
-                handleStartEditing()
-              }
-            }}
-          >
+          {attachments.length > 0 && (
+            <div className="mb-2 flex flex-wrap justify-end gap-2">
+              {attachments.map((attachment) => (
+                <div
+                  key={attachment.id}
+                  className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#212121] py-1 pr-2 pl-1"
+                >
+                  {attachment.kind === "image" && attachment.url ? (
+                    <span
+                      className="size-9 shrink-0 rounded-lg bg-cover bg-center"
+                      style={{ backgroundImage: `url(${attachment.url})` }}
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/10 text-muted-foreground">
+                      <FileText className="size-4" aria-hidden="true" />
+                    </span>
+                  )}
+                  <span className="max-w-32 truncate text-xs text-foreground/80">
+                    {attachment.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          {hasCopyableContent && (
             <div
               className={cn(
-                agentSurfaceClass,
-                "w-full overflow-clip rounded-3xl bg-[#212121] bg-none px-4 py-2 text-base"
+                "max-w-full",
+                agentShellFrameClass,
+                agentShellInteractiveClass,
+                "rounded-3xl",
+                !disableEditing && "cursor-pointer"
               )}
-              style={{
-                maxHeight: `${String(MAX_CONTENT_HEIGHT)}px`,
+              role="button"
+              tabIndex={disableEditing || isEditPending ? -1 : 0}
+              onClick={() => {
+                if (!disableEditing) {
+                  handleStartEditing()
+                }
+              }}
+              onKeyDown={(e) => {
+                if ((e.key === "Enter" || e.key === " ") && !disableEditing) {
+                  e.preventDefault()
+                  handleStartEditing()
+                }
               }}
             >
               <div
                 className={cn(
-                  agentSurfaceBackgroundClass,
-                  "rounded-3xl bg-[#212121]"
+                  agentSurfaceClass,
+                  "w-full overflow-clip rounded-3xl bg-[#212121] bg-none px-4 py-2 text-base"
                 )}
-              />
-              {isContentOverflowing && (
-                <div className="absolute bottom-0 left-0 h-1/3 w-full animate-in bg-gradient-to-t from-[#212121] via-[#212121]/80 to-transparent fade-in" />
-              )}
-              <div ref={messageContentRef} className="whitespace-pre-wrap">
-                {message.content}
+                style={{
+                  maxHeight: `${String(MAX_CONTENT_HEIGHT)}px`,
+                }}
+              >
+                <div
+                  className={cn(
+                    agentSurfaceBackgroundClass,
+                    "rounded-3xl bg-[#212121]"
+                  )}
+                />
+                {isContentOverflowing && (
+                  <div className="absolute bottom-0 left-0 h-1/3 w-full animate-in bg-gradient-to-t from-[#212121] via-[#212121]/80 to-transparent fade-in" />
+                )}
+                <div ref={messageContentRef} className="whitespace-pre-wrap">
+                  {message.content}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {hasCopyableContent ? (
             <div className="-mt-1 h-5 opacity-0 transition-opacity group-hover/user-message:opacity-100 focus-within:opacity-100">

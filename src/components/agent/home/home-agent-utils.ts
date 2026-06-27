@@ -1,6 +1,10 @@
 import { ASSISTANT_EMPTY_RESPONSE_FALLBACK } from "@/lib/constants"
 import { createRequestHeaders } from "@/lib/request-id"
-import { type Message as AgentMessage, type ModelType } from "@/lib/shared"
+import {
+  type Message as AgentMessage,
+  type MessageAttachment,
+  type ModelType,
+} from "@/lib/shared"
 import {
   AGENT_REQUEST_MAX_MESSAGE_CHARS,
   AGENT_REQUEST_MAX_MESSAGES,
@@ -13,15 +17,25 @@ export const CLIENT_MESSAGE_MAX_CHARS = AGENT_REQUEST_MAX_MESSAGE_CHARS
 const TRUNCATED_MESSAGE_SUFFIX =
   "\n\n[Earlier content truncated to fit this agent request.]"
 
+interface AgentRequestAttachment {
+  id: string
+  kind: MessageAttachment["kind"]
+  name: string
+  mediaType: string
+  url: string
+}
+
 interface AgentRequestMessage {
   role: "user" | "assistant"
   content: string
+  attachments?: AgentRequestAttachment[]
 }
 
 interface AgentRequestMessageDraft {
   id: string
   role: "user" | "assistant"
   content: string
+  attachments?: AgentRequestAttachment[]
 }
 
 function getClientTimeZone(): string | undefined {
@@ -75,13 +89,30 @@ export function toRequestMessages(
       } => message.role === "user" || message.role === "assistant"
     )
     .map((message) => {
+      const attachments = (message.metadata?.attachments ?? [])
+        .filter(
+          (attachment): attachment is MessageAttachment & { url: string } =>
+            typeof attachment.url === "string" && attachment.url.length > 0
+        )
+        .map((attachment) => ({
+          id: attachment.id,
+          kind: attachment.kind,
+          name: attachment.name,
+          mediaType: attachment.mediaType,
+          url: attachment.url,
+        }))
+
       return {
         id: message.id,
         role: message.role,
         content: trimMessageContent(message.content.trim()),
+        ...(attachments.length > 0 ? { attachments } : {}),
       }
     })
-    .filter((message) => message.content.length > 0)
+    .filter(
+      (message) =>
+        message.content.length > 0 || (message.attachments?.length ?? 0) > 0
+    )
 
   const boundedMessages = requestMessageDrafts.slice(
     -AGENT_REQUEST_MAX_MESSAGES
@@ -97,13 +128,17 @@ export function toRequestMessages(
   return boundedMessages.map((message) => ({
     role: message.role,
     content: message.content,
+    ...(message.attachments?.length
+      ? { attachments: message.attachments }
+      : {}),
   }))
 }
 
 export function appendUserMessage(
   currentMessages: AgentMessage[],
   content: string,
-  model: ModelType
+  model: ModelType,
+  attachments?: MessageAttachment[]
 ): AgentMessage[] {
   const userMessage: AgentMessage = {
     id: createClientMessageId(),
@@ -114,12 +149,15 @@ export function appendUserMessage(
     metadata: {
       isStreaming: false,
       selectedModel: model,
+      ...(attachments && attachments.length > 0 ? { attachments } : {}),
     },
   }
 
   const lastMessage = currentMessages[currentMessages.length - 1]
   const shouldReplaceLastUnansweredMessage =
-    lastMessage?.role === "user" && lastMessage.content.trim() === content
+    content.trim().length > 0 &&
+    lastMessage?.role === "user" &&
+    lastMessage.content.trim() === content
 
   const baseMessages = shouldReplaceLastUnansweredMessage
     ? currentMessages.slice(0, -1)

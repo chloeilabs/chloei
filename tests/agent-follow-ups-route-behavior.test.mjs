@@ -29,7 +29,7 @@ setTestModuleStubs({
 
 const { POST } = await import(routeUrl)
 
-const originalAiGatewayApiKey = process.env.AI_GATEWAY_API_KEY
+const originalAiGatewayApiKey = process.env.OPENAI_API_KEY
 
 function createRequest(overrides = {}) {
   return {
@@ -37,7 +37,7 @@ function createRequest(overrides = {}) {
     signal: AbortSignal.timeout(30_000),
     json: async () => ({
       assistantMessageId: "assistant-1",
-      model: "zai/glm-5.2",
+      model: "gpt-5.4-mini",
       threadId: "thread-1",
       messages: [
         { role: "user", content: "Explain love" },
@@ -67,7 +67,7 @@ async function assertErrorResponse(response, expected) {
 
 beforeEach(() => {
   resetTestMocks()
-  process.env.AI_GATEWAY_API_KEY = "test-gateway-key"
+  process.env.OPENAI_API_KEY = "test-gateway-key"
   setTestMocks({
     authSession: {
       getRequestSession() {
@@ -85,9 +85,9 @@ beforeEach(() => {
 
 after(() => {
   if (originalAiGatewayApiKey === undefined) {
-    delete process.env.AI_GATEWAY_API_KEY
+    delete process.env.OPENAI_API_KEY
   } else {
-    process.env.AI_GATEWAY_API_KEY = originalAiGatewayApiKey
+    process.env.OPENAI_API_KEY = originalAiGatewayApiKey
   }
 })
 

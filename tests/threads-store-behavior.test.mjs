@@ -34,7 +34,7 @@ function createStoredMessage(overrides = {}) {
     id: "message-1",
     role: "user",
     content: "Stored thread message",
-    llmModel: "zai/glm-5.2",
+    llmModel: "gpt-5.4-mini",
     createdAt: "2026-04-15T10:00:00.000Z",
     ...overrides,
   }
@@ -43,7 +43,7 @@ function createStoredMessage(overrides = {}) {
 function createStoredRow(overrides = {}) {
   return {
     id: "thread-1",
-    model: "zai/glm-5.2",
+    model: "gpt-5.4-mini",
     messages: [createStoredMessage()],
     createdAt: "2026-04-15T10:00:00.000Z",
     updatedAt: "2026-04-15T10:05:00.000Z",
@@ -140,7 +140,7 @@ test("listThreadSummariesForUser avoids selecting message payloads", async () =>
             {
               id: "summary-thread",
               title: "Stored summary",
-              model: "zai/glm-5.2",
+              model: "gpt-5.4-mini",
               createdAt: "2026-04-15T10:00:00.000Z",
               updatedAt: "2026-04-15T10:05:00.000Z",
             },
@@ -156,7 +156,7 @@ test("listThreadSummariesForUser avoids selecting message payloads", async () =>
     {
       id: "summary-thread",
       title: "Stored summary",
-      model: "zai/glm-5.2",
+      model: "gpt-5.4-mini",
       createdAt: "2026-04-15T10:00:00.000Z",
       updatedAt: "2026-04-15T10:05:00.000Z",
     },
@@ -177,7 +177,7 @@ test("listThreadSummariesForUser skips invalid summary rows", async () => {
             {
               id: "invalid-summary",
               title: "Stored summary",
-              model: "zai/glm-5.2",
+              model: "gpt-5.4-mini",
               createdAt: "not-a-date",
               updatedAt: "2026-04-15T10:05:00.000Z",
             },
@@ -254,7 +254,7 @@ test("upsertThreadForUser normalizes the persisted thread and shapes SQL values"
         id: "message-upsert",
         role: "user",
         content: "  Derive my title from the first message  ",
-        llmModel: "zai/glm-5.2",
+        llmModel: "gpt-5.4-mini",
         createdAt: "2026-04-15T09:59:00.000Z",
       },
     ],
@@ -285,7 +285,7 @@ test("upsertThreadForUser normalizes the persisted thread and shapes SQL values"
         id: "message-upsert",
         role: "user",
         content: "  Derive my title from the first message  ",
-        llmModel: "zai/glm-5.2",
+        llmModel: "gpt-5.4-mini",
         createdAt: "2026-04-15T09:59:00.000Z",
       },
     ])

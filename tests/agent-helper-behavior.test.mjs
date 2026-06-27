@@ -122,12 +122,12 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "zai/glm-5.2" }],
+    availableModels: [{ id: "gpt-5.4-mini" }],
     requestId: "request-default-mode",
   })
 
   assert(!(defaultModeResult instanceof Response))
-  assert.equal(defaultModeResult.selectedModel, "zai/glm-5.2")
+  assert.equal(defaultModeResult.selectedModel, "gpt-5.4-mini")
 
   const unavailableModelResult = parseAgentStreamRequest({
     body: {
@@ -139,7 +139,7 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "zai/glm-5.2" }],
+    availableModels: [{ id: "gpt-5.4-mini" }],
     requestId: "request-unavailable-model",
   })
 
@@ -161,7 +161,7 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "zai/glm-5.2" }],
+    availableModels: [{ id: "gpt-5.4-mini" }],
     requestId: "request-unknown-field",
   })
 
@@ -180,7 +180,7 @@ test("agent helper validates total size, last-message role, and default model su
         content: "hello",
       })),
     },
-    availableModels: [{ id: "zai/glm-5.2" }],
+    availableModels: [{ id: "gpt-5.4-mini" }],
     requestId: "request-too-many",
   })
 
@@ -201,7 +201,7 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "zai/glm-5.2" }],
+    availableModels: [{ id: "gpt-5.4-mini" }],
     requestId: "request-message-too-large",
   })
 
@@ -220,7 +220,7 @@ test("agent helper validates total size, last-message role, and default model su
         content: `${String(index).padStart(2, "0")}${"x".repeat(10_998)}`,
       })),
     },
-    availableModels: [{ id: "zai/glm-5.2" }],
+    availableModels: [{ id: "gpt-5.4-mini" }],
     requestId: "request-1",
   })
 
@@ -241,7 +241,7 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "zai/glm-5.2" }],
+    availableModels: [{ id: "gpt-5.4-mini" }],
     requestId: "request-2",
   })
 
@@ -289,9 +289,9 @@ test("agent helper streams fallback output when the model yields no content", as
     request: createRequest(),
     requestId: "request-1",
     timeoutMs: 30_000,
-    selectedModel: "zai/glm-5.2",
-    aiGatewayApiKey: "ai-gateway-key",
-    tavilyApiKey: "tavily-key",
+    selectedModel: "gpt-5.4-mini",
+    openAiApiKey: "openai-key",
+    exaApiKey: "exa-key",
     messages: [{ role: "user", content: "Hello" }],
     systemInstruction: "system",
   })
@@ -322,7 +322,7 @@ test("agent helper marks tool-backed partial output incomplete when a tool call 
           yield {
             type: "tool_call",
             callId: "call-search",
-            toolName: "tavily_search",
+            toolName: "exa_search",
             label: "Searching web",
             query: "Vercel AI Gateway",
           }
@@ -339,9 +339,9 @@ test("agent helper marks tool-backed partial output incomplete when a tool call 
     request: createRequest(),
     requestId: "request-unresolved-tool",
     timeoutMs: 30_000,
-    selectedModel: "zai/glm-5.2",
-    aiGatewayApiKey: "ai-gateway-key",
-    tavilyApiKey: "tavily-key",
+    selectedModel: "gpt-5.4-mini",
+    openAiApiKey: "openai-key",
+    exaApiKey: "exa-key",
     messages: [{ role: "user", content: "Search latest docs" }],
     systemInstruction: "system",
   })
@@ -370,16 +370,16 @@ test("agent helper does not add an incomplete fallback when a meaningful answer 
           yield {
             type: "tool_call",
             callId: "call-search",
-            toolName: "tavily_search",
+            toolName: "exa_search",
             label: "Searching web",
             query: "Vercel AI Gateway",
           }
           yield {
             type: "tool_result",
             callId: "call-search",
-            toolName: "tavily_search",
+            toolName: "exa_search",
             status: "error",
-            errorCode: "TAVILY_ERROR",
+            errorCode: "EXA_ERROR",
           }
           yield {
             type: "text_delta",
@@ -394,9 +394,9 @@ test("agent helper does not add an incomplete fallback when a meaningful answer 
     request: createRequest(),
     requestId: "request-tool-error",
     timeoutMs: 30_000,
-    selectedModel: "zai/glm-5.2",
-    aiGatewayApiKey: "ai-gateway-key",
-    tavilyApiKey: "tavily-key",
+    selectedModel: "gpt-5.4-mini",
+    openAiApiKey: "openai-key",
+    exaApiKey: "exa-key",
     messages: [{ role: "user", content: "Search latest docs" }],
     systemInstruction: "system",
   })
@@ -441,8 +441,8 @@ test("agent helper turns upstream body timeouts into visible timeout output", as
     request: createRequest(),
     requestId: "request-body-timeout",
     timeoutMs: 30_000,
-    selectedModel: "zai/glm-5.2",
-    aiGatewayApiKey: "ai-gateway-key",
+    selectedModel: "gpt-5.4-mini",
+    openAiApiKey: "openai-key",
     messages: [{ role: "user", content: "Latest AI news" }],
     systemInstruction: "system",
   })
@@ -487,8 +487,8 @@ test("agent helper returns an auth-key fallback when provider auth fails", async
     request: createRequest(),
     requestId: "request-2",
     timeoutMs: 30_000,
-    selectedModel: "zai/glm-5.2",
-    aiGatewayApiKey: "ai-gateway-key",
+    selectedModel: "gpt-5.4-mini",
+    openAiApiKey: "openai-key",
     messages: [{ role: "user", content: "Hello" }],
     systemInstruction: "system",
   })
@@ -500,7 +500,7 @@ test("agent helper returns an auth-key fallback when provider auth fails", async
     { type: "agent_status", status: "failed" },
     {
       type: "text_delta",
-      delta: "Invalid AI_GATEWAY_API_KEY on the server.",
+      delta: "Invalid OPENAI_API_KEY on the server.",
     },
   ])
   assert.equal(recorded.loggerErrors.length, 1)

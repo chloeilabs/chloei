@@ -14,6 +14,11 @@ import {
   type ModelType,
   resolveDefaultModelSelectorModel,
 } from "@/lib/shared"
+import {
+  AGENT_ATTACHMENT_MAX_DATA_URL_CHARS,
+  AGENT_MAX_ATTACHMENTS_PER_MESSAGE,
+  AGENT_SUPPORTED_ATTACHMENT_MEDIA_TYPES,
+} from "@/lib/shared/agent-request-limits"
 
 import {
   AGENT_MAX_MESSAGE_CHARS,
@@ -48,12 +53,36 @@ const TIMEOUT_ERROR_NAMES = new Set([
   "TimeoutError",
 ])
 
+const attachmentRequestSchema = z
+  .object({
+    id: z.string().trim().min(1).max(200),
+    kind: z.enum(["image", "pdf"]),
+    name: z.string().trim().min(1).max(500),
+    mediaType: z.enum(AGENT_SUPPORTED_ATTACHMENT_MEDIA_TYPES),
+    url: z
+      .string()
+      .trim()
+      .min(1)
+      .max(AGENT_ATTACHMENT_MAX_DATA_URL_CHARS)
+      .startsWith("data:"),
+  })
+  .strict()
+
 const agentMessageSchema = z
   .object({
     role: z.enum(["user", "assistant"]),
-    content: z.string().trim().min(1),
+    content: z.string().trim(),
+    attachments: z
+      .array(attachmentRequestSchema)
+      .max(AGENT_MAX_ATTACHMENTS_PER_MESSAGE)
+      .optional(),
   })
   .strict()
+  .refine(
+    (message) =>
+      message.content.length > 0 || (message.attachments?.length ?? 0) > 0,
+    { message: "A message must include text or at least one attachment." }
+  )
 
 export const agentStreamRequestSchema = z
   .object({
@@ -87,8 +116,8 @@ interface CreateAgentStreamResponseParams {
   requestId: string
   timeoutMs: number
   selectedModel: ModelType
-  aiGatewayApiKey: string
-  tavilyApiKey?: string
+  openAiApiKey: string
+  exaApiKey?: string
   userTimeZone?: string
   userId?: string
   featureFlags?: AgentFeatureFlags
@@ -458,8 +487,8 @@ export function createAgentStreamResponse(
         const stream = startGatewayResponseStream({
           requestId: params.requestId,
           model: params.selectedModel,
-          aiGatewayApiKey: params.aiGatewayApiKey,
-          tavilyApiKey: params.tavilyApiKey,
+          openAiApiKey: params.openAiApiKey,
+          exaApiKey: params.exaApiKey,
           userTimeZone: params.userTimeZone,
           userId: params.userId,
           featureFlags: params.featureFlags,
@@ -548,10 +577,8 @@ export function createAgentStreamResponse(
           streamState.hasMeaningfulText = true
           streamState.textChunkCount += 1
           streamState.textCharCount +=
-            "Invalid AI_GATEWAY_API_KEY on the server.".length
-          enqueueEvent(
-            textDeltaEvent("Invalid AI_GATEWAY_API_KEY on the server.")
-          )
+            "Invalid OPENAI_API_KEY on the server.".length
+          enqueueEvent(textDeltaEvent("Invalid OPENAI_API_KEY on the server."))
         } else if (!streamState.hasMeaningfulText) {
           streamOutcome = "failed"
           logger.error("Agent stream failed.", streamFailureDetails)

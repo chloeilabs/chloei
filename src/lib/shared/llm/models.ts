@@ -1,5 +1,6 @@
 export const AvailableModels = {
-  ZAI_GLM_5_2: "zai/glm-5.2",
+  OPENAI_GPT_5_5: "gpt-5.5-2026-04-23",
+  OPENAI_GPT_5_4_MINI: "gpt-5.4-mini",
 } as const
 
 export type ModelType = (typeof AvailableModels)[keyof typeof AvailableModels]
@@ -16,11 +17,19 @@ export interface ModelInfo {
   name: string
 }
 
-export const SUPPORTED_MODELS = [AvailableModels.ZAI_GLM_5_2] as const
+// Order matters: the first entry is the default selected model (see
+// resolveDefaultModelSelectorModel).
+export const SUPPORTED_MODELS = [
+  AvailableModels.OPENAI_GPT_5_5,
+  AvailableModels.OPENAI_GPT_5_4_MINI,
+] as const
 
 export const ALL_MODELS = [...SUPPORTED_MODELS] as const
 
-export const MODEL_SELECTOR_MODELS = [AvailableModels.ZAI_GLM_5_2] as const
+export const MODEL_SELECTOR_MODELS = [
+  AvailableModels.OPENAI_GPT_5_5,
+  AvailableModels.OPENAI_GPT_5_4_MINI,
+] as const
 
 const MODEL_SELECTOR_MODEL_SET: ReadonlySet<ModelType> = new Set(
   MODEL_SELECTOR_MODELS
@@ -50,8 +59,12 @@ export function resolveDefaultModelSelectorModel(
 }
 
 export const ModelInfos: Record<ModelType, ModelInfo> = {
-  [AvailableModels.ZAI_GLM_5_2]: {
-    id: AvailableModels.ZAI_GLM_5_2,
-    name: "GLM 5.2",
+  [AvailableModels.OPENAI_GPT_5_5]: {
+    id: AvailableModels.OPENAI_GPT_5_5,
+    name: "GPT-5.5",
+  },
+  [AvailableModels.OPENAI_GPT_5_4_MINI]: {
+    id: AvailableModels.OPENAI_GPT_5_4_MINI,
+    name: "GPT-5.4 Mini",
   },
 }

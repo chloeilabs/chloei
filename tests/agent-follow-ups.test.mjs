@@ -15,9 +15,7 @@ const moduleUrl = pathToFileURL(
 ).href
 
 setTestModuleStubs({
-  "./llm/gateway-client": toProjectFileUrl("tests/stubs/gateway-client.mjs"),
-  "@ai-sdk/gateway": toProjectFileUrl("tests/stubs/ai-sdk-gateway.mjs"),
-  ai: toProjectFileUrl("tests/stubs/ai.mjs"),
+  openai: toProjectFileUrl("tests/stubs/openai.mjs"),
 })
 
 const {
@@ -96,29 +94,29 @@ test("follow-up context validation requires the latest assistant response", () =
   )
 })
 
-test("follow-up generation uses GPT-5.1 Instant and tags the source model", async () => {
+test("follow-up generation uses the OpenAI Responses API for structured questions", async () => {
   resetTestMocks()
 
   let recordedParams = null
   setTestMocks({
-    ai: {
-      async generateText(params) {
+    openai: {
+      async responsesCreate(params) {
         recordedParams = params
         return {
-          output: {
+          output_text: JSON.stringify({
             questions: [
-              "How does Kimi handle the repair-after-conflict point?",
+              "How does the repair-after-conflict point work in practice?",
               "What tradeoff matters most for commitment over time?",
               "How would care over time change the recommendation?",
             ],
-          },
+          }),
         }
       },
     },
   })
 
   const followUps = await generateFollowUpQuestions({
-    aiGatewayApiKey: "test-gateway-key",
+    openAiApiKey: "test-openai-key",
     messages: [
       { role: "user", content: "Explain love" },
       {
@@ -127,15 +125,12 @@ test("follow-up generation uses GPT-5.1 Instant and tags the source model", asyn
           "Love includes intimacy, commitment, repair after conflict, and care over time.",
       },
     ],
-    model: "zai/glm-5.2",
+    model: "gpt-5.4-mini",
     userId: "user-1",
   })
 
-  assert.equal(recordedParams?.model, "openai/gpt-5.1-instant")
-  assert.deepEqual(recordedParams?.providerOptions?.gateway?.tags, [
-    "feature:follow_up_questions",
-    "generation_model:openai/gpt-5.1-instant",
-    "source_model:zai/glm-5.2",
-  ])
+  assert.equal(recordedParams?.model, "gpt-5.4-mini")
+  assert.equal(recordedParams?.text?.format?.type, "json_schema")
+  assert.equal(recordedParams?.text?.format?.name, "follow_up_questions")
   assert.equal(followUps.length, 3)
 })

@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Chloei is a **Next.js 16 / React 19** authenticated AI chat app backed by the **Vercel AI Gateway**. A single streaming agent endpoint (`/api/agent`) runs a multi-step tool-using loop (Tavily web search) and streams NDJSON to the browser. Auth, sessions, and threads are **PostgreSQL-backed** (Better Auth + Kysely/`pg`).
+Chloei is a **Next.js 16 / React 19** authenticated AI chat app backed by the **OpenAI Agents SDK** (`@openai/agents`) running against the **OpenAI API**. A single streaming agent endpoint (`/api/agent`) runs a multi-step tool-using loop (Exa web search) and streams NDJSON to the browser. Auth, sessions, and threads are **PostgreSQL-backed** (Better Auth + Kysely/`pg`).
 
 > **Maintaining this file:** keep it accurate and concise — stale or bloated guidance makes Claude ignore the parts that matter. Cite durable anchors (file paths + symbol names), not line numbers. When you change a subsystem, update the matching section here in the same PR.
 
@@ -65,7 +65,7 @@ Client (useAgentSession)
     → Auth check (isAuthConfigured → getRequestSession)   [routes self-guard; see Middleware]
     → Zod validation (parseAgentStreamRequest) — model + messages
     → System prompt assembly (buildAgentSystemInstruction)
-    → AI Gateway stream via Vercel AI SDK (startGatewayResponseStream → runAgentStream)
+    → OpenAI Agents SDK stream (startGatewayResponseStream → startAgentRuntimeStream → run())
     → NDJSON chunks (application/x-ndjson) → client
       → readResponseStreamLines / parseStreamEventLine
         → applyAgentStreamEvent → AgentStreamAccumulator → React state → render
@@ -91,7 +91,7 @@ This boundary is **enforced by Next.js bundling at build time** (importing `pg`/
 
 1. `OPERATING INSTRUCTIONS` — `DEFAULT_OPERATING_INSTRUCTION` (`src/lib/shared/llm/system-instructions.ts`)
 2. `RUNTIME DATE CONTEXT` — current UTC timestamp + user timezone (from `X-User-Timezone` header)
-3. **Provider overlay** (`PROVIDER OVERLAY: ALIBABA|MOONSHOTAI|ZAI`) — keyed by the model's **provider org**, not its nickname. `agent-prompt-steering.ts` defines overlays for `alibaba`, `moonshotai`, and `zai`, but only `zai` is wired today since GLM 5.2 (`zai/glm-5.2`) is the sole model; the alibaba/moonshotai overlays are dormant. Always applied for a supported model.
+3. **Provider overlay** (`PROVIDER OVERLAY: ALIBABA|ANTHROPIC|MOONSHOTAI|OPENAI|ZAI`) — keyed by the model's **provider org**, not its nickname. `agent-prompt-steering.ts` defines overlays for `alibaba`, `anthropic`, `moonshotai`, `openai`, and `zai`, but only `openai` is wired today since GPT-5.4 Mini (`gpt-5.4-mini`) is the sole model; the others are dormant. Always applied for a supported model.
 4. `IDENTITY AND TONE CONTEXT` — `DEFAULT_SOUL_FALLBACK_INSTRUCTION` (`src/lib/shared/llm/system-instructions.ts`)
 5. `AUTH USER CONTEXT` — authenticated user id, name, email
 
@@ -118,11 +118,11 @@ The client accumulator (`agent-stream-state.ts`) builds: `content`, `reasoning`,
 
 The runtime actively prevents "ran tools but never wrote an answer" outcomes (`agent-runtime.ts` + `agent-runtime-synthesis-gating.ts`):
 
-- **Final-synthesis step** — on the last allowed step (`stepNumber >= toolMaxSteps - 1`), `prepareStep` forces `toolChoice: "none"` and appends an instruction to write the answer in the user's exact terminology.
-- **Mid-budget nudge** — from ~1/3 of the step budget onward, appends a reminder to stop retrieving and start synthesizing (disabled when the budget is ≤ 3 steps).
-- **Empty-response fallback** — if the main stream ends with zero emitted text (and wasn't aborted), a second `streamText` call with `toolChoice: "none"` forces a written answer. Orphan tool-calls are patched with synthetic stub tool-results (`sanitizeResponseMessagesForFallback`) to avoid `AI_MissingToolResultsError`.
+- **Tool budget** — `run()` is capped with `maxTurns: AGENT_TOOL_MAX_STEPS`; a `MaxTurnsExceededError` is caught and routed into the final-synthesis pass below (the Agents SDK has no per-step `prepareStep`).
+- **Mid-budget nudge** — baked into the agent instructions (always-on), since per-step system overrides aren't available; it reminds the model to stop retrieving and synthesize.
+- **Final-synthesis / empty-response fallback** — if the main run ends with zero emitted text (and wasn't aborted), a second `run()` with **no tools** and a hard "write the answer now" instruction, fed the gathered run history (`result.history`), forces a written answer.
 
-`createAgentStreamResponse` also injects fallback text and downgrades `agent_status` to `incomplete` on timeout, provider-auth errors (401/403/`invalid_api_key` → "Invalid AI_GATEWAY_API_KEY"), or empty output. Responses set `X-Agent-Effective-Model` and `Cache-Control: no-store, no-transform`.
+`createAgentStreamResponse` also injects fallback text and downgrades `agent_status` to `incomplete` on timeout, provider-auth errors (401/403/`invalid_api_key` → "Invalid OPENAI_API_KEY"), or empty output. Responses set `X-Agent-Effective-Model` and `Cache-Control: no-store, no-transform`.
 
 ### Reasoning and Privacy
 
@@ -136,12 +136,12 @@ User ids are never logged in the clear: `hashUserId` (`src/lib/server/privacy.ts
 
 ### Agent Tools
 
-The only tools are the two Tavily web-search tools, and both are registered together when `TAVILY_API_KEY` is set. There are no other internal or external tools.
+The only tools are the two Exa web-search tools, and both are registered together when `EXA_API_KEY` is set. There are no other internal or external tools.
 
-| Tool             | Requirement      | Tool id / operations                                                                                                                     |
-| ---------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `tavily_search`  | `TAVILY_API_KEY` | Web search. `topic: general\|news\|finance`, `timeRange`, `includeDomains`, `excludeDomains`, `country`; up to **8** results (default 5) |
-| `tavily_extract` | `TAVILY_API_KEY` | Extract content from up to **5** URLs; `extractDepth: basic\|advanced` (default advanced), `format: markdown\|text`                      |
+| Tool               | Requirement   | Tool id / operations                                                                                                                                           |
+| ------------------ | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `exa_search`       | `EXA_API_KEY` | Web search. `category: news\|company\|research paper\|pdf\|financial report`, `timeRange`, `includeDomains`, `excludeDomains`; up to **8** results (default 5) |
+| `exa_get_contents` | `EXA_API_KEY` | Read full page content from up to **5** URLs                                                                                                                   |
 
 **Max tool steps** (`AGENT_TOOL_MAX_STEPS` in `agent-runtime-config.ts`): 12.
 
@@ -149,12 +149,13 @@ The only tools are the two Tavily web-search tools, and both are registered toge
 
 All models are defined in `src/lib/shared/llm/models.ts`:
 
-| Key           | Model ID      | Display Name |
-| ------------- | ------------- | ------------ |
-| `ZAI_GLM_5_2` | `zai/glm-5.2` | GLM 5.2      |
+| Key                   | Model ID             | Display Name |
+| --------------------- | -------------------- | ------------ |
+| `OPENAI_GPT_5_5`      | `gpt-5.5-2026-04-23` | GPT-5.5      |
+| `OPENAI_GPT_5_4_MINI` | `gpt-5.4-mini`       | GPT-5.4 Mini |
 
-- `MODEL_SELECTOR_MODELS` — the chat selector subset: currently just GLM 5.2 (the only model).
-- The agent is text-only: all chat input is plain text (no image, file, or PDF input).
+- `MODEL_SELECTOR_MODELS` — the chat selector subset, rendered as a dropdown at the top-left of the home page (`model-selector.tsx`). **Order matters: the first entry (GPT-5.5) is the default.** The selection persists in `localStorage` and syncs across components via the `model-selector-updated` event.
+- The agent accepts **multimodal input**: plain text plus image (`image/png|jpeg|webp|gif`) and PDF (`application/pdf`) attachments for vision / document analysis. Attachments are added via the paperclip button in the prompt form, carried as base64 data URLs on each request message (`attachments[]` in `agentMessageSchema`), and converted to OpenAI Responses `input_image` / `input_file` content parts in `agent-runtime.ts`. Limits live in `src/lib/shared/agent-request-limits.ts` (≤5 files/message, ≤10 MB each); the request body cap is `proxyClientMaxBodySize` in `next.config.mjs`. The base64 `url` is **stripped on persistence** (`thread-payload.ts` `messageAttachmentSchema`) — stored threads keep only the lightweight `{id, kind, name, mediaType}` descriptor, so reloaded threads show a file chip rather than the original image data.
 - Adding a model means updating `AvailableModels`, `ModelInfos`, `SUPPORTED_MODELS`, and optionally `MODEL_SELECTOR_MODELS`. `/api/models` filters this registry by configured keys (`getModels()` in `src/lib/actions/api-keys.ts`).
 
 ### Thread Storage
@@ -268,7 +269,7 @@ src/
     editor/highlighter.ts
     server/
       agent-context.ts          # buildAgentSystemInstruction
-      agent-prompt-steering.ts  # Provider overlays (per-provider tuning; zai/GLM today)
+      agent-prompt-steering.ts  # Provider overlays (per-provider tuning; anthropic/Claude today)
       agent-route.ts            # parseAgentStreamRequest, createAgentStreamResponse
       agent-runtime-config.ts   # Runtime constants (no env knobs)
       auth.ts / auth-session.ts # isAuthConfigured, getRequestSession
@@ -282,8 +283,8 @@ src/
         agent-runtime-messages.ts         # Message preparation (rejects system-role)
         agent-runtime-synthesis-gating.ts # Final-step + mid-budget synthesis predicates
         gateway-responses.ts              # startGatewayResponseStream
-        gateway-client.ts                 # undici dispatcher for AI Gateway
-        ai-sdk-tavily-tools.ts            # tavily_search / tavily_extract
+        openai-client.ts                  # configures OpenAI Agents SDK (key + tracing off)
+        openai-agents-exa-tools.ts        # exa_search / exa_get_contents
         initial-reasoning-chunk-sanitizer.ts # Redacted-reasoning filtering
         system-instruction-augmentations.ts  # Citation rules appended to prompt
     shared/
@@ -344,7 +345,7 @@ Required for a working local instance:
 DATABASE_URL=
 BETTER_AUTH_SECRET=
 BETTER_AUTH_URL=http://localhost:3000
-AI_GATEWAY_API_KEY=
+OPENAI_API_KEY=
 ```
 
 All others are optional with safe defaults. See `.env.example` for the annotated list.
@@ -354,7 +355,7 @@ All others are optional with safe defaults. See `.env.example` for the annotated
 | `AUTH_DATABASE_URL`           | Separate DB for Better Auth (falls back to / reuses `DATABASE_URL`) |
 | `BETTER_AUTH_TRUSTED_ORIGINS` | Comma-separated additional trusted origins                          |
 | `BETTER_AUTH_COOKIE_DOMAIN`   | Shared cookie domain for cross-subdomain auth                       |
-| `TAVILY_API_KEY`              | Enables `tavily_search` + `tavily_extract`                          |
+| `EXA_API_KEY`                 | Enables `exa_search` + `exa_get_contents`                           |
 | `EDGE_CONFIG`                 | Vercel Edge Config connection for remote feature flags              |
 | `AGENT_TELEMETRY_RECORD_IO`   | Feature flag: record prompt/output IO in telemetry (default off)    |
 

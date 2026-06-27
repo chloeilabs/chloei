@@ -7,9 +7,9 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import "./register-ts-path-hooks.mjs"
 
 const cwd = fileURLToPath(new URL("..", import.meta.url))
-const tavilyToolsPath = path.join(
+const exaToolsPath = path.join(
   cwd,
-  "src/lib/server/llm/ai-sdk-tavily-tools.ts"
+  "src/lib/server/llm/openai-agents-exa-tools.ts"
 )
 const persistentSelectedModelUrl = pathToFileURL(
   path.join(cwd, "src/hooks/agent/persistent-selected-model-utils.ts")
@@ -21,18 +21,18 @@ const {
   serializeStoredSelectedModel,
 } = await import(persistentSelectedModelUrl)
 
-test("tavily search tool results derive source links", async () => {
-  const source = await readFile(tavilyToolsPath, "utf8")
+test("exa search tool results derive source links", async () => {
+  const source = await readFile(exaToolsPath, "utf8")
 
   assert.match(
     source,
     /sources: payload\.output[\s\S]*toSourcesFromOutput\(toolName, payload\.output\)/,
-    "Expected Tavily tool results to expose source links from successful search output."
+    "Expected Exa tool results to expose source links from successful search output."
   )
   assert.match(
     source,
     /id: `\$\{toolName\}-\$\{requestId\}-\$\{String\(index\)\}`/,
-    "Expected Tavily source ids to be stable per tool call and result index."
+    "Expected Exa source ids to be stable per tool call and result index."
   )
 })
 
@@ -51,7 +51,7 @@ test("inline citation instructions avoid separate sources sections", async () =>
   )
 })
 
-test("stale and fallback-only model ids fall back to GLM 5.2", () => {
+test("stale and fallback-only model ids fall back to GPT-5.4 Mini", () => {
   assert.equal(parseStoredSelectedModel("qwen/qwen3.6-plus"), null)
   assert.equal(
     parseStoredSelectedModel(
@@ -67,11 +67,11 @@ test("stale and fallback-only model ids fall back to GLM 5.2", () => {
       initialSelectedModel: null,
       availableModels: [
         {
-          id: "zai/glm-5.2",
-          name: "GLM 5.2",
+          id: "gpt-5.4-mini",
+          name: "GPT-5.4 Mini",
         },
       ],
     }),
-    "zai/glm-5.2"
+    "gpt-5.4-mini"
   )
 })

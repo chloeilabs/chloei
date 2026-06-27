@@ -21,7 +21,7 @@ import {
   createE2eAgentStreamResponse,
   isE2eMockModeEnabled,
 } from "@/lib/server/e2e-test-mode"
-import { getAiGatewayApiKey, getTavilyApiKey } from "@/lib/server/env"
+import { getExaApiKey, getOpenAiApiKey } from "@/lib/server/env"
 import { resolveAgentFeatureFlags } from "@/lib/server/integration-flags"
 import {
   createRouteObservation,
@@ -54,8 +54,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const aiGatewayApiKey = getAiGatewayApiKey()
-    const tavilyApiKey = getTavilyApiKey()
+    const openAiApiKey = getOpenAiApiKey()
+    const exaApiKey = getExaApiKey()
     const isE2eMockRequest = isE2eMockModeEnabled()
     const session = await getRequestSession(request.headers)
 
@@ -134,21 +134,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!aiGatewayApiKey) {
-      logger.error("Missing AI_GATEWAY_API_KEY on the server.", {
-        errorCode: "AGENT_AI_GATEWAY_API_KEY_MISSING",
+    if (!openAiApiKey) {
+      logger.error("Missing OPENAI_API_KEY on the server.", {
+        errorCode: "AGENT_OPENAI_API_KEY_MISSING",
         requestId,
       })
       return observeRouteResponse(
         observation,
         createJsonErrorResponse({
           requestId,
-          error: "Missing AI_GATEWAY_API_KEY on the server.",
-          errorCode: "AGENT_AI_GATEWAY_API_KEY_MISSING",
+          error: "Missing OPENAI_API_KEY on the server.",
+          errorCode: "AGENT_OPENAI_API_KEY_MISSING",
           status: 500,
         }),
         {
-          errorCode: "AGENT_AI_GATEWAY_API_KEY_MISSING",
+          errorCode: "AGENT_OPENAI_API_KEY_MISSING",
           outcome: "error",
         }
       )
@@ -161,8 +161,8 @@ export async function POST(request: NextRequest) {
         requestId,
         timeoutMs: AGENT_STREAM_TIMEOUT_MS,
         selectedModel,
-        aiGatewayApiKey,
-        tavilyApiKey,
+        openAiApiKey,
+        exaApiKey,
         userTimeZone,
         userId: session.user.id,
         featureFlags,

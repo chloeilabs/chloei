@@ -1,12 +1,10 @@
 "use client"
 
-import { SquarePen } from "lucide-react"
 import dynamic from "next/dynamic"
 import {
   type CSSProperties,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useRef,
   useState,
   useTransition,
@@ -16,23 +14,22 @@ import { Toaster } from "sonner"
 import { StickToBottom } from "use-stick-to-bottom"
 
 import { AppSidebar } from "@/components/app-sidebar"
-import { Button } from "@/components/ui/button"
 import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 import { useIsMobile } from "@/hooks/use-mobile"
-import { type AuthViewer, type ModelType } from "@/lib/shared"
+import {
+  type AuthViewer,
+  type MessageAttachment,
+  type ModelType,
+} from "@/lib/shared"
 import { cn } from "@/lib/utils"
 
 import { PromptForm } from "../prompt-form/prompt-form"
+import { ModelSelector } from "./model-selector"
 import { ScrollToBottom } from "./scroll-to-bottom"
 import { useThreadStoreContext } from "./thread-store-context"
 import { useAgentSession } from "./use-agent-session"
@@ -83,12 +80,8 @@ export function HomePageContent({
   const [isPending, startTransition] = useTransition()
   const [isFallbackEnteringConversation, setIsFallbackEnteringConversation] =
     useState(false)
-  const [mirroredHeaderWidth, setMirroredHeaderWidth] = useState<number | null>(
-    null
-  )
   const fallbackTransitionTimeoutRef = useRef<number | null>(null)
   const overflowPinnedTurnIdRef = useRef<string | null>(null)
-  const headerActionsRef = useRef<HTMLDivElement | null>(null)
   const isMobile = useIsMobile()
   const threadStore = useThreadStoreContext()
   const {
@@ -103,8 +96,13 @@ export function HomePageContent({
   } = useAgentSession(threadStore)
 
   const handlePromptFormSubmit = useCallback(
-    (message: string, model: ModelType) => {
-      handlePromptSubmit(message, model)
+    (
+      message: string,
+      model: ModelType,
+      _queue: boolean,
+      attachments: MessageAttachment[]
+    ) => {
+      handlePromptSubmit(message, model, attachments)
     },
     [handlePromptSubmit]
   )
@@ -218,10 +216,15 @@ export function HomePageContent({
   }, [fallbackTransitionMs])
 
   const handleAnimatedPromptSubmit = useCallback(
-    (message: string, model: ModelType) => {
+    (
+      message: string,
+      model: ModelType,
+      _queue: boolean,
+      attachments: MessageAttachment[]
+    ) => {
       if (isMobile) {
         startFallbackConversationTransition()
-        handlePromptSubmit(message, model)
+        handlePromptSubmit(message, model, attachments)
         return
       }
 
@@ -236,13 +239,13 @@ export function HomePageContent({
 
       if (!startViewTransition) {
         startFallbackConversationTransition()
-        handlePromptSubmit(message, model)
+        handlePromptSubmit(message, model, attachments)
         return
       }
 
       startViewTransition(() => {
         flushSync(() => {
-          handlePromptSubmit(message, model)
+          handlePromptSubmit(message, model, attachments)
         })
       })
     },
@@ -277,36 +280,6 @@ export function HomePageContent({
     }
   }, [hasMessages])
 
-  useLayoutEffect(() => {
-    const actionsElement = headerActionsRef.current
-
-    if (!actionsElement || isMobile) {
-      return
-    }
-
-    const syncMirroredHeaderWidth = () => {
-      const nextWidth = Math.ceil(actionsElement.getBoundingClientRect().width)
-
-      setMirroredHeaderWidth((currentWidth) =>
-        currentWidth === nextWidth ? currentWidth : nextWidth
-      )
-    }
-
-    syncMirroredHeaderWidth()
-
-    const resizeObserver = new ResizeObserver(() => {
-      syncMirroredHeaderWidth()
-    })
-
-    resizeObserver.observe(actionsElement)
-    window.addEventListener("resize", syncMirroredHeaderWidth)
-
-    return () => {
-      resizeObserver.disconnect()
-      window.removeEventListener("resize", syncMirroredHeaderWidth)
-    }
-  }, [isMobile])
-
   const handleNewChat = useCallback(() => {
     resetConversation()
   }, [resetConversation])
@@ -323,40 +296,10 @@ export function HomePageContent({
         onNewChat={handleNewChat}
       />
       <SidebarInset className="relative flex min-h-0 w-full flex-col overflow-hidden">
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-center justify-between p-3">
-          <div
-            className="flex min-w-0 items-center justify-start gap-1"
-            style={
-              !isMobile && mirroredHeaderWidth
-                ? {
-                    width: mirroredHeaderWidth,
-                  }
-                : undefined
-            }
-          >
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-center justify-between px-3 py-2">
+          <div className="flex min-w-0 items-center justify-start gap-1">
             <MainSidebarTrigger />
-          </div>
-
-          <div ref={headerActionsRef} className="flex items-center gap-1">
-            {hasActiveThread ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    className="pointer-events-auto text-muted-foreground hover:text-foreground"
-                    onClick={handleNewChat}
-                    aria-label="Start a new chat"
-                  >
-                    <SquarePen className="size-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" align="end">
-                  New chat
-                </TooltipContent>
-              </Tooltip>
-            ) : null}
+            <ModelSelector initialSelectedModel={initialSelectedModel} />
           </div>
         </div>
 
