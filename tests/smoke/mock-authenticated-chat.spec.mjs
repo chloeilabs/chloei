@@ -94,7 +94,7 @@ test.describe("mock authenticated chat smoke", () => {
     await openMockChat({ baseURL, context, page })
     await sendPrompt(page, firstPrompt)
 
-    await page.getByRole("button", { name: "Start a new chat" }).click()
+    await page.getByRole("button", { name: "New chat" }).click()
     await expect(page.locator("[data-message-role='user']")).toHaveCount(0)
 
     await sendPrompt(page, secondPrompt)
