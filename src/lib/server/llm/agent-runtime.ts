@@ -1,44 +1,43 @@
-import { createGateway } from "@ai-sdk/gateway"
 import {
-  type LanguageModelUsage,
-  stepCountIs,
-  streamText,
-  type ToolSet,
-} from "ai"
+  Agent,
+  type AgentInputItem,
+  MaxTurnsExceededError,
+  run,
+} from "@openai/agents"
 
+import { asRecord, asString } from "@/lib/cast"
 import { createLogger } from "@/lib/logger"
 import { AGENT_TOOL_MAX_STEPS } from "@/lib/server/agent-runtime-config"
-import {
-  type AgentFeatureFlags,
-  getDefaultAgentFeatureFlags,
-} from "@/lib/server/integration-flags"
-import { hashUserId } from "@/lib/server/privacy"
+import { type AgentFeatureFlags } from "@/lib/server/integration-flags"
 import { type AgentStreamEvent, type ModelType } from "@/lib/shared"
 
 import {
   type AgentInputMessage,
   toModelMessages,
 } from "./agent-runtime-messages"
-import {
-  shouldForceFinalSynthesisStep,
-  shouldNudgeMidBudgetSynthesis,
-} from "./agent-runtime-synthesis-gating"
-import {
-  createAiSdkTavilyTools,
-  getAiSdkTavilyToolCallMetadata,
-  getAiSdkTavilyToolResultMetadata,
-  isAiSdkTavilyToolName,
-} from "./ai-sdk-tavily-tools"
-import { aiGatewayFetch } from "./gateway-client"
 import { createReasoningDisplaySanitizer } from "./initial-reasoning-chunk-sanitizer"
+import {
+  createOpenAiAgentsExaTools,
+  getExaToolCallMetadata,
+  getExaToolResultMetadata,
+  isExaToolName,
+} from "./openai-agents-exa-tools"
+import { configureOpenAiForAgents } from "./openai-client"
 
 const logger = createLogger("agent-runtime")
+
+const REASONING_EFFORT = "high" as const
+
+type UserContentPart =
+  | { type: "input_text"; text: string }
+  | { type: "input_image"; image: string }
+  | { type: "input_file"; file: string; filename: string }
 
 export interface StartAgentRuntimeStreamParams {
   requestId?: string
   model: ModelType
-  aiGatewayApiKey: string
-  tavilyApiKey?: string
+  openAiApiKey: string
+  exaApiKey?: string
   userTimeZone?: string
   messages: AgentInputMessage[]
   systemInstruction: string
@@ -47,6 +46,17 @@ export interface StartAgentRuntimeStreamParams {
   userId?: string
   featureFlags?: AgentFeatureFlags
 }
+
+// Baked into every run's instructions. The OpenAI Agents SDK has no per-step
+// system override (unlike the AI SDK's prepareStep), so the mid-budget nudge is
+// always-on guidance; the forced final-synthesis pass below is the real safety
+// net for silent, tool-only completions.
+const MID_BUDGET_SYNTHESIS_REMINDER = [
+  "You have a limited web-tool budget for each request (about a dozen tool calls).",
+  "Prefer synthesizing the final answer from the evidence you have over running deeper retrievals.",
+  "If another tool call would not materially change the conclusion, stop calling tools and write the answer.",
+  "Always finish by writing the user-facing answer; mirror the user's exact terminology (named metrics, defined terms, proper nouns) rather than paraphrasing.",
+].join(" ")
 
 const FINAL_SYNTHESIS_STEP_INSTRUCTION = [
   "You are on the final synthesis step for this request.",
@@ -57,99 +67,8 @@ const FINAL_SYNTHESIS_STEP_INSTRUCTION = [
   "Cite the sources you used inline. Do not stall, do not stay silent, and do not ask the user to retry.",
 ].join(" ")
 
-const MID_BUDGET_SYNTHESIS_REMINDER = [
-  "Tool-budget checkpoint: most of your tool-call budget for this request is already spent.",
-  "Prefer synthesizing the final answer from the evidence you have over running deeper retrievals.",
-  "If another tool call would not materially change the conclusion, stop calling tools and write the answer.",
-  "When you write the answer, mirror the user's exact terminology (e.g., 'operating margin', 'CET1', 'net interest income') rather than paraphrasing.",
-].join(" ")
-
-const EMPTY_RESPONSE_SYNTHESIS_FALLBACK_SYSTEM = [
-  "Your previous turn finished without writing a final answer to the user.",
-  "Look at the tool results and any retrieved evidence in the conversation above, and write the answer now using only that evidence.",
-  "Do not call any tools.",
-  "Mirror the user's exact terminology in your answer (named metrics, defined terms, proper nouns).",
-  "If the evidence is incomplete or contradictory, write what you found, name the gap, and end with a clear summary.",
-  "An empty response is not acceptable.",
-].join(" ")
-
-// When the main stream finishes mid-tool-call (e.g. abort or provider hiccup),
-// response.messages can include assistant tool-call parts that never received
-// a matching tool-result message. Sending that history straight to streamText
-// raises AI_MissingToolResultsError. This helper appends synthetic stub
-// tool-result messages for every orphan so the fallback call always parses.
-function sanitizeResponseMessagesForFallback<T extends { role: string }>(
-  responseMessages: readonly T[]
-): T[] {
-  const sanitized: T[] = []
-  const seenToolResultIds = new Set<string>()
-  for (const message of responseMessages) {
-    if (
-      message.role === "tool" &&
-      typeof (message as unknown as { content?: unknown }).content !== "string"
-    ) {
-      const parts = (
-        message as unknown as { content: { toolCallId?: string }[] }
-      ).content
-      for (const part of parts) {
-        if (typeof part.toolCallId === "string") {
-          seenToolResultIds.add(part.toolCallId)
-        }
-      }
-    }
-  }
-
-  const orphanCalls: { toolCallId: string; toolName: string }[] = []
-  for (const message of responseMessages) {
-    sanitized.push(message)
-    if (
-      message.role !== "assistant" ||
-      typeof (message as unknown as { content?: unknown }).content === "string"
-    ) {
-      continue
-    }
-    const parts = (
-      message as unknown as {
-        content: { type?: string; toolCallId?: string; toolName?: string }[]
-      }
-    ).content
-    for (const part of parts) {
-      if (
-        part.type === "tool-call" &&
-        typeof part.toolCallId === "string" &&
-        typeof part.toolName === "string" &&
-        !seenToolResultIds.has(part.toolCallId)
-      ) {
-        orphanCalls.push({
-          toolCallId: part.toolCallId,
-          toolName: part.toolName,
-        })
-        seenToolResultIds.add(part.toolCallId)
-      }
-    }
-  }
-
-  if (orphanCalls.length === 0) {
-    return sanitized
-  }
-
-  sanitized.push({
-    role: "tool",
-    content: orphanCalls.map((call) => ({
-      type: "tool-result",
-      toolCallId: call.toolCallId,
-      toolName: call.toolName,
-      output: {
-        type: "json",
-        value: {
-          error: "Tool call was not completed before the stream ended.",
-          errorCode: "TOOL_CALL_NOT_COMPLETED",
-        },
-      },
-    })),
-  } as unknown as T)
-  return sanitized
-}
+const FINAL_SYNTHESIS_USER_PROMPT =
+  "Now write the final answer to my original question using the tool results above. Mirror my exact terminology. Do not call any tools. An empty response is not acceptable — if the evidence is partial, write what you found and name the gap."
 
 function getSourceEvent(
   id: string,
@@ -170,40 +89,117 @@ function shouldSkipReasoningChunk(text: string): boolean {
   return text.trim() === "[REDACTED]"
 }
 
-function getUsageLogFields(usage: LanguageModelUsage | undefined) {
-  const outputTokenDetails = usage?.outputTokenDetails as
-    | Partial<LanguageModelUsage["outputTokenDetails"]>
-    | undefined
-
-  return {
-    inputTokens: usage?.inputTokens,
-    outputTokens: usage?.outputTokens,
-    totalTokens: usage?.totalTokens,
-    textTokens: outputTokenDetails?.textTokens,
-    reasoningTokens: outputTokenDetails?.reasoningTokens,
+function parseToolArguments(value: unknown): unknown {
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value)
+    } catch {
+      return {}
+    }
   }
+  return value
+}
+
+function normalizeToolOutput(value: unknown): unknown {
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value)
+    } catch {
+      return value
+    }
+  }
+  return value
+}
+
+// The Agents SDK emits NORMALIZED raw-model events: assistant text arrives as
+// { type: "output_text_delta", delta }. Reasoning summaries have no normalized
+// event, so they come via the raw passthrough { type: "model", event: <OpenAI
+// Responses event> } as response.reasoning_summary_text.delta.
+function readTextDelta(eventData: unknown): string | null {
+  const data = asRecord(eventData)
+  if (asString(data?.type) === "output_text_delta") {
+    return asString(data?.delta) ?? ""
+  }
+  return null
+}
+
+function readReasoningDelta(eventData: unknown): string | null {
+  const data = asRecord(eventData)
+  if (asString(data?.type) !== "model") {
+    return null
+  }
+  const raw = asRecord(data?.event)
+  const rawType = asString(raw?.type)
+  if (
+    rawType === "response.reasoning_summary_text.delta" ||
+    rawType === "response.reasoning_text.delta"
+  ) {
+    return asString(raw?.delta) ?? ""
+  }
+  return null
+}
+
+function buildInstructions(systemInstruction: string): string {
+  return `${systemInstruction}\n\n${MID_BUDGET_SYNTHESIS_REMINDER}`
 }
 
 export async function* startAgentRuntimeStream(
   params: StartAgentRuntimeStreamParams
 ): AsyncGenerator<AgentStreamEvent> {
-  const userId = params.userId
-  const featureFlags = params.featureFlags ?? getDefaultAgentFeatureFlags()
-  const gatewayProvider = createGateway({
-    apiKey: params.aiGatewayApiKey,
-    fetch: aiGatewayFetch,
-  })
+  // Convert to Agents SDK input items. User content may be a plain string, but
+  // assistant history items require a content array of output_text parts (a
+  // plain string throws "item.content.map is not a function" on multi-turn).
+  // User messages with attachments become a multimodal content array
+  // (input_text + input_image / input_file) for vision / PDF analysis.
+  const inputItems = toModelMessages(params.messages).map(
+    (message): AgentInputItem => {
+      if (message.role === "assistant") {
+        return {
+          role: "assistant",
+          status: "completed",
+          content: [{ type: "output_text", text: message.content }],
+        }
+      }
 
-  const messages = toModelMessages(params.messages)
-  if (messages.length === 0) {
+      const attachments = message.attachments ?? []
+      if (attachments.length === 0) {
+        return { role: "user", content: message.content }
+      }
+
+      const content: UserContentPart[] = []
+      if (message.content) {
+        content.push({ type: "input_text", text: message.content })
+      }
+      for (const attachment of attachments) {
+        if (!attachment.url) {
+          continue
+        }
+        content.push(
+          attachment.kind === "image"
+            ? { type: "input_image", image: attachment.url }
+            : {
+                type: "input_file",
+                file: attachment.url,
+                filename: attachment.name,
+              }
+        )
+      }
+      return { role: "user", content }
+    }
+  )
+  if (inputItems.length === 0) {
     return
   }
 
-  const normalizedTavilyApiKey = params.tavilyApiKey?.trim()
+  configureOpenAiForAgents(params.openAiApiKey)
+
+  const tools = createOpenAiAgentsExaTools(params.exaApiKey?.trim())
+  const toolNames = tools.map((tool) => tool.name)
 
   const seenToolCalls = new Set<string>()
   const finalizedToolCalls = new Set<string>()
   const seenSourceKeys = new Set<string>()
+  const toolNamesByCallId = new Map<string, string>()
   const sanitizeReasoningChunk = createReasoningDisplaySanitizer()
 
   const createSourceEvent = (
@@ -213,19 +209,26 @@ export async function* startAgentRuntimeStream(
   ): Extract<AgentStreamEvent, { type: "source" }> | null => {
     const normalizedUrl = url.trim()
     const normalizedTitle = title.trim() || normalizedUrl
-    const key = normalizedUrl
-    if (!normalizedUrl || seenSourceKeys.has(key)) {
+    if (!normalizedUrl || seenSourceKeys.has(normalizedUrl)) {
       return null
     }
 
-    seenSourceKeys.add(key)
+    seenSourceKeys.add(normalizedUrl)
     return getSourceEvent(id, normalizedUrl, normalizedTitle)
   }
 
-  const tools = {
-    ...createAiSdkTavilyTools(normalizedTavilyApiKey),
-  } as ToolSet
-  const toolNames = Object.keys(tools)
+  const agent = new Agent({
+    name: "chloei-agent",
+    instructions: buildInstructions(params.systemInstruction),
+    model: params.model,
+    modelSettings: {
+      reasoning: { effort: REASONING_EFFORT, summary: "auto" },
+      ...(params.temperature !== undefined
+        ? { temperature: params.temperature }
+        : {}),
+    },
+    tools,
+  })
 
   logger.info("Starting agent runtime stream.", {
     requestId: params.requestId,
@@ -233,214 +236,158 @@ export async function* startAgentRuntimeStream(
     toolCount: toolNames.length,
     toolNames,
   })
-  const systemInstruction = params.systemInstruction
-
-  const result = streamText({
-    model: gatewayProvider(params.model),
-    // GLM only emits reasoning when an effort level is requested; without this
-    // it skips thinking on many turns, so the activity timeline shows none.
-    providerOptions: {
-      zai: { reasoningEffort: "high" },
-    },
-    system: systemInstruction,
-    messages,
-    abortSignal: params.signal,
-    ...(params.temperature !== undefined
-      ? { temperature: params.temperature }
-      : {}),
-    experimental_telemetry: {
-      isEnabled: true,
-      recordInputs: featureFlags.telemetryRecordIo,
-      recordOutputs: featureFlags.telemetryRecordIo,
-      functionId: "chloei.agent.stream",
-      metadata: {
-        requestId: params.requestId ?? "",
-        modelId: params.model,
-        toolNames: toolNames.join(","),
-        userHash: userId ? hashUserId(userId) : "",
-      },
-    },
-    tools,
-    prepareStep: ({ stepNumber }) => {
-      const forceFinalSynthesis = shouldForceFinalSynthesisStep(
-        stepNumber,
-        AGENT_TOOL_MAX_STEPS
-      )
-      if (forceFinalSynthesis) {
-        return {
-          toolChoice: "none" as const,
-          system: `${systemInstruction}\n\n${FINAL_SYNTHESIS_STEP_INSTRUCTION}`,
-        }
-      }
-
-      if (shouldNudgeMidBudgetSynthesis(stepNumber, AGENT_TOOL_MAX_STEPS)) {
-        return {
-          system: `${systemInstruction}\n\n${MID_BUDGET_SYNTHESIS_REMINDER}`,
-        }
-      }
-
-      return undefined
-    },
-    stopWhen: stepCountIs(AGENT_TOOL_MAX_STEPS),
-  })
 
   let hasEmittedText = false
 
-  for await (const part of result.fullStream) {
-    if (part.type === "finish-step") {
-      logger.info("Agent runtime model step finished.", {
-        requestId: params.requestId,
-        model: params.model,
-        finishReason: part.finishReason,
-        rawFinishReason: part.rawFinishReason,
-        ...getUsageLogFields(part.usage),
-      })
-      continue
-    }
+  const result = await run(agent, inputItems, {
+    stream: true,
+    maxTurns: AGENT_TOOL_MAX_STEPS,
+    signal: params.signal,
+  })
 
-    if (part.type === "finish") {
-      logger.info("Agent runtime stream finished.", {
-        requestId: params.requestId,
-        model: params.model,
-        finishReason: part.finishReason,
-        rawFinishReason: part.rawFinishReason,
-        ...getUsageLogFields(part.totalUsage),
-      })
-      continue
-    }
-
-    if (part.type === "abort") {
-      logger.warn("Agent runtime stream aborted.", {
-        requestId: params.requestId,
-        model: params.model,
-        reason: part.reason,
-      })
-      continue
-    }
-
-    if (part.type === "text-delta") {
-      if (part.text.length > 0) {
-        hasEmittedText = true
-        yield { type: "text_delta", delta: part.text }
-      }
-      continue
-    }
-
-    if (part.type === "reasoning-delta") {
-      const delta = sanitizeReasoningChunk(part.text)
-      if (delta.length > 0 && !shouldSkipReasoningChunk(delta)) {
-        yield { type: "reasoning_delta", delta }
-      }
-      continue
-    }
-
-    if (part.type === "source" && part.sourceType === "url") {
-      const sourceEvent = createSourceEvent(
-        part.id,
-        part.url,
-        part.title?.trim() ?? part.url
-      )
-      if (sourceEvent) {
-        yield sourceEvent
-      }
-      continue
-    }
-
-    if (part.type === "tool-call") {
-      const metadata = getAiSdkTavilyToolCallMetadata(part)
-      if (!metadata || seenToolCalls.has(metadata.callId)) {
-        continue
-      }
-
-      seenToolCalls.add(metadata.callId)
-      yield {
-        type: "tool_call",
-        callId: metadata.callId,
-        toolName: metadata.toolName,
-        label: metadata.label,
-        ...("query" in metadata && metadata.query
-          ? { query: metadata.query }
-          : {}),
-        ...("operation" in metadata && metadata.operation
-          ? { operation: metadata.operation }
-          : {}),
-        ...("provider" in metadata && metadata.provider
-          ? { provider: metadata.provider }
-          : {}),
-      }
-      continue
-    }
-
-    if (part.type === "tool-result") {
-      if (part.preliminary) {
-        continue
-      }
-
-      const metadata = getAiSdkTavilyToolResultMetadata(part)
-      if (!metadata || finalizedToolCalls.has(metadata.callId)) {
-        continue
-      }
-
-      finalizedToolCalls.add(metadata.callId)
-      yield {
-        type: "tool_result",
-        callId: metadata.callId,
-        toolName: metadata.toolName,
-        status: metadata.status,
-        ...("operation" in metadata && metadata.operation
-          ? { operation: metadata.operation }
-          : {}),
-        ...("provider" in metadata && metadata.provider
-          ? { provider: metadata.provider }
-          : {}),
-        ...("errorCode" in metadata && metadata.errorCode
-          ? { errorCode: metadata.errorCode }
-          : {}),
-        ...("retryable" in metadata && metadata.retryable !== undefined
-          ? { retryable: metadata.retryable }
-          : {}),
-      }
-
-      for (const source of metadata.sources) {
-        const sourceEvent = createSourceEvent(
-          source.id,
-          source.url,
-          source.title
-        )
-        if (sourceEvent) {
-          yield sourceEvent
+  try {
+    for await (const event of result) {
+      if (event.type === "raw_model_stream_event") {
+        const reasoningDelta = readReasoningDelta(event.data)
+        if (reasoningDelta !== null) {
+          const delta = sanitizeReasoningChunk(reasoningDelta)
+          if (delta.length > 0 && !shouldSkipReasoningChunk(delta)) {
+            yield { type: "reasoning_delta", delta }
+          }
+          continue
         }
+
+        const textDelta = readTextDelta(event.data)
+        if (textDelta && textDelta.length > 0) {
+          hasEmittedText = true
+          yield { type: "text_delta", delta: textDelta }
+        }
+        continue
       }
 
-      continue
-    }
+      if (event.type === "run_item_stream_event") {
+        const item = asRecord(event.item)
+        const rawItem = asRecord(item?.rawItem)
 
-    if (
-      part.type === "tool-error" &&
-      isAiSdkTavilyToolName(part.toolName) &&
-      !finalizedToolCalls.has(part.toolCallId)
-    ) {
-      finalizedToolCalls.add(part.toolCallId)
-      const toolName = part.toolName
-      yield {
-        type: "tool_result",
-        callId: part.toolCallId,
-        toolName,
-        status: "error",
-        errorCode: "TOOL_EXECUTION_ERROR",
-        retryable: true,
+        if (event.name === "tool_called") {
+          const callId = asString(rawItem?.callId)
+          const toolName = asString(rawItem?.name)
+          if (!callId || !toolName) {
+            continue
+          }
+          toolNamesByCallId.set(callId, toolName)
+
+          const metadata = getExaToolCallMetadata({
+            toolCallId: callId,
+            toolName,
+            input: parseToolArguments(rawItem?.arguments),
+          })
+          if (!metadata || seenToolCalls.has(metadata.callId)) {
+            continue
+          }
+
+          seenToolCalls.add(metadata.callId)
+          yield {
+            type: "tool_call",
+            callId: metadata.callId,
+            toolName: metadata.toolName,
+            label: metadata.label,
+            ...(metadata.query ? { query: metadata.query } : {}),
+            ...(metadata.operation ? { operation: metadata.operation } : {}),
+            ...(metadata.provider ? { provider: metadata.provider } : {}),
+          }
+          continue
+        }
+
+        if (event.name === "tool_output") {
+          const callId = asString(rawItem?.callId)
+          const toolName =
+            asString(rawItem?.name) ??
+            (callId ? toolNamesByCallId.get(callId) : undefined)
+          if (!callId || !toolName || !isExaToolName(toolName)) {
+            continue
+          }
+          if (finalizedToolCalls.has(callId)) {
+            continue
+          }
+
+          const normalizedOutput = normalizeToolOutput(item?.output)
+
+          // The SDK returns a plain string (not our {output|error} payload) when
+          // the model sent invalid tool-call arguments and execute never ran
+          // (InvalidToolInputError). Surface it as a clean, retryable error.
+          if (!asRecord(normalizedOutput)) {
+            finalizedToolCalls.add(callId)
+            yield {
+              type: "tool_result",
+              callId,
+              toolName,
+              status: "error",
+              operation: toolName === "exa_search" ? "search" : "get_contents",
+              provider: "exa",
+              errorCode: "TOOL_INPUT_ERROR",
+              retryable: true,
+            }
+            continue
+          }
+
+          const metadata = getExaToolResultMetadata({
+            toolCallId: callId,
+            toolName,
+            output: normalizedOutput,
+          })
+          if (!metadata) {
+            continue
+          }
+
+          finalizedToolCalls.add(metadata.callId)
+          yield {
+            type: "tool_result",
+            callId: metadata.callId,
+            toolName: metadata.toolName,
+            status: metadata.status,
+            ...(metadata.operation ? { operation: metadata.operation } : {}),
+            ...(metadata.provider ? { provider: metadata.provider } : {}),
+            ...(metadata.errorCode ? { errorCode: metadata.errorCode } : {}),
+            ...(metadata.retryable !== undefined
+              ? { retryable: metadata.retryable }
+              : {}),
+          }
+
+          for (const source of metadata.sources) {
+            const sourceEvent = createSourceEvent(
+              source.id,
+              source.url,
+              source.title
+            )
+            if (sourceEvent) {
+              yield sourceEvent
+            }
+          }
+        }
+        continue
       }
     }
 
-    if (part.type === "error") {
-      const streamError =
-        "error" in part ? (part as { error?: unknown }).error : part
+    await result.completed
+    logger.info("Agent runtime stream finished.", {
+      requestId: params.requestId,
+      model: params.model,
+      hasEmittedText,
+    })
+  } catch (error) {
+    if (error instanceof MaxTurnsExceededError) {
+      logger.warn("Agent runtime hit max turns; running final synthesis.", {
+        requestId: params.requestId,
+        model: params.model,
+      })
+    } else {
       const message =
-        streamError instanceof Error
-          ? streamError.message
-          : typeof streamError === "string"
-            ? streamError
-            : JSON.stringify(streamError)
+        error instanceof Error
+          ? error.message
+          : typeof error === "string"
+            ? error
+            : JSON.stringify(error)
       throw new Error(`Agent model stream error: ${message}`)
     }
   }
@@ -453,79 +400,60 @@ export async function* startAgentRuntimeStream(
     yield { type: "reasoning_delta", delta: finalReasoningDelta }
   }
 
-  // Synthesis-fallback safety net: if the main stream completed without
-  // emitting any text (model called tools then stopped silent), re-invoke
-  // the model with the tool results in context and force a written answer.
-  // This is the most common failure mode on long multi-source retrieval
-  // chains where the model exhausts evidence-gathering and forgets to
-  // write the synthesis.
+  // Forced final-synthesis safety net: if the run finished (or hit the turn cap)
+  // without writing any text, re-run with the gathered history, no tools, and a
+  // hard instruction to write the answer now. Replaces the AI SDK prepareStep
+  // forced-synthesis step + empty-response fallback.
   if (!hasEmittedText && !params.signal?.aborted) {
     try {
-      const rawResponseMessages = (await result.response).messages
-      const responseMessages =
-        sanitizeResponseMessagesForFallback(rawResponseMessages)
-      logger.warn("Main stream emitted no text; running synthesis fallback.", {
-        requestId: params.requestId,
+      const history =
+        (result.history as AgentInputItem[] | undefined) ?? inputItems
+      const synthesisAgent = new Agent({
+        name: "chloei-agent-synthesis",
+        instructions: `${params.systemInstruction}\n\n${FINAL_SYNTHESIS_STEP_INSTRUCTION}`,
         model: params.model,
-        responseMessageCount: responseMessages.length,
-        sanitizedToolStubCount:
-          responseMessages.length - rawResponseMessages.length,
+        modelSettings: {
+          reasoning: { effort: REASONING_EFFORT, summary: "auto" },
+          ...(params.temperature !== undefined
+            ? { temperature: params.temperature }
+            : {}),
+        },
       })
 
-      const fallbackResult = streamText({
-        model: gatewayProvider(params.model),
-        system: EMPTY_RESPONSE_SYNTHESIS_FALLBACK_SYSTEM,
-        messages: [
-          ...messages,
-          ...responseMessages,
-          {
-            role: "user",
-            content:
-              "Now write the final answer to my original question using the tool results above. Mirror my exact terminology. Do not call any tools. An empty response is not acceptable — if the evidence is partial, write what you found and name the gap.",
-          },
-        ],
-        abortSignal: params.signal,
-        ...(params.temperature !== undefined
-          ? { temperature: params.temperature }
-          : {}),
-        tools,
-        toolChoice: "none" as const,
-        stopWhen: stepCountIs(1),
+      logger.warn("Main run emitted no text; running synthesis fallback.", {
+        requestId: params.requestId,
+        model: params.model,
+        historyItemCount: history.length,
+      })
+
+      const synthesisInput: AgentInputItem[] = [
+        ...history,
+        { role: "user", content: FINAL_SYNTHESIS_USER_PROMPT },
+      ]
+      const synthesisResult = await run(synthesisAgent, synthesisInput, {
+        stream: true,
+        maxTurns: 1,
+        signal: params.signal,
       })
 
       let fallbackEmittedText = false
-      for await (const part of fallbackResult.fullStream) {
-        if (part.type === "text-delta" && part.text.length > 0) {
-          hasEmittedText = true
-          fallbackEmittedText = true
-          yield { type: "text_delta", delta: part.text }
+      for await (const event of synthesisResult) {
+        if (event.type !== "raw_model_stream_event") {
           continue
         }
-        if (part.type === "finish") {
-          logger.info("Synthesis fallback stream finished.", {
-            requestId: params.requestId,
-            model: params.model,
-            finishReason: part.finishReason,
-            fallbackEmittedText,
-            ...getUsageLogFields(part.totalUsage),
-          })
-        }
-        if (part.type === "error") {
-          const streamError =
-            "error" in part ? (part as { error?: unknown }).error : part
-          logger.warn("Synthesis fallback stream emitted an error event.", {
-            requestId: params.requestId,
-            model: params.model,
-            error: streamError,
-          })
+        const delta = readTextDelta(event.data)
+        if (delta && delta.length > 0) {
+          hasEmittedText = true
+          fallbackEmittedText = true
+          yield { type: "text_delta", delta }
         }
       }
+      await synthesisResult.completed
 
       if (!fallbackEmittedText) {
         logger.warn("Synthesis fallback completed without emitting text.", {
           requestId: params.requestId,
           model: params.model,
-          responseMessageCount: responseMessages.length,
         })
       }
     } catch (fallbackError) {

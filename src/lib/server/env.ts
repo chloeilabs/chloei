@@ -11,7 +11,7 @@ import { z } from "zod"
  * - Accessors read `process.env` at call time, preserving the existing
  *   per-request read semantics.
  * - They never throw: a blank or whitespace-only value normalizes to
- *   `undefined` (i.e. "not configured"), matching how `AI_GATEWAY_API_KEY` was
+ *   `undefined` (i.e. "not configured"), matching how `OPENAI_API_KEY` was
  *   already treated in the follow-ups route and gateway error handling.
  *
  * Out of scope (left where they already live, by design):
@@ -24,17 +24,17 @@ import { z } from "zod"
 const optionalSecret = z.string().trim().min(1).optional().catch(undefined)
 
 function readOptionalSecret(
-  name: "AI_GATEWAY_API_KEY" | "TAVILY_API_KEY"
+  name: "OPENAI_API_KEY" | "EXA_API_KEY"
 ): string | undefined {
   return optionalSecret.parse(process.env[name])
 }
 
-/** Vercel AI Gateway key. Gates `/api/models` and `/api/agent`. */
-export function getAiGatewayApiKey(): string | undefined {
-  return readOptionalSecret("AI_GATEWAY_API_KEY")
+/** OpenAI API key. Gates `/api/models` and `/api/agent`. */
+export function getOpenAiApiKey(): string | undefined {
+  return readOptionalSecret("OPENAI_API_KEY")
 }
 
-/** Tavily key. Enables the `tavily_search` / `tavily_extract` tools when set. */
-export function getTavilyApiKey(): string | undefined {
-  return readOptionalSecret("TAVILY_API_KEY")
+/** Exa key. Enables the `exa_search` / `exa_get_contents` tools when set. */
+export function getExaApiKey(): string | undefined {
+  return readOptionalSecret("EXA_API_KEY")
 }

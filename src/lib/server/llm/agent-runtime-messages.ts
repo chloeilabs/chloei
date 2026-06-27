@@ -1,11 +1,15 @@
+import type { MessageAttachment } from "@/lib/shared"
+
 export interface AgentInputMessage {
   role: "system" | "user" | "assistant"
   content: string
+  attachments?: MessageAttachment[]
 }
 
 interface AgentUserModelMessage {
   role: "user"
   content: string
+  attachments?: MessageAttachment[]
 }
 
 interface AgentAssistantModelMessage {
@@ -13,7 +17,9 @@ interface AgentAssistantModelMessage {
   content: string
 }
 
-type AgentModelMessage = AgentUserModelMessage | AgentAssistantModelMessage
+export type AgentModelMessage =
+  | AgentUserModelMessage
+  | AgentAssistantModelMessage
 
 export function toModelMessages(
   messages: AgentInputMessage[]
@@ -22,7 +28,11 @@ export function toModelMessages(
 
   for (const message of messages) {
     const content = message.content.trim()
-    if (!content) {
+    const attachments = (message.attachments ?? []).filter((attachment) =>
+      Boolean(attachment.url)
+    )
+
+    if (!content && attachments.length === 0) {
       continue
     }
 
@@ -43,6 +53,7 @@ export function toModelMessages(
     inputMessages.push({
       role: "user",
       content,
+      ...(attachments.length > 0 ? { attachments } : {}),
     })
   }
 

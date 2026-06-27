@@ -41,8 +41,8 @@ setTestModuleStubs({
 
 const { POST } = await import(routeUrl)
 
-const originalAiGatewayApiKey = process.env.AI_GATEWAY_API_KEY
-const originalTavilyApiKey = process.env.TAVILY_API_KEY
+const originalAiGatewayApiKey = process.env.OPENAI_API_KEY
+const originalExaApiKey = process.env.EXA_API_KEY
 
 let recorded
 
@@ -97,8 +97,8 @@ beforeEach(() => {
     streamCalls: [],
   }
 
-  process.env.AI_GATEWAY_API_KEY = "ai-gateway-key"
-  process.env.TAVILY_API_KEY = "tavily-key"
+  process.env.OPENAI_API_KEY = "openai-key"
+  process.env.EXA_API_KEY = "exa-key"
 
   resetTestMocks()
   setTestMocks({
@@ -126,7 +126,7 @@ beforeEach(() => {
           parsedRequest: {
             messages: body.messages,
           },
-          selectedModel: "zai/glm-5.2",
+          selectedModel: "gpt-5.4-mini",
         }
       },
       createAgentStreamResponse(params) {
@@ -195,8 +195,8 @@ beforeEach(() => {
 })
 
 after(() => {
-  process.env.AI_GATEWAY_API_KEY = originalAiGatewayApiKey
-  process.env.TAVILY_API_KEY = originalTavilyApiKey
+  process.env.OPENAI_API_KEY = originalAiGatewayApiKey
+  process.env.EXA_API_KEY = originalExaApiKey
 })
 
 test("agent route returns auth unavailable when auth is disabled", async () => {
@@ -269,23 +269,23 @@ test("agent route passes the resolved prompt context into stream creation", asyn
     context: {
       now: recorded.buildInstructionCalls[0].context.now,
       userTimeZone: "America/Chicago",
-      provider: "provider:zai/glm-5.2",
+      provider: "provider:gpt-5.4-mini",
     },
   })
   assert.deepEqual(recorded.streamCalls[0]?.messages, [
     { role: "user", content: "What changed?" },
     { role: "assistant", content: "Here is the summary." },
   ])
-  assert.equal(recorded.streamCalls[0]?.aiGatewayApiKey, "ai-gateway-key")
-  assert.equal(recorded.streamCalls[0]?.tavilyApiKey, "tavily-key")
+  assert.equal(recorded.streamCalls[0]?.openAiApiKey, "openai-key")
+  assert.equal(recorded.streamCalls[0]?.exaApiKey, "exa-key")
   assert.equal(recorded.streamCalls[0]?.systemInstruction, "system-instruction")
 })
 
 test("agent route returns 500 when the AI gateway key is missing", async () => {
   // getAiGatewayApiKey() (src/lib/server/env.ts) reads process.env at call time
   // and maps a missing/blank value to undefined, which must hit the route's
-  // AGENT_AI_GATEWAY_API_KEY_MISSING 500 branch rather than starting a stream.
-  delete process.env.AI_GATEWAY_API_KEY
+  // AGENT_OPENAI_API_KEY_MISSING 500 branch rather than starting a stream.
+  delete process.env.OPENAI_API_KEY
 
   const response = await POST(
     createRequest({
@@ -297,8 +297,8 @@ test("agent route returns 500 when the AI gateway key is missing", async () => {
 
   await assertErrorResponse(response, {
     status: 500,
-    error: "Missing AI_GATEWAY_API_KEY on the server.",
-    errorCode: "AGENT_AI_GATEWAY_API_KEY_MISSING",
+    error: "Missing OPENAI_API_KEY on the server.",
+    errorCode: "AGENT_OPENAI_API_KEY_MISSING",
     requestId: "request-1",
   })
   assert.equal(recorded.streamCalls.length, 0)

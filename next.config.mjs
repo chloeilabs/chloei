@@ -3,7 +3,9 @@ const isProduction =
   process.env.NODE_ENV === "production"
 
 const serverActionsBodySizeLimit = "1mb"
-const proxyClientMaxBodySize = "12mb"
+// Large enough to carry base64-encoded image / PDF attachments on /api/agent
+// requests (data URLs inflate raw bytes by ~4/3).
+const proxyClientMaxBodySize = "40mb"
 
 function buildContentSecurityPolicy() {
   const directives = [

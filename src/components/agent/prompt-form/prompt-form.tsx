@@ -2,7 +2,7 @@
 
 import "../shared/shell-styles.css"
 
-import { CornerRightUp, Loader2, Square } from "lucide-react"
+import { ArrowUp, FileText, Loader2, Plus, Square, X } from "lucide-react"
 import {
   type CSSProperties,
   type TransitionStartFunction,
@@ -12,13 +12,18 @@ import {
   useRef,
   useState,
 } from "react"
+import { toast } from "sonner"
 
 import { RefreshGlow } from "@/components/graphics/effects/refresh-glow"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { useModels } from "@/hooks/agent/use-models"
 import { usePersistentSelectedModel } from "@/hooks/agent/use-persistent-selected-model"
-import { getModelSelectorModels, type ModelType } from "@/lib/shared"
+import {
+  getModelSelectorModels,
+  type MessageAttachment,
+  type ModelType,
+} from "@/lib/shared"
 import { cn } from "@/lib/utils"
 
 import { QueuedAction } from "../messages/queued-message"
@@ -29,6 +34,11 @@ import {
   agentSurfaceBackgroundClass,
   agentSurfaceClass,
 } from "../shared/shell-styles"
+import {
+  ACCEPTED_ATTACHMENT_TYPES,
+  MAX_ATTACHMENTS,
+  readAttachmentFile,
+} from "./attachments"
 
 interface QueuedPromptSubmission {
   message: string
@@ -51,7 +61,12 @@ export function PromptForm({
   transition,
   viewTransitionName,
 }: {
-  onSubmit?: (message: string, model: ModelType, queue: boolean) => void
+  onSubmit?: (
+    message: string,
+    model: ModelType,
+    queue: boolean,
+    attachments: MessageAttachment[]
+  ) => void
   onStopStream?: () => void
   isStreaming?: boolean
   isHome?: boolean
@@ -77,6 +92,55 @@ export function PromptForm({
   const [message, setMessage] = useState("")
   const trimmedMessage = useMemo(() => message.trim(), [message])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [attachments, setAttachments] = useState<MessageAttachment[]>([])
+  const attachmentsRef = useRef<MessageAttachment[]>([])
+  useEffect(() => {
+    attachmentsRef.current = attachments
+  }, [attachments])
+
+  const addFiles = useCallback(async (files: File[]) => {
+    if (files.length === 0) {
+      return
+    }
+
+    const accepted: MessageAttachment[] = []
+    const errors: string[] = []
+    let remaining = MAX_ATTACHMENTS - attachmentsRef.current.length
+
+    for (const file of files) {
+      if (remaining <= 0) {
+        errors.push(
+          `${file.name}: up to ${String(MAX_ATTACHMENTS)} files allowed`
+        )
+        continue
+      }
+
+      const result = await readAttachmentFile(file)
+      if (result.attachment) {
+        accepted.push(result.attachment)
+        remaining -= 1
+      } else if (result.error) {
+        errors.push(result.error)
+      }
+    }
+
+    if (accepted.length > 0) {
+      setAttachments((previous) =>
+        [...previous, ...accepted].slice(0, MAX_ATTACHMENTS)
+      )
+    }
+
+    for (const error of errors) {
+      toast.error("Attachment skipped", { description: error })
+    }
+  }, [])
+
+  const removeAttachment = useCallback((id: string) => {
+    setAttachments((previous) =>
+      previous.filter((attachment) => attachment.id !== id)
+    )
+  }, [])
 
   const { data: availableModels } = useModels()
   const modelSelectorModels = useMemo(
@@ -122,13 +186,15 @@ export function PromptForm({
 
   const submitPrompt = useCallback(() => {
     const nextMessage = message.trim()
+    const nextAttachments = attachments
+    const composerEmpty = !nextMessage && nextAttachments.length === 0
 
-    if (isStreaming && !nextMessage) {
+    if (isStreaming && composerEmpty) {
       onStopStream?.()
       return true
     }
 
-    if (!nextMessage || !resolvedSelectedModel || isFormPending) {
+    if (composerEmpty || !resolvedSelectedModel || isFormPending) {
       return false
     }
 
@@ -140,11 +206,13 @@ export function PromptForm({
       }
     }
 
-    onSubmit?.(nextMessage, resolvedSelectedModel, isStreaming)
+    onSubmit?.(nextMessage, resolvedSelectedModel, isStreaming, nextAttachments)
     setMessage("")
+    setAttachments([])
 
     return true
   }, [
+    attachments,
     dismissKeyboardOnSubmit,
     isFormPending,
     isStreaming,
@@ -243,8 +311,9 @@ export function PromptForm({
     }
   }, [scrollFade.top, scrollFade.bottom])
 
+  const isComposerEmpty = !trimmedMessage && attachments.length === 0
   const isSubmitButtonDisabled =
-    isFormPending || !resolvedSelectedModel || (!isStreaming && !trimmedMessage)
+    isFormPending || !resolvedSelectedModel || (!isStreaming && isComposerEmpty)
 
   return (
     <form
@@ -275,70 +344,134 @@ export function PromptForm({
           agentShellFrameClass,
           agentShellInteractiveClass,
           agentShellHighlightClass,
-          "rounded-3xl",
+          "rounded-[28px]",
           isFormPending && "opacity-50"
         )}
       >
         <div
           className={cn(
             agentSurfaceClass,
-            "flex items-end gap-1 rounded-3xl bg-[#212121] bg-none pr-2"
+            "flex flex-col rounded-[28px] bg-[#212121] bg-none"
           )}
         >
           <div
             className={cn(
               agentSurfaceBackgroundClass,
-              "rounded-3xl bg-[#212121]"
+              "rounded-[28px] bg-[#212121]"
             )}
           />
 
-          <Textarea
-            ref={textareaRef}
-            value={message}
-            rows={1}
-            onChange={(e) => {
-              if (!isFormPending) {
-                setMessage(e.target.value)
+          {attachments.length > 0 && (
+            <div className="flex flex-wrap gap-2 px-3 pt-3">
+              {attachments.map((attachment) => (
+                <div
+                  key={attachment.id}
+                  className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 py-1 pr-2 pl-1"
+                >
+                  {attachment.kind === "image" && attachment.url ? (
+                    <span
+                      className="size-9 shrink-0 rounded-lg bg-cover bg-center"
+                      style={{ backgroundImage: `url(${attachment.url})` }}
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/10 text-muted-foreground">
+                      <FileText className="size-4" aria-hidden="true" />
+                    </span>
+                  )}
+                  <span className="max-w-32 truncate text-xs text-foreground/80">
+                    {attachment.name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      removeAttachment(attachment.id)
+                    }}
+                    aria-label={`Remove ${attachment.name}`}
+                    className="rounded-full p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <X className="size-3.5" aria-hidden="true" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-end gap-1 p-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPTED_ATTACHMENT_TYPES}
+              multiple
+              className="hidden"
+              onChange={(event) => {
+                const files = Array.from(event.target.files ?? [])
+                event.target.value = ""
+                void addFiles(files)
+              }}
+            />
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              disabled={isFormPending || attachments.length >= MAX_ATTACHMENTS}
+              onClick={() => {
+                fileInputRef.current?.click()
+              }}
+              aria-label="Attach images or PDFs"
+              className="size-9 shrink-0 rounded-full text-foreground/80 transition-colors hover:bg-[#383838] hover:text-foreground dark:hover:bg-[#383838]"
+            >
+              <Plus className="size-6" strokeWidth={1.65} />
+            </Button>
+
+            <Textarea
+              ref={textareaRef}
+              value={message}
+              rows={1}
+              onChange={(e) => {
+                if (!isFormPending) {
+                  setMessage(e.target.value)
+                }
+              }}
+              onKeyDown={onKeyDown}
+              onScroll={syncScrollFades}
+              onFocus={onFocus}
+              onBlur={onBlur}
+              placeholder="Ask anything"
+              style={textareaMaskStyle}
+              className="no-scrollbar max-h-48 min-h-9 flex-1 resize-none border-0 bg-transparent! px-1 py-1.5 shadow-none placeholder:text-muted-foreground focus-visible:ring-0 md:text-base"
+            />
+
+            <Button
+              type="submit"
+              size="icon"
+              disabled={isSubmitButtonDisabled}
+              aria-label={
+                isFormPending
+                  ? "Sending message"
+                  : isStreaming && isComposerEmpty
+                    ? "Stop response"
+                    : "Send message"
               }
-            }}
-            onKeyDown={onKeyDown}
-            onScroll={syncScrollFades}
-            onFocus={onFocus}
-            onBlur={onBlur}
-            placeholder="Ask anything"
-            style={textareaMaskStyle}
-            className="no-scrollbar max-h-48 min-h-0 flex-1 resize-none border-0 bg-transparent! py-3.5 pl-4 shadow-none placeholder:text-muted-foreground focus-visible:ring-0 md:text-base"
-          />
-
-          <Button
-            type="submit"
-            size="icon"
-            disabled={isSubmitButtonDisabled}
-            aria-label={
-              isFormPending
-                ? "Sending message"
-                : isStreaming && !trimmedMessage
-                  ? "Stop response"
-                  : "Send message"
-            }
-            className="mb-2 shrink-0 ring-offset-background"
-          >
-            {isFormPending ? (
-              <Loader2 className="size-5 animate-spin" />
-            ) : isStreaming && !trimmedMessage ? (
-              <div className="p-0.5">
-                <Square className="size-3.5 fill-primary-foreground" />
-              </div>
-            ) : (
-              <CornerRightUp className="size-5" />
-            )}
-          </Button>
+              className="size-9 shrink-0 rounded-full bg-white text-black ring-offset-background transition-colors hover:bg-white/90"
+            >
+              {isFormPending ? (
+                <Loader2 className="size-5 animate-spin" />
+              ) : isStreaming && isComposerEmpty ? (
+                <div className="p-0.5">
+                  <Square className="size-3.5 fill-black" />
+                </div>
+              ) : (
+                <ArrowUp className="size-5" />
+              )}
+            </Button>
+          </div>
         </div>
       </div>
 
       {!resolvedSelectedModel && (
         <p className="mt-2 text-xs text-muted-foreground">
-          Configure `AI_GATEWAY_API_KEY` on the server to enable model access.
+          Configure `OPENAI_API_KEY` on the server to enable model access.
         </p>
       )}
     </form>

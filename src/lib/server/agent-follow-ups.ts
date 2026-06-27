@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
 
-import type { GatewayProviderOptions } from "@ai-sdk/gateway"
+import OpenAI from "openai"
 import { z } from "zod"
 
 import { type FollowUpQuestion, type ModelType } from "@/lib/shared"
@@ -13,7 +13,7 @@ import {
 const FOLLOW_UP_QUESTION_LIMIT = 3
 const FOLLOW_UP_QUESTION_MAX_CHARS = 160
 const FOLLOW_UP_CONTEXT_MAX_CHARS = 16_000
-const FOLLOW_UP_GENERATION_MODEL = "openai/gpt-5.1-instant"
+const FOLLOW_UP_GENERATION_MODEL = "gpt-5.4-mini"
 
 const generatedFollowUpQuestionTextsSchema = z
   .array(z.string().trim().min(1).max(FOLLOW_UP_QUESTION_MAX_CHARS))
@@ -161,52 +161,54 @@ function truncateContext(messages: readonly FollowUpContextMessage[]) {
 }
 
 export async function generateFollowUpQuestions(params: {
-  aiGatewayApiKey: string
+  openAiApiKey: string
   messages: readonly FollowUpContextMessage[]
   model: ModelType
   signal?: AbortSignal
   userId: string
 }): Promise<FollowUpQuestion[]> {
-  const [{ createGateway }, { generateText, Output }, { aiGatewayFetch }] =
-    await Promise.all([
-      import("@ai-sdk/gateway"),
-      import("ai"),
-      import("./llm/gateway-client"),
-    ])
-  const gateway = createGateway({
-    apiKey: params.aiGatewayApiKey,
-    fetch: aiGatewayFetch,
-  })
+  const client = new OpenAI({ apiKey: params.openAiApiKey })
   const context = truncateContext(params.messages)
 
-  const result = await generateText({
-    model: gateway(FOLLOW_UP_GENERATION_MODEL),
-    system:
-      "You generate concise follow-up questions for a chat UI. Return only structured data. Each question must be useful, specific to the assistant's latest answer, written from the user's point of view, and short enough for a compact button. Each question must include a concrete term, entity, claim, or tradeoff from the latest answer. Do not use markdown, numbering, emojis, citations, repeated questions, or generic prompts like asking for an example without naming the topic.",
-    prompt: [
-      "Generate exactly three follow-up questions for the latest assistant response.",
-      'Use this exact JSON shape: {"questions":["...","...","..."]}.',
-      "Avoid questions the assistant already answered directly.",
-      "Conversation:",
-      context,
-    ].join("\n\n"),
-    output: Output.object({
-      schema: generatedFollowUpQuestionsSchema,
-    }),
-    providerOptions: {
-      gateway: {
-        user: params.userId,
-        tags: [
-          "feature:follow_up_questions",
-          `generation_model:${FOLLOW_UP_GENERATION_MODEL}`,
-          `source_model:${params.model}`,
-        ],
-      } satisfies GatewayProviderOptions,
+  const response = await client.responses.create(
+    {
+      model: FOLLOW_UP_GENERATION_MODEL,
+      instructions:
+        "You generate concise follow-up questions for a chat UI. Return only structured data. Each question must be useful, specific to the assistant's latest answer, written from the user's point of view, and short enough for a compact button. Each question must include a concrete term, entity, claim, or tradeoff from the latest answer. Do not use markdown, numbering, emojis, citations, repeated questions, or generic prompts like asking for an example without naming the topic.",
+      input: [
+        "Generate exactly three follow-up questions for the latest assistant response.",
+        'Use this exact JSON shape: {"questions":["...","...","..."]}.',
+        "Avoid questions the assistant already answered directly.",
+        "Conversation:",
+        context,
+      ].join("\n\n"),
+      text: {
+        format: {
+          type: "json_schema",
+          name: "follow_up_questions",
+          strict: true,
+          schema: {
+            type: "object",
+            properties: {
+              questions: { type: "array", items: { type: "string" } },
+            },
+            required: ["questions"],
+            additionalProperties: false,
+          },
+        },
+      },
     },
-    abortSignal: params.signal,
-  })
+    { signal: params.signal }
+  )
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(response.output_text)
+  } catch {
+    parsed = undefined
+  }
 
   return createFollowUpQuestions(
-    normalizeGeneratedFollowUpQuestionTexts(result.output)
+    normalizeGeneratedFollowUpQuestionTexts(parsed)
   )
 }

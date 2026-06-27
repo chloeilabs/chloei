@@ -1,37 +1,31 @@
-import {
-  tavily,
-  type TavilyClient,
-  type TavilyExtractOptions,
-  type TavilyExtractResponse,
-  type TavilySearchOptions,
-  type TavilySearchResponse,
-} from "@tavily/core"
-import { tool } from "ai"
+import { tool } from "@openai/agents"
+import Exa from "exa-js"
 import { z } from "zod"
 
 import { asRecord, asString, toOptionalString } from "@/lib/cast"
 import type { MessageSource, ToolName } from "@/lib/shared"
 
-const TAVILY_SEARCH_TOOL_NAME = "tavily_search" as const
-const TAVILY_EXTRACT_TOOL_NAME = "tavily_extract" as const
-const TAVILY_SEARCH_MAX_RESULTS = 8
-const TAVILY_SEARCH_DEFAULT_MAX_RESULTS = 5
-const TAVILY_EXTRACT_MAX_URLS = 5
+const EXA_SEARCH_TOOL_NAME = "exa_search" as const
+const EXA_GET_CONTENTS_TOOL_NAME = "exa_get_contents" as const
+const EXA_SEARCH_MAX_RESULTS = 8
+const EXA_SEARCH_DEFAULT_MAX_RESULTS = 5
+const EXA_GET_CONTENTS_MAX_URLS = 5
+const EXA_SEARCH_TEXT_MAX_CHARACTERS = 8000
 
-const AI_SDK_TAVILY_SEARCH_LABEL = "Searching with Tavily"
-const AI_SDK_TAVILY_EXTRACT_LABEL = "Reading pages"
+const EXA_SEARCH_LABEL = "Searching the web"
+const EXA_GET_CONTENTS_LABEL = "Reading pages"
 
-type AiSdkTavilyToolName = Extract<
+type ExaToolName = Extract<
   ToolName,
-  typeof TAVILY_SEARCH_TOOL_NAME | typeof TAVILY_EXTRACT_TOOL_NAME
+  typeof EXA_SEARCH_TOOL_NAME | typeof EXA_GET_CONTENTS_TOOL_NAME
 >
 
-interface TavilyToolErrorPayload {
+interface ExaToolErrorPayload {
   message: string
   code?: string
 }
 
-interface TavilySearchToolOutput {
+interface ExaSearchToolOutput {
   query: string
   requestId: string
   results: {
@@ -44,7 +38,7 @@ interface TavilySearchToolOutput {
   }[]
 }
 
-interface TavilyExtractToolOutput {
+interface ExaGetContentsToolOutput {
   requestId: string
   results: {
     url: string
@@ -58,25 +52,25 @@ interface TavilyExtractToolOutput {
   }[]
 }
 
-type TavilyToolOutput = TavilySearchToolOutput | TavilyExtractToolOutput
+type ExaToolOutput = ExaSearchToolOutput | ExaGetContentsToolOutput
 
-interface TavilyToolResultPayload {
-  output?: TavilyToolOutput
-  error?: TavilyToolErrorPayload
+interface ExaToolResultPayload {
+  output?: ExaToolOutput
+  error?: ExaToolErrorPayload
 }
 
-interface AiSdkTavilyToolCallMetadata {
+interface ExaToolCallMetadata {
   callId: string
-  toolName: AiSdkTavilyToolName
+  toolName: ExaToolName
   label: string
   query?: string
   operation?: string
   provider?: string
 }
 
-interface AiSdkTavilyToolResultMetadata {
+interface ExaToolResultMetadata {
   callId: string
-  toolName: AiSdkTavilyToolName
+  toolName: ExaToolName
   status: "success" | "error"
   sources: MessageSource[]
   operation?: string
@@ -85,7 +79,7 @@ interface AiSdkTavilyToolResultMetadata {
   retryable?: boolean
 }
 
-const tavilySearchInputSchema = z.object({
+const exaSearchInputSchema = z.object({
   query: z
     .string()
     .trim()
@@ -93,11 +87,11 @@ const tavilySearchInputSchema = z.object({
     .describe(
       "Focused, natural-language search query for the information you need."
     ),
-  topic: z
-    .enum(["general", "news", "finance"])
+  category: z
+    .enum(["news", "company", "research paper", "pdf", "financial report"])
     .optional()
     .describe(
-      "Search topic. Use 'news' for current events and 'finance' for markets or company financials; defaults to 'general'."
+      "Bias results to a content category. Use 'news' for current events and 'financial report' for company financials; omit for a general web search."
     ),
   timeRange: z
     .enum(["day", "week", "month", "year"])
@@ -115,24 +109,16 @@ const tavilySearchInputSchema = z.object({
     .array(z.string().trim().min(1))
     .optional()
     .describe("Exclude results from these domains."),
-  country: z
-    .string()
-    .trim()
-    .min(1)
-    .optional()
-    .describe(
-      "Bias results toward a country (ISO name, e.g. 'united states'). Use only when locale matters."
-    ),
   maxResults: z
     .number()
     .int()
     .min(1)
-    .max(TAVILY_SEARCH_MAX_RESULTS)
+    .max(EXA_SEARCH_MAX_RESULTS)
     .optional()
     .describe("Maximum number of search results to return."),
 })
 
-const tavilyExtractInputSchema = z.object({
+const exaGetContentsInputSchema = z.object({
   urls: z
     .array(z.string().trim().min(1))
     .min(1)
@@ -147,40 +133,49 @@ const tavilyExtractInputSchema = z.object({
     .describe(
       "Optional focus for extraction — what to prioritize when reading the pages."
     ),
-  extractDepth: z
-    .enum(["basic", "advanced"])
-    .optional()
-    .describe(
-      "Extraction depth; 'advanced' pulls more complete content. Defaults to 'advanced'."
-    ),
-  format: z
-    .enum(["markdown", "text"])
-    .optional()
-    .describe("Output format for extracted content. Defaults to 'markdown'."),
 })
 
-function createTavilyClient(apiKey: string): TavilyClient {
-  return tavily({ apiKey })
+type ExaSearchCategory = z.infer<typeof exaSearchInputSchema>["category"]
+
+function createExaClient(apiKey: string): Exa {
+  return new Exa(apiKey)
 }
 
-function getToolName(value: string | undefined): AiSdkTavilyToolName | null {
-  if (value === TAVILY_SEARCH_TOOL_NAME || value === TAVILY_EXTRACT_TOOL_NAME) {
+function getToolName(value: string | undefined): ExaToolName | null {
+  if (value === EXA_SEARCH_TOOL_NAME || value === EXA_GET_CONTENTS_TOOL_NAME) {
     return value
   }
 
   return null
 }
 
-export function isAiSdkTavilyToolName(
-  value: unknown
-): value is AiSdkTavilyToolName {
+export function isExaToolName(value: unknown): value is ExaToolName {
   return getToolName(typeof value === "string" ? value : undefined) !== null
 }
 
-function getToolLabel(toolName: AiSdkTavilyToolName): string {
-  return toolName === TAVILY_SEARCH_TOOL_NAME
-    ? AI_SDK_TAVILY_SEARCH_LABEL
-    : AI_SDK_TAVILY_EXTRACT_LABEL
+function getToolLabel(toolName: ExaToolName): string {
+  return toolName === EXA_SEARCH_TOOL_NAME
+    ? EXA_SEARCH_LABEL
+    : EXA_GET_CONTENTS_LABEL
+}
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000
+const TIME_RANGE_DAYS: Record<"day" | "week" | "month" | "year", number> = {
+  day: 1,
+  week: 7,
+  month: 30,
+  year: 365,
+}
+
+function timeRangeToStartDate(
+  timeRange: "day" | "week" | "month" | "year" | undefined
+): string | undefined {
+  if (!timeRange) {
+    return undefined
+  }
+
+  const start = new Date(Date.now() - TIME_RANGE_DAYS[timeRange] * MS_PER_DAY)
+  return start.toISOString().slice(0, 10)
 }
 
 const MULTIPART_PUBLIC_SUFFIX_PREFIXES = new Set([
@@ -312,7 +307,7 @@ function toCitationMarkdown(url: string, title?: string): string {
   return `[${label}](<${url}>)`
 }
 
-function getTavilyErrorPayload(error: unknown): TavilyToolErrorPayload {
+function getExaErrorPayload(error: unknown): ExaToolErrorPayload {
   const record = asRecord(error)
   const message =
     asString(record?.message)?.trim() ??
@@ -330,49 +325,96 @@ function getTavilyErrorPayload(error: unknown): TavilyToolErrorPayload {
     (status ? `HTTP_${String(status)}` : undefined)
 
   return {
-    message: message && message.length > 0 ? message : "Tavily request failed.",
+    message: message && message.length > 0 ? message : "Exa request failed.",
     ...(code ? { code } : {}),
   }
 }
 
-function toSearchOutput(
-  response: TavilySearchResponse
-): TavilySearchToolOutput {
+function toSearchOutput(query: string, response: unknown): ExaSearchToolOutput {
+  const record = asRecord(response)
+  const requestId = toOptionalString(record?.requestId) ?? ""
+  const rawResults = Array.isArray(record?.results) ? record.results : []
+
   return {
-    query: response.query,
-    requestId: response.requestId,
-    results: response.results.map((result) => ({
-      title: result.title,
-      url: result.url,
-      content: result.content,
-      citationMarkdown: toCitationMarkdown(result.url, result.title),
-      ...(result.publishedDate ? { publishedDate: result.publishedDate } : {}),
-      ...(result.favicon ? { favicon: result.favicon } : {}),
-    })),
+    query,
+    requestId,
+    results: rawResults.flatMap((result) => {
+      const resultRecord = asRecord(result)
+      const url = asString(resultRecord?.url)?.trim()
+      if (!url) {
+        return []
+      }
+
+      const title = asString(resultRecord?.title)?.trim()
+      const text = asString(resultRecord?.text)?.trim()
+      const highlights = Array.isArray(resultRecord?.highlights)
+        ? resultRecord.highlights
+            .map((highlight) => asString(highlight)?.trim())
+            .filter((highlight): highlight is string => Boolean(highlight))
+            .join(" ")
+        : undefined
+      const content = text && text.length > 0 ? text : (highlights ?? "")
+      const publishedDate = asString(resultRecord?.publishedDate)?.trim()
+      const favicon = asString(resultRecord?.favicon)?.trim()
+
+      return [
+        {
+          title: title && title.length > 0 ? title : url,
+          url,
+          content,
+          citationMarkdown: toCitationMarkdown(url, title ?? undefined),
+          ...(publishedDate ? { publishedDate } : {}),
+          ...(favicon ? { favicon } : {}),
+        },
+      ]
+    }),
   }
 }
 
-function toExtractOutput(
-  response: TavilyExtractResponse
-): TavilyExtractToolOutput {
+function toGetContentsOutput(
+  requestedUrls: string[],
+  response: unknown
+): ExaGetContentsToolOutput {
+  const record = asRecord(response)
+  const requestId = toOptionalString(record?.requestId) ?? ""
+  const rawResults = Array.isArray(record?.results) ? record.results : []
+
+  const results = rawResults.flatMap((result) => {
+    const resultRecord = asRecord(result)
+    const url = asString(resultRecord?.url)?.trim()
+    const rawContent = asString(resultRecord?.text)?.trim()
+    if (!url || !rawContent) {
+      return []
+    }
+
+    const title = asString(resultRecord?.title)?.trim()
+    const favicon = asString(resultRecord?.favicon)?.trim()
+
+    return [
+      {
+        url,
+        rawContent,
+        citationMarkdown: toCitationMarkdown(url, title ?? undefined),
+        ...(favicon ? { favicon } : {}),
+      },
+    ]
+  })
+
+  const succeededUrls = new Set(results.map((result) => result.url))
+  const failedResults = requestedUrls
+    .filter((url) => !succeededUrls.has(url))
+    .map((url) => ({ url, error: "No content returned." }))
+
   return {
-    requestId: response.requestId,
-    results: response.results.map((result) => ({
-      url: result.url,
-      rawContent: result.rawContent,
-      citationMarkdown: toCitationMarkdown(result.url),
-      ...(result.favicon ? { favicon: result.favicon } : {}),
-    })),
-    failedResults: response.failedResults.map((result) => ({
-      url: result.url,
-      error: result.error,
-    })),
+    requestId,
+    results,
+    failedResults,
   }
 }
 
 function toSourcesFromOutput(
-  toolName: AiSdkTavilyToolName,
-  output: TavilyToolOutput
+  toolName: ExaToolName,
+  output: ExaToolOutput
 ): MessageSource[] {
   const normalizedRequestId = output.requestId.trim()
   const requestId =
@@ -401,9 +443,7 @@ function toSourcesFromOutput(
     .filter((source): source is MessageSource => source !== null)
 }
 
-function parseToolResultPayload(
-  value: unknown
-): TavilyToolResultPayload | null {
+function parseToolResultPayload(value: unknown): ExaToolResultPayload | null {
   const normalized = asRecord(value)
   if (!normalized) {
     return null
@@ -413,90 +453,94 @@ function parseToolResultPayload(
   const error = normalized.error
 
   return {
-    ...(asRecord(output) ? { output: output as TavilyToolOutput } : {}),
-    ...(asRecord(error) ? { error: error as TavilyToolErrorPayload } : {}),
+    ...(asRecord(output) ? { output: output as ExaToolOutput } : {}),
+    ...(asRecord(error) ? { error: error as ExaToolErrorPayload } : {}),
   }
 }
 
-export function createAiSdkTavilyTools(apiKey?: string) {
+/**
+ * Builds the Exa web-search tools for the OpenAI Agents SDK. Returns an empty
+ * array when no Exa key is configured (the agent then runs without web tools).
+ */
+export function createOpenAiAgentsExaTools(apiKey?: string) {
   const normalized = apiKey?.trim()
   if (!normalized) {
-    return {}
+    return []
   }
 
-  const client = createTavilyClient(normalized)
+  const client = createExaClient(normalized)
 
-  return {
-    tavily_search: tool({
+  return [
+    tool({
+      name: EXA_SEARCH_TOOL_NAME,
       description:
-        "Search the live web with Tavily for fresh, multi-source retrieval. Use this when you need up-to-date external information or need to discover relevant pages before reading them in detail.",
-      inputSchema: tavilySearchInputSchema,
+        "Search the live web for fresh, multi-source retrieval. Use this when you need up-to-date external information or need to discover relevant pages before reading them in detail.",
+      parameters: exaSearchInputSchema,
       execute: async (input) => {
         try {
           const maxResults = Math.min(
-            TAVILY_SEARCH_MAX_RESULTS,
-            Math.max(1, input.maxResults ?? TAVILY_SEARCH_DEFAULT_MAX_RESULTS)
+            EXA_SEARCH_MAX_RESULTS,
+            Math.max(1, input.maxResults ?? EXA_SEARCH_DEFAULT_MAX_RESULTS)
           )
-          const options: TavilySearchOptions = {
-            searchDepth: "advanced",
-            includeFavicon: true,
-            includeRawContent: false,
-            topic: input.topic ?? "general",
-            maxResults,
-            ...(input.timeRange ? { timeRange: input.timeRange } : {}),
+          const startPublishedDate = timeRangeToStartDate(input.timeRange)
+          const category: ExaSearchCategory = input.category
+
+          const response = await client.search(input.query, {
+            type: "auto",
+            numResults: maxResults,
+            contents: {
+              text: { maxCharacters: EXA_SEARCH_TEXT_MAX_CHARACTERS },
+            },
+            ...(category ? { category } : {}),
+            ...(startPublishedDate ? { startPublishedDate } : {}),
             ...(input.includeDomains && input.includeDomains.length > 0
               ? { includeDomains: input.includeDomains }
               : {}),
             ...(input.excludeDomains && input.excludeDomains.length > 0
               ? { excludeDomains: input.excludeDomains }
               : {}),
-            ...(input.country ? { country: input.country } : {}),
-          }
+          })
 
-          const response = await client.search(input.query, options)
           return {
-            output: toSearchOutput(response),
-          } satisfies TavilyToolResultPayload
+            output: toSearchOutput(input.query, response),
+          } satisfies ExaToolResultPayload
         } catch (error) {
           return {
-            error: getTavilyErrorPayload(error),
-          } satisfies TavilyToolResultPayload
+            error: getExaErrorPayload(error),
+          } satisfies ExaToolResultPayload
         }
       },
     }),
-    tavily_extract: tool({
+    tool({
+      name: EXA_GET_CONTENTS_TOOL_NAME,
       description:
-        "Read and extract content from specific URLs with Tavily. Use this after you already have one or more pages and need to inspect or summarize their contents.",
-      inputSchema: tavilyExtractInputSchema,
+        "Read and extract content from specific URLs. Use this after you already have one or more pages and need to inspect or summarize their contents.",
+      parameters: exaGetContentsInputSchema,
       execute: async (input) => {
         try {
-          const options: TavilyExtractOptions = {
-            extractDepth: input.extractDepth ?? "advanced",
-            format: input.format ?? "markdown",
-            ...(input.query ? { query: input.query } : {}),
-          }
+          const urls = Array.from(
+            new Set(input.urls.map((url) => url.trim()).filter((url) => url))
+          ).slice(0, EXA_GET_CONTENTS_MAX_URLS)
 
-          const response = await client.extract(
-            Array.from(
-              new Set(input.urls.map((url) => url.trim()).filter((url) => url))
-            ).slice(0, TAVILY_EXTRACT_MAX_URLS),
-            options
-          )
+          const response = await client.getContents(urls, {
+            text: true,
+            livecrawl: "fallback",
+          })
 
           return {
-            output: toExtractOutput(response),
-          } satisfies TavilyToolResultPayload
+            output: toGetContentsOutput(urls, response),
+          } satisfies ExaToolResultPayload
         } catch (error) {
           return {
-            error: getTavilyErrorPayload(error),
-          } satisfies TavilyToolResultPayload
+            error: getExaErrorPayload(error),
+          } satisfies ExaToolResultPayload
         }
       },
     }),
-  }
+  ]
 }
 
-export function getAiSdkTavilyToolCallMetadata(
+export function getExaToolCallMetadata(
   part:
     | {
         toolCallId: string
@@ -504,7 +548,7 @@ export function getAiSdkTavilyToolCallMetadata(
         input: unknown
       }
     | undefined
-): AiSdkTavilyToolCallMetadata | null {
+): ExaToolCallMetadata | null {
   const toolName = getToolName(part?.toolName)
   if (!toolName || !part) {
     return null
@@ -512,7 +556,7 @@ export function getAiSdkTavilyToolCallMetadata(
 
   const inputRecord = asRecord(part.input)
   const query =
-    toolName === TAVILY_SEARCH_TOOL_NAME
+    toolName === EXA_SEARCH_TOOL_NAME
       ? toOptionalString(inputRecord?.query)
       : undefined
 
@@ -521,12 +565,12 @@ export function getAiSdkTavilyToolCallMetadata(
     toolName,
     label: getToolLabel(toolName),
     ...(query ? { query } : {}),
-    operation: toolName === TAVILY_SEARCH_TOOL_NAME ? "search" : "extract",
-    provider: "tavily",
+    operation: toolName === EXA_SEARCH_TOOL_NAME ? "search" : "get_contents",
+    provider: "exa",
   }
 }
 
-export function getAiSdkTavilyToolResultMetadata(
+export function getExaToolResultMetadata(
   part:
     | {
         toolCallId: string
@@ -534,7 +578,7 @@ export function getAiSdkTavilyToolResultMetadata(
         output: unknown
       }
     | undefined
-): AiSdkTavilyToolResultMetadata | null {
+): ExaToolResultMetadata | null {
   const toolName = getToolName(part?.toolName)
   if (!toolName || !part) {
     return null
@@ -547,8 +591,8 @@ export function getAiSdkTavilyToolResultMetadata(
       toolName,
       status: "error",
       sources: [],
-      operation: toolName === TAVILY_SEARCH_TOOL_NAME ? "search" : "extract",
-      provider: "tavily",
+      operation: toolName === EXA_SEARCH_TOOL_NAME ? "search" : "get_contents",
+      provider: "exa",
       errorCode: "INVALID_TOOL_OUTPUT",
       retryable: false,
     }
@@ -560,8 +604,8 @@ export function getAiSdkTavilyToolResultMetadata(
       toolName,
       status: "error",
       sources: [],
-      operation: toolName === TAVILY_SEARCH_TOOL_NAME ? "search" : "extract",
-      provider: "tavily",
+      operation: toolName === EXA_SEARCH_TOOL_NAME ? "search" : "get_contents",
+      provider: "exa",
       errorCode: payload.error.code,
       retryable: true,
     }
@@ -574,8 +618,8 @@ export function getAiSdkTavilyToolResultMetadata(
     sources: payload.output
       ? toSourcesFromOutput(toolName, payload.output)
       : [],
-    operation: toolName === TAVILY_SEARCH_TOOL_NAME ? "search" : "extract",
-    provider: "tavily",
+    operation: toolName === EXA_SEARCH_TOOL_NAME ? "search" : "get_contents",
+    provider: "exa",
     retryable: false,
   }
 }

@@ -8,10 +8,6 @@ const cwd = fileURLToPath(new URL("..", import.meta.url))
 const routePath = path.join(cwd, "src/app/api/agent/route.ts")
 const helperPath = path.join(cwd, "src/lib/server/agent-route.ts")
 const runtimePath = path.join(cwd, "src/lib/server/llm/agent-runtime.ts")
-const synthesisGatingPath = path.join(
-  cwd,
-  "src/lib/server/llm/agent-runtime-synthesis-gating.ts"
-)
 
 test("agent route validates model, threadId, and messages", async () => {
   const source = await readFile(helperPath, "utf8")
@@ -35,7 +31,7 @@ test("agent route validates model, threadId, and messages", async () => {
   )
 })
 
-test("agent route streams through the extracted AI Gateway helper path", async () => {
+test("agent route streams through the extracted helper path", async () => {
   const helperSource = await readFile(helperPath, "utf8")
   const routeSource = await readFile(routePath, "utf8")
 
@@ -91,9 +87,8 @@ test("agent route emits a visible fallback for tool-only completions", async () 
   )
 })
 
-test("agent runtime reserves the final loop step for synthesis", async () => {
+test("agent runtime runs a forced final synthesis when no text was emitted", async () => {
   const runtimeSource = await readFile(runtimePath, "utf8")
-  const synthesisGatingSource = await readFile(synthesisGatingPath, "utf8")
 
   assert.match(
     runtimeSource,
@@ -102,33 +97,40 @@ test("agent runtime reserves the final loop step for synthesis", async () => {
   )
   assert.match(
     runtimeSource,
-    /prepareStep:\s*\(\{[\s\S]*stepNumber[\s\S]*\}\)[\s\S]*shouldForceFinalSynthesisStep\(\s*stepNumber,\s*AGENT_TOOL_MAX_STEPS\s*\)[\s\S]*toolChoice:\s*"none"/,
-    "Expected the last permitted model step to disable tools."
-  )
-  assert.match(
-    synthesisGatingSource,
-    /stepNumber\s*>=\s*Math\.max\(0,\s*toolMaxSteps\s*-\s*1\)/,
-    "Expected final synthesis to happen before the profile step budget stops the loop."
-  )
-})
-
-test("agent runtime extends the AI Gateway client timeout", async () => {
-  const runtimeSource = await readFile(runtimePath, "utf8")
-  const gatewayClientPath = path.join(
-    cwd,
-    "src/lib/server/llm/gateway-client.ts"
-  )
-  const gatewayClientSource = await readFile(gatewayClientPath, "utf8")
-
-  assert.match(
-    gatewayClientSource,
-    /new Dispatcher1Wrapper\(\s*new Agent\(\{\s*bodyTimeout: AI_GATEWAY_CLIENT_TIMEOUT_MS,\s*headersTimeout: AI_GATEWAY_CLIENT_TIMEOUT_MS,\s*\}\)\s*\)/,
-    "Expected the gateway client to use a custom Undici timeout dispatcher."
+    /maxTurns: AGENT_TOOL_MAX_STEPS/,
+    "Expected the run to cap tool turns with maxTurns."
   )
   assert.match(
     runtimeSource,
-    /createGateway\(\{\s*apiKey: params\.aiGatewayApiKey,\s*fetch: aiGatewayFetch,/,
-    "Expected createGateway to receive the custom fetch implementation."
+    /if \(!hasEmittedText && !params\.signal\?\.aborted\)[\s\S]*run\(synthesisAgent/,
+    "Expected a second synthesis run when the main run emitted no text."
+  )
+  assert.match(
+    runtimeSource,
+    /MaxTurnsExceededError/,
+    "Expected MaxTurnsExceeded to be caught and routed to final synthesis."
+  )
+})
+
+test("agent runtime configures the OpenAI Agents SDK client", async () => {
+  const runtimeSource = await readFile(runtimePath, "utf8")
+  const clientPath = path.join(cwd, "src/lib/server/llm/openai-client.ts")
+  const clientSource = await readFile(clientPath, "utf8")
+
+  assert.match(
+    clientSource,
+    /setDefaultOpenAIKey\(apiKey\)/,
+    "Expected the client module to set the default OpenAI API key."
+  )
+  assert.match(
+    clientSource,
+    /getGlobalTraceProvider\(\)\.setDisabled\(true\)/,
+    "Expected agent tracing to be disabled."
+  )
+  assert.match(
+    runtimeSource,
+    /configureOpenAiForAgents\(params\.openAiApiKey\)/,
+    "Expected the runtime to configure the OpenAI client from the threaded key."
   )
 })
 
@@ -148,8 +150,8 @@ test("agent runtime gives supported chat models the same runtime toolset", async
   )
   assert.match(
     runtimeSource,
-    /createAiSdkTavilyTools\(normalizedTavilyApiKey\)/,
-    "Expected Tavily tools to be created for all chat models."
+    /createOpenAiAgentsExaTools\(/,
+    "Expected Exa tools to be created for all chat models."
   )
   assert.doesNotMatch(
     helperSource,
@@ -173,17 +175,17 @@ test("agent runtime does not include removed model step compatibility hooks", as
   )
 })
 
-test("agent runtime logs finish metadata for model streams", async () => {
+test("agent runtime logs when the model stream finishes", async () => {
   const runtimeSource = await readFile(runtimePath, "utf8")
 
   assert.match(
     runtimeSource,
-    /part\.type === "finish-step"[\s\S]*finishReason: part\.finishReason/,
-    "Expected runtime step finish reasons to be logged."
+    /await result\.completed/,
+    "Expected the runtime to await stream completion."
   )
   assert.match(
     runtimeSource,
-    /part\.type === "finish"[\s\S]*totalUsage/,
-    "Expected final stream finish usage to be logged."
+    /logger\.info\(\s*"Agent runtime stream finished\./,
+    "Expected the runtime to log when the model stream finishes."
   )
 })

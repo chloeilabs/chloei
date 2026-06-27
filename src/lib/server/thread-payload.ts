@@ -10,7 +10,33 @@ import {
   type Thread,
   type ThreadSummary,
   TOOL_NAMES,
+  type ToolName,
 } from "@/lib/shared"
+
+// Threads saved before the Tavily→Exa migration stored the old tool names.
+// Normalize them to the current Exa names on read so historical Activity
+// timelines and tool invocations still validate and render.
+const LEGACY_TOOL_NAME_REPLACEMENTS: Record<string, ToolName> = {
+  tavily_search: "exa_search",
+  tavily_extract: "exa_get_contents",
+}
+
+function remapLegacyToolName(value: unknown): unknown {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return value
+  }
+
+  const record = value as Record<string, unknown>
+  const toolName = record.toolName
+  if (
+    typeof toolName !== "string" ||
+    !(toolName in LEGACY_TOOL_NAME_REPLACEMENTS)
+  ) {
+    return value
+  }
+
+  return { ...record, toolName: LEGACY_TOOL_NAME_REPLACEMENTS[toolName] }
+}
 
 const ISO_DATETIME_SCHEMA = z.iso.datetime({ offset: true })
 const TOOL_NAME_SCHEMA = z.enum(TOOL_NAMES)
@@ -29,6 +55,16 @@ const messageSourceSchema = z
     title: z.string().trim().min(1).max(500),
   })
   .strict()
+
+// Persisted attachment metadata. Intentionally omits the base64 `url` (and is
+// not `.strict()`) so the large data URL is stripped out when a thread is
+// saved — stored threads keep only the lightweight descriptor.
+const messageAttachmentSchema = z.object({
+  id: z.string().trim().min(1).max(200),
+  kind: z.enum(["image", "pdf"]),
+  name: z.string().trim().min(1).max(500),
+  mediaType: z.string().trim().min(1).max(200),
+})
 
 const followUpQuestionSchema = z
   .object({
@@ -170,6 +206,7 @@ const messageMetadataSchema = z
     reasoning: z.string().max(100_000).optional(),
     activityTimeline: z.array(activityTimelineEntrySchema).optional(),
     sources: z.array(messageSourceSchema).optional(),
+    attachments: z.array(messageAttachmentSchema).max(10).optional(),
     followUpQuestions: z.array(followUpQuestionSchema).max(3).optional(),
     followUpQuestionsPending: z.boolean().optional(),
   })
@@ -287,6 +324,11 @@ function sanitizeMessageSource(value: unknown) {
   return parsed.success ? parsed.data : null
 }
 
+function sanitizeMessageAttachment(value: unknown) {
+  const parsed = messageAttachmentSchema.safeParse(value)
+  return parsed.success ? parsed.data : null
+}
+
 function sanitizeFollowUpQuestion(value: unknown) {
   const parsed = followUpQuestionSchema.safeParse(value)
   if (!parsed.success) {
@@ -299,7 +341,7 @@ function sanitizeFollowUpQuestion(value: unknown) {
 }
 
 function sanitizeToolInvocation(value: unknown) {
-  const parsed = toolInvocationSchema.safeParse(value)
+  const parsed = toolInvocationSchema.safeParse(remapLegacyToolName(value))
   return parsed.success ? parsed.data : null
 }
 
@@ -353,10 +395,11 @@ function convertLegacyActivityTimelineEntry(value: unknown) {
 }
 
 function sanitizeActivityTimelineEntry(value: unknown) {
-  const parsed = activityTimelineEntrySchema.safeParse(value)
+  const remapped = remapLegacyToolName(value)
+  const parsed = activityTimelineEntrySchema.safeParse(remapped)
   const entry = parsed.success
     ? parsed.data
-    : convertLegacyActivityTimelineEntry(value)
+    : convertLegacyActivityTimelineEntry(remapped)
 
   if (!entry) {
     return null
@@ -418,6 +461,12 @@ function sanitizeMessageMetadata(value: unknown) {
         return sanitized ? [sanitized] : []
       })
     : undefined
+  const attachments = Array.isArray(metadata.attachments)
+    ? metadata.attachments.flatMap((attachment) => {
+        const sanitized = sanitizeMessageAttachment(attachment)
+        return sanitized ? [sanitized] : []
+      })
+    : undefined
   const followUpQuestions = Array.isArray(metadata.followUpQuestions)
     ? metadata.followUpQuestions
         .flatMap((question) => {
@@ -438,6 +487,7 @@ function sanitizeMessageMetadata(value: unknown) {
     ...(reasoning ? { reasoning } : {}),
     ...(activityTimeline ? { activityTimeline } : {}),
     ...(sources ? { sources } : {}),
+    ...(attachments?.length ? { attachments } : {}),
     ...(followUpQuestions?.length ? { followUpQuestions } : {}),
     ...(followUpQuestionsPending !== undefined
       ? { followUpQuestionsPending }

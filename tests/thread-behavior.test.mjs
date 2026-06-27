@@ -31,7 +31,7 @@ function createMessage(overrides = {}) {
     id: "message-1",
     role: "user",
     content: "First question about streaming behavior",
-    llmModel: "zai/glm-5.2",
+    llmModel: "gpt-5.4-mini",
     createdAt: "2026-04-15T10:00:00.000Z",
     ...overrides,
   }
@@ -101,7 +101,7 @@ test("parseThreadPayload sanitizes invalid metadata and converts legacy activity
         id: "assistant-1",
         role: "assistant",
         content: "Summarize this thread",
-        llmModel: "zai/glm-5.2",
+        llmModel: "gpt-5.4-mini",
         createdAt: "2026-04-15T10:00:00.000Z",
         metadata: {
           selectedModel: "not-a-model",
@@ -111,6 +111,7 @@ test("parseThreadPayload sanitizes invalid metadata and converts legacy activity
             {
               id: "tool-1",
               callId: "call-1",
+              // Legacy pre-migration tool name; should normalize to exa_search.
               toolName: "tavily_search",
               label: " Search ",
               status: "success",
@@ -186,7 +187,7 @@ test("parseThreadPayload sanitizes invalid metadata and converts legacy activity
     {
       id: "tool-1",
       callId: "call-1",
-      toolName: "tavily_search",
+      toolName: "exa_search",
       label: "Search",
       status: "success",
     },
@@ -295,7 +296,7 @@ test("parseThreadPayload keeps generated follow-ups after malformed entries", ()
 test("prepareThreadForPersistence aligns createdAt with the first message", () => {
   const normalizedThread = prepareThreadForPersistence({
     id: "thread-persist",
-    model: "zai/glm-5.2",
+    model: "gpt-5.4-mini",
     messages: [
       createMessage({
         createdAt: "2026-04-15T09:59:00.000Z",

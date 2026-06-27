@@ -1,6 +1,6 @@
 # Chloei
 
-Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently exposes a curated model selector offering GLM 5.2 (`zai/glm-5.2`), and offers optional Tavily web search and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
+Chloei is a Next.js 16 chat app backed by the OpenAI Agents SDK and the OpenAI API. It currently exposes a curated model selector (top-left of the home page) offering GPT-5.5 (`gpt-5.5-2026-04-23`, the default) and GPT-5.4 Mini, and offers optional Exa web search and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
 
 ## Documentation
 
@@ -18,13 +18,13 @@ Chloei is a Next.js 16 chat app backed by Vercel AI Gateway. It currently expose
 ```bash
 pnpm install
 cp .env.example .env.local
-# Fill DATABASE_URL, BETTER_AUTH_SECRET, BETTER_AUTH_URL, and AI_GATEWAY_API_KEY.
+# Fill DATABASE_URL, BETTER_AUTH_SECRET, BETTER_AUTH_URL, and OPENAI_API_KEY.
 # Start PostgreSQL locally before running migrate.
 pnpm migrate
 pnpm dev
 ```
 
-Add `AI_GATEWAY_API_KEY` to `.env.local` before starting the app; optionally add `TAVILY_API_KEY` for Tavily search and extract tools. The app runs on [http://localhost:3000](http://localhost:3000).
+Add `OPENAI_API_KEY` to `.env.local` before starting the app; optionally add `EXA_API_KEY` for Exa web search and content tools. The app runs on [http://localhost:3000](http://localhost:3000).
 
 To enable auth locally, provision PostgreSQL before running `pnpm migrate` and add:
 
@@ -77,7 +77,7 @@ pnpm exec playwright install --with-deps chromium
 
 `.env.example` documents the supported environment variables. Required variables are:
 
-- `AI_GATEWAY_API_KEY`: required to enable `/api/models` and `/api/agent`
+- `OPENAI_API_KEY`: required to enable `/api/models` and `/api/agent`
 - `DATABASE_URL`: PostgreSQL connection string for Better Auth
 - `AUTH_DATABASE_URL`: optional Better Auth database override; falls back to `DATABASE_URL`
 - `BETTER_AUTH_SECRET`: Better Auth signing secret
@@ -87,7 +87,7 @@ pnpm exec playwright install --with-deps chromium
 
 Optional feature-enabling variables:
 
-- `TAVILY_API_KEY`: enables Tavily search and extract callable tools for chat requests
+- `EXA_API_KEY`: enables `exa_search` and `exa_get_contents` callable tools for chat requests
 - `AGENT_TELEMETRY_RECORD_IO`: feature gate; defaults off unless explicitly set or synced through Edge Config
 
 Agent request limits, timeouts, and tool-step budgets are fixed safe constants in `src/lib/server/agent-runtime-config.ts` (no env knobs).
@@ -96,7 +96,7 @@ Agent request limits, timeouts, and tool-step budgets are fixed safe constants i
 
 - **`pnpm migrate` can't connect**: make sure local PostgreSQL is running and `DATABASE_URL` points at it (for local dev, a local Postgres such as `postgresql://chloei:chloei_dev@localhost:5432/chloei`, not the hosted DB). `vercel env pull` overwrites `.env.local`, so re-apply any local `DATABASE_URL` override afterward.
 - **"Thread storage is not initialized" (HTTP 500)**: the app tables don't exist yet — run `pnpm app:migrate` (or `pnpm migrate`). Storage does not self-initialize on live requests.
-- **Empty model selector / `/api/models` returns nothing**: sign in, and set `AI_GATEWAY_API_KEY` in `.env.local`.
+- **Empty model selector / `/api/models` returns nothing**: sign in, and set `OPENAI_API_KEY` in `.env.local`.
 - **Auth endpoints return 503**: one of `DATABASE_URL`, `BETTER_AUTH_SECRET`, or `BETTER_AUTH_URL` is missing. Generate a secret with `openssl rand -base64 32`.
 - **Playwright can't find a browser**: run `pnpm exec playwright install --with-deps chromium` once.
 

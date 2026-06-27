@@ -42,7 +42,7 @@ test("assistant session state builds assistant messages from stream accumulators
       {
         id: "tool-1",
         callId: "call-1",
-        toolName: "tavily_search",
+        toolName: "exa_search",
         label: "Search",
         query: "query",
         status: "success",
@@ -70,7 +70,7 @@ test("assistant session state builds assistant messages from stream accumulators
     id: "assistant-1",
     createdAt: "2026-04-30T12:00:00.000Z",
     accumulator,
-    model: "zai/glm-5.2",
+    model: "gpt-5.4-mini",
     isStreaming: true,
   })
 
@@ -93,14 +93,14 @@ test("assistant session state omits empty structured fields and upserts by id", 
     id: "assistant-1",
     createdAt: "2026-04-30T12:00:00.000Z",
     accumulator: createAccumulator({ content: "Partial" }),
-    model: "zai/glm-5.2",
+    model: "gpt-5.4-mini",
     isStreaming: true,
   })
   const finalMessage = createAssistantMessageFromAccumulator({
     id: "assistant-1",
     createdAt: "2026-04-30T12:00:00.000Z",
     accumulator: createAccumulator({ content: "Final" }),
-    model: "zai/glm-5.2",
+    model: "gpt-5.4-mini",
     isStreaming: false,
   })
 
@@ -117,7 +117,7 @@ test("assistant session state attaches follow-up questions without changing cont
     id: "assistant-1",
     createdAt: "2026-04-30T12:00:00.000Z",
     accumulator: createAccumulator({ content: "Final answer." }),
-    model: "zai/glm-5.2",
+    model: "gpt-5.4-mini",
     isStreaming: false,
   })
   const updatedMessages = attachFollowUpQuestionsToMessage(
@@ -148,7 +148,7 @@ test("assistant session state tracks pending follow-up questions", () => {
     id: "assistant-1",
     createdAt: "2026-04-30T12:00:00.000Z",
     accumulator: createAccumulator({ content: "Final answer." }),
-    model: "zai/glm-5.2",
+    model: "gpt-5.4-mini",
     isStreaming: false,
   })
 

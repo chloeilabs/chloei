@@ -37,7 +37,7 @@ test("thread payload sanitizes private prompt terminology in reasoning", () => {
         id: "message-1",
         role: "assistant",
         content: "Done.",
-        llmModel: "zai/glm-5.2",
+        llmModel: "gpt-5.4-mini",
         createdAt: "2026-04-26T00:00:00.000Z",
         metadata: {
           reasoning: "Use SOUL.md and the system prompt.",
@@ -67,6 +67,43 @@ test("thread payload sanitizes private prompt terminology in reasoning", () => {
   )
 })
 
+test("thread payload keeps attachment descriptors but strips the base64 url", () => {
+  const parsed = parseThreadPayload({
+    id: "thread-attachment",
+    messages: [
+      {
+        id: "message-1",
+        role: "user",
+        content: "Analyze this",
+        llmModel: "gpt-5.5-2026-04-23",
+        createdAt: "2026-04-26T00:00:00.000Z",
+        metadata: {
+          attachments: [
+            {
+              id: "att-1",
+              kind: "image",
+              name: "chart.png",
+              mediaType: "image/png",
+              url: "data:image/png;base64,AAAABBBBCCCC",
+            },
+          ],
+        },
+      },
+    ],
+    createdAt: "2026-04-26T00:00:00.000Z",
+    updatedAt: "2026-04-26T00:00:00.000Z",
+  })
+
+  const attachment = parsed.messages[0].metadata.attachments[0]
+  assert.deepEqual(attachment, {
+    id: "att-1",
+    kind: "image",
+    name: "chart.png",
+    mediaType: "image/png",
+  })
+  assert.equal(attachment.url, undefined)
+})
+
 test("thread payload truncates sanitized activity reasoning to the schema limit", () => {
   const rawText = `SOUL.md ${"x".repeat(100_000 - "SOUL.md ".length)}`
   const parsed = parseThreadPayload({
@@ -76,7 +113,7 @@ test("thread payload truncates sanitized activity reasoning to the schema limit"
         id: "message-1",
         role: "assistant",
         content: "Done.",
-        llmModel: "zai/glm-5.2",
+        llmModel: "gpt-5.4-mini",
         createdAt: "2026-04-26T00:00:00.000Z",
         metadata: {
           activityTimeline: [
@@ -126,16 +163,16 @@ test("thread store delegates parsing and persistence shaping to the payload help
 test("thread payload drops legacy run-mode metadata from stored threads", () => {
   const parsed = parseThreadPayload({
     id: "thread-1",
-    model: "zai/glm-5.2",
+    model: "gpt-5.4-mini",
     messages: [
       {
         id: "message-1",
         role: "user",
         content: "Research this.",
-        llmModel: "zai/glm-5.2",
+        llmModel: "gpt-5.4-mini",
         createdAt: "2026-04-26T00:00:00.000Z",
         metadata: {
-          selectedModel: "zai/glm-5.2",
+          selectedModel: "gpt-5.4-mini",
           runMode: "research",
         },
       },
@@ -144,6 +181,6 @@ test("thread payload drops legacy run-mode metadata from stored threads", () => 
     updatedAt: "2026-04-26T00:00:01.000Z",
   })
 
-  assert.equal(parsed.messages[0]?.metadata?.selectedModel, "zai/glm-5.2")
+  assert.equal(parsed.messages[0]?.metadata?.selectedModel, "gpt-5.4-mini")
   assert.equal(parsed.messages[0]?.metadata?.runMode, undefined)
 })

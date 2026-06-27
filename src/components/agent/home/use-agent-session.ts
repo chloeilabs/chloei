@@ -14,6 +14,7 @@ import {
   type FollowUpQuestion,
   isModelType,
   type Message as AgentMessage,
+  type MessageAttachment,
   type ModelType,
   type Thread,
 } from "@/lib/shared"
@@ -66,6 +67,7 @@ interface EditMessageParams {
 interface QueuedSubmission {
   message: string
   model: ModelType
+  attachments?: MessageAttachment[]
 }
 
 const INITIAL_STATE: AgentSessionState = {
@@ -606,9 +608,14 @@ export function useAgentSession({
   )
 
   const handleSubmit = useCallback(
-    async (message: string, model: ModelType) => {
+    async (
+      message: string,
+      model: ModelType,
+      attachments?: MessageAttachment[]
+    ) => {
       const trimmedMessage = message.trim()
-      if (!trimmedMessage) {
+      const messageAttachments = attachments ?? []
+      if (!trimmedMessage && messageAttachments.length === 0) {
         return
       }
 
@@ -623,7 +630,8 @@ export function useAgentSession({
       const nextMessages = appendUserMessage(
         messagesRef.current,
         trimmedMessage,
-        model
+        model,
+        messageAttachments
       )
 
       await runAgentRequest(nextMessages, model, activeThreadId)
@@ -691,9 +699,10 @@ export function useAgentSession({
   )
 
   const handlePromptSubmit = useCallback(
-    (message: string, model: ModelType) => {
+    (message: string, model: ModelType, attachments?: MessageAttachment[]) => {
       const trimmedMessage = message.trim()
-      if (!trimmedMessage) {
+      const messageAttachments = attachments ?? []
+      if (!trimmedMessage && messageAttachments.length === 0) {
         return
       }
 
@@ -701,11 +710,14 @@ export function useAgentSession({
         setQueuedSubmission({
           message: trimmedMessage,
           model,
+          ...(messageAttachments.length > 0
+            ? { attachments: messageAttachments }
+            : {}),
         })
         return
       }
 
-      void handleSubmit(trimmedMessage, model)
+      void handleSubmit(trimmedMessage, model, messageAttachments)
     },
     [handleSubmit]
   )
@@ -716,7 +728,11 @@ export function useAgentSession({
     }
 
     setQueuedSubmission(null)
-    void handleSubmit(queuedSubmission.message, queuedSubmission.model)
+    void handleSubmit(
+      queuedSubmission.message,
+      queuedSubmission.model,
+      queuedSubmission.attachments
+    )
   }, [streamingState, queuedSubmission, handleSubmit])
 
   return {
