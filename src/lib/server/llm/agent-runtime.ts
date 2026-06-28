@@ -9,7 +9,11 @@ import { asRecord, asString } from "@/lib/cast"
 import { createLogger } from "@/lib/logger"
 import { AGENT_TOOL_MAX_STEPS } from "@/lib/server/agent-runtime-config"
 import { type AgentFeatureFlags } from "@/lib/server/integration-flags"
-import { type AgentStreamEvent, type ModelType } from "@/lib/shared"
+import {
+  type AgentStreamEvent,
+  AvailableModels,
+  type ModelType,
+} from "@/lib/shared"
 
 import {
   type AgentInputMessage,
@@ -26,7 +30,11 @@ import { configureOpenAiForAgents } from "./openai-client"
 
 const logger = createLogger("agent-runtime")
 
-const REASONING_EFFORT = "high" as const
+type ReasoningEffortLevel = "high" | "xhigh"
+
+// GPT-5.5 runs at xhigh reasoning effort; other models default to high.
+const resolveReasoningEffort = (model: ModelType): ReasoningEffortLevel =>
+  model === AvailableModels.OPENAI_GPT_5_5 ? "xhigh" : "high"
 
 type UserContentPart =
   | { type: "input_text"; text: string }
@@ -222,7 +230,10 @@ export async function* startAgentRuntimeStream(
     instructions: buildInstructions(params.systemInstruction),
     model: params.model,
     modelSettings: {
-      reasoning: { effort: REASONING_EFFORT, summary: "auto" },
+      reasoning: {
+        effort: resolveReasoningEffort(params.model),
+        summary: "auto",
+      },
       ...(params.temperature !== undefined
         ? { temperature: params.temperature }
         : {}),
@@ -413,7 +424,10 @@ export async function* startAgentRuntimeStream(
         instructions: `${params.systemInstruction}\n\n${FINAL_SYNTHESIS_STEP_INSTRUCTION}`,
         model: params.model,
         modelSettings: {
-          reasoning: { effort: REASONING_EFFORT, summary: "auto" },
+          reasoning: {
+            effort: resolveReasoningEffort(params.model),
+            summary: "auto",
+          },
           ...(params.temperature !== undefined
             ? { temperature: params.temperature }
             : {}),
