@@ -25,9 +25,7 @@ const mappingUrl = pathToFileURL(
 const goblinsAgentsUrl = pathToFileURL(
   path.join(cwd, "src/lib/server/llm/goblins-agents.ts")
 ).href
-const sharedUrl = pathToFileURL(
-  path.join(cwd, "src/lib/shared/index.ts")
-).href
+const sharedUrl = pathToFileURL(path.join(cwd, "src/lib/shared/index.ts")).href
 
 const { createAgentStreamMapper } = await import(mappingUrl)
 const { resolveGoblinSubagent, GOBLIN_DEFINITIONS, createGoblinTools } =
@@ -35,7 +33,11 @@ const { resolveGoblinSubagent, GOBLIN_DEFINITIONS, createGoblinTools } =
 const { SUBAGENT_IDS } = await import(sharedUrl)
 
 const toolCalledItem = (callId, name, args) => ({
-  rawItem: { callId, name, ...(args ? { arguments: JSON.stringify(args) } : {}) },
+  rawItem: {
+    callId,
+    name,
+    ...(args ? { arguments: JSON.stringify(args) } : {}),
+  },
 })
 const toolOutputItem = (callId, name, output) => ({
   rawItem: { callId, name },
@@ -44,9 +46,10 @@ const toolOutputItem = (callId, name, output) => ({
 
 test("mapper maps assistant text deltas", () => {
   const mapper = createAgentStreamMapper()
-  assert.deepEqual(mapper.mapRawModelEvent({ type: "output_text_delta", delta: "hi" }), [
-    { type: "text_delta", delta: "hi" },
-  ])
+  assert.deepEqual(
+    mapper.mapRawModelEvent({ type: "output_text_delta", delta: "hi" }),
+    [{ type: "text_delta", delta: "hi" }]
+  )
 })
 
 test("mapper with a subagent resolver emits subagent_call (with task) and subagent_result", () => {
@@ -56,7 +59,9 @@ test("mapper with a subagent resolver emits subagent_call (with task) and subage
 
   const callEvents = mapper.mapRunItemEvent(
     "tool_called",
-    toolCalledItem("c1", "goblin_web_researcher", { input: "find recent sources" })
+    toolCalledItem("c1", "goblin_web_researcher", {
+      input: "find recent sources",
+    })
   )
   assert.deepEqual(callEvents, [
     {
@@ -87,14 +92,20 @@ test("mapper dedupes repeated subagent call/result for the same callId", () => {
     resolveSubagent: resolveGoblinSubagent,
   })
 
-  mapper.mapRunItemEvent("tool_called", toolCalledItem("c1", "goblin_contrarian"))
+  mapper.mapRunItemEvent(
+    "tool_called",
+    toolCalledItem("c1", "goblin_contrarian")
+  )
   const dupCall = mapper.mapRunItemEvent(
     "tool_called",
     toolCalledItem("c1", "goblin_contrarian")
   )
   assert.deepEqual(dupCall, [])
 
-  mapper.mapRunItemEvent("tool_output", toolOutputItem("c1", "goblin_contrarian", "x"))
+  mapper.mapRunItemEvent(
+    "tool_output",
+    toolOutputItem("c1", "goblin_contrarian", "x")
+  )
   const dupResult = mapper.mapRunItemEvent(
     "tool_output",
     toolOutputItem("c1", "goblin_contrarian", "x")

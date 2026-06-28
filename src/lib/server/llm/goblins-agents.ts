@@ -1,4 +1,4 @@
-import { type Tool,tool } from "@openai/agents"
+import { type Tool, tool } from "@openai/agents"
 import { z } from "zod"
 
 import { GOBLIN_SUBAGENT_MAX_STEPS } from "@/lib/server/agent-runtime-config"

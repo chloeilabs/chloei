@@ -100,11 +100,7 @@ export function ModelSelector({
           }}
         >
           {modelSelectorModels.map((model) => (
-            <DropdownMenuRadioItem
-              key={model.id}
-              value={model.id}
-              closeOnClick
-            >
+            <DropdownMenuRadioItem key={model.id} value={model.id} closeOnClick>
               <ModelOptionLabel model={model} />
             </DropdownMenuRadioItem>
           ))}

@@ -86,12 +86,13 @@ export async function* startGoblinsRuntimeStream(
     }
   }
 
-  const finalizeOpenGoblinToolCalls = function* (): Generator<AgentStreamEvent> {
-    for (const callId of openToolCallIds) {
-      yield { type: "tool_result", callId, status: "success" }
+  const finalizeOpenGoblinToolCalls =
+    function* (): Generator<AgentStreamEvent> {
+      for (const callId of openToolCallIds) {
+        yield { type: "tool_result", callId, status: "success" }
+      }
+      openToolCallIds.clear()
     }
-    openToolCallIds.clear()
-  }
 
   const manager = new Agent({
     // The single-model MID_BUDGET reminder ("limited web-tool budget; prefer

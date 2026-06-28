@@ -128,8 +128,7 @@ export interface ReasoningActivityTimelineEntry extends ActivityTimelineBaseEntr
   text: string
 }
 
-export interface SubagentActivityTimelineEntry
-  extends ActivityTimelineBaseEntry {
+export interface SubagentActivityTimelineEntry extends ActivityTimelineBaseEntry {
   kind: "subagent"
   callId: string | null
   subagentId: SubagentId

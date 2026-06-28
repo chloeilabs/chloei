@@ -11,8 +11,7 @@ export function getExaToolCallMetadata(part) {
   if (!part || !isExaToolName(part.toolName)) {
     return null
   }
-  const query =
-    part.toolName === "exa_search" ? part.input?.query : undefined
+  const query = part.toolName === "exa_search" ? part.input?.query : undefined
   return {
     callId: part.toolCallId,
     toolName: part.toolName,

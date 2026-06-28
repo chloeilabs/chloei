@@ -20,9 +20,7 @@ setTestModuleStubs({
 })
 
 const { startGoblinsRuntimeStream } = await import(
-  pathToFileURL(
-    path.join(cwd, "src/lib/server/llm/goblins-runtime.ts")
-  ).href
+  pathToFileURL(path.join(cwd, "src/lib/server/llm/goblins-runtime.ts")).href
 )
 const { makeStreamResult } = await import(
   pathToFileURL(path.join(cwd, "tests/stubs/openai-agents.mjs")).href

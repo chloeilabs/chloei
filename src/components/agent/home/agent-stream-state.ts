@@ -14,7 +14,10 @@ import { createClientMessageId } from "./home-agent-utils"
 type ToolCallEvent = Extract<AgentStreamEvent, { type: "tool_call" }>
 type ToolResultEvent = Extract<AgentStreamEvent, { type: "tool_result" }>
 type SubagentCallEvent = Extract<AgentStreamEvent, { type: "subagent_call" }>
-type SubagentResultEvent = Extract<AgentStreamEvent, { type: "subagent_result" }>
+type SubagentResultEvent = Extract<
+  AgentStreamEvent,
+  { type: "subagent_result" }
+>
 type SubagentActivityTimelineEntry = Extract<
   ActivityTimelineEntry,
   { kind: "subagent" }

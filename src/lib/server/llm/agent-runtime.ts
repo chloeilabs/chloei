@@ -187,7 +187,10 @@ export async function* startAgentRuntimeStream(
         model: params.model,
         modelSettings: {
           reasoning: {
-            effort: resolveReasoningEffort(params.model, params.reasoningEffort),
+            effort: resolveReasoningEffort(
+              params.model,
+              params.reasoningEffort
+            ),
             summary: "auto",
           },
           ...(params.temperature !== undefined

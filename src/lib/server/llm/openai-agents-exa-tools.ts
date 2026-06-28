@@ -1,4 +1,4 @@
-import { type Tool,tool } from "@openai/agents"
+import { type Tool, tool } from "@openai/agents"
 import { webSearchTool } from "@openai/agents-openai"
 import Exa from "exa-js"
 import { z } from "zod"
@@ -496,7 +496,9 @@ function isRetriableExaError(error: unknown): boolean {
       : typeof record?.statusCode === "number"
         ? record.statusCode
         : undefined
-  return status === 429 || (status !== undefined && status >= 500 && status < 600)
+  return (
+    status === 429 || (status !== undefined && status >= 500 && status < 600)
+  )
 }
 
 /** Runs an Exa call under the shared concurrency gate, retrying 429/5xx with backoff. */

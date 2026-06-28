@@ -1,8 +1,5 @@
 import { asRecord, asString } from "@/lib/cast"
-import {
-  type AgentStreamEvent,
-  type SubagentId,
-} from "@/lib/shared"
+import { type AgentStreamEvent, type SubagentId } from "@/lib/shared"
 
 import { createReasoningDisplaySanitizer } from "./initial-reasoning-chunk-sanitizer"
 import {
