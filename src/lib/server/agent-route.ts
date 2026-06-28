@@ -60,14 +60,25 @@ const attachmentRequestSchema = z
     kind: z.enum(["image", "pdf"]),
     name: z.string().trim().min(1).max(500),
     mediaType: z.enum(AGENT_SUPPORTED_ATTACHMENT_MEDIA_TYPES),
+    // A new attachment arrives as a base64 data URL; once uploaded to the Files
+    // API it round-trips as a fileId (and the client drops the url). At least
+    // one is required.
     url: z
       .string()
       .trim()
       .min(1)
       .max(AGENT_ATTACHMENT_MAX_DATA_URL_CHARS)
-      .startsWith("data:"),
+      .startsWith("data:")
+      .optional(),
+    fileId: z.string().trim().min(1).max(200).optional(),
   })
   .strict()
+  .refine(
+    (attachment) => Boolean(attachment.url) || Boolean(attachment.fileId),
+    {
+      message: "An attachment must include a data URL or a fileId.",
+    }
+  )
 
 const agentMessageSchema = z
   .object({
