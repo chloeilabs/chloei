@@ -19,7 +19,10 @@ import {
 import { toAgentInputItems } from "./agent-runtime-messages"
 import { createAgentStreamMapper, readTextDelta } from "./agent-stream-mapping"
 import { createGoblinTools, resolveGoblinSubagent } from "./goblins-agents"
-import { configureOpenAiForAgents } from "./openai-client"
+import {
+  configureOpenAiForAgents,
+  configureResponsesTransport,
+} from "./openai-client"
 
 const logger = createLogger("goblins-runtime")
 
@@ -48,6 +51,9 @@ export async function* startGoblinsRuntimeStream(
   }
 
   configureOpenAiForAgents(params.openAiApiKey)
+  configureResponsesTransport(
+    params.featureFlags?.responsesWebsocketTransport ?? false
+  )
 
   const mapper = createAgentStreamMapper({
     resolveSubagent: resolveGoblinSubagent,

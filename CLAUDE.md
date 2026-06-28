@@ -214,11 +214,19 @@ Better Auth handles sessions. `getRequestSession` (`src/lib/server/auth-session.
 
 ### Feature Flags
 
-`src/lib/server/integration-flags.ts` resolves default-off flags: `telemetryRecordIo` (`AGENT_TELEMETRY_RECORD_IO`) and `responseCompaction` (`AGENT_RESPONSE_COMPACTION` — enables OpenAI server-side context compaction within a run via `modelSettings.contextManagement`; `resolveContextManagementSettings` in `agent-runtime.ts`, threshold `RESPONSE_COMPACTION_TOKEN_THRESHOLD`). Precedence:
+`src/lib/server/integration-flags.ts` resolves default-off flags: `telemetryRecordIo` (`AGENT_TELEMETRY_RECORD_IO`), `responseCompaction` (`AGENT_RESPONSE_COMPACTION` — enables OpenAI server-side context compaction within a run via `modelSettings.contextManagement`; `resolveContextManagementSettings` in `agent-runtime.ts`, threshold `RESPONSE_COMPACTION_TOKEN_THRESHOLD`), and `responsesWebsocketTransport` (`AGENT_RESPONSES_WS_TRANSPORT` — routes Responses API traffic over a persistent WebSocket via `configureResponsesTransport` in `openai-client.ts` instead of HTTP). Precedence:
 
 1. Explicit `AGENT_*` env var (e.g. `AGENT_TELEMETRY_RECORD_IO`).
 2. Edge Config (`EDGE_CONFIG`) — checked across three map namespaces in order: **`agent_flags`, `analytics_flags`, `flags`**, matching the dotted key (e.g. `agent.telemetry.record_io`) or its Vercel slug form (e.g. `agent-telemetry-record-io`), then top-level fallback keys.
 3. Built-in default (off).
+
+### Background, Webhooks & Transport (run & scale)
+
+Foundations for disconnect-resilient long runs. The raw OpenAI client (Files API, webhooks, background responses — endpoints the Agents SDK doesn't wrap) lives in `src/lib/server/llm/openai-raw-client.ts` (`getOpenAiClient`).
+
+- **WebSocket transport** — flag-gated (`responsesWebsocketTransport`); see Feature Flags above.
+- **Webhook receiver** — `POST /api/webhooks/openai` (`src/app/api/webhooks/openai/route.ts`) verifies the Standard-Webhooks signature via `client.webhooks.unwrap` (secret `OPENAI_WEBHOOK_SECRET`; unset → 503; bad signature → 400), de-dupes by webhook id, and acks 2xx. The signing secret is the auth — the route is intentionally public (the middleware matcher doesn't cover `/api/*`). Register the endpoint + secret in the OpenAI dashboard.
+- **Background + resumable streaming** — `src/lib/server/llm/background-responses.ts`: `createBackgroundResponse` (`background: true, store: true`) returns an id immediately; `resumeBackgroundResponseStream` streams a stored response from a `starting_after` checkpoint. `GET /api/agent/responses/[responseId]/stream?after=<seq>` resumes as NDJSON. **Not yet wired to the agent loop** — running the tool-using SDK loop in the background needs a worker (serverless functions end with the response), which is the remaining piece; nothing creates background agent runs today.
 
 ### Observability and Telemetry
 
@@ -242,9 +250,11 @@ src/
     api/
       agent/route.ts       # POST /api/agent — streaming agent endpoint
       agent/follow-ups/    # Follow-up question suggestions
+      agent/responses/[responseId]/stream/  # GET — resume a stored background response (starting_after)
       auth/[...all]/       # Better Auth catch-all
       models/route.ts      # GET /api/models — available models for configured keys
       threads/route.ts     # GET/PUT/DELETE /api/threads — thread CRUD
+      webhooks/openai/     # POST — OpenAI webhook receiver (signature-verified)
     layout.tsx          # Root layout: fonts, dark theme, Analytics + SpeedInsights, dev cache-reset
     manifest.ts         # PWA manifest (production-only standalone)
   components/
@@ -352,15 +362,17 @@ OPENAI_API_KEY=
 
 All others are optional with safe defaults. See `.env.example` for the annotated list.
 
-| Variable                      | Purpose                                                                        |
-| ----------------------------- | ------------------------------------------------------------------------------ |
-| `AUTH_DATABASE_URL`           | Separate DB for Better Auth (falls back to / reuses `DATABASE_URL`)            |
-| `BETTER_AUTH_TRUSTED_ORIGINS` | Comma-separated additional trusted origins                                     |
-| `BETTER_AUTH_COOKIE_DOMAIN`   | Shared cookie domain for cross-subdomain auth                                  |
-| `EXA_API_KEY`                 | Enables `exa_search` + `exa_get_contents`                                      |
-| `EDGE_CONFIG`                 | Vercel Edge Config connection for remote feature flags                         |
-| `AGENT_TELEMETRY_RECORD_IO`   | Feature flag: record prompt/output IO in telemetry (default off)               |
-| `AGENT_RESPONSE_COMPACTION`   | Feature flag: OpenAI server-side context compaction within a run (default off) |
+| Variable                       | Purpose                                                                        |
+| ------------------------------ | ------------------------------------------------------------------------------ |
+| `AUTH_DATABASE_URL`            | Separate DB for Better Auth (falls back to / reuses `DATABASE_URL`)            |
+| `BETTER_AUTH_TRUSTED_ORIGINS`  | Comma-separated additional trusted origins                                     |
+| `BETTER_AUTH_COOKIE_DOMAIN`    | Shared cookie domain for cross-subdomain auth                                  |
+| `EXA_API_KEY`                  | Enables `exa_search` + `exa_get_contents`                                      |
+| `EDGE_CONFIG`                  | Vercel Edge Config connection for remote feature flags                         |
+| `OPENAI_WEBHOOK_SECRET`        | Signing secret for the `/api/webhooks/openai` receiver (unset → 503)           |
+| `AGENT_TELEMETRY_RECORD_IO`    | Feature flag: record prompt/output IO in telemetry (default off)               |
+| `AGENT_RESPONSE_COMPACTION`    | Feature flag: OpenAI server-side context compaction within a run (default off) |
+| `AGENT_RESPONSES_WS_TRANSPORT` | Feature flag: WebSocket transport for the Responses API (default off)          |
 
 Request size limits, stream/gateway timeouts, tool-step budgets, and body-size limits are **fixed constants** in `src/lib/server/agent-runtime-config.ts` / `next.config.mjs` — not env-configurable. Change them in code if needed.
 

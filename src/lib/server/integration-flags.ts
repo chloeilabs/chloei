@@ -5,6 +5,7 @@ const logger = createLogger("integration-flags")
 export const AGENT_FLAG_KEYS = [
   "agent.telemetry.record_io",
   "agent.response.compaction",
+  "agent.responses.ws_transport",
 ] as const
 
 type AgentFlagKey = (typeof AGENT_FLAG_KEYS)[number]
@@ -15,21 +16,27 @@ export interface AgentFeatureFlags {
   // Enables OpenAI server-side context compaction within a run (long agentic
   // loops). Default off; opt in per environment.
   responseCompaction: boolean
+  // Routes Responses API traffic over a persistent WebSocket instead of HTTP,
+  // cutting per-round-trip overhead on tool-heavy runs. Default off.
+  responsesWebsocketTransport: boolean
 }
 
 const DEFAULT_FLAGS: AgentFeatureFlags = {
   telemetryRecordIo: false,
   responseCompaction: false,
+  responsesWebsocketTransport: false,
 }
 
 const ENV_FLAG_NAMES: Record<keyof AgentFeatureFlags, string> = {
   telemetryRecordIo: "AGENT_TELEMETRY_RECORD_IO",
   responseCompaction: "AGENT_RESPONSE_COMPACTION",
+  responsesWebsocketTransport: "AGENT_RESPONSES_WS_TRANSPORT",
 }
 
 const EDGE_FLAG_KEYS: Record<keyof AgentFeatureFlags, IntegrationFlagKey> = {
   telemetryRecordIo: "agent.telemetry.record_io",
   responseCompaction: "agent.response.compaction",
+  responsesWebsocketTransport: "agent.responses.ws_transport",
 }
 
 export function toEdgeConfigFlagKey(key: IntegrationFlagKey): string {
