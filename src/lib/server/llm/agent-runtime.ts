@@ -6,7 +6,10 @@ import {
 } from "@openai/agents"
 
 import { createLogger } from "@/lib/logger"
-import { AGENT_TOOL_MAX_STEPS } from "@/lib/server/agent-runtime-config"
+import {
+  AGENT_TOOL_MAX_STEPS,
+  RESPONSE_COMPACTION_TOKEN_THRESHOLD,
+} from "@/lib/server/agent-runtime-config"
 import { type AgentFeatureFlags } from "@/lib/server/integration-flags"
 import {
   type AgentStreamEvent,
@@ -33,6 +36,26 @@ const resolveReasoningEffort = (
   override?: ReasoningEffortLevel
 ): ReasoningEffortLevel =>
   override ?? (model === AvailableModels.OPENAI_GPT_5_5 ? "xhigh" : "high")
+
+// When the responseCompaction flag is on, OpenAI compacts the run's context
+// once the rendered input crosses the threshold (the encrypted compaction item
+// carries reasoning forward within the run). Off → no contextManagement, so the
+// spread is empty and behavior is unchanged. Shared by both runtimes.
+export function resolveContextManagementSettings(enabled: boolean): {
+  contextManagement?: { type: "compaction"; compactThreshold: number }[]
+} {
+  if (!enabled) {
+    return {}
+  }
+  return {
+    contextManagement: [
+      {
+        type: "compaction",
+        compactThreshold: RESPONSE_COMPACTION_TOKEN_THRESHOLD,
+      },
+    ],
+  }
+}
 
 export interface StartAgentRuntimeStreamParams {
   requestId?: string
@@ -104,6 +127,9 @@ export async function* startAgentRuntimeStream(
         effort: resolveReasoningEffort(params.model, params.reasoningEffort),
         summary: "auto",
       },
+      ...resolveContextManagementSettings(
+        params.featureFlags?.responseCompaction ?? false
+      ),
       ...(params.temperature !== undefined
         ? { temperature: params.temperature }
         : {}),

@@ -12,6 +12,7 @@ import { type AgentStreamEvent, GOBLINS_MANAGER_MODEL } from "@/lib/shared"
 import {
   FINAL_SYNTHESIS_STEP_INSTRUCTION,
   FINAL_SYNTHESIS_USER_PROMPT,
+  resolveContextManagementSettings,
   type StartAgentRuntimeStreamParams,
 } from "./agent-runtime"
 import { toAgentInputItems } from "./agent-runtime-messages"
@@ -110,6 +111,11 @@ export async function* startGoblinsRuntimeStream(
       // the "single parallel batch" instruction) so the fan-out runs in parallel
       // rather than one goblin at a time.
       parallelToolCalls: true,
+      // The manager accumulates every goblin's brief, so it benefits most from
+      // server-side compaction when that flag is on.
+      ...resolveContextManagementSettings(
+        params.featureFlags?.responseCompaction ?? false
+      ),
     },
     tools: goblinTools,
   })
