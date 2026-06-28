@@ -97,8 +97,8 @@ test("agent runtime runs a forced final synthesis when no text was emitted", asy
   )
   assert.match(
     runtimeSource,
-    /maxTurns: AGENT_TOOL_MAX_STEPS/,
-    "Expected the run to cap tool turns with maxTurns."
+    /maxTurns:[^,\n]*AGENT_TOOL_MAX_STEPS/,
+    "Expected the run to cap tool turns with maxTurns (default AGENT_TOOL_MAX_STEPS)."
   )
   assert.match(
     runtimeSource,

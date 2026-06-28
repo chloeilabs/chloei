@@ -1,4 +1,5 @@
 import { CircleX, Wrench } from "lucide-react"
+import Image from "next/image"
 
 import { LogoHover } from "@/components/graphics/logo/logo-hover"
 import type { ActivityTimelineEntry } from "@/lib/shared"
@@ -20,6 +21,8 @@ export function activityStepLabel(entry: ActivityEntry): string {
         : "Searched the web"
     case "sources":
       return "Sources"
+    case "subagent":
+      return `Goblin: ${entry.label}`
     default:
       return entry.label
   }
@@ -27,6 +30,28 @@ export function activityStepLabel(entry: ActivityEntry): string {
 
 /** The dot/glyph drawn on the rail for a given step. */
 export function ActivityStepIcon({ entry }: { entry: ActivityEntry }) {
+  // Goblins (sub-agents) get their own on-brand icon — pulsing while running,
+  // a red cross on failure — so they read distinctly from web searches/tools.
+  if (entry.kind === "subagent") {
+    if (entry.status === "error") {
+      return <CircleX className="size-3 text-destructive" />
+    }
+    return (
+      <Image
+        src="/goblin.png"
+        alt=""
+        width={16}
+        height={16}
+        unoptimized
+        aria-hidden="true"
+        className={cn(
+          "size-4 rounded-sm",
+          entry.status === "running" && "animate-pulse"
+        )}
+      />
+    )
+  }
+
   if (
     (entry.kind === "tool" || entry.kind === "search") &&
     entry.status === "running"
@@ -41,7 +66,10 @@ export function ActivityStepIcon({ entry }: { entry: ActivityEntry }) {
     return <CircleX className="size-3 text-destructive" />
   }
 
-  if (entry.kind === "search") {
+  if (
+    entry.kind === "search" ||
+    (entry.kind === "tool" && entry.toolName === "web_search")
+  ) {
     return <TimelineGlobeIcon className="size-3 text-muted-foreground" />
   }
 
@@ -57,7 +85,8 @@ function hasStepBody(entry: ActivityEntry): boolean {
   return (
     (entry.kind === "reasoning" && entry.text.length > 0) ||
     entry.kind === "search" ||
-    entry.kind === "sources"
+    entry.kind === "sources" ||
+    (entry.kind === "subagent" && Boolean(entry.task))
   )
 }
 
@@ -91,6 +120,14 @@ function ActivityStepBody({
 
   if (entry.kind === "sources") {
     return <SourceList sources={entry.sources} showFavicon={showFavicon} />
+  }
+
+  if (entry.kind === "subagent" && entry.task) {
+    return (
+      <div className="line-clamp-2 text-[13px] leading-relaxed text-muted-foreground/60">
+        {entry.task}
+      </div>
+    )
   }
 
   return null

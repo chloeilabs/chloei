@@ -4,6 +4,7 @@ import {
   AGENT_RUN_STATUSES,
   type AgentRunStatus,
   type AgentStreamEvent,
+  isSubagentId,
   isToolName,
 } from "@/lib/shared"
 
@@ -257,6 +258,65 @@ export function parseStreamEventLine(line: string): AgentStreamEvent | null {
 
     return {
       type,
+      status,
+      ...checkpointFields,
+    }
+  }
+
+  if (type === "subagent_call") {
+    const callIdRaw = record.callId
+    const callId = asString(callIdRaw)
+    if (callIdRaw !== null && callId === null) {
+      return null
+    }
+
+    const subagentId = record.subagentId
+    if (!isSubagentId(subagentId)) {
+      return null
+    }
+
+    const label = asString(record.label)?.trim()
+    if (!label) {
+      return null
+    }
+
+    const taskValue = record.task
+    const task = asString(taskValue)?.trim()
+    if (taskValue !== undefined && taskValue !== null && task === undefined) {
+      return null
+    }
+
+    return {
+      type,
+      callId: callId ?? null,
+      subagentId,
+      label,
+      ...(task ? { task } : {}),
+      ...checkpointFields,
+    }
+  }
+
+  if (type === "subagent_result") {
+    const callIdRaw = record.callId
+    const callId = asString(callIdRaw)
+    if (callIdRaw !== null && callId === null) {
+      return null
+    }
+
+    const subagentId = record.subagentId
+    if (!isSubagentId(subagentId)) {
+      return null
+    }
+
+    const status = asString(record.status)
+    if (status !== "success" && status !== "error") {
+      return null
+    }
+
+    return {
+      type,
+      callId: callId ?? null,
+      subagentId,
       status,
       ...checkpointFields,
     }
