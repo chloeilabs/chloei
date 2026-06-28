@@ -23,6 +23,7 @@ import {
 } from "@/lib/server/e2e-test-mode"
 import { getExaApiKey, getOpenAiApiKey } from "@/lib/server/env"
 import { resolveAgentFeatureFlags } from "@/lib/server/integration-flags"
+import { resolveAttachmentFileIds } from "@/lib/server/llm/attachment-uploads"
 import {
   createRouteObservation,
   observeRouteResponse,
@@ -154,25 +155,39 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    return observeRouteResponse(
-      observation,
-      createAgentStreamResponse({
-        request,
-        requestId,
-        timeoutMs: AGENT_STREAM_TIMEOUT_MS,
-        selectedModel,
-        openAiApiKey,
-        exaApiKey,
-        userTimeZone,
-        userId: session.user.id,
-        featureFlags,
-        messages: parsedRequest.messages,
-        systemInstruction,
-      }),
-      {
-        outcome: "stream_started",
-      }
-    )
+    // Upload any new base64 attachments to the Files API once, mutating the
+    // request messages to reference them by fileId (smaller model request,
+    // prompt-cacheable across turns). The returned map is echoed to the client
+    // so it can persist and resend fileIds instead of base64 next turn.
+    const attachmentFileIds = await resolveAttachmentFileIds({
+      openAiApiKey,
+      messages: parsedRequest.messages,
+      requestId,
+    })
+
+    const streamResponse = createAgentStreamResponse({
+      request,
+      requestId,
+      timeoutMs: AGENT_STREAM_TIMEOUT_MS,
+      selectedModel,
+      openAiApiKey,
+      exaApiKey,
+      userTimeZone,
+      userId: session.user.id,
+      featureFlags,
+      messages: parsedRequest.messages,
+      systemInstruction,
+    })
+    if (Object.keys(attachmentFileIds).length > 0) {
+      streamResponse.headers.set(
+        "X-Attachment-File-Ids",
+        JSON.stringify(attachmentFileIds)
+      )
+    }
+
+    return observeRouteResponse(observation, streamResponse, {
+      outcome: "stream_started",
+    })
   } catch (error) {
     if (isThreadStoreNotInitializedError(error)) {
       logger.error("Thread store is not initialized.", {

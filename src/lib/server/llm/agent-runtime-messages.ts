@@ -30,8 +30,8 @@ export function toModelMessages(
 
   for (const message of messages) {
     const content = message.content.trim()
-    const attachments = (message.attachments ?? []).filter((attachment) =>
-      Boolean(attachment.url)
+    const attachments = (message.attachments ?? []).filter(
+      (attachment) => Boolean(attachment.fileId) || Boolean(attachment.url)
     )
 
     if (!content && attachments.length === 0) {
@@ -64,8 +64,8 @@ export function toModelMessages(
 
 type UserContentPart =
   | { type: "input_text"; text: string }
-  | { type: "input_image"; image: string }
-  | { type: "input_file"; file: string; filename: string }
+  | { type: "input_image"; image: string | { id: string } }
+  | { type: "input_file"; file: string | { id: string }; filename: string }
 
 /**
  * Converts request messages into Agents SDK input items. Assistant history items
@@ -97,15 +97,20 @@ export function toAgentInputItems(
       content.push({ type: "input_text", text: message.content })
     }
     for (const attachment of attachments) {
-      if (!attachment.url) {
+      // Prefer the uploaded Files API id (referenced by { id }); fall back to the
+      // inline base64 data URL when the upload didn't happen.
+      const ref: string | { id: string } | undefined = attachment.fileId
+        ? { id: attachment.fileId }
+        : attachment.url
+      if (!ref) {
         continue
       }
       content.push(
         attachment.kind === "image"
-          ? { type: "input_image", image: attachment.url }
+          ? { type: "input_image", image: ref }
           : {
               type: "input_file",
-              file: attachment.url,
+              file: ref,
               filename: attachment.name,
             }
       )

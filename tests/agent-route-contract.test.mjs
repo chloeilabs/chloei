@@ -31,6 +31,16 @@ test("agent route validates model, threadId, and messages", async () => {
   )
 })
 
+test("agent route accepts either a base64 attachment url or an uploaded fileId", async () => {
+  const source = await readFile(helperPath, "utf8")
+
+  assert.match(
+    source,
+    /const attachmentRequestSchema = z[\s\S]*fileId: z\.string\(\)[\s\S]*\.refine\(\s*\(attachment\) =>\s*Boolean\(attachment\.url\) \|\| Boolean\(attachment\.fileId\)/,
+    "Expected attachments to accept a data URL or a fileId (at least one)."
+  )
+})
+
 test("agent route streams through the extracted helper path", async () => {
   const helperSource = await readFile(helperPath, "utf8")
   const routeSource = await readFile(routePath, "utf8")
