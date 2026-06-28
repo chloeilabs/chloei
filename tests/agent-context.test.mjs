@@ -23,11 +23,14 @@ const viewer = {
 }
 const baseContext = { now: new Date("2026-06-14T12:30:00.000Z") }
 
+// Stable -> volatile order (for prompt-cache prefix stability): operating and
+// identity/tone are shared; the per-user AUTH and per-request RUNTIME DATE
+// blocks come last.
 const MANDATORY_LABELS = [
   "OPERATING INSTRUCTIONS",
-  "RUNTIME DATE CONTEXT",
   "IDENTITY AND TONE CONTEXT",
   "AUTH USER CONTEXT",
+  "RUNTIME DATE CONTEXT",
 ]
 
 test("emits the mandatory prompt blocks, delimited and ordered", () => {
@@ -47,7 +50,7 @@ test("emits the mandatory prompt blocks, delimited and ordered", () => {
   assert.deepEqual(
     order,
     [...order].sort((a, b) => a - b),
-    "blocks should appear in operating/date/identity/auth order"
+    "blocks should appear in operating/identity/auth/date order"
   )
 
   assert.ok(
