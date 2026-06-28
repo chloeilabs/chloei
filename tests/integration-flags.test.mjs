@@ -33,6 +33,7 @@ const {
 const ENV_KEYS = [
   "EDGE_CONFIG",
   "AGENT_TELEMETRY_RECORD_IO",
+  "AGENT_RESPONSE_COMPACTION",
   "AGENT_RESPONSES_WS_TRANSPORT",
 ]
 
@@ -78,6 +79,7 @@ test("getDefaultAgentFeatureFlags returns fresh all-disabled copies", () => {
   const first = getDefaultAgentFeatureFlags()
   assert.deepEqual(first, {
     telemetryRecordIo: false,
+    responseCompaction: false,
     responsesWebsocketTransport: false,
   })
 
@@ -122,6 +124,7 @@ test("resolveAgentFeatureFlags defaults everything off", async () => {
   await withEnv({}, async () => {
     assert.deepEqual(await resolveAgentFeatureFlags(), {
       telemetryRecordIo: false,
+      responseCompaction: false,
       responsesWebsocketTransport: false,
     })
   })
@@ -131,6 +134,11 @@ test("resolveAgentFeatureFlags applies per-flag env overrides", async () => {
   await withEnv({ AGENT_TELEMETRY_RECORD_IO: "1" }, async () => {
     const flags = await resolveAgentFeatureFlags()
     assert.equal(flags.telemetryRecordIo, true)
+  })
+
+  await withEnv({ AGENT_RESPONSE_COMPACTION: "1" }, async () => {
+    const flags = await resolveAgentFeatureFlags()
+    assert.equal(flags.responseCompaction, true)
   })
 
   await withEnv({ AGENT_RESPONSES_WS_TRANSPORT: "1" }, async () => {

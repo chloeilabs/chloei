@@ -99,14 +99,16 @@ function composeSystemInstruction(params: {
   operatingInstruction?: string
   providerOverlaysEnabled?: boolean
 }): string {
+  // Blocks are ordered stable -> volatile so the longest possible prompt PREFIX
+  // stays byte-identical across requests, which is exactly what OpenAI prompt
+  // caching keys on. The operating instructions, provider overlay, and
+  // identity/tone are shared across all users and requests; the per-user AUTH
+  // block and the per-request RUNTIME DATE block (which embeds the current
+  // timestamp) go LAST so they don't truncate the cacheable prefix.
   const blocks = [
     formatPromptBlock(
       "OPERATING INSTRUCTIONS",
       params.operatingInstruction ?? DEFAULT_OPERATING_INSTRUCTION
-    ),
-    formatPromptBlock(
-      "RUNTIME DATE CONTEXT",
-      formatRuntimeDateContext(params.runtimeContext)
     ),
   ]
 
@@ -126,7 +128,14 @@ function composeSystemInstruction(params: {
     )
   )
 
+  // Volatile, cache-busting blocks last: per-user auth, then per-request date.
   blocks.push(formatPromptBlock("AUTH USER CONTEXT", params.authUserContext))
+  blocks.push(
+    formatPromptBlock(
+      "RUNTIME DATE CONTEXT",
+      formatRuntimeDateContext(params.runtimeContext)
+    )
+  )
 
   return blocks.join("\n\n")
 }

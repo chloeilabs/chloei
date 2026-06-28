@@ -133,6 +133,9 @@ export function createGoblinTools(params: CreateGoblinToolsParams): Tool[] {
           exaApiKey: params.exaApiKey,
           messages: [{ role: "user", content: input }],
           systemInstruction: definition.instructions,
+          // Each specialist's instructions are stable, so give it its own cache
+          // line — the prefix is reused across requests that hit this goblin.
+          promptCacheKey: definition.subagentId,
           signal: params.signal,
         })) {
           if (event.type === "text_delta") {

@@ -60,12 +60,15 @@ const messageSourceSchema = z
 
 // Persisted attachment metadata. Intentionally omits the base64 `url` (and is
 // not `.strict()`) so the large data URL is stripped out when a thread is
-// saved — stored threads keep only the lightweight descriptor.
+// saved — stored threads keep only the lightweight descriptor plus the Files
+// API `fileId` (so a reloaded thread can resend the file by id instead of
+// losing it).
 const messageAttachmentSchema = z.object({
   id: z.string().trim().min(1).max(200),
   kind: z.enum(["image", "pdf"]),
   name: z.string().trim().min(1).max(500),
   mediaType: z.string().trim().min(1).max(200),
+  fileId: z.string().trim().min(1).max(200).optional(),
 })
 
 const followUpQuestionSchema = z

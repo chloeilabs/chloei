@@ -87,15 +87,17 @@ This boundary is **enforced by Next.js bundling at build time** (importing `pg`/
 
 ### System Prompt Composition
 
-`buildAgentSystemInstruction` (`src/lib/server/agent-context.ts`) assembles the prompt per-request from labeled blocks delimited by `--- BEGIN <LABEL> ---` / `--- END <LABEL> ---`, in this order:
+`buildAgentSystemInstruction` (`src/lib/server/agent-context.ts`) assembles the prompt per-request from labeled blocks delimited by `--- BEGIN <LABEL> ---` / `--- END <LABEL> ---`. Blocks are ordered **stable → volatile** so the longest possible prompt **prefix** stays byte-identical across requests, which is what OpenAI prompt caching keys on:
 
 1. `OPERATING INSTRUCTIONS` — `DEFAULT_OPERATING_INSTRUCTION` (`src/lib/shared/llm/system-instructions.ts`)
-2. `RUNTIME DATE CONTEXT` — current UTC timestamp + user timezone (from `X-User-Timezone` header)
-3. **Provider overlay** (`PROVIDER OVERLAY: ALIBABA|ANTHROPIC|MOONSHOTAI|OPENAI|ZAI`) — keyed by the model's **provider org**, not its nickname. `agent-prompt-steering.ts` defines overlays for `alibaba`, `anthropic`, `moonshotai`, `openai`, and `zai`, but only `openai` is wired today since GPT-5.4 Mini (`gpt-5.4-mini`) is the sole model; the others are dormant. Always applied for a supported model.
-4. `IDENTITY AND TONE CONTEXT` — `DEFAULT_SOUL_FALLBACK_INSTRUCTION` (`src/lib/shared/llm/system-instructions.ts`)
-5. `AUTH USER CONTEXT` — authenticated user id, name, email
+2. **Provider overlay** (`PROVIDER OVERLAY: ALIBABA|ANTHROPIC|MOONSHOTAI|OPENAI|ZAI`) — keyed by the model's **provider org**, not its nickname. `agent-prompt-steering.ts` defines overlays for `alibaba`, `anthropic`, `moonshotai`, `openai`, and `zai`; only `openai` is wired today. Always applied for a supported model.
+3. `IDENTITY AND TONE CONTEXT` — `DEFAULT_SOUL_FALLBACK_INSTRUCTION` (`src/lib/shared/llm/system-instructions.ts`)
+4. `AUTH USER CONTEXT` — authenticated user id, name, email (per-user, semi-stable)
+5. `RUNTIME DATE CONTEXT` — current UTC timestamp + user timezone (from `X-User-Timezone` header). **Last on purpose** — it embeds the current timestamp, so keeping it ahead of the stable blocks would bust the cacheable prefix.
 
 Inline-citation rules are appended **later**, by `withAiSdkInlineCitationInstruction` (`system-instruction-augmentations.ts`), inside `createAgentStreamResponse` — not by `buildAgentSystemInstruction`.
+
+**Prompt caching** (`agent-runtime.ts` `resolvePromptCacheSettings`): every run sets a `prompt_cache_key` (via `modelSettings.providerData`) to co-locate identical prefixes — `"chloei-agent"` for the single-agent path, `"goblins-manager"` for the manager, and the goblin's `subagentId` for each sub-agent. GPT-5.5 paths also set `promptCacheRetention: "24h"`. Token usage (`result.state.usage`, incl. `inputTokensDetails.cached_tokens`) is logged on stream finish via `summarizeRunUsage`.
 
 ### Streaming Protocol
 
@@ -155,7 +157,7 @@ All models are defined in `src/lib/shared/llm/models.ts`:
 | `OPENAI_GPT_5_4_MINI` | `gpt-5.4-mini`       | GPT-5.4 Mini |
 
 - `MODEL_SELECTOR_MODELS` — the chat selector subset, rendered as a dropdown at the top-left of the home page (`model-selector.tsx`). **Order matters: the first entry (GPT-5.5) is the default.** The selection persists in `localStorage` and syncs across components via the `model-selector-updated` event.
-- The agent accepts **multimodal input**: plain text plus image (`image/png|jpeg|webp|gif`) and PDF (`application/pdf`) attachments for vision / document analysis. Attachments are added via the paperclip button in the prompt form, carried as base64 data URLs on each request message (`attachments[]` in `agentMessageSchema`), and converted to OpenAI Responses `input_image` / `input_file` content parts in `agent-runtime.ts`. Limits live in `src/lib/shared/agent-request-limits.ts` (≤5 files/message, ≤10 MB each); the request body cap is `proxyClientMaxBodySize` in `next.config.mjs`. The base64 `url` is **stripped on persistence** (`thread-payload.ts` `messageAttachmentSchema`) — stored threads keep only the lightweight `{id, kind, name, mediaType}` descriptor, so reloaded threads show a file chip rather than the original image data.
+- The agent accepts **multimodal input**: plain text plus image (`image/png|jpeg|webp|gif`) and PDF (`application/pdf`) attachments for vision / document analysis. Attachments are added via the paperclip button in the prompt form and sent as base64 data URLs the **first** time (`attachments[]` in `agentMessageSchema`). **Files-API round-trip:** before streaming, the route uploads each new base64 attachment once via the OpenAI Files API (`resolveAttachmentFileIds` in `src/lib/server/llm/attachment-uploads.ts`; images use `purpose: "vision"`, PDFs `"user_data"`), sets its `fileId`, and echoes a `{ attachmentId: fileId }` map in the `X-Attachment-File-Ids` response header. The client (`use-agent-session.ts`) stores the `fileId` on the message and, on later turns, resends the `fileId` instead of the base64 (`toRequestMessages`). `toAgentInputItems` (`agent-runtime-messages.ts`) references the file by `{ id: fileId }` (falling back to the inline base64 url). Net effect: each file is uploaded once and stays prompt-cacheable across turns. Limits live in `src/lib/shared/agent-request-limits.ts` (≤5 files/message, ≤10 MB each); the request body cap is `proxyClientMaxBodySize` in `next.config.mjs`. On persistence the base64 `url` is **stripped** but the `fileId` is **kept** (`thread-payload.ts` `messageAttachmentSchema`), so a reloaded thread can still resend the file by id.
 - Adding a model means updating `AvailableModels`, `ModelInfos`, `SUPPORTED_MODELS`, and optionally `MODEL_SELECTOR_MODELS`. `/api/models` filters this registry by configured keys (`getModels()` in `src/lib/actions/api-keys.ts`).
 
 ### Thread Storage
@@ -212,10 +214,10 @@ Better Auth handles sessions. `getRequestSession` (`src/lib/server/auth-session.
 
 ### Feature Flags
 
-`src/lib/server/integration-flags.ts` resolves default-off flags: `telemetryRecordIo` (`AGENT_TELEMETRY_RECORD_IO`) and `responsesWebsocketTransport` (`AGENT_RESPONSES_WS_TRANSPORT` — routes Responses API traffic over a persistent WebSocket via `configureResponsesTransport` in `openai-client.ts` instead of HTTP). Precedence:
+`src/lib/server/integration-flags.ts` resolves default-off flags: `telemetryRecordIo` (`AGENT_TELEMETRY_RECORD_IO`), `responseCompaction` (`AGENT_RESPONSE_COMPACTION` — enables OpenAI server-side context compaction within a run via `modelSettings.contextManagement`; `resolveContextManagementSettings` in `agent-runtime.ts`, threshold `RESPONSE_COMPACTION_TOKEN_THRESHOLD`), and `responsesWebsocketTransport` (`AGENT_RESPONSES_WS_TRANSPORT` — routes Responses API traffic over a persistent WebSocket via `configureResponsesTransport` in `openai-client.ts` instead of HTTP). Precedence:
 
 1. Explicit `AGENT_*` env var (e.g. `AGENT_TELEMETRY_RECORD_IO`).
-2. Edge Config (`EDGE_CONFIG`) — checked across three map namespaces in order: **`agent_flags`, `analytics_flags`, `flags`**, matching the dotted key (`agent.telemetry.record_io`) or its Vercel slug form (`agent-telemetry-record-io`), then top-level fallback keys.
+2. Edge Config (`EDGE_CONFIG`) — checked across three map namespaces in order: **`agent_flags`, `analytics_flags`, `flags`**, matching the dotted key (e.g. `agent.telemetry.record_io`) or its Vercel slug form (e.g. `agent-telemetry-record-io`), then top-level fallback keys.
 3. Built-in default (off).
 
 ### Background, Webhooks & Transport (run & scale)
@@ -360,16 +362,17 @@ OPENAI_API_KEY=
 
 All others are optional with safe defaults. See `.env.example` for the annotated list.
 
-| Variable                       | Purpose                                                               |
-| ------------------------------ | --------------------------------------------------------------------- |
-| `AUTH_DATABASE_URL`            | Separate DB for Better Auth (falls back to / reuses `DATABASE_URL`)   |
-| `BETTER_AUTH_TRUSTED_ORIGINS`  | Comma-separated additional trusted origins                            |
-| `BETTER_AUTH_COOKIE_DOMAIN`    | Shared cookie domain for cross-subdomain auth                         |
-| `EXA_API_KEY`                  | Enables `exa_search` + `exa_get_contents`                             |
-| `EDGE_CONFIG`                  | Vercel Edge Config connection for remote feature flags                |
-| `OPENAI_WEBHOOK_SECRET`        | Signing secret for the `/api/webhooks/openai` receiver (unset → 503)  |
-| `AGENT_TELEMETRY_RECORD_IO`    | Feature flag: record prompt/output IO in telemetry (default off)      |
-| `AGENT_RESPONSES_WS_TRANSPORT` | Feature flag: WebSocket transport for the Responses API (default off) |
+| Variable                       | Purpose                                                                        |
+| ------------------------------ | ------------------------------------------------------------------------------ |
+| `AUTH_DATABASE_URL`            | Separate DB for Better Auth (falls back to / reuses `DATABASE_URL`)            |
+| `BETTER_AUTH_TRUSTED_ORIGINS`  | Comma-separated additional trusted origins                                     |
+| `BETTER_AUTH_COOKIE_DOMAIN`    | Shared cookie domain for cross-subdomain auth                                  |
+| `EXA_API_KEY`                  | Enables `exa_search` + `exa_get_contents`                                      |
+| `EDGE_CONFIG`                  | Vercel Edge Config connection for remote feature flags                         |
+| `OPENAI_WEBHOOK_SECRET`        | Signing secret for the `/api/webhooks/openai` receiver (unset → 503)           |
+| `AGENT_TELEMETRY_RECORD_IO`    | Feature flag: record prompt/output IO in telemetry (default off)               |
+| `AGENT_RESPONSE_COMPACTION`    | Feature flag: OpenAI server-side context compaction within a run (default off) |
+| `AGENT_RESPONSES_WS_TRANSPORT` | Feature flag: WebSocket transport for the Responses API (default off)          |
 
 Request size limits, stream/gateway timeouts, tool-step budgets, and body-size limits are **fixed constants** in `src/lib/server/agent-runtime-config.ts` / `next.config.mjs` — not env-configurable. Change them in code if needed.
 

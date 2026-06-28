@@ -6,7 +6,10 @@ import {
 } from "@openai/agents"
 
 import { createLogger } from "@/lib/logger"
-import { AGENT_TOOL_MAX_STEPS } from "@/lib/server/agent-runtime-config"
+import {
+  AGENT_TOOL_MAX_STEPS,
+  RESPONSE_COMPACTION_TOKEN_THRESHOLD,
+} from "@/lib/server/agent-runtime-config"
 import { type AgentFeatureFlags } from "@/lib/server/integration-flags"
 import {
   type AgentStreamEvent,
@@ -37,6 +40,73 @@ const resolveReasoningEffort = (
 ): ReasoningEffortLevel =>
   override ?? (model === AvailableModels.OPENAI_GPT_5_5 ? "xhigh" : "high")
 
+// The single-agent path's default cache key. The prompt cache key co-locates
+// requests that share a prompt prefix on the same cache, so the large stable
+// system-prompt prefix is reused across turns/users. Sub-agents (goblins) pass
+// their own per-specialist key.
+export const DEFAULT_PROMPT_CACHE_KEY = "chloei-agent"
+
+// Enables prompt caching for a model run. GPT-5.5 supports 24h cache retention
+// (extended KV reuse across sessions); other models keep the automatic in-memory
+// cache. `prompt_cache_key` is forwarded verbatim by the SDK (via providerData)
+// as the Responses `prompt_cache_key` param.
+function resolvePromptCacheSettings(
+  model: ModelType,
+  promptCacheKey: string
+): {
+  promptCacheRetention?: "24h"
+  providerData: { prompt_cache_key: string }
+} {
+  return {
+    ...(model === AvailableModels.OPENAI_GPT_5_5
+      ? { promptCacheRetention: "24h" as const }
+      : {}),
+    providerData: { prompt_cache_key: promptCacheKey },
+  }
+}
+
+// When the responseCompaction flag is on, OpenAI compacts the run's context
+// once the rendered input crosses the threshold (the encrypted compaction item
+// carries reasoning forward within the run). Off → no contextManagement, so the
+// spread is empty and behavior is unchanged. Shared by both runtimes.
+export function resolveContextManagementSettings(enabled: boolean): {
+  contextManagement?: { type: "compaction"; compactThreshold: number }[]
+} {
+  if (!enabled) {
+    return {}
+  }
+  return {
+    contextManagement: [
+      {
+        type: "compaction",
+        compactThreshold: RESPONSE_COMPACTION_TOKEN_THRESHOLD,
+      },
+    ],
+  }
+}
+
+// Minimal structural view of the SDK's run Usage so we can log token spend
+// (including cached input tokens, under inputTokensDetails) without importing
+// the Usage class. inputTokensDetails is an array of per-request detail records
+// (e.g. [{ cached_tokens: 1234 }]).
+interface RunUsageLike {
+  requests: number
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+  inputTokensDetails: Record<string, number>[]
+}
+
+export function summarizeRunUsage(usage: RunUsageLike): RunUsageLike {
+  return {
+    requests: usage.requests,
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
+    totalTokens: usage.totalTokens,
+    inputTokensDetails: usage.inputTokensDetails,
+  }
+}
+
 export interface StartAgentRuntimeStreamParams {
   requestId?: string
   model: ModelType
@@ -51,6 +121,10 @@ export interface StartAgentRuntimeStreamParams {
   // final-synthesis fallback still fires on overrun, so a small value keeps a
   // sub-agent fast while still producing a written answer from what it gathered.
   maxToolSteps?: number
+  // Prompt cache key for this run (default DEFAULT_PROMPT_CACHE_KEY). Goblin
+  // sub-agents pass their specialist id so each specialist's stable instructions
+  // get their own cache line.
+  promptCacheKey?: string
   signal?: AbortSignal
   userId?: string
   featureFlags?: AgentFeatureFlags
@@ -110,6 +184,13 @@ export async function* startAgentRuntimeStream(
         effort: resolveReasoningEffort(params.model, params.reasoningEffort),
         summary: "auto",
       },
+      ...resolvePromptCacheSettings(
+        params.model,
+        params.promptCacheKey ?? DEFAULT_PROMPT_CACHE_KEY
+      ),
+      ...resolveContextManagementSettings(
+        params.featureFlags?.responseCompaction ?? false
+      ),
       ...(params.temperature !== undefined
         ? { temperature: params.temperature }
         : {}),
@@ -157,6 +238,7 @@ export async function* startAgentRuntimeStream(
       requestId: params.requestId,
       model: params.model,
       hasEmittedText,
+      usage: summarizeRunUsage(result.state.usage),
     })
   } catch (error) {
     if (error instanceof MaxTurnsExceededError) {
@@ -199,6 +281,10 @@ export async function* startAgentRuntimeStream(
             ),
             summary: "auto",
           },
+          ...resolvePromptCacheSettings(
+            params.model,
+            params.promptCacheKey ?? DEFAULT_PROMPT_CACHE_KEY
+          ),
           ...(params.temperature !== undefined
             ? { temperature: params.temperature }
             : {}),
