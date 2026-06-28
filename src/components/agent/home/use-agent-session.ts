@@ -349,6 +349,68 @@ export function useAgentSession({
         })
       }
 
+      // The server uploads new base64 attachments to the Files API and echoes a
+      // { attachmentId: fileId } map. Merge the fileIds into the sent message's
+      // attachments so they persist and are resent (by id, not base64) next turn.
+      const applyAttachmentFileIds = (headerValue: string | null) => {
+        if (!headerValue) {
+          return
+        }
+        let parsed: unknown
+        try {
+          parsed = JSON.parse(headerValue)
+        } catch {
+          return
+        }
+        if (!parsed || typeof parsed !== "object") {
+          return
+        }
+        const lookup = parsed as Record<string, unknown>
+
+        const current = messagesRef.current
+        const updatedMessages = current.map((message) => {
+          const attachments = message.metadata?.attachments
+          if (!attachments?.length) {
+            return message
+          }
+          const nextAttachments = attachments.map((attachment) => {
+            const fileId = lookup[attachment.id]
+            return typeof fileId === "string" &&
+              fileId.length > 0 &&
+              attachment.fileId !== fileId
+              ? { ...attachment, fileId }
+              : attachment
+          })
+          const attachmentsChanged = nextAttachments.some(
+            (attachment, index) => attachment !== attachments[index]
+          )
+          if (!attachmentsChanged) {
+            return message
+          }
+          return {
+            ...message,
+            metadata: { ...message.metadata, attachments: nextAttachments },
+          }
+        })
+
+        const changed = updatedMessages.some(
+          (message, index) => message !== current[index]
+        )
+        if (!changed) {
+          return
+        }
+
+        messagesRef.current = updatedMessages
+        saveThread(
+          createThreadSnapshot(
+            params.threadId,
+            updatedMessages,
+            effectiveModel
+          ),
+          { immediate: false }
+        )
+      }
+
       const startParallelFollowUpQuestions = () => {
         if (
           params.threadId !== currentThreadIdRef.current ||
@@ -414,6 +476,8 @@ export function useAgentSession({
         if (isModelType(responseEffectiveModel)) {
           effectiveModel = responseEffectiveModel
         }
+
+        applyAttachmentFileIds(response.headers.get("x-attachment-file-ids"))
 
         if (!response.body) {
           throw createHttpError({

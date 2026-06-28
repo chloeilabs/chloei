@@ -104,6 +104,45 @@ test("thread payload keeps attachment descriptors but strips the base64 url", ()
   assert.equal(attachment.url, undefined)
 })
 
+test("thread payload persists the attachment fileId while stripping the base64 url", () => {
+  const parsed = parseThreadPayload({
+    id: "thread-attachment-fileid",
+    messages: [
+      {
+        id: "message-1",
+        role: "user",
+        content: "Analyze this",
+        llmModel: "gpt-5.5-2026-04-23",
+        createdAt: "2026-04-26T00:00:00.000Z",
+        metadata: {
+          attachments: [
+            {
+              id: "att-1",
+              kind: "pdf",
+              name: "report.pdf",
+              mediaType: "application/pdf",
+              url: "data:application/pdf;base64,AAAABBBBCCCC",
+              fileId: "file-abc123",
+            },
+          ],
+        },
+      },
+    ],
+    createdAt: "2026-04-26T00:00:00.000Z",
+    updatedAt: "2026-04-26T00:00:00.000Z",
+  })
+
+  const attachment = parsed.messages[0].metadata.attachments[0]
+  assert.deepEqual(attachment, {
+    id: "att-1",
+    kind: "pdf",
+    name: "report.pdf",
+    mediaType: "application/pdf",
+    fileId: "file-abc123",
+  })
+  assert.equal(attachment.url, undefined)
+})
+
 test("thread payload truncates sanitized activity reasoning to the schema limit", () => {
   const rawText = `SOUL.md ${"x".repeat(100_000 - "SOUL.md ".length)}`
   const parsed = parseThreadPayload({

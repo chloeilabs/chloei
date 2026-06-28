@@ -31,8 +31,11 @@ export function getGlobalTraceProvider() {
   return { setDisabled() {} }
 }
 
-/** Builds a streamed-run result: async-iterable of events + completed + history. */
-export function makeStreamResult(events, history) {
+/**
+ * Builds a streamed-run result: async-iterable of events + completed + history
+ * + state.usage (mirrors the real SDK so usage logging can read it).
+ */
+export function makeStreamResult(events, history, usage) {
   return {
     async *[Symbol.asyncIterator]() {
       for (const event of events) {
@@ -41,6 +44,17 @@ export function makeStreamResult(events, history) {
     },
     completed: Promise.resolve(),
     history: history ?? [],
+    state: {
+      usage: usage ?? {
+        requests: 1,
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        inputTokensDetails: [],
+        outputTokensDetails: [],
+        requestUsageEntries: undefined,
+      },
+    },
   }
 }
 

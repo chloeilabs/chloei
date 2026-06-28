@@ -240,11 +240,16 @@ export interface MessageAttachment {
   name: string
   mediaType: string
   /**
-   * Base64 data URL of the file. Present in-session (so it can be sent to the
-   * model and previewed), omitted once the thread is persisted to keep stored
-   * threads lean.
+   * Base64 data URL of the file. Present in-session (so it can be previewed and
+   * uploaded), omitted once the thread is persisted to keep stored threads lean.
    */
   url?: string
+  /**
+   * OpenAI Files API id, assigned server-side after the base64 is uploaded once.
+   * Persisted and resent on later turns in place of the base64 `url` so the file
+   * is uploaded a single time and its tokens stay prompt-cacheable across turns.
+   */
+  fileId?: string
 }
 
 interface MessageMetadata {

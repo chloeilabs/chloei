@@ -14,6 +14,7 @@ import {
   FINAL_SYNTHESIS_USER_PROMPT,
   resolveContextManagementSettings,
   type StartAgentRuntimeStreamParams,
+  summarizeRunUsage,
 } from "./agent-runtime"
 import { toAgentInputItems } from "./agent-runtime-messages"
 import { createAgentStreamMapper, readTextDelta } from "./agent-stream-mapping"
@@ -21,6 +22,9 @@ import { createGoblinTools, resolveGoblinSubagent } from "./goblins-agents"
 import { configureOpenAiForAgents } from "./openai-client"
 
 const logger = createLogger("goblins-runtime")
+
+// Cache key for the GPT-5.5 manager's stable orchestration prefix.
+const GOBLINS_MANAGER_CACHE_KEY = "goblins-manager"
 
 // "Goblins" mode reuses the single-model params shape so the gateway branch is a
 // drop-in. params.model is always "goblins"; the real models are fixed here
@@ -111,6 +115,10 @@ export async function* startGoblinsRuntimeStream(
       // the "single parallel batch" instruction) so the fan-out runs in parallel
       // rather than one goblin at a time.
       parallelToolCalls: true,
+      // Manager is GPT-5.5 → 24h cache retention; the stable orchestration
+      // prefix is reused across requests via this dedicated cache key.
+      promptCacheRetention: "24h",
+      providerData: { prompt_cache_key: GOBLINS_MANAGER_CACHE_KEY },
       // The manager accumulates every goblin's brief, so it benefits most from
       // server-side compaction when that flag is on.
       ...resolveContextManagementSettings(
@@ -156,6 +164,9 @@ export async function* startGoblinsRuntimeStream(
     logger.info("Goblins runtime stream finished.", {
       requestId: params.requestId,
       hasEmittedText,
+      // Manager-only usage; each goblin logs its own usage from its
+      // startAgentRuntimeStream run.
+      usage: summarizeRunUsage(result.state.usage),
     })
   } catch (error) {
     if (error instanceof MaxTurnsExceededError) {
@@ -193,6 +204,8 @@ export async function* startGoblinsRuntimeStream(
         modelSettings: {
           reasoning: { effort: "xhigh", summary: "auto" },
           text: { verbosity: "high" },
+          promptCacheRetention: "24h",
+          providerData: { prompt_cache_key: GOBLINS_MANAGER_CACHE_KEY },
         },
       })
 

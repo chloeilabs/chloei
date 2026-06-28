@@ -22,7 +22,8 @@ interface AgentRequestAttachment {
   kind: MessageAttachment["kind"]
   name: string
   mediaType: string
-  url: string
+  url?: string
+  fileId?: string
 }
 
 interface AgentRequestMessage {
@@ -90,17 +91,27 @@ export function toRequestMessages(
     )
     .map((message) => {
       const attachments = (message.metadata?.attachments ?? [])
+        .map((attachment): AgentRequestAttachment | null => {
+          const base = {
+            id: attachment.id,
+            kind: attachment.kind,
+            name: attachment.name,
+            mediaType: attachment.mediaType,
+          }
+          // Once the server has uploaded it, reuse the fileId and drop the
+          // base64 so follow-up turns send a tiny reference instead.
+          if (typeof attachment.fileId === "string" && attachment.fileId) {
+            return { ...base, fileId: attachment.fileId }
+          }
+          if (typeof attachment.url === "string" && attachment.url.length > 0) {
+            return { ...base, url: attachment.url }
+          }
+          return null
+        })
         .filter(
-          (attachment): attachment is MessageAttachment & { url: string } =>
-            typeof attachment.url === "string" && attachment.url.length > 0
+          (attachment): attachment is AgentRequestAttachment =>
+            attachment !== null
         )
-        .map((attachment) => ({
-          id: attachment.id,
-          kind: attachment.kind,
-          name: attachment.name,
-          mediaType: attachment.mediaType,
-          url: attachment.url,
-        }))
 
       return {
         id: message.id,
