@@ -12,6 +12,7 @@ import { type AgentStreamEvent, GOBLINS_MANAGER_MODEL } from "@/lib/shared"
 import {
   FINAL_SYNTHESIS_STEP_INSTRUCTION,
   FINAL_SYNTHESIS_USER_PROMPT,
+  resolveContextManagementSettings,
   type StartAgentRuntimeStreamParams,
   summarizeRunUsage,
 } from "./agent-runtime"
@@ -118,6 +119,11 @@ export async function* startGoblinsRuntimeStream(
       // prefix is reused across requests via this dedicated cache key.
       promptCacheRetention: "24h",
       providerData: { prompt_cache_key: GOBLINS_MANAGER_CACHE_KEY },
+      // The manager accumulates every goblin's brief, so it benefits most from
+      // server-side compaction when that flag is on.
+      ...resolveContextManagementSettings(
+        params.featureFlags?.responseCompaction ?? false
+      ),
     },
     tools: goblinTools,
   })

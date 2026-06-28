@@ -6,7 +6,10 @@ import {
 } from "@openai/agents"
 
 import { createLogger } from "@/lib/logger"
-import { AGENT_TOOL_MAX_STEPS } from "@/lib/server/agent-runtime-config"
+import {
+  AGENT_TOOL_MAX_STEPS,
+  RESPONSE_COMPACTION_TOKEN_THRESHOLD,
+} from "@/lib/server/agent-runtime-config"
 import { type AgentFeatureFlags } from "@/lib/server/integration-flags"
 import {
   type AgentStreamEvent,
@@ -56,6 +59,26 @@ function resolvePromptCacheSettings(
       ? { promptCacheRetention: "24h" as const }
       : {}),
     providerData: { prompt_cache_key: promptCacheKey },
+  }
+}
+
+// When the responseCompaction flag is on, OpenAI compacts the run's context
+// once the rendered input crosses the threshold (the encrypted compaction item
+// carries reasoning forward within the run). Off → no contextManagement, so the
+// spread is empty and behavior is unchanged. Shared by both runtimes.
+export function resolveContextManagementSettings(enabled: boolean): {
+  contextManagement?: { type: "compaction"; compactThreshold: number }[]
+} {
+  if (!enabled) {
+    return {}
+  }
+  return {
+    contextManagement: [
+      {
+        type: "compaction",
+        compactThreshold: RESPONSE_COMPACTION_TOKEN_THRESHOLD,
+      },
+    ],
   }
 }
 
@@ -158,6 +181,9 @@ export async function* startAgentRuntimeStream(
       ...resolvePromptCacheSettings(
         params.model,
         params.promptCacheKey ?? DEFAULT_PROMPT_CACHE_KEY
+      ),
+      ...resolveContextManagementSettings(
+        params.featureFlags?.responseCompaction ?? false
       ),
       ...(params.temperature !== undefined
         ? { temperature: params.temperature }

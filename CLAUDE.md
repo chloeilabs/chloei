@@ -214,10 +214,10 @@ Better Auth handles sessions. `getRequestSession` (`src/lib/server/auth-session.
 
 ### Feature Flags
 
-`src/lib/server/integration-flags.ts` resolves one default-off flag: `telemetryRecordIo`. Precedence:
+`src/lib/server/integration-flags.ts` resolves default-off flags: `telemetryRecordIo` (`AGENT_TELEMETRY_RECORD_IO`) and `responseCompaction` (`AGENT_RESPONSE_COMPACTION` — enables OpenAI server-side context compaction within a run via `modelSettings.contextManagement`; `resolveContextManagementSettings` in `agent-runtime.ts`, threshold `RESPONSE_COMPACTION_TOKEN_THRESHOLD`). Precedence:
 
-1. Explicit `AGENT_*` env var (`AGENT_TELEMETRY_RECORD_IO`).
-2. Edge Config (`EDGE_CONFIG`) — checked across three map namespaces in order: **`agent_flags`, `analytics_flags`, `flags`**, matching the dotted key (`agent.telemetry.record_io`) or its Vercel slug form (`agent-telemetry-record-io`), then top-level fallback keys.
+1. Explicit `AGENT_*` env var (e.g. `AGENT_TELEMETRY_RECORD_IO`).
+2. Edge Config (`EDGE_CONFIG`) — checked across three map namespaces in order: **`agent_flags`, `analytics_flags`, `flags`**, matching the dotted key (e.g. `agent.telemetry.record_io`) or its Vercel slug form (e.g. `agent-telemetry-record-io`), then top-level fallback keys.
 3. Built-in default (off).
 
 ### Observability and Telemetry
@@ -352,14 +352,15 @@ OPENAI_API_KEY=
 
 All others are optional with safe defaults. See `.env.example` for the annotated list.
 
-| Variable                      | Purpose                                                             |
-| ----------------------------- | ------------------------------------------------------------------- |
-| `AUTH_DATABASE_URL`           | Separate DB for Better Auth (falls back to / reuses `DATABASE_URL`) |
-| `BETTER_AUTH_TRUSTED_ORIGINS` | Comma-separated additional trusted origins                          |
-| `BETTER_AUTH_COOKIE_DOMAIN`   | Shared cookie domain for cross-subdomain auth                       |
-| `EXA_API_KEY`                 | Enables `exa_search` + `exa_get_contents`                           |
-| `EDGE_CONFIG`                 | Vercel Edge Config connection for remote feature flags              |
-| `AGENT_TELEMETRY_RECORD_IO`   | Feature flag: record prompt/output IO in telemetry (default off)    |
+| Variable                      | Purpose                                                                        |
+| ----------------------------- | ------------------------------------------------------------------------------ |
+| `AUTH_DATABASE_URL`           | Separate DB for Better Auth (falls back to / reuses `DATABASE_URL`)            |
+| `BETTER_AUTH_TRUSTED_ORIGINS` | Comma-separated additional trusted origins                                     |
+| `BETTER_AUTH_COOKIE_DOMAIN`   | Shared cookie domain for cross-subdomain auth                                  |
+| `EXA_API_KEY`                 | Enables `exa_search` + `exa_get_contents`                                      |
+| `EDGE_CONFIG`                 | Vercel Edge Config connection for remote feature flags                         |
+| `AGENT_TELEMETRY_RECORD_IO`   | Feature flag: record prompt/output IO in telemetry (default off)               |
+| `AGENT_RESPONSE_COMPACTION`   | Feature flag: OpenAI server-side context compaction within a run (default off) |
 
 Request size limits, stream/gateway timeouts, tool-step budgets, and body-size limits are **fixed constants** in `src/lib/server/agent-runtime-config.ts` / `next.config.mjs` — not env-configurable. Change them in code if needed.
 
