@@ -87,15 +87,17 @@ This boundary is **enforced by Next.js bundling at build time** (importing `pg`/
 
 ### System Prompt Composition
 
-`buildAgentSystemInstruction` (`src/lib/server/agent-context.ts`) assembles the prompt per-request from labeled blocks delimited by `--- BEGIN <LABEL> ---` / `--- END <LABEL> ---`, in this order:
+`buildAgentSystemInstruction` (`src/lib/server/agent-context.ts`) assembles the prompt per-request from labeled blocks delimited by `--- BEGIN <LABEL> ---` / `--- END <LABEL> ---`. Blocks are ordered **stable → volatile** so the longest possible prompt **prefix** stays byte-identical across requests, which is what OpenAI prompt caching keys on:
 
 1. `OPERATING INSTRUCTIONS` — `DEFAULT_OPERATING_INSTRUCTION` (`src/lib/shared/llm/system-instructions.ts`)
-2. `RUNTIME DATE CONTEXT` — current UTC timestamp + user timezone (from `X-User-Timezone` header)
-3. **Provider overlay** (`PROVIDER OVERLAY: ALIBABA|ANTHROPIC|MOONSHOTAI|OPENAI|ZAI`) — keyed by the model's **provider org**, not its nickname. `agent-prompt-steering.ts` defines overlays for `alibaba`, `anthropic`, `moonshotai`, `openai`, and `zai`, but only `openai` is wired today since GPT-5.4 Mini (`gpt-5.4-mini`) is the sole model; the others are dormant. Always applied for a supported model.
-4. `IDENTITY AND TONE CONTEXT` — `DEFAULT_SOUL_FALLBACK_INSTRUCTION` (`src/lib/shared/llm/system-instructions.ts`)
-5. `AUTH USER CONTEXT` — authenticated user id, name, email
+2. **Provider overlay** (`PROVIDER OVERLAY: ALIBABA|ANTHROPIC|MOONSHOTAI|OPENAI|ZAI`) — keyed by the model's **provider org**, not its nickname. `agent-prompt-steering.ts` defines overlays for `alibaba`, `anthropic`, `moonshotai`, `openai`, and `zai`; only `openai` is wired today. Always applied for a supported model.
+3. `IDENTITY AND TONE CONTEXT` — `DEFAULT_SOUL_FALLBACK_INSTRUCTION` (`src/lib/shared/llm/system-instructions.ts`)
+4. `AUTH USER CONTEXT` — authenticated user id, name, email (per-user, semi-stable)
+5. `RUNTIME DATE CONTEXT` — current UTC timestamp + user timezone (from `X-User-Timezone` header). **Last on purpose** — it embeds the current timestamp, so keeping it ahead of the stable blocks would bust the cacheable prefix.
 
 Inline-citation rules are appended **later**, by `withAiSdkInlineCitationInstruction` (`system-instruction-augmentations.ts`), inside `createAgentStreamResponse` — not by `buildAgentSystemInstruction`.
+
+**Prompt caching** (`agent-runtime.ts` `resolvePromptCacheSettings`): every run sets a `prompt_cache_key` (via `modelSettings.providerData`) to co-locate identical prefixes — `"chloei-agent"` for the single-agent path, `"goblins-manager"` for the manager, and the goblin's `subagentId` for each sub-agent. GPT-5.5 paths also set `promptCacheRetention: "24h"`. Token usage (`result.state.usage`, incl. `inputTokensDetails.cached_tokens`) is logged on stream finish via `summarizeRunUsage`.
 
 ### Streaming Protocol
 
