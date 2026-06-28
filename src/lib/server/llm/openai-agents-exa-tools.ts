@@ -1,4 +1,5 @@
-import { tool } from "@openai/agents"
+import { type Tool,tool } from "@openai/agents"
+import { webSearchTool } from "@openai/agents-openai"
 import Exa from "exa-js"
 import { z } from "zod"
 
@@ -458,19 +459,83 @@ function parseToolResultPayload(value: unknown): ExaToolResultPayload | null {
   }
 }
 
+// Exa rate-limits at roughly 10 concurrent requests per key. The Goblins fan-out
+// (up to 6 sub-agents searching in parallel, plus any concurrent requests) easily
+// exceeds that, so a process-wide gate caps in-flight Exa calls and any 429/5xx
+// that still slips through is retried with backoff — otherwise searches surface
+// as failed (red ✗) steps and goblins waste their budget retrying the same query.
+const EXA_MAX_CONCURRENCY = 6
+const EXA_MAX_RETRIES = 4
+
+let exaActiveCount = 0
+const exaWaiters: (() => void)[] = []
+
+function acquireExaSlot(): Promise<void> {
+  if (exaActiveCount < EXA_MAX_CONCURRENCY) {
+    exaActiveCount += 1
+    return Promise.resolve()
+  }
+  return new Promise((resolve) => {
+    exaWaiters.push(() => {
+      exaActiveCount += 1
+      resolve()
+    })
+  })
+}
+
+function releaseExaSlot(): void {
+  exaActiveCount = Math.max(0, exaActiveCount - 1)
+  exaWaiters.shift()?.()
+}
+
+function isRetriableExaError(error: unknown): boolean {
+  const record = asRecord(error)
+  const status =
+    typeof record?.status === "number"
+      ? record.status
+      : typeof record?.statusCode === "number"
+        ? record.statusCode
+        : undefined
+  return status === 429 || (status !== undefined && status >= 500 && status < 600)
+}
+
+/** Runs an Exa call under the shared concurrency gate, retrying 429/5xx with backoff. */
+async function runExaRequest<T>(fn: () => Promise<T>): Promise<T> {
+  await acquireExaSlot()
+  try {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await fn()
+      } catch (error) {
+        if (attempt >= EXA_MAX_RETRIES || !isRetriableExaError(error)) {
+          throw error
+        }
+        const delayMs = 400 * Math.pow(2, attempt) + Math.random() * 300
+        await new Promise((resolve) => setTimeout(resolve, delayMs))
+      }
+    }
+  } finally {
+    releaseExaSlot()
+  }
+}
+
 /**
- * Builds the Exa web-search tools for the OpenAI Agents SDK. Returns an empty
- * array when no Exa key is configured (the agent then runs without web tools).
+ * Builds the agent's web tools for the OpenAI Agents SDK: OpenAI's hosted
+ * web_search tool (always available — it uses the OpenAI key) plus the Exa
+ * search/read function tools when an Exa key is configured. Giving the model both
+ * lets it cross-source and gives it a fallback when one provider rate-limits.
  */
-export function createOpenAiAgentsExaTools(apiKey?: string) {
+export function createOpenAiAgentsExaTools(apiKey?: string): Tool[] {
+  const tools: Tool[] = [webSearchTool({ searchContextSize: "medium" })]
+
   const normalized = apiKey?.trim()
   if (!normalized) {
-    return []
+    return tools
   }
 
   const client = createExaClient(normalized)
 
-  return [
+  tools.push(
     tool({
       name: EXA_SEARCH_TOOL_NAME,
       description:
@@ -485,21 +550,23 @@ export function createOpenAiAgentsExaTools(apiKey?: string) {
           const startPublishedDate = timeRangeToStartDate(input.timeRange)
           const category: ExaSearchCategory = input.category
 
-          const response = await client.search(input.query, {
-            type: "auto",
-            numResults: maxResults,
-            contents: {
-              text: { maxCharacters: EXA_SEARCH_TEXT_MAX_CHARACTERS },
-            },
-            ...(category ? { category } : {}),
-            ...(startPublishedDate ? { startPublishedDate } : {}),
-            ...(input.includeDomains && input.includeDomains.length > 0
-              ? { includeDomains: input.includeDomains }
-              : {}),
-            ...(input.excludeDomains && input.excludeDomains.length > 0
-              ? { excludeDomains: input.excludeDomains }
-              : {}),
-          })
+          const response = await runExaRequest(() =>
+            client.search(input.query, {
+              type: "auto",
+              numResults: maxResults,
+              contents: {
+                text: { maxCharacters: EXA_SEARCH_TEXT_MAX_CHARACTERS },
+              },
+              ...(category ? { category } : {}),
+              ...(startPublishedDate ? { startPublishedDate } : {}),
+              ...(input.includeDomains && input.includeDomains.length > 0
+                ? { includeDomains: input.includeDomains }
+                : {}),
+              ...(input.excludeDomains && input.excludeDomains.length > 0
+                ? { excludeDomains: input.excludeDomains }
+                : {}),
+            })
+          )
 
           return {
             output: toSearchOutput(input.query, response),
@@ -522,10 +589,12 @@ export function createOpenAiAgentsExaTools(apiKey?: string) {
             new Set(input.urls.map((url) => url.trim()).filter((url) => url))
           ).slice(0, EXA_GET_CONTENTS_MAX_URLS)
 
-          const response = await client.getContents(urls, {
-            text: true,
-            livecrawl: "fallback",
-          })
+          const response = await runExaRequest(() =>
+            client.getContents(urls, {
+              text: true,
+              livecrawl: "fallback",
+            })
+          )
 
           return {
             output: toGetContentsOutput(urls, response),
@@ -536,8 +605,10 @@ export function createOpenAiAgentsExaTools(apiKey?: string) {
           } satisfies ExaToolResultPayload
         }
       },
-    }),
-  ]
+    })
+  )
+
+  return tools
 }
 
 export function getExaToolCallMetadata(

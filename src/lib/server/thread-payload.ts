@@ -7,6 +7,7 @@ import {
   type ModelType,
   sanitizeReasoningForDisplay,
   SEARCH_TOOL_NAMES,
+  SUBAGENT_IDS,
   type Thread,
   type ThreadSummary,
   TOOL_NAMES,
@@ -42,6 +43,7 @@ const ISO_DATETIME_SCHEMA = z.iso.datetime({ offset: true })
 const TOOL_NAME_SCHEMA = z.enum(TOOL_NAMES)
 const SEARCH_TOOL_NAME_SCHEMA = z.enum(SEARCH_TOOL_NAMES)
 const TOOL_INVOCATION_STATUS_SCHEMA = z.enum(["running", "success", "error"])
+const SUBAGENT_ID_SCHEMA = z.enum(SUBAGENT_IDS)
 const AGENT_RUN_STATUS_SCHEMA = z.enum(AGENT_RUN_STATUSES)
 const MODEL_TYPE_SCHEMA = z.custom<ModelType>(
   isModelType,
@@ -146,11 +148,26 @@ const reasoningActivityTimelineEntrySchema = z
   })
   .strict()
 
+const subagentActivityTimelineEntrySchema = z
+  .object({
+    id: z.string().trim().min(1).max(200),
+    kind: z.literal("subagent"),
+    order: z.number().int().nonnegative(),
+    createdAt: ISO_DATETIME_SCHEMA,
+    callId: z.string().trim().min(1).max(200).nullable(),
+    subagentId: SUBAGENT_ID_SCHEMA,
+    label: z.string().trim().min(1).max(500),
+    task: z.string().trim().min(1).max(10_000).optional(),
+    status: TOOL_INVOCATION_STATUS_SCHEMA,
+  })
+  .strict()
+
 const activityTimelineEntrySchema = z.union([
   toolActivityTimelineEntrySchema,
   searchActivityTimelineEntrySchema,
   sourcesActivityTimelineEntrySchema,
   reasoningActivityTimelineEntrySchema,
+  subagentActivityTimelineEntrySchema,
 ])
 
 const legacyCrewStatusActivityTimelineEntrySchema = z

@@ -1,6 +1,7 @@
 "use client"
 
 import { ChevronDown } from "lucide-react"
+import Image from "next/image"
 import { useMemo } from "react"
 
 import { Button } from "@/components/ui/button"
@@ -13,7 +14,44 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useModels } from "@/hooks/agent/use-models"
 import { usePersistentSelectedModel } from "@/hooks/agent/use-persistent-selected-model"
-import { getModelSelectorModels, type ModelType } from "@/lib/shared"
+import {
+  getModelSelectorModels,
+  isGoblinsModel,
+  type ModelInfo,
+  type ModelType,
+} from "@/lib/shared"
+
+/** Per-model selector icon: goblin face for Goblins mode, OpenAI mark for GPT. */
+function modelIconSrc(model: ModelInfo): string | null {
+  if (isGoblinsModel(model.id)) {
+    return "/goblin.png"
+  }
+  if (model.id.startsWith("gpt-")) {
+    return "/openai_dark.svg"
+  }
+  return null
+}
+
+/** Model name, prefixed with its brand/mode icon. */
+function ModelOptionLabel({ model }: { model: ModelInfo }) {
+  const iconSrc = modelIconSrc(model)
+  return (
+    <span className="flex items-center gap-1.5">
+      {iconSrc && (
+        <Image
+          src={iconSrc}
+          alt=""
+          width={18}
+          height={18}
+          aria-hidden="true"
+          unoptimized
+          className="size-[18px] shrink-0 rounded-sm"
+        />
+      )}
+      {model.name}
+    </span>
+  )
+}
 
 export function ModelSelector({
   initialSelectedModel,
@@ -48,7 +86,7 @@ export function ModelSelector({
           className="pointer-events-auto -ml-2 gap-1 font-medium text-muted-foreground hover:text-foreground"
           aria-label="Select model"
         >
-          {activeModel?.name ?? "Model"}
+          {activeModel ? <ModelOptionLabel model={activeModel} /> : "Model"}
           <ChevronDown className="size-4 opacity-60" aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
@@ -62,8 +100,12 @@ export function ModelSelector({
           }}
         >
           {modelSelectorModels.map((model) => (
-            <DropdownMenuRadioItem key={model.id} value={model.id}>
-              {model.name}
+            <DropdownMenuRadioItem
+              key={model.id}
+              value={model.id}
+              closeOnClick
+            >
+              <ModelOptionLabel model={model} />
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>

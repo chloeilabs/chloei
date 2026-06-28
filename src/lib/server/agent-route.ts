@@ -9,6 +9,7 @@ import type { AgentFeatureFlags } from "@/lib/server/integration-flags"
 import {
   type AgentStreamEvent,
   ALL_MODELS,
+  isGoblinsModel,
   MODEL_SELECTOR_MODELS,
   type ModelInfo,
   type ModelType,
@@ -259,7 +260,9 @@ function isTimeoutLikeError(error: unknown): boolean {
 function isSupportedModel(model: unknown): model is ModelType {
   return (
     typeof model === "string" &&
-    (ALL_MODELS as readonly string[]).includes(model)
+    // "goblins" is a selectable virtual mode, not part of ALL_MODELS (the real
+    // callable models), so it is accepted explicitly here.
+    ((ALL_MODELS as readonly string[]).includes(model) || isGoblinsModel(model))
   )
 }
 

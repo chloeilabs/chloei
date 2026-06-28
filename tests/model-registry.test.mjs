@@ -40,15 +40,37 @@ test("shared model registry exposes GPT-5.5 (default) and GPT-5.4 Mini", async (
     "Expected SUPPORTED_MODELS to list GPT-5.5 first, then GPT-5.4 Mini."
   )
 
+  // GPT-5.5 stays first (default); "goblins" is appended as the last selector
+  // entry (the virtual multi-agent mode).
   assert.match(
     source,
-    /MODEL_SELECTOR_MODELS = \[\s*AvailableModels\.OPENAI_GPT_5_5,\s*AvailableModels\.OPENAI_GPT_5_4_MINI,?\s*\] as const/,
-    "Expected MODEL_SELECTOR_MODELS to list GPT-5.5 first (default), then GPT-5.4 Mini."
+    /MODEL_SELECTOR_MODELS = \[\s*AvailableModels\.OPENAI_GPT_5_5,\s*AvailableModels\.OPENAI_GPT_5_4_MINI,\s*AvailableModels\.OPENAI_GOBLINS,?\s*\] as const/,
+    "Expected MODEL_SELECTOR_MODELS to list GPT-5.5, GPT-5.4 Mini, then Goblins."
   )
 
   assert.match(
     source,
     /\[AvailableModels\.OPENAI_GPT_5_5\]:\s*\{[\s\S]*name:\s*"GPT-5\.5"/,
     "Expected ModelInfos to define display metadata for OPENAI_GPT_5_5."
+  )
+
+  // "goblins" is a virtual selectable mode: present in AvailableModels +
+  // ModelInfos, but NOT in SUPPORTED_MODELS / ALL_MODELS (the real models).
+  assert.match(
+    source,
+    /OPENAI_GOBLINS:\s*"goblins"/,
+    "Expected AvailableModels to include the virtual OPENAI_GOBLINS id."
+  )
+  assert.match(
+    source,
+    /\[AvailableModels\.OPENAI_GOBLINS\]:\s*\{[\s\S]*name:\s*"Goblins"/,
+    "Expected ModelInfos to define display metadata for OPENAI_GOBLINS."
+  )
+  // [^\]]* stays within the SUPPORTED_MODELS array (up to its closing bracket),
+  // so this asserts Goblins is not one of the real callable models.
+  assert.doesNotMatch(
+    source,
+    /SUPPORTED_MODELS = \[[^\]]*OPENAI_GOBLINS/,
+    "Expected Goblins to be excluded from SUPPORTED_MODELS (it is a mode, not a real model)."
   )
 })

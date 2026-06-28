@@ -5,7 +5,6 @@ import {
   run,
 } from "@openai/agents"
 
-import { asRecord, asString } from "@/lib/cast"
 import { createLogger } from "@/lib/logger"
 import { AGENT_TOOL_MAX_STEPS } from "@/lib/server/agent-runtime-config"
 import { type AgentFeatureFlags } from "@/lib/server/integration-flags"
@@ -17,29 +16,23 @@ import {
 
 import {
   type AgentInputMessage,
-  toModelMessages,
+  toAgentInputItems,
 } from "./agent-runtime-messages"
-import { createReasoningDisplaySanitizer } from "./initial-reasoning-chunk-sanitizer"
-import {
-  createOpenAiAgentsExaTools,
-  getExaToolCallMetadata,
-  getExaToolResultMetadata,
-  isExaToolName,
-} from "./openai-agents-exa-tools"
+import { createAgentStreamMapper, readTextDelta } from "./agent-stream-mapping"
+import { createOpenAiAgentsExaTools } from "./openai-agents-exa-tools"
 import { configureOpenAiForAgents } from "./openai-client"
 
 const logger = createLogger("agent-runtime")
 
-type ReasoningEffortLevel = "high" | "xhigh"
+export type ReasoningEffortLevel = "high" | "xhigh"
 
-// GPT-5.5 runs at xhigh reasoning effort; other models default to high.
-const resolveReasoningEffort = (model: ModelType): ReasoningEffortLevel =>
-  model === AvailableModels.OPENAI_GPT_5_5 ? "xhigh" : "high"
-
-type UserContentPart =
-  | { type: "input_text"; text: string }
-  | { type: "input_image"; image: string }
-  | { type: "input_file"; file: string; filename: string }
+// GPT-5.5 runs at xhigh reasoning effort; other models default to high. Callers
+// (e.g. the Goblins sub-agents) may force a level via reasoningEffort.
+const resolveReasoningEffort = (
+  model: ModelType,
+  override?: ReasoningEffortLevel
+): ReasoningEffortLevel =>
+  override ?? (model === AvailableModels.OPENAI_GPT_5_5 ? "xhigh" : "high")
 
 export interface StartAgentRuntimeStreamParams {
   requestId?: string
@@ -50,6 +43,11 @@ export interface StartAgentRuntimeStreamParams {
   messages: AgentInputMessage[]
   systemInstruction: string
   temperature?: number
+  reasoningEffort?: ReasoningEffortLevel
+  // Overrides the tool-step budget (default AGENT_TOOL_MAX_STEPS). The forced
+  // final-synthesis fallback still fires on overrun, so a small value keeps a
+  // sub-agent fast while still producing a written answer from what it gathered.
+  maxToolSteps?: number
   signal?: AbortSignal
   userId?: string
   featureFlags?: AgentFeatureFlags
@@ -66,7 +64,7 @@ const MID_BUDGET_SYNTHESIS_REMINDER = [
   "Always finish by writing the user-facing answer; mirror the user's exact terminology (named metrics, defined terms, proper nouns) rather than paraphrasing.",
 ].join(" ")
 
-const FINAL_SYNTHESIS_STEP_INSTRUCTION = [
+export const FINAL_SYNTHESIS_STEP_INSTRUCTION = [
   "You are on the final synthesis step for this request.",
   "Do not call any tools on this step.",
   "You MUST write a final answer now using the tool results and sources already gathered.",
@@ -75,126 +73,17 @@ const FINAL_SYNTHESIS_STEP_INSTRUCTION = [
   "Cite the sources you used inline. Do not stall, do not stay silent, and do not ask the user to retry.",
 ].join(" ")
 
-const FINAL_SYNTHESIS_USER_PROMPT =
+export const FINAL_SYNTHESIS_USER_PROMPT =
   "Now write the final answer to my original question using the tool results above. Mirror my exact terminology. Do not call any tools. An empty response is not acceptable — if the evidence is partial, write what you found and name the gap."
 
-function getSourceEvent(
-  id: string,
-  url: string,
-  title: string
-): Extract<AgentStreamEvent, { type: "source" }> {
-  return {
-    type: "source",
-    source: {
-      id,
-      url,
-      title,
-    },
-  }
-}
-
-function shouldSkipReasoningChunk(text: string): boolean {
-  return text.trim() === "[REDACTED]"
-}
-
-function parseToolArguments(value: unknown): unknown {
-  if (typeof value === "string") {
-    try {
-      return JSON.parse(value)
-    } catch {
-      return {}
-    }
-  }
-  return value
-}
-
-function normalizeToolOutput(value: unknown): unknown {
-  if (typeof value === "string") {
-    try {
-      return JSON.parse(value)
-    } catch {
-      return value
-    }
-  }
-  return value
-}
-
-// The Agents SDK emits NORMALIZED raw-model events: assistant text arrives as
-// { type: "output_text_delta", delta }. Reasoning summaries have no normalized
-// event, so they come via the raw passthrough { type: "model", event: <OpenAI
-// Responses event> } as response.reasoning_summary_text.delta.
-function readTextDelta(eventData: unknown): string | null {
-  const data = asRecord(eventData)
-  if (asString(data?.type) === "output_text_delta") {
-    return asString(data?.delta) ?? ""
-  }
-  return null
-}
-
-function readReasoningDelta(eventData: unknown): string | null {
-  const data = asRecord(eventData)
-  if (asString(data?.type) !== "model") {
-    return null
-  }
-  const raw = asRecord(data?.event)
-  const rawType = asString(raw?.type)
-  if (
-    rawType === "response.reasoning_summary_text.delta" ||
-    rawType === "response.reasoning_text.delta"
-  ) {
-    return asString(raw?.delta) ?? ""
-  }
-  return null
-}
-
-function buildInstructions(systemInstruction: string): string {
+export function buildInstructions(systemInstruction: string): string {
   return `${systemInstruction}\n\n${MID_BUDGET_SYNTHESIS_REMINDER}`
 }
 
 export async function* startAgentRuntimeStream(
   params: StartAgentRuntimeStreamParams
 ): AsyncGenerator<AgentStreamEvent> {
-  // Convert to Agents SDK input items. User content may be a plain string, but
-  // assistant history items require a content array of output_text parts (a
-  // plain string throws "item.content.map is not a function" on multi-turn).
-  // User messages with attachments become a multimodal content array
-  // (input_text + input_image / input_file) for vision / PDF analysis.
-  const inputItems = toModelMessages(params.messages).map(
-    (message): AgentInputItem => {
-      if (message.role === "assistant") {
-        return {
-          role: "assistant",
-          status: "completed",
-          content: [{ type: "output_text", text: message.content }],
-        }
-      }
-
-      const attachments = message.attachments ?? []
-      if (attachments.length === 0) {
-        return { role: "user", content: message.content }
-      }
-
-      const content: UserContentPart[] = []
-      if (message.content) {
-        content.push({ type: "input_text", text: message.content })
-      }
-      for (const attachment of attachments) {
-        if (!attachment.url) {
-          continue
-        }
-        content.push(
-          attachment.kind === "image"
-            ? { type: "input_image", image: attachment.url }
-            : {
-                type: "input_file",
-                file: attachment.url,
-                filename: attachment.name,
-              }
-        )
-      }
-      return { role: "user", content }
-    }
-  )
+  const inputItems = toAgentInputItems(params.messages)
   if (inputItems.length === 0) {
     return
   }
@@ -204,26 +93,7 @@ export async function* startAgentRuntimeStream(
   const tools = createOpenAiAgentsExaTools(params.exaApiKey?.trim())
   const toolNames = tools.map((tool) => tool.name)
 
-  const seenToolCalls = new Set<string>()
-  const finalizedToolCalls = new Set<string>()
-  const seenSourceKeys = new Set<string>()
-  const toolNamesByCallId = new Map<string, string>()
-  const sanitizeReasoningChunk = createReasoningDisplaySanitizer()
-
-  const createSourceEvent = (
-    id: string,
-    url: string,
-    title: string
-  ): Extract<AgentStreamEvent, { type: "source" }> | null => {
-    const normalizedUrl = url.trim()
-    const normalizedTitle = title.trim() || normalizedUrl
-    if (!normalizedUrl || seenSourceKeys.has(normalizedUrl)) {
-      return null
-    }
-
-    seenSourceKeys.add(normalizedUrl)
-    return getSourceEvent(id, normalizedUrl, normalizedTitle)
-  }
+  const mapper = createAgentStreamMapper()
 
   const agent = new Agent({
     name: "chloei-agent",
@@ -231,7 +101,7 @@ export async function* startAgentRuntimeStream(
     model: params.model,
     modelSettings: {
       reasoning: {
-        effort: resolveReasoningEffort(params.model),
+        effort: resolveReasoningEffort(params.model, params.reasoningEffort),
         summary: "auto",
       },
       ...(params.temperature !== undefined
@@ -252,129 +122,25 @@ export async function* startAgentRuntimeStream(
 
   const result = await run(agent, inputItems, {
     stream: true,
-    maxTurns: AGENT_TOOL_MAX_STEPS,
+    maxTurns: params.maxToolSteps ?? AGENT_TOOL_MAX_STEPS,
     signal: params.signal,
   })
 
   try {
     for await (const event of result) {
       if (event.type === "raw_model_stream_event") {
-        const reasoningDelta = readReasoningDelta(event.data)
-        if (reasoningDelta !== null) {
-          const delta = sanitizeReasoningChunk(reasoningDelta)
-          if (delta.length > 0 && !shouldSkipReasoningChunk(delta)) {
-            yield { type: "reasoning_delta", delta }
+        for (const mapped of mapper.mapRawModelEvent(event.data)) {
+          if (mapped.type === "text_delta") {
+            hasEmittedText = true
           }
-          continue
-        }
-
-        const textDelta = readTextDelta(event.data)
-        if (textDelta && textDelta.length > 0) {
-          hasEmittedText = true
-          yield { type: "text_delta", delta: textDelta }
+          yield mapped
         }
         continue
       }
 
       if (event.type === "run_item_stream_event") {
-        const item = asRecord(event.item)
-        const rawItem = asRecord(item?.rawItem)
-
-        if (event.name === "tool_called") {
-          const callId = asString(rawItem?.callId)
-          const toolName = asString(rawItem?.name)
-          if (!callId || !toolName) {
-            continue
-          }
-          toolNamesByCallId.set(callId, toolName)
-
-          const metadata = getExaToolCallMetadata({
-            toolCallId: callId,
-            toolName,
-            input: parseToolArguments(rawItem?.arguments),
-          })
-          if (!metadata || seenToolCalls.has(metadata.callId)) {
-            continue
-          }
-
-          seenToolCalls.add(metadata.callId)
-          yield {
-            type: "tool_call",
-            callId: metadata.callId,
-            toolName: metadata.toolName,
-            label: metadata.label,
-            ...(metadata.query ? { query: metadata.query } : {}),
-            ...(metadata.operation ? { operation: metadata.operation } : {}),
-            ...(metadata.provider ? { provider: metadata.provider } : {}),
-          }
-          continue
-        }
-
-        if (event.name === "tool_output") {
-          const callId = asString(rawItem?.callId)
-          const toolName =
-            asString(rawItem?.name) ??
-            (callId ? toolNamesByCallId.get(callId) : undefined)
-          if (!callId || !toolName || !isExaToolName(toolName)) {
-            continue
-          }
-          if (finalizedToolCalls.has(callId)) {
-            continue
-          }
-
-          const normalizedOutput = normalizeToolOutput(item?.output)
-
-          // The SDK returns a plain string (not our {output|error} payload) when
-          // the model sent invalid tool-call arguments and execute never ran
-          // (InvalidToolInputError). Surface it as a clean, retryable error.
-          if (!asRecord(normalizedOutput)) {
-            finalizedToolCalls.add(callId)
-            yield {
-              type: "tool_result",
-              callId,
-              toolName,
-              status: "error",
-              operation: toolName === "exa_search" ? "search" : "get_contents",
-              provider: "exa",
-              errorCode: "TOOL_INPUT_ERROR",
-              retryable: true,
-            }
-            continue
-          }
-
-          const metadata = getExaToolResultMetadata({
-            toolCallId: callId,
-            toolName,
-            output: normalizedOutput,
-          })
-          if (!metadata) {
-            continue
-          }
-
-          finalizedToolCalls.add(metadata.callId)
-          yield {
-            type: "tool_result",
-            callId: metadata.callId,
-            toolName: metadata.toolName,
-            status: metadata.status,
-            ...(metadata.operation ? { operation: metadata.operation } : {}),
-            ...(metadata.provider ? { provider: metadata.provider } : {}),
-            ...(metadata.errorCode ? { errorCode: metadata.errorCode } : {}),
-            ...(metadata.retryable !== undefined
-              ? { retryable: metadata.retryable }
-              : {}),
-          }
-
-          for (const source of metadata.sources) {
-            const sourceEvent = createSourceEvent(
-              source.id,
-              source.url,
-              source.title
-            )
-            if (sourceEvent) {
-              yield sourceEvent
-            }
-          }
+        for (const mapped of mapper.mapRunItemEvent(event.name, event.item)) {
+          yield mapped
         }
         continue
       }
@@ -403,12 +169,8 @@ export async function* startAgentRuntimeStream(
     }
   }
 
-  const finalReasoningDelta = sanitizeReasoningChunk.flush()
-  if (
-    finalReasoningDelta.length > 0 &&
-    !shouldSkipReasoningChunk(finalReasoningDelta)
-  ) {
-    yield { type: "reasoning_delta", delta: finalReasoningDelta }
+  for (const mapped of mapper.flushReasoning()) {
+    yield mapped
   }
 
   // Forced final-synthesis safety net: if the run finished (or hit the turn cap)
@@ -425,7 +187,7 @@ export async function* startAgentRuntimeStream(
         model: params.model,
         modelSettings: {
           reasoning: {
-            effort: resolveReasoningEffort(params.model),
+            effort: resolveReasoningEffort(params.model, params.reasoningEffort),
             summary: "auto",
           },
           ...(params.temperature !== undefined
