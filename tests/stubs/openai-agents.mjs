@@ -27,6 +27,8 @@ export function tool(definition) {
 
 export function setDefaultOpenAIKey() {}
 
+export function setOpenAIResponsesTransport() {}
+
 export function getGlobalTraceProvider() {
   return { setDisabled() {} }
 }

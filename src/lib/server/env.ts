@@ -24,7 +24,7 @@ import { z } from "zod"
 const optionalSecret = z.string().trim().min(1).optional().catch(undefined)
 
 function readOptionalSecret(
-  name: "OPENAI_API_KEY" | "EXA_API_KEY"
+  name: "OPENAI_API_KEY" | "EXA_API_KEY" | "OPENAI_WEBHOOK_SECRET"
 ): string | undefined {
   return optionalSecret.parse(process.env[name])
 }
@@ -37,4 +37,12 @@ export function getOpenAiApiKey(): string | undefined {
 /** Exa key. Enables the `exa_search` / `exa_get_contents` tools when set. */
 export function getExaApiKey(): string | undefined {
   return readOptionalSecret("EXA_API_KEY")
+}
+
+/**
+ * OpenAI webhook signing secret. Required to verify inbound webhook deliveries
+ * at `/api/webhooks/openai`; when unset the endpoint returns 503.
+ */
+export function getOpenAiWebhookSecret(): string | undefined {
+  return readOptionalSecret("OPENAI_WEBHOOK_SECRET")
 }

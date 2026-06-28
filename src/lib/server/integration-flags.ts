@@ -2,25 +2,34 @@ import { createLogger } from "@/lib/logger"
 
 const logger = createLogger("integration-flags")
 
-export const AGENT_FLAG_KEYS = ["agent.telemetry.record_io"] as const
+export const AGENT_FLAG_KEYS = [
+  "agent.telemetry.record_io",
+  "agent.responses.ws_transport",
+] as const
 
 type AgentFlagKey = (typeof AGENT_FLAG_KEYS)[number]
 type IntegrationFlagKey = AgentFlagKey
 
 export interface AgentFeatureFlags {
   telemetryRecordIo: boolean
+  // Routes Responses API traffic over a persistent WebSocket instead of HTTP,
+  // cutting per-round-trip overhead on tool-heavy runs. Default off.
+  responsesWebsocketTransport: boolean
 }
 
 const DEFAULT_FLAGS: AgentFeatureFlags = {
   telemetryRecordIo: false,
+  responsesWebsocketTransport: false,
 }
 
 const ENV_FLAG_NAMES: Record<keyof AgentFeatureFlags, string> = {
   telemetryRecordIo: "AGENT_TELEMETRY_RECORD_IO",
+  responsesWebsocketTransport: "AGENT_RESPONSES_WS_TRANSPORT",
 }
 
 const EDGE_FLAG_KEYS: Record<keyof AgentFeatureFlags, IntegrationFlagKey> = {
   telemetryRecordIo: "agent.telemetry.record_io",
+  responsesWebsocketTransport: "agent.responses.ws_transport",
 }
 
 export function toEdgeConfigFlagKey(key: IntegrationFlagKey): string {

@@ -30,7 +30,11 @@ const {
 // All env that the module reads. Cleared before each scenario so tests never
 // leak into one another and Edge Config is never contacted (EDGE_CONFIG unset
 // short-circuits the lookup).
-const ENV_KEYS = ["EDGE_CONFIG", "AGENT_TELEMETRY_RECORD_IO"]
+const ENV_KEYS = [
+  "EDGE_CONFIG",
+  "AGENT_TELEMETRY_RECORD_IO",
+  "AGENT_RESPONSES_WS_TRANSPORT",
+]
 
 async function withEnv(overrides, fn) {
   const saved = new Map()
@@ -74,6 +78,7 @@ test("getDefaultAgentFeatureFlags returns fresh all-disabled copies", () => {
   const first = getDefaultAgentFeatureFlags()
   assert.deepEqual(first, {
     telemetryRecordIo: false,
+    responsesWebsocketTransport: false,
   })
 
   first.telemetryRecordIo = true
@@ -117,6 +122,7 @@ test("resolveAgentFeatureFlags defaults everything off", async () => {
   await withEnv({}, async () => {
     assert.deepEqual(await resolveAgentFeatureFlags(), {
       telemetryRecordIo: false,
+      responsesWebsocketTransport: false,
     })
   })
 })
@@ -125,6 +131,11 @@ test("resolveAgentFeatureFlags applies per-flag env overrides", async () => {
   await withEnv({ AGENT_TELEMETRY_RECORD_IO: "1" }, async () => {
     const flags = await resolveAgentFeatureFlags()
     assert.equal(flags.telemetryRecordIo, true)
+  })
+
+  await withEnv({ AGENT_RESPONSES_WS_TRANSPORT: "1" }, async () => {
+    const flags = await resolveAgentFeatureFlags()
+    assert.equal(flags.responsesWebsocketTransport, true)
   })
 })
 

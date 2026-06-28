@@ -20,7 +20,10 @@ import {
 } from "./agent-runtime-messages"
 import { createAgentStreamMapper, readTextDelta } from "./agent-stream-mapping"
 import { createOpenAiAgentsExaTools } from "./openai-agents-exa-tools"
-import { configureOpenAiForAgents } from "./openai-client"
+import {
+  configureOpenAiForAgents,
+  configureResponsesTransport,
+} from "./openai-client"
 
 const logger = createLogger("agent-runtime")
 
@@ -89,6 +92,9 @@ export async function* startAgentRuntimeStream(
   }
 
   configureOpenAiForAgents(params.openAiApiKey)
+  configureResponsesTransport(
+    params.featureFlags?.responsesWebsocketTransport ?? false
+  )
 
   const tools = createOpenAiAgentsExaTools(params.exaApiKey?.trim())
   const toolNames = tools.map((tool) => tool.name)
