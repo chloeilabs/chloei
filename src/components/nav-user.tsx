@@ -65,9 +65,12 @@ export function NavUser({ viewer }: { viewer: AuthViewer }) {
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <SidebarMenuButton size="lg" className="aria-expanded:bg-muted">
-              <Avatar className="size-8 rounded-full after:rounded-full">
-                <AvatarFallback className="rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+            <SidebarMenuButton
+              size="lg"
+              className="h-12 pl-1 transition-[width,height,padding,margin] group-data-[collapsible=icon]:mb-2 group-data-[collapsible=icon]:-ml-0.5 group-data-[collapsible=icon]:h-9! group-data-[collapsible=icon]:w-9! group-data-[collapsible=icon]:rounded-[8px] group-data-[collapsible=icon]:pl-1.5! group-data-[state=expanded]:mb-0.5 group-data-[state=expanded]:-ml-0.5 group-data-[state=expanded]:w-[calc(100%+5px)] group-data-[state=expanded]:pl-1.5 aria-expanded:bg-muted"
+            >
+              <Avatar className="size-6 rounded-full after:rounded-full">
+                <AvatarFallback className="rounded-full bg-primary text-xs font-semibold text-primary-foreground">
                   {getInitials(viewer)}
                 </AvatarFallback>
               </Avatar>

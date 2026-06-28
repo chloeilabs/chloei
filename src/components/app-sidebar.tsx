@@ -120,12 +120,12 @@ export function AppSidebar({
               onClick={handleNewChat}
               render={<Link href="/" aria-label="Chloei home" />}
             >
-              <span className="relative block size-4 shrink-0 overflow-hidden">
+              <span className="relative -ml-0.5 block size-5 shrink-0 overflow-hidden">
                 <span className="absolute inset-0 transition-opacity duration-100 group-hover/chloei-home:opacity-0 group-focus-visible/chloei-home:opacity-0">
                   <ChloeiLogoSvg className="size-full!" />
                 </span>
                 <span className="absolute inset-0 opacity-0 transition-opacity duration-100 group-hover/chloei-home:opacity-100 group-focus-visible/chloei-home:opacity-100">
-                  <span className="block h-4 w-[240px]">
+                  <span className="block h-5 w-[300px]">
                     <ChloeiLogoHoverSvg className="logo-sm size-full! [animation-play-state:paused] group-hover/chloei-home:[animation-play-state:running] group-focus-visible/chloei-home:[animation-play-state:running]" />
                   </span>
                 </span>
@@ -175,7 +175,7 @@ export function AppSidebar({
           )}
         </div>
       </SidebarContent>
-      <SidebarFooter>
+      <SidebarFooter className="pb-1">
         <NavUser viewer={viewer} />
       </SidebarFooter>
     </Sidebar>

@@ -100,7 +100,7 @@ export function NavThreads({
           render={
             <SidebarGroupLabel
               render={<button type="button" />}
-              className="group/threads-label w-fit cursor-pointer gap-0.5 hover:text-sidebar-foreground"
+              className="group/threads-label w-fit cursor-pointer gap-0.5 pl-2 hover:text-sidebar-foreground"
             />
           }
         >
