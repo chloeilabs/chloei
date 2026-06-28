@@ -70,13 +70,12 @@ test("agent system prompt composes trusted blocks in priority order", () => {
   assert(identityIndex >= 0, "Identity and tone block not found")
   assert(authIndex >= 0, "AUTH USER CONTEXT block not found")
 
+  // Blocks are ordered stable -> volatile (for prompt-cache prefix stability):
+  // operating -> provider overlay -> identity/tone -> auth (per-user) -> date
+  // (per-request). The per-request RUNTIME DATE block is LAST.
   assert(
-    dateIndex > operatingIndex,
-    "Runtime date context should follow operating instructions"
-  )
-  assert(
-    providerIndex > dateIndex,
-    "Provider overlay should follow runtime date context"
+    providerIndex > operatingIndex,
+    "Provider overlay should follow operating instructions"
   )
   assert(
     identityIndex > providerIndex,
@@ -85,6 +84,10 @@ test("agent system prompt composes trusted blocks in priority order", () => {
   assert(
     authIndex > identityIndex,
     "Auth context should follow identity and tone"
+  )
+  assert(
+    dateIndex > authIndex,
+    "Runtime date context should be last (after auth) so the per-request timestamp does not bust the cacheable prefix"
   )
 
   assert.match(prompt, /Current UTC timestamp: 2026-05-03T12:34:56.000Z/)
