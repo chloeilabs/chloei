@@ -66,10 +66,7 @@ export function ActivityStepIcon({ entry }: { entry: ActivityEntry }) {
     return <CircleX className="size-3 text-destructive" />
   }
 
-  if (
-    entry.kind === "search" ||
-    (entry.kind === "tool" && entry.toolName === "web_search")
-  ) {
+  if (entry.kind === "search") {
     return <TimelineGlobeIcon className="size-3 text-muted-foreground" />
   }
 
