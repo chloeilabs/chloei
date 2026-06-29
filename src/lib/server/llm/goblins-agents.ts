@@ -127,7 +127,11 @@ export function createGoblinTools(params: CreateGoblinToolsParams): Tool[] {
         let brief = ""
         for await (const event of startAgentRuntimeStream({
           model: AvailableModels.OPENAI_GPT_5_4_MINI,
-          reasoningEffort: "xhigh",
+          // Goblins are evidence-gatherers, not the final writer, so "high" is
+          // enough — "xhigh" on up-to-6 parallel sub-agents doing multi-step web
+          // research is the latency long pole that pushes whole runs past the
+          // 800s serverless cap. The GPT-5.5 manager keeps xhigh for synthesis.
+          reasoningEffort: "high",
           maxToolSteps: GOBLIN_SUBAGENT_MAX_STEPS,
           openAiApiKey: params.openAiApiKey,
           exaApiKey: params.exaApiKey,
