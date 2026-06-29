@@ -3,7 +3,10 @@ import Exa from "exa-js"
 import { z } from "zod"
 
 import { asRecord, asString, toOptionalString } from "@/lib/cast"
+import { createLogger } from "@/lib/logger"
 import type { MessageSource, ToolName } from "@/lib/shared"
+
+const logger = createLogger("exa-tools")
 
 const EXA_SEARCH_TOOL_NAME = "exa_search" as const
 const EXA_GET_CONTENTS_TOOL_NAME = "exa_get_contents" as const
@@ -458,13 +461,15 @@ function parseToolResultPayload(value: unknown): ExaToolResultPayload | null {
   }
 }
 
-// Exa rate-limits at roughly 10 concurrent requests per key. The Goblins fan-out
-// (up to 6 sub-agents searching in parallel, plus any concurrent requests) easily
-// exceeds that, so a process-wide gate caps in-flight Exa calls and any 429/5xx
-// that still slips through is retried with backoff — otherwise searches surface
-// as failed (red ✗) steps and goblins waste their budget retrying the same query.
-const EXA_MAX_CONCURRENCY = 6
-const EXA_MAX_RETRIES = 4
+// Exa rate-limits per key. The Goblins fan-out (up to 6 sub-agents searching in
+// parallel) easily exceeds that, so a process-wide gate caps in-flight Exa calls
+// and any 429/5xx that still slips through is retried with capped exponential
+// backoff — otherwise searches surface as failed (red ✗) steps and goblins waste
+// their budget retrying the same query. Kept conservative (and now Exa carries
+// 100% of search load since the OpenAI web_search tool was removed).
+const EXA_MAX_CONCURRENCY = 4
+const EXA_MAX_RETRIES = 6
+const EXA_RETRY_MAX_DELAY_MS = 6000
 
 let exaActiveCount = 0
 const exaWaiters: (() => void)[] = []
@@ -487,31 +492,52 @@ function releaseExaSlot(): void {
   exaWaiters.shift()?.()
 }
 
-function isRetriableExaError(error: unknown): boolean {
+function getExaStatus(error: unknown): number | undefined {
   const record = asRecord(error)
-  const status =
-    typeof record?.status === "number"
-      ? record.status
-      : typeof record?.statusCode === "number"
-        ? record.statusCode
-        : undefined
+  return typeof record?.status === "number"
+    ? record.status
+    : typeof record?.statusCode === "number"
+      ? record.statusCode
+      : undefined
+}
+
+function isRetriableExaError(error: unknown): boolean {
+  const status = getExaStatus(error)
   return (
     status === 429 || (status !== undefined && status >= 500 && status < 600)
   )
 }
 
-/** Runs an Exa call under the shared concurrency gate, retrying 429/5xx with backoff. */
-async function runExaRequest<T>(fn: () => Promise<T>): Promise<T> {
+/**
+ * Runs an Exa call under the shared concurrency gate, retrying 429/5xx with
+ * capped exponential backoff. Logs the final failure (the red ✗ the user sees)
+ * with its HTTP status so rate-limiting (429) is visible in the runtime logs.
+ * `context` labels the call (tool + query) in those logs.
+ */
+async function runExaRequest<T>(
+  fn: () => Promise<T>,
+  context: string
+): Promise<T> {
   await acquireExaSlot()
   try {
     for (let attempt = 0; ; attempt += 1) {
       try {
         return await fn()
       } catch (error) {
+        const status = getExaStatus(error)
         if (attempt >= EXA_MAX_RETRIES || !isRetriableExaError(error)) {
+          logger.warn("Exa request failed.", {
+            context,
+            status,
+            attempts: attempt + 1,
+            retriable: isRetriableExaError(error),
+            errorCode: getExaErrorPayload(error).code,
+          })
           throw error
         }
-        const delayMs = 400 * Math.pow(2, attempt) + Math.random() * 300
+        const delayMs =
+          Math.min(EXA_RETRY_MAX_DELAY_MS, 400 * Math.pow(2, attempt)) +
+          Math.random() * 300
         await new Promise((resolve) => setTimeout(resolve, delayMs))
       }
     }
@@ -551,22 +577,24 @@ export function createOpenAiAgentsExaTools(apiKey?: string): Tool[] {
           const startPublishedDate = timeRangeToStartDate(input.timeRange)
           const category: ExaSearchCategory = input.category
 
-          const response = await runExaRequest(() =>
-            client.search(input.query, {
-              type: "auto",
-              numResults: maxResults,
-              contents: {
-                text: { maxCharacters: EXA_SEARCH_TEXT_MAX_CHARACTERS },
-              },
-              ...(category ? { category } : {}),
-              ...(startPublishedDate ? { startPublishedDate } : {}),
-              ...(input.includeDomains && input.includeDomains.length > 0
-                ? { includeDomains: input.includeDomains }
-                : {}),
-              ...(input.excludeDomains && input.excludeDomains.length > 0
-                ? { excludeDomains: input.excludeDomains }
-                : {}),
-            })
+          const response = await runExaRequest(
+            () =>
+              client.search(input.query, {
+                type: "auto",
+                numResults: maxResults,
+                contents: {
+                  text: { maxCharacters: EXA_SEARCH_TEXT_MAX_CHARACTERS },
+                },
+                ...(category ? { category } : {}),
+                ...(startPublishedDate ? { startPublishedDate } : {}),
+                ...(input.includeDomains && input.includeDomains.length > 0
+                  ? { includeDomains: input.includeDomains }
+                  : {}),
+                ...(input.excludeDomains && input.excludeDomains.length > 0
+                  ? { excludeDomains: input.excludeDomains }
+                  : {}),
+              }),
+            `exa_search:${input.query}`
           )
 
           return {
@@ -590,11 +618,13 @@ export function createOpenAiAgentsExaTools(apiKey?: string): Tool[] {
             new Set(input.urls.map((url) => url.trim()).filter((url) => url))
           ).slice(0, EXA_GET_CONTENTS_MAX_URLS)
 
-          const response = await runExaRequest(() =>
-            client.getContents(urls, {
-              text: true,
-              livecrawl: "fallback",
-            })
+          const response = await runExaRequest(
+            () =>
+              client.getContents(urls, {
+                text: true,
+                livecrawl: "fallback",
+              }),
+            `exa_get_contents:${String(urls.length)} urls`
           )
 
           return {
