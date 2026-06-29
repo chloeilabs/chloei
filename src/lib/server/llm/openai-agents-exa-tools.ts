@@ -1,5 +1,4 @@
 import { type Tool, tool } from "@openai/agents"
-import { webSearchTool } from "@openai/agents-openai"
 import Exa from "exa-js"
 import { z } from "zod"
 
@@ -522,13 +521,13 @@ async function runExaRequest<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 /**
- * Builds the agent's web tools for the OpenAI Agents SDK: OpenAI's hosted
- * web_search tool (always available — it uses the OpenAI key) plus the Exa
- * search/read function tools when an Exa key is configured. Giving the model both
- * lets it cross-source and gives it a fallback when one provider rate-limits.
+ * Builds the agent's web tools for the OpenAI Agents SDK: the Exa search/read
+ * function tools when an Exa key is configured. Exa is the only web-search
+ * provider — returns an empty toolset (the agent runs tool-less) when no Exa key
+ * is set.
  */
 export function createOpenAiAgentsExaTools(apiKey?: string): Tool[] {
-  const tools: Tool[] = [webSearchTool({ searchContextSize: "medium" })]
+  const tools: Tool[] = []
 
   const normalized = apiKey?.trim()
   if (!normalized) {

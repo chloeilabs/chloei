@@ -40,9 +40,9 @@ export function shouldSkipReasoningChunk(text: string): boolean {
   return text.trim() === "[REDACTED]"
 }
 
-// OpenAI's hosted web_search tool and its citations arrive as raw OpenAI
-// Responses events through the SDK's { type: "model", event: <raw> } passthrough
-// (the same channel as reasoning summaries). This reads that nested raw event.
+// Some raw OpenAI Responses events (reasoning summaries, url_citation
+// annotations) arrive through the SDK's { type: "model", event: <raw> }
+// passthrough channel. This reads that nested raw event.
 interface ModelPassthroughEvent {
   type: string
   itemId?: string
@@ -221,43 +221,10 @@ export function createAgentStreamMapper(
         return events
       }
 
-      // OpenAI hosted web_search: surface its lifecycle as a search step and its
-      // url_citation annotations as sources (deduped against Exa sources).
+      // Inline url_citation annotations (if any) surface as sources, deduped
+      // against Exa sources.
       const passthrough = readModelPassthroughEvent(eventData)
       if (passthrough) {
-        if (
-          passthrough.type === "response.web_search_call.in_progress" ||
-          passthrough.type === "response.web_search_call.searching"
-        ) {
-          const callId = passthrough.itemId
-          if (callId && !seenToolCalls.has(callId)) {
-            seenToolCalls.add(callId)
-            events.push({
-              type: "tool_call",
-              callId,
-              toolName: "web_search",
-              label: "Searching the web",
-              operation: "search",
-              provider: "openai",
-            })
-          }
-          return events
-        }
-        if (passthrough.type === "response.web_search_call.completed") {
-          const callId = passthrough.itemId
-          if (callId && !finalizedToolCalls.has(callId)) {
-            finalizedToolCalls.add(callId)
-            events.push({
-              type: "tool_result",
-              callId,
-              toolName: "web_search",
-              status: "success",
-              operation: "search",
-              provider: "openai",
-            })
-          }
-          return events
-        }
         if (passthrough.type === "response.output_text.annotation.added") {
           const annotation = passthrough.annotation
           if (asString(annotation?.type) === "url_citation") {

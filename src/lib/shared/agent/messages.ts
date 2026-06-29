@@ -12,12 +12,8 @@ export interface FollowUpQuestion {
   text: string
 }
 
-// exa_* are Exa function tools; web_search is OpenAI's hosted web-search tool.
-export const TOOL_NAMES = [
-  "exa_search",
-  "exa_get_contents",
-  "web_search",
-] as const
+// The agent's tools are the two Exa function tools (web search + read).
+export const TOOL_NAMES = ["exa_search", "exa_get_contents"] as const
 export type ToolName = (typeof TOOL_NAMES)[number]
 
 // Goblins-mode sub-agents. These are NOT tools (kept out of ToolName); the
