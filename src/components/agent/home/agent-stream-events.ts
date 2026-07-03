@@ -4,6 +4,7 @@ import {
   AGENT_RUN_STATUSES,
   type AgentRunStatus,
   type AgentStreamEvent,
+  isGoblinsPhase,
   isSubagentId,
   isToolName,
 } from "@/lib/shared"
@@ -313,11 +314,41 @@ export function parseStreamEventLine(line: string): AgentStreamEvent | null {
       return null
     }
 
+    const errorCode = asString(record.errorCode)?.trim()
+
     return {
       type,
       callId: callId ?? null,
       subagentId,
       status,
+      ...(errorCode ? { errorCode } : {}),
+      ...checkpointFields,
+    }
+  }
+
+  if (type === "goblins_phase") {
+    const phase = record.phase
+    if (!isGoblinsPhase(phase)) {
+      return null
+    }
+
+    const label = asString(record.label)?.trim()
+    if (!label) {
+      return null
+    }
+
+    const tier = asString(record.tier)?.trim()
+    const round =
+      typeof record.round === "number" && Number.isInteger(record.round)
+        ? record.round
+        : undefined
+
+    return {
+      type,
+      phase,
+      label,
+      ...(tier ? { tier } : {}),
+      ...(round !== undefined ? { round } : {}),
       ...checkpointFields,
     }
   }

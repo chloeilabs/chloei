@@ -81,6 +81,9 @@ test("getDefaultAgentFeatureFlags returns fresh all-disabled copies", () => {
     telemetryRecordIo: false,
     responseCompaction: false,
     responsesWebsocketTransport: false,
+    goblinsAdaptive: false,
+    goblinsHostedTools: false,
+    goblinsBackgroundEscalation: false,
   })
 
   first.telemetryRecordIo = true
@@ -126,6 +129,9 @@ test("resolveAgentFeatureFlags defaults everything off", async () => {
       telemetryRecordIo: false,
       responseCompaction: false,
       responsesWebsocketTransport: false,
+      goblinsAdaptive: false,
+      goblinsHostedTools: false,
+      goblinsBackgroundEscalation: false,
     })
   })
 })

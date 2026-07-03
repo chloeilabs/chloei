@@ -223,3 +223,63 @@ test("thread payload drops legacy run-mode metadata from stored threads", () => 
   assert.equal(parsed.messages[0]?.metadata?.selectedModel, "gpt-5.4-mini")
   assert.equal(parsed.messages[0]?.metadata?.runMode, undefined)
 })
+
+test("thread payload persists phase timeline entries and subagent error codes", () => {
+  const parsed = parseThreadPayload({
+    id: "thread-goblins-phases",
+    messages: [
+      {
+        id: "message-1",
+        role: "assistant",
+        content: "Done.",
+        llmModel: "goblins",
+        createdAt: "2026-07-03T00:00:00.000Z",
+        metadata: {
+          activityTimeline: [
+            {
+              id: "phase-1",
+              kind: "phase",
+              order: 0,
+              createdAt: "2026-07-03T00:00:00.000Z",
+              phase: "triage",
+              label: "Sizing up the question",
+              tier: "deep",
+            },
+            {
+              id: "phase-2",
+              kind: "phase",
+              order: 1,
+              createdAt: "2026-07-03T00:00:00.000Z",
+              phase: "round",
+              label: "Research round 1",
+              round: 1,
+            },
+            {
+              id: "subagent-1",
+              kind: "subagent",
+              order: 2,
+              createdAt: "2026-07-03T00:00:00.000Z",
+              callId: "g1",
+              subagentId: "goblin_source_verifier",
+              label: "Source Verifier",
+              status: "error",
+              errorCode: "GOBLIN_FAILED",
+            },
+          ],
+        },
+      },
+    ],
+    createdAt: "2026-07-03T00:00:00.000Z",
+    updatedAt: "2026-07-03T00:00:00.000Z",
+  })
+
+  const timeline = parsed.messages[0].metadata.activityTimeline
+  assert.equal(timeline.length, 3)
+  assert.deepEqual(
+    timeline.map((entry) => entry.kind),
+    ["phase", "phase", "subagent"]
+  )
+  assert.equal(timeline[0].tier, "deep")
+  assert.equal(timeline[1].round, 1)
+  assert.equal(timeline[2].errorCode, "GOBLIN_FAILED")
+})

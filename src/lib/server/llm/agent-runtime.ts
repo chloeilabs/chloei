@@ -3,6 +3,7 @@ import {
   type AgentInputItem,
   MaxTurnsExceededError,
   run,
+  type Tool,
 } from "@openai/agents"
 
 import { createLogger } from "@/lib/logger"
@@ -22,7 +23,10 @@ import {
   toAgentInputItems,
 } from "./agent-runtime-messages"
 import { createAgentStreamMapper, readTextDelta } from "./agent-stream-mapping"
-import { createOpenAiAgentsExaTools } from "./openai-agents-exa-tools"
+import {
+  createOpenAiAgentsExaTools,
+  type SharedResearchState,
+} from "./openai-agents-exa-tools"
 import {
   configureOpenAiForAgents,
   configureResponsesTransport,
@@ -30,7 +34,7 @@ import {
 
 const logger = createLogger("agent-runtime")
 
-export type ReasoningEffortLevel = "high" | "xhigh"
+export type ReasoningEffortLevel = "medium" | "high" | "xhigh"
 
 // GPT-5.5 runs at xhigh reasoning effort; other models default to high. Callers
 // (e.g. the Goblins sub-agents) may force a level via reasoningEffort.
@@ -128,6 +132,12 @@ export interface StartAgentRuntimeStreamParams {
   signal?: AbortSignal
   userId?: string
   featureFlags?: AgentFeatureFlags
+  // Cross-goblin shared research state: dedupes repeat Exa fetches across the
+  // parallel sub-agents of one request. Absent → no behavior change.
+  sharedResearch?: SharedResearchState
+  // Additional tools appended after the Exa tools (e.g. a goblin's hosted
+  // OpenAI tools). Absent → no behavior change.
+  extraTools?: Tool[]
 }
 
 // Baked into every run's instructions. The OpenAI Agents SDK has no per-step
@@ -170,7 +180,13 @@ export async function* startAgentRuntimeStream(
     params.featureFlags?.responsesWebsocketTransport ?? false
   )
 
-  const tools = createOpenAiAgentsExaTools(params.exaApiKey?.trim())
+  const tools = [
+    ...createOpenAiAgentsExaTools(
+      params.exaApiKey?.trim(),
+      params.sharedResearch
+    ),
+    ...(params.extraTools ?? []),
+  ]
   const toolNames = tools.map((tool) => tool.name)
 
   const mapper = createAgentStreamMapper()

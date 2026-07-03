@@ -38,6 +38,11 @@ type ReasoningActivityTimelineEntry = Extract<
   ActivityTimelineEntry,
   { kind: "reasoning" }
 >
+type GoblinsPhaseEvent = Extract<AgentStreamEvent, { type: "goblins_phase" }>
+type PhaseActivityTimelineEntry = Extract<
+  ActivityTimelineEntry,
+  { kind: "phase" }
+>
 
 function getSearchQueryFromToolCall(event: ToolCallEvent): string | null {
   if (!isSearchToolName(event.toolName)) {
@@ -203,6 +208,19 @@ export function applyAgentStreamEvent(
         current.activityTimeline,
         event
       ),
+    }
+  }
+
+  if (event.type === "goblins_phase") {
+    return {
+      ...current,
+      ...checkpointFields,
+      activityTimeline: appendPhaseToTimeline(
+        current.activityTimeline,
+        event,
+        nextOrder
+      ),
+      nextActivityOrder,
     }
   }
 
@@ -625,12 +643,40 @@ function applySubagentResultToTimeline(
     return current
   }
 
+  // No-flip rule: once a goblin is marked failed, a later success for the same
+  // call must not clear the error (protects the degraded-brief ✗ against
+  // duplicate result emissions with differing status).
+  if (target.status === "error" && event.status === "success") {
+    return current
+  }
+
   const updated = [...current]
   updated[targetIndex] = {
     ...target,
     status: event.status,
+    ...(event.errorCode ? { errorCode: event.errorCode } : {}),
   }
   return updated
+}
+
+// Phase markers (triage / round / evaluate) are ordered dividers: always
+// appended, never upserted.
+function appendPhaseToTimeline(
+  current: ActivityTimelineEntry[],
+  event: GoblinsPhaseEvent,
+  nextOrder: () => number
+): ActivityTimelineEntry[] {
+  const entry: PhaseActivityTimelineEntry = {
+    id: createClientMessageId(),
+    kind: "phase",
+    phase: event.phase,
+    label: event.label,
+    ...(event.tier ? { tier: event.tier } : {}),
+    ...(event.round !== undefined ? { round: event.round } : {}),
+    order: nextOrder(),
+    createdAt: new Date().toISOString(),
+  }
+  return [...current, entry]
 }
 
 function upsertSourcesTimelineFromSource(

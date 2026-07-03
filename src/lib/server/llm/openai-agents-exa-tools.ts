@@ -4,6 +4,7 @@ import { z } from "zod"
 
 import { asRecord, asString, toOptionalString } from "@/lib/cast"
 import { createLogger } from "@/lib/logger"
+import { GOBLINS_SHARED_CONTENT_CACHE_MAX_ENTRIES } from "@/lib/server/agent-runtime-config"
 import type { MessageSource, ToolName } from "@/lib/shared"
 
 const logger = createLogger("exa-tools")
@@ -546,13 +547,47 @@ async function runExaRequest<T>(
   }
 }
 
+// Cross-goblin research state, one per request: the parallel specialists of a
+// Goblins run often surface the same pages, so repeat hits are annotated (search)
+// or served from cache (get_contents) instead of re-fetched. Node's single
+// threaded event loop makes the plain Set/Map mutation safe between awaits.
+export interface SharedResearchState {
+  seenUrls: Set<string>
+  contentByUrl: Map<string, string>
+}
+
+export function createSharedResearchState(): SharedResearchState {
+  return { seenUrls: new Set(), contentByUrl: new Map() }
+}
+
+const SHARED_DUPLICATE_CONTENT_NOTE =
+  "[Already retrieved by another researcher this request — content omitted; cite the URL if relevant.]"
+
+function cacheSharedContent(
+  shared: SharedResearchState,
+  url: string,
+  content: string
+): void {
+  if (
+    content.length > 0 &&
+    !shared.contentByUrl.has(url) &&
+    shared.contentByUrl.size < GOBLINS_SHARED_CONTENT_CACHE_MAX_ENTRIES
+  ) {
+    shared.contentByUrl.set(url, content)
+  }
+}
+
 /**
  * Builds the agent's web tools for the OpenAI Agents SDK: the Exa search/read
  * function tools when an Exa key is configured. Exa is the only web-search
  * provider — returns an empty toolset (the agent runs tool-less) when no Exa key
- * is set.
+ * is set. Pass `shared` (Goblins mode) to dedupe repeat fetches across the
+ * request's parallel sub-agents.
  */
-export function createOpenAiAgentsExaTools(apiKey?: string): Tool[] {
+export function createOpenAiAgentsExaTools(
+  apiKey?: string,
+  shared?: SharedResearchState
+): Tool[] {
   const tools: Tool[] = []
 
   const normalized = apiKey?.trim()
@@ -597,8 +632,20 @@ export function createOpenAiAgentsExaTools(apiKey?: string): Tool[] {
             `exa_search:${input.query}`
           )
 
+          const output = toSearchOutput(input.query, response)
+          if (shared) {
+            output.results = output.results.map((result) => {
+              if (shared.seenUrls.has(result.url)) {
+                return { ...result, content: SHARED_DUPLICATE_CONTENT_NOTE }
+              }
+              shared.seenUrls.add(result.url)
+              cacheSharedContent(shared, result.url, result.content)
+              return result
+            })
+          }
+
           return {
-            output: toSearchOutput(input.query, response),
+            output,
           } satisfies ExaToolResultPayload
         } catch (error) {
           return {
@@ -618,17 +665,54 @@ export function createOpenAiAgentsExaTools(apiKey?: string): Tool[] {
             new Set(input.urls.map((url) => url.trim()).filter((url) => url))
           ).slice(0, EXA_GET_CONTENTS_MAX_URLS)
 
-          const response = await runExaRequest(
-            () =>
-              client.getContents(urls, {
-                text: true,
-                livecrawl: "fallback",
-              }),
-            `exa_get_contents:${String(urls.length)} urls`
-          )
+          // Serve cache hits from the shared request state; only uncached URLs
+          // spend an Exa call. All-cached batches skip the network entirely.
+          const cachedResults = shared
+            ? urls.flatMap((url) => {
+                const rawContent = shared.contentByUrl.get(url)
+                return rawContent
+                  ? [
+                      {
+                        url,
+                        rawContent,
+                        citationMarkdown: toCitationMarkdown(url),
+                      },
+                    ]
+                  : []
+              })
+            : []
+          const cachedUrls = new Set(cachedResults.map((result) => result.url))
+          const urlsToFetch = urls.filter((url) => !cachedUrls.has(url))
+
+          const output =
+            urlsToFetch.length > 0
+              ? toGetContentsOutput(
+                  urlsToFetch,
+                  await runExaRequest(
+                    () =>
+                      client.getContents(urlsToFetch, {
+                        text: true,
+                        livecrawl: "fallback",
+                      }),
+                    `exa_get_contents:${String(urlsToFetch.length)} urls`
+                  )
+                )
+              : ({
+                  requestId: "",
+                  results: [],
+                  failedResults: [],
+                } satisfies ExaGetContentsToolOutput)
+
+          if (shared) {
+            for (const result of output.results) {
+              shared.seenUrls.add(result.url)
+              cacheSharedContent(shared, result.url, result.rawContent)
+            }
+            output.results = [...cachedResults, ...output.results]
+          }
 
           return {
-            output: toGetContentsOutput(urls, response),
+            output,
           } satisfies ExaToolResultPayload
         } catch (error) {
           return {

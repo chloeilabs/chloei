@@ -3,6 +3,7 @@ import { z } from "zod"
 import {
   AGENT_RUN_STATUSES,
   DEFAULT_THREAD_TITLE,
+  GOBLINS_PHASES,
   isModelType,
   type ModelType,
   sanitizeReasoningForDisplay,
@@ -162,6 +163,20 @@ const subagentActivityTimelineEntrySchema = z
     label: z.string().trim().min(1).max(500),
     task: z.string().trim().min(1).max(10_000).optional(),
     status: TOOL_INVOCATION_STATUS_SCHEMA,
+    errorCode: z.string().trim().min(1).max(200).optional(),
+  })
+  .strict()
+
+const phaseActivityTimelineEntrySchema = z
+  .object({
+    id: z.string().trim().min(1).max(200),
+    kind: z.literal("phase"),
+    order: z.number().int().nonnegative(),
+    createdAt: ISO_DATETIME_SCHEMA,
+    phase: z.enum(GOBLINS_PHASES),
+    label: z.string().trim().min(1).max(500),
+    tier: z.string().trim().min(1).max(100).optional(),
+    round: z.number().int().positive().optional(),
   })
   .strict()
 
@@ -171,6 +186,7 @@ const activityTimelineEntrySchema = z.union([
   sourcesActivityTimelineEntrySchema,
   reasoningActivityTimelineEntrySchema,
   subagentActivityTimelineEntrySchema,
+  phaseActivityTimelineEntrySchema,
 ])
 
 const legacyCrewStatusActivityTimelineEntrySchema = z

@@ -101,3 +101,75 @@ test("parseStreamEventLine rejects subagent_call missing a label and bad result 
     null
   )
 })
+
+test("parseStreamEventLine parses goblins_phase with tier and round", () => {
+  assert.deepEqual(
+    parseStreamEventLine(
+      JSON.stringify({
+        type: "goblins_phase",
+        phase: "triage",
+        tier: "deep",
+        label: "Sizing up the question",
+      })
+    ),
+    {
+      type: "goblins_phase",
+      phase: "triage",
+      tier: "deep",
+      label: "Sizing up the question",
+    }
+  )
+
+  assert.deepEqual(
+    parseStreamEventLine(
+      JSON.stringify({
+        type: "goblins_phase",
+        phase: "round",
+        round: 2,
+        label: "Research round 2 — filling gaps",
+      })
+    ),
+    {
+      type: "goblins_phase",
+      phase: "round",
+      round: 2,
+      label: "Research round 2 — filling gaps",
+    }
+  )
+})
+
+test("parseStreamEventLine rejects malformed goblins_phase events", () => {
+  assert.equal(
+    parseStreamEventLine(
+      JSON.stringify({ type: "goblins_phase", phase: "party", label: "x" })
+    ),
+    null
+  )
+  assert.equal(
+    parseStreamEventLine(
+      JSON.stringify({ type: "goblins_phase", phase: "round", label: "  " })
+    ),
+    null
+  )
+})
+
+test("parseStreamEventLine keeps errorCode on subagent_result", () => {
+  assert.deepEqual(
+    parseStreamEventLine(
+      JSON.stringify({
+        type: "subagent_result",
+        callId: "call-9",
+        subagentId: "goblin_source_verifier",
+        status: "error",
+        errorCode: "GOBLIN_FAILED",
+      })
+    ),
+    {
+      type: "subagent_result",
+      callId: "call-9",
+      subagentId: "goblin_source_verifier",
+      status: "error",
+      errorCode: "GOBLIN_FAILED",
+    }
+  )
+})

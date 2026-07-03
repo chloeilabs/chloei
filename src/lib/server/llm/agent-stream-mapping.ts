@@ -95,6 +95,11 @@ export interface SubagentToolInfo {
   label: string
 }
 
+// Degraded-brief marker returned by a failed goblin's tool execute (adaptive
+// mode). Defined here — not in goblins-agents — so the mapper can detect it
+// without an import cycle; goblins-agents re-exports it.
+export const GOBLIN_ERROR_PREFIX = "GOBLIN_ERROR:"
+
 export interface AgentStreamMapperOptions {
   // When provided, run-item tool events whose tool name resolves to a sub-agent
   // are surfaced as subagent_call / subagent_result events instead of the
@@ -313,11 +318,17 @@ export function createAgentStreamMapper(
         if (subagent) {
           if (!finalizedSubagentCalls.has(callId)) {
             finalizedSubagentCalls.add(callId)
+            // A degraded brief (GOBLIN_ERROR prefix) marks the goblin failed;
+            // the manager still receives the brief text and adapts per its
+            // orchestration instruction.
+            const outputText = asString(itemRecord?.output)?.trim()
+            const failed = outputText?.startsWith(GOBLIN_ERROR_PREFIX) ?? false
             events.push({
               type: "subagent_result",
               callId,
               subagentId: subagent.subagentId,
-              status: "success",
+              status: failed ? "error" : "success",
+              ...(failed ? { errorCode: "GOBLIN_FAILED" } : {}),
             })
           }
           return events

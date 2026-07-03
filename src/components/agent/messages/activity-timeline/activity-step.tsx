@@ -1,4 +1,4 @@
-import { CircleX, Wrench } from "lucide-react"
+import { CircleX, Flag, Wrench } from "lucide-react"
 import Image from "next/image"
 
 import { LogoHover } from "@/components/graphics/logo/logo-hover"
@@ -50,6 +50,12 @@ export function ActivityStepIcon({ entry }: { entry: ActivityEntry }) {
         )}
       />
     )
+  }
+
+  // Orchestration phase markers (triage / round / evaluate) read as slim
+  // waypoints between the work steps.
+  if (entry.kind === "phase") {
+    return <Flag className="size-3 text-muted-foreground/70" />
   }
 
   if (

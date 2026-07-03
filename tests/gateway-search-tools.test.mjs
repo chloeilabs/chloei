@@ -75,3 +75,33 @@ test("stale and fallback-only model ids fall back to GPT-5.4 Mini", () => {
     "gpt-5.4-mini"
   )
 })
+
+test("exa tools dedupe repeat fetches through the shared research state", async () => {
+  const source = await readFile(exaToolsPath, "utf8")
+
+  assert.match(
+    source,
+    /export function createSharedResearchState\(\)/,
+    "Expected the shared research state factory to be exported for Goblins mode."
+  )
+  assert.match(
+    source,
+    /shared\.seenUrls\.has\(result\.url\)[\s\S]*SHARED_DUPLICATE_CONTENT_NOTE/,
+    "Expected repeat search hits to be annotated instead of repeating content."
+  )
+  assert.match(
+    source,
+    /shared\.contentByUrl\.get\(url\)/,
+    "Expected exa_get_contents to serve cache hits from the shared state."
+  )
+  assert.match(
+    source,
+    /urlsToFetch\.length > 0/,
+    "Expected all-cached get_contents batches to skip the Exa network call."
+  )
+  assert.match(
+    source,
+    /GOBLINS_SHARED_CONTENT_CACHE_MAX_ENTRIES/,
+    "Expected the shared content cache to be bounded."
+  )
+})

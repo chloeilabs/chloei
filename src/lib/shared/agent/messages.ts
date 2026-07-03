@@ -133,6 +133,28 @@ export interface SubagentActivityTimelineEntry extends ActivityTimelineBaseEntry
   // so the user can see what each goblin is researching).
   task?: string
   status: ToolInvocationStatus
+  errorCode?: string
+}
+
+// Goblins-mode orchestration phase markers (adaptive runs): the triage tier
+// pick, each delegation round boundary, and the pre-synthesis coverage check.
+export const GOBLINS_PHASES = ["triage", "round", "evaluate"] as const
+export type GoblinsPhase = (typeof GOBLINS_PHASES)[number]
+
+const GOBLINS_PHASE_SET: ReadonlySet<GoblinsPhase> = new Set(GOBLINS_PHASES)
+
+export function isGoblinsPhase(value: unknown): value is GoblinsPhase {
+  return (
+    typeof value === "string" && GOBLINS_PHASE_SET.has(value as GoblinsPhase)
+  )
+}
+
+export interface PhaseActivityTimelineEntry extends ActivityTimelineBaseEntry {
+  kind: "phase"
+  phase: GoblinsPhase
+  label: string
+  tier?: string
+  round?: number
 }
 
 export type ActivityTimelineEntry =
@@ -141,6 +163,7 @@ export type ActivityTimelineEntry =
   | SourcesActivityTimelineEntry
   | ReasoningActivityTimelineEntry
   | SubagentActivityTimelineEntry
+  | PhaseActivityTimelineEntry
 
 interface InteractionCheckpointFields {
   interactionId?: string
@@ -207,6 +230,18 @@ interface SubagentResultStreamEvent extends InteractionCheckpointFields {
   callId: string | null
   subagentId: SubagentId
   status: Extract<ToolInvocationStatus, "success" | "error">
+  errorCode?: string
+}
+
+interface GoblinsPhaseStreamEvent extends InteractionCheckpointFields {
+  type: "goblins_phase"
+  phase: GoblinsPhase
+  // Human-facing marker label, e.g. "Sizing up the question", "Research round 2".
+  label: string
+  // Budget tier id; present on phase:"triage".
+  tier?: string
+  // 1-based delegation round; present on phase:"round".
+  round?: number
 }
 
 export type AgentStreamEvent =
@@ -218,6 +253,7 @@ export type AgentStreamEvent =
   | AgentStatusStreamEvent
   | SubagentCallStreamEvent
   | SubagentResultStreamEvent
+  | GoblinsPhaseStreamEvent
 
 export interface Message {
   id: string

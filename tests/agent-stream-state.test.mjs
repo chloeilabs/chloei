@@ -77,3 +77,63 @@ test("reasoning timeline sanitizes private prompt terminology", () => {
   assert.equal(accumulator.activityTimeline[0]?.kind, "reasoning")
   assert.equal(accumulator.activityTimeline[0]?.text, expected)
 })
+
+test("goblins_phase events append phase timeline entries in order", () => {
+  let accumulator = createAgentStreamAccumulator()
+  accumulator = applyAgentStreamEvent(accumulator, {
+    type: "goblins_phase",
+    phase: "triage",
+    tier: "deep",
+    label: "Sizing up the question",
+  })
+  accumulator = applyAgentStreamEvent(accumulator, {
+    type: "goblins_phase",
+    phase: "round",
+    round: 1,
+    label: "Research round 1",
+  })
+
+  const phases = accumulator.activityTimeline.filter(
+    (entry) => entry.kind === "phase"
+  )
+  assert.equal(phases.length, 2)
+  assert.deepEqual(
+    phases.map((entry) => [entry.phase, entry.label]),
+    [
+      ["triage", "Sizing up the question"],
+      ["round", "Research round 1"],
+    ]
+  )
+  assert.equal(phases[0].tier, "deep")
+  assert.equal(phases[1].round, 1)
+  assert.ok(phases[1].order > phases[0].order)
+})
+
+test("a failed subagent entry never flips back to success", () => {
+  let accumulator = createAgentStreamAccumulator()
+  accumulator = applyAgentStreamEvent(accumulator, {
+    type: "subagent_call",
+    callId: "g-err",
+    subagentId: "goblin_source_verifier",
+    label: "Source Verifier",
+  })
+  accumulator = applyAgentStreamEvent(accumulator, {
+    type: "subagent_result",
+    callId: "g-err",
+    subagentId: "goblin_source_verifier",
+    status: "error",
+    errorCode: "GOBLIN_FAILED",
+  })
+  accumulator = applyAgentStreamEvent(accumulator, {
+    type: "subagent_result",
+    callId: "g-err",
+    subagentId: "goblin_source_verifier",
+    status: "success",
+  })
+
+  const entry = accumulator.activityTimeline.find(
+    (candidate) => candidate.kind === "subagent"
+  )
+  assert.equal(entry.status, "error")
+  assert.equal(entry.errorCode, "GOBLIN_FAILED")
+})

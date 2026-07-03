@@ -6,6 +6,9 @@ export const AGENT_FLAG_KEYS = [
   "agent.telemetry.record_io",
   "agent.response.compaction",
   "agent.responses.ws_transport",
+  "agent.goblins.adaptive",
+  "agent.goblins.hosted_tools",
+  "agent.goblins.background_escalation",
 ] as const
 
 type AgentFlagKey = (typeof AGENT_FLAG_KEYS)[number]
@@ -19,24 +22,42 @@ export interface AgentFeatureFlags {
   // Routes Responses API traffic over a persistent WebSocket instead of HTTP,
   // cutting per-round-trip overhead on tool-heavy runs. Default off.
   responsesWebsocketTransport: boolean
+  // Goblins adaptive orchestration: triage tiers, multi-round delegation,
+  // coverage evaluator, shared research state. Default off.
+  goblinsAdaptive: boolean
+  // Goblins hosted tools: OpenAI web_search / file_search / code_interpreter
+  // on the specialist sub-agents. Default off.
+  goblinsHostedTools: boolean
+  // Goblins background escalation: durable deep-research runs driven by
+  // background responses + webhooks. Default off.
+  goblinsBackgroundEscalation: boolean
 }
 
 const DEFAULT_FLAGS: AgentFeatureFlags = {
   telemetryRecordIo: false,
   responseCompaction: false,
   responsesWebsocketTransport: false,
+  goblinsAdaptive: false,
+  goblinsHostedTools: false,
+  goblinsBackgroundEscalation: false,
 }
 
 const ENV_FLAG_NAMES: Record<keyof AgentFeatureFlags, string> = {
   telemetryRecordIo: "AGENT_TELEMETRY_RECORD_IO",
   responseCompaction: "AGENT_RESPONSE_COMPACTION",
   responsesWebsocketTransport: "AGENT_RESPONSES_WS_TRANSPORT",
+  goblinsAdaptive: "AGENT_GOBLINS_ADAPTIVE",
+  goblinsHostedTools: "AGENT_GOBLINS_HOSTED_TOOLS",
+  goblinsBackgroundEscalation: "AGENT_GOBLINS_BACKGROUND_ESCALATION",
 }
 
 const EDGE_FLAG_KEYS: Record<keyof AgentFeatureFlags, IntegrationFlagKey> = {
   telemetryRecordIo: "agent.telemetry.record_io",
   responseCompaction: "agent.response.compaction",
   responsesWebsocketTransport: "agent.responses.ws_transport",
+  goblinsAdaptive: "agent.goblins.adaptive",
+  goblinsHostedTools: "agent.goblins.hosted_tools",
+  goblinsBackgroundEscalation: "agent.goblins.background_escalation",
 }
 
 export function toEdgeConfigFlagKey(key: IntegrationFlagKey): string {

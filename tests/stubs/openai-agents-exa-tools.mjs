@@ -47,3 +47,7 @@ export function getExaToolResultMetadata(part) {
 export function createOpenAiAgentsExaTools() {
   return []
 }
+
+export function createSharedResearchState() {
+  return { seenUrls: new Set(), contentByUrl: new Map() }
+}
