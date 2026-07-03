@@ -14,8 +14,7 @@ export const DATABASE_URL_ENV_NAME = "DATABASE_URL" as const
 const AUTH_DATABASE_URL_ENV_NAME = "AUTH_DATABASE_URL" as const
 
 type DatabaseUrlEnvName =
-  | typeof DATABASE_URL_ENV_NAME
-  | typeof AUTH_DATABASE_URL_ENV_NAME
+  typeof DATABASE_URL_ENV_NAME | typeof AUTH_DATABASE_URL_ENV_NAME
 
 function getConfiguredDatabaseUrl(name: DatabaseUrlEnvName): string | null {
   const databaseUrl = process.env[name]?.trim()

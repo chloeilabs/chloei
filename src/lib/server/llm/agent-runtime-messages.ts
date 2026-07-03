@@ -20,8 +20,7 @@ interface AgentAssistantModelMessage {
 }
 
 export type AgentModelMessage =
-  | AgentUserModelMessage
-  | AgentAssistantModelMessage
+  AgentUserModelMessage | AgentAssistantModelMessage
 
 export function toModelMessages(
   messages: AgentInputMessage[]
