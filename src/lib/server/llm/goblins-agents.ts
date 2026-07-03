@@ -1,8 +1,16 @@
-import { type Tool, tool } from "@openai/agents"
+import {
+  codeInterpreterTool,
+  fileSearchTool,
+  type Tool,
+  tool,
+  webSearchTool,
+} from "@openai/agents"
 import { z } from "zod"
 
 import {
   GOBLIN_SUBAGENT_MAX_STEPS,
+  GOBLINS_FILE_SEARCH_MAX_RESULTS,
+  GOBLINS_WEB_SEARCH_CONTEXT_SIZE,
   type GoblinsBudgetTier,
 } from "@/lib/server/agent-runtime-config"
 import {
@@ -15,6 +23,12 @@ import { startAgentRuntimeStream } from "./agent-runtime"
 import { GOBLIN_ERROR_PREFIX } from "./agent-stream-mapping"
 import { type SharedResearchState } from "./openai-agents-exa-tools"
 
+// Per-request context for building a goblin's hosted OpenAI tools.
+export interface GoblinHostedToolContext {
+  // Vector store ids built from the request's PDF attachments, when any.
+  vectorStoreIds?: string[]
+}
+
 // One specialist sub-agent. `subagentId` is also the SDK tool name the manager
 // sees, so the stream mapper can resolve manager tool calls back to the goblin.
 export interface GoblinDefinition {
@@ -25,7 +39,34 @@ export interface GoblinDefinition {
   toolDescription: string
   // The sub-agent's own system prompt (role framing).
   instructions: string
+  // Hosted OpenAI tools for this role (agent.goblins.hosted_tools flag).
+  hostedTools?: (context: GoblinHostedToolContext) => Tool[]
+  // Stable sentence(s) appended to the role instructions when hosted tools are
+  // enabled, telling the goblin how to use them.
+  hostedInstructions?: string
 }
+
+const HOSTED_WEB_SEARCH_INSTRUCTION =
+  "You also have a hosted web_search tool; use it to complement Exa when a different search angle or fresher coverage would help."
+
+const HOSTED_FILE_SEARCH_INSTRUCTION =
+  "If a document-search tool is available, the user has provided documents — search them first for anything the question implies is in those documents."
+
+const HOSTED_CODE_INTERPRETER_INSTRUCTION =
+  "When figures need arithmetic, unit conversion, growth rates, or reconciliation, use the code interpreter to compute rather than estimating."
+
+const hostedWebSearch = (): Tool[] => [
+  webSearchTool({ searchContextSize: GOBLINS_WEB_SEARCH_CONTEXT_SIZE }),
+]
+
+const hostedFileSearch = (context: GoblinHostedToolContext): Tool[] =>
+  context.vectorStoreIds && context.vectorStoreIds.length > 0
+    ? [
+        fileSearchTool(context.vectorStoreIds, {
+          maxNumResults: GOBLINS_FILE_SEARCH_MAX_RESULTS,
+        }),
+      ]
+    : []
 
 const GOBLIN_BASE_INSTRUCTIONS = [
   "You are a specialist research goblin reporting to a lead analyst. Goal: return a concise, well-sourced brief that answers your assigned task.",
@@ -40,6 +81,8 @@ export const GOBLIN_DEFINITIONS: GoblinDefinition[] = [
     toolDescription:
       "Broad live-web discovery. Use for general fact-finding and gathering a wide base of relevant, current sources on the task.",
     instructions: `${GOBLIN_BASE_INSTRUCTIONS} Your specialty is BROAD DISCOVERY: cast a wide net, find the most relevant and authoritative pages, and summarize the landscape of what is known.`,
+    hostedTools: hostedWebSearch,
+    hostedInstructions: HOSTED_WEB_SEARCH_INSTRUCTION,
   },
   {
     subagentId: "goblin_source_verifier",
@@ -47,6 +90,11 @@ export const GOBLIN_DEFINITIONS: GoblinDefinition[] = [
     toolDescription:
       "Cross-checks specific claims against primary sources. Use when a claim needs verification or you need the authoritative original document.",
     instructions: `${GOBLIN_BASE_INSTRUCTIONS} Your specialty is VERIFICATION: take the key claims, find primary/authoritative sources, read them closely, and report which claims hold up, which don't, and the exact supporting quotes.`,
+    hostedTools: (context) => [
+      ...hostedWebSearch(),
+      ...hostedFileSearch(context),
+    ],
+    hostedInstructions: `${HOSTED_WEB_SEARCH_INSTRUCTION} ${HOSTED_FILE_SEARCH_INSTRUCTION}`,
   },
   {
     subagentId: "goblin_recency_scout",
@@ -54,6 +102,8 @@ export const GOBLIN_DEFINITIONS: GoblinDefinition[] = [
     toolDescription:
       "Time-sensitive 'what is the latest' angle. Use for breaking developments, recent changes, or anything where freshness matters.",
     instructions: `${GOBLIN_BASE_INSTRUCTIONS} Your specialty is RECENCY: bias toward the newest information, prefer recent results, and clearly date every finding so the manager knows how current it is.`,
+    hostedTools: hostedWebSearch,
+    hostedInstructions: HOSTED_WEB_SEARCH_INSTRUCTION,
   },
   {
     subagentId: "goblin_numbers_analyst",
@@ -61,6 +111,11 @@ export const GOBLIN_DEFINITIONS: GoblinDefinition[] = [
     toolDescription:
       "Extracts and reconciles figures, metrics, and data from filings/reports. Use for quantitative questions, statistics, or financial detail.",
     instructions: `${GOBLIN_BASE_INSTRUCTIONS} Your specialty is QUANTITATIVE DETAIL: find the hard numbers, reconcile figures across sources, note units/periods, and flag any discrepancies between sources.`,
+    hostedTools: (context) => [
+      codeInterpreterTool({ container: { type: "auto" } }),
+      ...hostedFileSearch(context),
+    ],
+    hostedInstructions: `${HOSTED_CODE_INTERPRETER_INSTRUCTION} ${HOSTED_FILE_SEARCH_INSTRUCTION}`,
   },
   {
     subagentId: "goblin_contrarian",
@@ -68,6 +123,8 @@ export const GOBLIN_DEFINITIONS: GoblinDefinition[] = [
     toolDescription:
       "Actively seeks disconfirming evidence and counterarguments. Use to stress-test a thesis and surface the strongest opposing view.",
     instructions: `${GOBLIN_BASE_INSTRUCTIONS} Your specialty is DISCONFIRMATION: actively search for evidence that contradicts the leading view, surface the strongest counterarguments and caveats, and report what would have to be true for the opposite conclusion.`,
+    hostedTools: hostedWebSearch,
+    hostedInstructions: HOSTED_WEB_SEARCH_INSTRUCTION,
   },
   {
     subagentId: "goblin_context_scout",
@@ -75,6 +132,8 @@ export const GOBLIN_DEFINITIONS: GoblinDefinition[] = [
     toolDescription:
       "Gathers background, definitions, and framing. Use to establish context, history, and how the topic fits a bigger picture.",
     instructions: `${GOBLIN_BASE_INSTRUCTIONS} Your specialty is CONTEXT: establish definitions, background, and framing so the manager understands how the specifics fit the bigger picture.`,
+    hostedTools: hostedFileSearch,
+    hostedInstructions: HOSTED_FILE_SEARCH_INSTRUCTION,
   },
 ]
 
@@ -112,6 +171,9 @@ export interface CreateGoblinToolsParams {
   // so the orchestrator can surface it on the top-level stream.
   onSubEvent?: (event: AgentStreamEvent) => void
   adaptive?: GoblinAdaptiveOptions
+  // Presence enables the per-role hosted OpenAI tools
+  // (agent.goblins.hosted_tools flag).
+  hosted?: GoblinHostedToolContext
 }
 
 const goblinInputSchema = z.object({
@@ -180,6 +242,17 @@ export async function runGoblinTask(
     ? `${params.input}\n\nAlready known (do not re-research):\n${params.knownFindings}`
     : params.input
 
+  const hostedTools = params.hosted
+    ? (definition.hostedTools?.(params.hosted) ?? [])
+    : []
+  const instructionParts = [
+    definition.instructions,
+    ...(params.adaptive ? [GOBLIN_EVIDENCE_NOT_INSTRUCTIONS] : []),
+    ...(hostedTools.length > 0 && definition.hostedInstructions
+      ? [definition.hostedInstructions]
+      : []),
+  ]
+
   let brief = ""
   for await (const event of startAgentRuntimeStream({
     model: AvailableModels.OPENAI_GPT_5_4_MINI,
@@ -193,9 +266,7 @@ export async function runGoblinTask(
     openAiApiKey: params.openAiApiKey,
     exaApiKey: params.exaApiKey,
     messages: [{ role: "user", content }],
-    systemInstruction: params.adaptive
-      ? `${definition.instructions} ${GOBLIN_EVIDENCE_NOT_INSTRUCTIONS}`
-      : definition.instructions,
+    systemInstruction: instructionParts.join(" "),
     // Each specialist's instructions are stable, so give it its own cache
     // line — the prefix is reused across requests that hit this goblin.
     promptCacheKey: definition.subagentId,
@@ -203,6 +274,7 @@ export async function runGoblinTask(
     ...(params.adaptive
       ? { sharedResearch: params.adaptive.sharedResearch }
       : {}),
+    ...(hostedTools.length > 0 ? { extraTools: hostedTools } : {}),
   })) {
     if (event.type === "text_delta") {
       brief += event.delta

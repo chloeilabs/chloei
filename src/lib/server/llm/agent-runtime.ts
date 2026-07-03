@@ -138,6 +138,9 @@ export interface StartAgentRuntimeStreamParams {
   // Additional tools appended after the Exa tools (e.g. a goblin's hosted
   // OpenAI tools). Absent → no behavior change.
   extraTools?: Tool[]
+  // Vector stores built from the request's PDF attachments; consumed by the
+  // Goblins runtime to give document access to file_search-enabled goblins.
+  vectorStoreIds?: string[]
 }
 
 // Baked into every run's instructions. The OpenAI Agents SDK has no per-step

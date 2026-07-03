@@ -12,8 +12,16 @@ export interface FollowUpQuestion {
   text: string
 }
 
-// The agent's tools are the two Exa function tools (web search + read).
-export const TOOL_NAMES = ["exa_search", "exa_get_contents"] as const
+// The agent's tools: the two Exa function tools (web search + read) plus the
+// OpenAI hosted tools available to Goblins specialists when the
+// agent.goblins.hosted_tools flag is on.
+export const TOOL_NAMES = [
+  "exa_search",
+  "exa_get_contents",
+  "web_search",
+  "file_search",
+  "code_interpreter",
+] as const
 export type ToolName = (typeof TOOL_NAMES)[number]
 
 // Goblins-mode sub-agents. These are NOT tools (kept out of ToolName); the
@@ -37,6 +45,7 @@ export function isSubagentId(value: unknown): value is SubagentId {
 
 export const SEARCH_TOOL_NAMES = [
   "exa_search",
+  "web_search",
 ] as const satisfies readonly ToolName[]
 type SearchToolName = (typeof SEARCH_TOOL_NAMES)[number]
 export type ToolInvocationStatus = "running" | "success" | "error"

@@ -24,11 +24,13 @@ import {
 import { getExaApiKey, getOpenAiApiKey } from "@/lib/server/env"
 import { resolveAgentFeatureFlags } from "@/lib/server/integration-flags"
 import { resolveAttachmentFileIds } from "@/lib/server/llm/attachment-uploads"
+import { ensureGoblinsVectorStore } from "@/lib/server/llm/vector-stores"
 import {
   createRouteObservation,
   observeRouteResponse,
 } from "@/lib/server/route-observability"
 import { isThreadStoreNotInitializedError } from "@/lib/server/threads"
+import { isGoblinsModel } from "@/lib/shared"
 
 export const runtime = "nodejs"
 export const maxDuration = 800
@@ -165,6 +167,30 @@ export async function POST(request: NextRequest) {
       requestId,
     })
 
+    // Goblins hosted tools: give file_search-enabled goblins access to the
+    // conversation's PDF attachments via a per-request vector store. Failure
+    // degrades to no file_search (the manager still sees the files inline).
+    let vectorStoreId: string | null = null
+    if (isGoblinsModel(selectedModel) && featureFlags.goblinsHostedTools) {
+      const pdfFileIds = [
+        ...new Set(
+          parsedRequest.messages.flatMap(
+            (message) =>
+              message.attachments?.flatMap((attachment) =>
+                attachment.kind === "pdf" && attachment.fileId
+                  ? [attachment.fileId]
+                  : []
+              ) ?? []
+          )
+        ),
+      ]
+      vectorStoreId = await ensureGoblinsVectorStore({
+        openAiApiKey,
+        fileIds: pdfFileIds,
+        requestId,
+      })
+    }
+
     const streamResponse = createAgentStreamResponse({
       request,
       requestId,
@@ -177,12 +203,16 @@ export async function POST(request: NextRequest) {
       featureFlags,
       messages: parsedRequest.messages,
       systemInstruction,
+      ...(vectorStoreId ? { vectorStoreIds: [vectorStoreId] } : {}),
     })
     if (Object.keys(attachmentFileIds).length > 0) {
       streamResponse.headers.set(
         "X-Attachment-File-Ids",
         JSON.stringify(attachmentFileIds)
       )
+    }
+    if (vectorStoreId) {
+      streamResponse.headers.set("X-Vector-Store-Id", vectorStoreId)
     }
 
     return observeRouteResponse(observation, streamResponse, {

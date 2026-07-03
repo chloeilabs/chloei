@@ -135,6 +135,8 @@ interface CreateAgentStreamResponseParams {
   featureFlags?: AgentFeatureFlags
   messages: AgentStreamRequest["messages"]
   systemInstruction: string
+  // Vector stores over the request's PDF attachments (goblins hosted tools).
+  vectorStoreIds?: string[]
 }
 
 export function resolveUserTimeZone(request: NextRequest): string | undefined {
@@ -511,6 +513,7 @@ export function createAgentStreamResponse(
             params.systemInstruction
           ),
           signal: streamSignal,
+          vectorStoreIds: params.vectorStoreIds,
         })
 
         for await (const event of stream) {

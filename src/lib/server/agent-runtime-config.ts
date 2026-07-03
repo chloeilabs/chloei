@@ -96,6 +96,12 @@ export const GOBLINS_BUDGET_TIERS: Record<
 // Triage pre-pass race timeout; on timeout (or any error) the run falls back to
 // the standard tier — the pre-pass may never fail a run.
 export const GOBLINS_TRIAGE_TIMEOUT_MS = 5_000
+// Hosted web_search context size. Deliberately NOT per-tier: hosted tool
+// configs serialize into the request prefix, and varying them would fragment
+// each goblin's prompt cache line.
+export const GOBLINS_WEB_SEARCH_CONTEXT_SIZE = "medium" as const
+// file_search result cap for goblins that search user documents.
+export const GOBLINS_FILE_SEARCH_MAX_RESULTS = 8
 // Cap on the cross-goblin shared page-content cache (entries per request).
 export const GOBLINS_SHARED_CONTENT_CACHE_MAX_ENTRIES = 40
 // Wall-clock budget for one background continuation segment (goblin batch +

@@ -67,3 +67,26 @@ export function run(agent, input, options) {
   }
   return makeStreamResult([], [])
 }
+
+// Hosted OpenAI tool factories (goblins hosted-tools mode). Return marker
+// objects that mirror the SDK's HostedTool shape closely enough for tests to
+// assert role assignment.
+export function webSearchTool(options) {
+  return { type: "hosted_tool", name: "web_search", providerData: options }
+}
+
+export function fileSearchTool(vectorStoreIds, options) {
+  return {
+    type: "hosted_tool",
+    name: "file_search",
+    providerData: { vectorStoreIds, ...options },
+  }
+}
+
+export function codeInterpreterTool(options) {
+  return {
+    type: "hosted_tool",
+    name: "code_interpreter",
+    providerData: options,
+  }
+}

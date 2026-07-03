@@ -150,6 +150,66 @@ export function createAgentStreamMapper(
     }
   }
 
+  // Hosted OpenAI tool items ("web_search_call" etc.). Emits the tool_call on
+  // first sight and the balancing tool_result once the item reports a terminal
+  // status — hosted outputs arrive whole, and an unbalanced call would trip the
+  // route's unresolved-tool-call fallback.
+  const mapHostedToolItem = (
+    rawItem: Record<string, unknown> | null
+  ): AgentStreamEvent[] => {
+    const events: AgentStreamEvent[] = []
+    const hostedName = asString(rawItem?.name)?.replace(/_call$/, "")
+    if (
+      hostedName !== "web_search" &&
+      hostedName !== "file_search" &&
+      hostedName !== "code_interpreter"
+    ) {
+      return events
+    }
+
+    const callId = asString(rawItem?.id) ?? crypto.randomUUID()
+    const status = asString(rawItem?.status)
+
+    if (!seenToolCalls.has(callId)) {
+      seenToolCalls.add(callId)
+      const args = asRecord(parseToolArguments(rawItem?.arguments))
+      const query =
+        asString(args?.query)?.trim() ??
+        asString(asRecord(args?.action)?.query)?.trim()
+      const label =
+        hostedName === "web_search"
+          ? "Searching the web"
+          : hostedName === "file_search"
+            ? "Searching your documents"
+            : "Running calculations"
+      events.push({
+        type: "tool_call",
+        callId,
+        toolName: hostedName,
+        label,
+        ...(query ? { query } : {}),
+        operation: hostedName,
+        provider: "openai",
+      })
+    }
+
+    const isTerminal = status === "completed" || status === "failed"
+    if (isTerminal && !finalizedToolCalls.has(callId)) {
+      finalizedToolCalls.add(callId)
+      events.push({
+        type: "tool_result",
+        callId,
+        toolName: hostedName,
+        status: status === "failed" ? "error" : "success",
+        operation: hostedName,
+        provider: "openai",
+        ...(status === "failed" ? { errorCode: "HOSTED_TOOL_FAILED" } : {}),
+      })
+    }
+
+    return events
+  }
+
   const mapExaToolOutput = (
     callId: string,
     toolName: string,
@@ -257,6 +317,17 @@ export function createAgentStreamMapper(
       const events: AgentStreamEvent[] = []
       const itemRecord = asRecord(item)
       const rawItem = asRecord(itemRecord?.rawItem)
+
+      // Hosted OpenAI tools (web_search / file_search / code_interpreter)
+      // arrive as hosted_tool_call items with an `id` (no callId) and carry
+      // their status/output on the item itself, so one item may need to emit
+      // both the call and its balancing result.
+      if (
+        (eventName === "tool_called" || eventName === "tool_output") &&
+        asString(rawItem?.type) === "hosted_tool_call"
+      ) {
+        return mapHostedToolItem(rawItem)
+      }
 
       if (eventName === "tool_called") {
         const callId = asString(rawItem?.callId)

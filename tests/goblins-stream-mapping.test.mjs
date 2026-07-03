@@ -170,3 +170,143 @@ test("createGoblinTools builds one tool per goblin", () => {
     )
   }
 })
+
+test("hosted tool items map to tool_call + balancing tool_result", () => {
+  const mapper = createAgentStreamMapper({
+    resolveSubagent: resolveGoblinSubagent,
+  })
+
+  // A completed hosted web search arrives whole: call + result together.
+  const completed = mapper.mapRunItemEvent("tool_called", {
+    rawItem: {
+      type: "hosted_tool_call",
+      id: "ws-1",
+      name: "web_search_call",
+      status: "completed",
+      arguments: JSON.stringify({ query: "latest GDP figures" }),
+    },
+  })
+  assert.deepEqual(
+    completed.map((event) => event.type),
+    ["tool_call", "tool_result"]
+  )
+  assert.equal(completed[0].toolName, "web_search")
+  assert.equal(completed[0].label, "Searching the web")
+  assert.equal(completed[0].query, "latest GDP figures")
+  assert.equal(completed[0].provider, "openai")
+  assert.equal(completed[1].status, "success")
+  assert.equal(completed[1].callId, "ws-1")
+
+  // Repeats of the same item id emit nothing new.
+  const repeat = mapper.mapRunItemEvent("tool_output", {
+    rawItem: {
+      type: "hosted_tool_call",
+      id: "ws-1",
+      name: "web_search_call",
+      status: "completed",
+    },
+  })
+  assert.deepEqual(repeat, [])
+})
+
+test("hosted tool items surface failures and other tool kinds", () => {
+  const mapper = createAgentStreamMapper({
+    resolveSubagent: resolveGoblinSubagent,
+  })
+
+  const inProgress = mapper.mapRunItemEvent("tool_called", {
+    rawItem: {
+      type: "hosted_tool_call",
+      id: "ci-1",
+      name: "code_interpreter_call",
+      status: "in_progress",
+    },
+  })
+  assert.deepEqual(
+    inProgress.map((event) => event.type),
+    ["tool_call"]
+  )
+  assert.equal(inProgress[0].toolName, "code_interpreter")
+  assert.equal(inProgress[0].label, "Running calculations")
+
+  const failed = mapper.mapRunItemEvent("tool_output", {
+    rawItem: {
+      type: "hosted_tool_call",
+      id: "ci-1",
+      name: "code_interpreter_call",
+      status: "failed",
+    },
+  })
+  assert.deepEqual(
+    failed.map((event) => event.type),
+    ["tool_result"]
+  )
+  assert.equal(failed[0].status, "error")
+  assert.equal(failed[0].errorCode, "HOSTED_TOOL_FAILED")
+
+  const fileSearch = mapper.mapRunItemEvent("tool_called", {
+    rawItem: {
+      type: "hosted_tool_call",
+      id: "fs-1",
+      name: "file_search_call",
+      status: "completed",
+    },
+  })
+  assert.equal(fileSearch[0].toolName, "file_search")
+  assert.equal(fileSearch[0].label, "Searching your documents")
+
+  const unknown = mapper.mapRunItemEvent("tool_called", {
+    rawItem: {
+      type: "hosted_tool_call",
+      id: "x-1",
+      name: "image_generation_call",
+      status: "completed",
+    },
+  })
+  assert.deepEqual(unknown, [])
+})
+
+test("hosted tools are assigned per role and only when enabled", () => {
+  const baseParams = { openAiApiKey: "key", exaApiKey: "exa" }
+
+  // Flag off (no hosted context): no hosted tools anywhere.
+  for (const definition of GOBLIN_DEFINITIONS) {
+    const hostedTools = definition.hostedTools?.({}) ?? []
+    if (definition.subagentId === "goblin_context_scout") {
+      // file_search-only roles produce nothing without vector stores.
+      assert.deepEqual(hostedTools, [])
+    }
+  }
+  assert.ok(createGoblinTools(baseParams).every((tool) => tool.execute))
+
+  // With vector stores, roles get their assigned hosted tools.
+  const context = { vectorStoreIds: ["vs_123"] }
+  const byId = new Map(
+    GOBLIN_DEFINITIONS.map((definition) => [
+      definition.subagentId,
+      (definition.hostedTools?.(context) ?? []).map((tool) => tool.name),
+    ])
+  )
+  assert.deepEqual(byId.get("goblin_web_researcher"), ["web_search"])
+  assert.deepEqual(byId.get("goblin_recency_scout"), ["web_search"])
+  assert.deepEqual(byId.get("goblin_contrarian"), ["web_search"])
+  assert.deepEqual(byId.get("goblin_source_verifier"), [
+    "web_search",
+    "file_search",
+  ])
+  assert.deepEqual(byId.get("goblin_numbers_analyst"), [
+    "code_interpreter",
+    "file_search",
+  ])
+  assert.deepEqual(byId.get("goblin_context_scout"), ["file_search"])
+
+  // Without vector stores, file_search drops out but web tools remain.
+  const noStores = new Map(
+    GOBLIN_DEFINITIONS.map((definition) => [
+      definition.subagentId,
+      (definition.hostedTools?.({}) ?? []).map((tool) => tool.name),
+    ])
+  )
+  assert.deepEqual(noStores.get("goblin_source_verifier"), ["web_search"])
+  assert.deepEqual(noStores.get("goblin_numbers_analyst"), ["code_interpreter"])
+})

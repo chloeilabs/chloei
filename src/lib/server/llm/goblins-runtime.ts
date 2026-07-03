@@ -194,6 +194,8 @@ export async function* startGoblinsRuntimeStream(
   // result (a goblin can stop on its step cap with a search still pending). Left
   // unbalanced, the route appends a spurious "tool request started" note.
   const openToolCallIds = new Set<string>()
+  const hostedToolsEnabled = params.featureFlags?.goblinsHostedTools ?? false
+
   const goblinTools = createGoblinTools({
     openAiApiKey: params.openAiApiKey,
     exaApiKey: params.exaApiKey,
@@ -205,6 +207,9 @@ export async function* startGoblinsRuntimeStream(
             sharedResearch: createSharedResearchState(),
           },
         }
+      : {}),
+    ...(hostedToolsEnabled
+      ? { hosted: { vectorStoreIds: params.vectorStoreIds } }
       : {}),
     onSubEvent: (event) => {
       if (event.type === "source") {
