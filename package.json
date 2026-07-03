@@ -70,9 +70,9 @@
   "devDependencies": {
     "@better-auth/cli": "^1.4.21",
     "@eslint/js": "^9.39.4",
-    "@next/eslint-plugin-next": "^16.2.9",
+    "@next/eslint-plugin-next": "^16.2.10",
     "@playwright/test": "^1.61.1",
-    "@tailwindcss/postcss": "^4.3.1",
+    "@tailwindcss/postcss": "^4.3.2",
     "@tailwindcss/typography": "^0.5.20",
     "@types/node": "^24.13.2",
     "@types/pg": "^8.20.0",
@@ -86,11 +86,11 @@
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "globals": "^17.7.0",
     "postcss": "^8.5.16",
-    "prettier": "^3.9.1",
+    "prettier": "^3.9.4",
     "prettier-plugin-tailwindcss": "^0.8.0",
-    "tailwindcss": "^4.3.1",
+    "tailwindcss": "^4.3.2",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.62.0"
+    "typescript-eslint": "^8.62.1"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
