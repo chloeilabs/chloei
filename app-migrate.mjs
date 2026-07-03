@@ -55,6 +55,39 @@ DROP TABLE IF EXISTS agent_job;
 ALTER TABLE thread
 DROP COLUMN IF EXISTS "${LEGACY_THREAD_CONFIG_COLUMN}";
 
+-- Durable Goblins background research runs (agent.goblins.background_escalation).
+-- One row per escalated run: OpenAI background-response chain cursors, the
+-- lease that serializes continuation segments across invocations, recorded
+-- goblin briefs (idempotent re-drives), and the append-only event log the
+-- client replays on reconnect. Inert until the feature flag is enabled.
+CREATE TABLE IF NOT EXISTS goblins_run (
+  id text PRIMARY KEY,
+  "userId" text NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+  "threadId" text NOT NULL,
+  "assistantMessageId" text NOT NULL,
+  status text NOT NULL,
+  phase jsonb NOT NULL DEFAULT '{}',
+  "openaiResponseId" text,
+  "previousResponseId" text,
+  "systemInstruction" text NOT NULL,
+  input jsonb NOT NULL,
+  "toolResults" jsonb NOT NULL DEFAULT '{}',
+  events jsonb NOT NULL DEFAULT '[]',
+  "eventCount" integer NOT NULL DEFAULT 0,
+  "leaseOwner" text,
+  "leaseExpiresAt" timestamptz,
+  error text,
+  "createdAt" timestamptz NOT NULL DEFAULT now(),
+  "updatedAt" timestamptz NOT NULL DEFAULT now(),
+  "expiresAt" timestamptz NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS goblins_run_openai_response_idx
+ON goblins_run ("openaiResponseId") WHERE "openaiResponseId" IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS goblins_run_user_thread_idx
+ON goblins_run ("userId", "threadId");
+
 -- Finance shares the auth database and stores additional thread metadata in
 -- the shared thread table. Preserve compatible columns when Chloei migrations
 -- rerun so cross-app storage stays stable.

@@ -9,6 +9,7 @@ import {
 } from "@/lib/server/auth"
 import { getRequestSession } from "@/lib/server/auth-session"
 import { getOpenAiApiKey } from "@/lib/server/env"
+import { getGoblinsRunByResponseId } from "@/lib/server/goblins-run-store"
 import { resumeBackgroundResponseStream } from "@/lib/server/llm/background-responses"
 import { getOpenAiClient } from "@/lib/server/llm/openai-raw-client"
 import {
@@ -67,6 +68,19 @@ export async function GET(
   }
 
   const { responseId } = await params
+
+  // Ownership: response ids are only streamable through the goblins run that
+  // owns them. Unknown ids and other users' runs both 404 (don't confirm
+  // existence).
+  const run = await getGoblinsRunByResponseId(responseId).catch(() => null)
+  if (run?.userId !== session.user.id) {
+    return observeRouteResponse(
+      observation,
+      new Response(null, { status: 404, headers }),
+      { errorCode: "AGENT_RESPONSE_NOT_FOUND", outcome: "not_found" }
+    )
+  }
+
   const afterRaw = request.nextUrl.searchParams.get("after")
   const startingAfter =
     afterRaw !== null && /^\d+$/.test(afterRaw) ? Number(afterRaw) : undefined

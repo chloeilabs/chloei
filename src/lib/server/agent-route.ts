@@ -101,6 +101,10 @@ export const agentStreamRequestSchema = z
     model: z.string().trim().min(1).max(200).optional(),
     threadId: z.string().trim().min(1).max(200).optional(),
     messages: z.array(agentMessageSchema).min(1),
+    // Requests a durable background Goblins run (deep research). Honored only
+    // for the goblins model with the escalation flag on and a threadId to fold
+    // the answer into; otherwise the request silently runs interactive.
+    background: z.boolean().optional(),
   })
   .strict()
 

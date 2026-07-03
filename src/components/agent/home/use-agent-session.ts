@@ -11,6 +11,7 @@ import {
 } from "@/lib/http-error"
 import { getRequestIdFromHeaders } from "@/lib/request-id"
 import {
+  type BackgroundRunStatus,
   type FollowUpQuestion,
   isModelType,
   type Message as AgentMessage,
@@ -49,8 +50,16 @@ import {
   EMPTY_ASSISTANT_RESPONSE_FALLBACK,
   toRequestMessages,
 } from "./home-agent-utils"
+import { cancelBackgroundRun, followBackgroundRun } from "./use-background-run"
 import { useFollowUpQuestions } from "./use-follow-up-questions"
 import type { useThreadStore } from "./use-thread-store"
+
+const TERMINAL_BACKGROUND_RUN_STATUSES: readonly BackgroundRunStatus[] = [
+  "completed",
+  "failed",
+  "cancelled",
+  "expired",
+]
 
 interface AgentSessionState {
   messages: AgentMessage[]
@@ -90,6 +99,11 @@ export function useAgentSession({
   const messagesRef = useRef<AgentMessage[]>([])
   const abortControllerRef = useRef<AbortController | null>(null)
   const currentThreadIdRef = useRef(currentThreadId)
+  // Active background-run followers, keyed by runId. Follows survive thread
+  // switches (their UI upserts no-op while another thread is open).
+  const backgroundRunControllersRef = useRef(
+    new Map<string, { controller: AbortController; threadId: string }>()
+  )
 
   const setCurrentThreadId = useCallback(
     (id: string | null) => {
@@ -189,6 +203,132 @@ export function useAgentSession({
     setState((prev) => ({ ...prev, messages: nextMessages }))
   }, [])
 
+  // Follows a durable background Goblins run: polls its event log, rebuilds the
+  // assistant message through the normal accumulator, and persists progress.
+  // Used both right after an escalation handoff and to resume on thread load.
+  const followBackgroundRunIntoThread = useCallback(
+    (params: {
+      runId: string
+      threadId: string
+      assistantMessageId: string
+      assistantCreatedAt: string
+      model: ModelType
+      startAfterEvent?: number
+    }) => {
+      if (backgroundRunControllersRef.current.has(params.runId)) {
+        return
+      }
+      const controller = new AbortController()
+      backgroundRunControllersRef.current.set(params.runId, {
+        controller,
+        threadId: params.threadId,
+      })
+
+      let accumulator = createAgentStreamAccumulator()
+      let runStatus: BackgroundRunStatus = "awaiting_manager"
+
+      const upsertFromAccumulator = (isStreaming: boolean) => {
+        if (params.threadId !== currentThreadIdRef.current) {
+          return
+        }
+        const base = createAssistantMessageFromAccumulator({
+          id: params.assistantMessageId,
+          createdAt: params.assistantCreatedAt,
+          accumulator,
+          model: params.model,
+          isStreaming,
+        })
+        const assistantMessage: AgentMessage = {
+          ...base,
+          metadata: {
+            ...base.metadata,
+            backgroundRun: { runId: params.runId, status: runStatus },
+          },
+        }
+        const updatedMessages = upsertAgentMessage(
+          messagesRef.current,
+          assistantMessage
+        )
+        messagesRef.current = updatedMessages
+        saveThread(
+          createThreadSnapshot(params.threadId, updatedMessages, params.model),
+          { immediate: !isStreaming }
+        )
+        setState((previous) => ({ ...previous, messages: updatedMessages }))
+      }
+
+      void (async () => {
+        try {
+          const terminal = await followBackgroundRun({
+            runId: params.runId,
+            ...(params.startAfterEvent !== undefined
+              ? { startAfterEvent: params.startAfterEvent }
+              : {}),
+            signal: controller.signal,
+            onEvents: (events) => {
+              for (const event of events) {
+                accumulator = applyAgentStreamEvent(accumulator, event)
+              }
+              upsertFromAccumulator(true)
+            },
+            onStatus: (update) => {
+              runStatus = update.status
+            },
+          })
+          if (terminal) {
+            runStatus = terminal
+            accumulator = applyAgentStreamEvent(accumulator, {
+              type: "agent_status",
+              status:
+                terminal === "completed"
+                  ? "completed"
+                  : terminal === "cancelled"
+                    ? "cancelled"
+                    : "failed",
+            })
+            accumulator = finalizeAgentStreamAccumulator(
+              accumulator,
+              terminal === "completed" ? "success" : "error"
+            )
+            upsertFromAccumulator(false)
+          }
+        } finally {
+          backgroundRunControllersRef.current.delete(params.runId)
+        }
+      })()
+    },
+    [createThreadSnapshot, saveThread]
+  )
+
+  // Resume following after a reload: a loaded thread whose assistant message
+  // carries a non-terminal backgroundRun is still running server-side.
+  useEffect(() => {
+    const threadId = currentThreadId
+    if (!threadId) {
+      return
+    }
+    for (const message of state.messages) {
+      const backgroundRun = message.metadata?.backgroundRun
+      if (
+        backgroundRun &&
+        !TERMINAL_BACKGROUND_RUN_STATUSES.includes(backgroundRun.status) &&
+        !backgroundRunControllersRef.current.has(backgroundRun.runId)
+      ) {
+        const model = message.metadata?.selectedModel
+        followBackgroundRunIntoThread({
+          runId: backgroundRun.runId,
+          threadId,
+          assistantMessageId: message.id,
+          assistantCreatedAt: message.createdAt,
+          model:
+            model ??
+            (isModelType(message.llmModel) ? message.llmModel : "goblins"),
+          startAfterEvent: 0,
+        })
+      }
+    }
+  }, [state.messages, currentThreadId, followBackgroundRunIntoThread])
+
   const {
     requestFollowUpQuestions,
     clearAllFollowUpBackfillRetries,
@@ -239,6 +379,15 @@ export function useAgentSession({
   }, [])
 
   const handleStopStream = useCallback(() => {
+    // Stop also cancels any background run attached to the current thread.
+    const activeThreadId = currentThreadIdRef.current
+    for (const [runId, entry] of backgroundRunControllersRef.current) {
+      if (entry.threadId === activeThreadId) {
+        entry.controller.abort()
+        void cancelBackgroundRun(runId)
+      }
+    }
+
     if (!submitLockRef.current) {
       return
     }
@@ -430,9 +579,20 @@ export function useAgentSession({
         })
       }
 
+      const detectedBackgroundRun: {
+        current: { runId: string; status: BackgroundRunStatus } | null
+      } = { current: null }
+
       const processLine = (line: string, appendNewline: boolean) => {
         const normalizedLine = line.endsWith("\r") ? line.slice(0, -1) : line
         const parsedEvent = parseStreamEventLine(normalizedLine)
+
+        if (parsedEvent?.type === "background_run") {
+          detectedBackgroundRun.current = {
+            runId: parsedEvent.runId,
+            status: parsedEvent.status,
+          }
+        }
 
         accumulator = parsedEvent
           ? applyAgentStreamEvent(accumulator, parsedEvent)
@@ -505,6 +665,24 @@ export function useAgentSession({
           }
 
           throw new Error("Sorry, the response was interrupted.")
+        }
+
+        // Escalated to a durable background run: persist the placeholder and
+        // hand off to the follower — no empty-content fallback, no follow-ups.
+        const backgroundRunHandoff = detectedBackgroundRun.current
+        if (backgroundRunHandoff) {
+          upsertAssistantMessage(accumulator, {
+            isSubmitting: false,
+            isStreaming: false,
+          })
+          followBackgroundRunIntoThread({
+            runId: backgroundRunHandoff.runId,
+            threadId: params.threadId,
+            assistantMessageId: assistantId,
+            assistantCreatedAt,
+            model: effectiveModel,
+          })
+          return true
         }
 
         accumulator = finalizeAgentStreamAccumulator(accumulator, "success")
@@ -637,6 +815,7 @@ export function useAgentSession({
     },
     [
       createThreadSnapshot,
+      followBackgroundRunIntoThread,
       parallelFollowUpMessageIdsRef,
       pendingFollowUpQuestionsRef,
       requestFollowUpQuestions,
@@ -649,7 +828,8 @@ export function useAgentSession({
     async (
       nextMessages: AgentMessage[],
       model: ModelType,
-      threadId?: string
+      threadId?: string,
+      options?: { background?: boolean }
     ) => {
       const activeThreadId = threadId ?? ensureCurrentThreadId()
 
@@ -665,6 +845,7 @@ export function useAgentSession({
           model,
           threadId: activeThreadId,
           messages: requestMessages,
+          ...(options?.background ? { background: true } : {}),
         },
       })
     },
@@ -675,7 +856,8 @@ export function useAgentSession({
     async (
       message: string,
       model: ModelType,
-      attachments?: MessageAttachment[]
+      attachments?: MessageAttachment[],
+      options?: { background?: boolean }
     ) => {
       const trimmedMessage = message.trim()
       const messageAttachments = attachments ?? []
@@ -698,7 +880,7 @@ export function useAgentSession({
         messageAttachments
       )
 
-      await runAgentRequest(nextMessages, model, activeThreadId)
+      await runAgentRequest(nextMessages, model, activeThreadId, options)
     },
     [ensureCurrentThreadId, runAgentRequest]
   )
@@ -763,7 +945,12 @@ export function useAgentSession({
   )
 
   const handlePromptSubmit = useCallback(
-    (message: string, model: ModelType, attachments?: MessageAttachment[]) => {
+    (
+      message: string,
+      model: ModelType,
+      attachments?: MessageAttachment[],
+      options?: { background?: boolean }
+    ) => {
       const trimmedMessage = message.trim()
       const messageAttachments = attachments ?? []
       if (!trimmedMessage && messageAttachments.length === 0) {
@@ -781,7 +968,7 @@ export function useAgentSession({
         return
       }
 
-      void handleSubmit(trimmedMessage, model, messageAttachments)
+      void handleSubmit(trimmedMessage, model, messageAttachments, options)
     },
     [handleSubmit]
   )

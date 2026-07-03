@@ -24,6 +24,7 @@ import {
 import { getExaApiKey, getOpenAiApiKey } from "@/lib/server/env"
 import { resolveAgentFeatureFlags } from "@/lib/server/integration-flags"
 import { resolveAttachmentFileIds } from "@/lib/server/llm/attachment-uploads"
+import { createGoblinsBackgroundRun } from "@/lib/server/llm/goblins-background-run"
 import { ensureGoblinsVectorStore } from "@/lib/server/llm/vector-stores"
 import {
   createRouteObservation,
@@ -166,6 +167,57 @@ export async function POST(request: NextRequest) {
       messages: parsedRequest.messages,
       requestId,
     })
+
+    // Background escalation (deep research): create the durable run and hand
+    // the client a background_run pointer instead of an interactive stream.
+    // Falls through to interactive when preconditions aren't met.
+    if (
+      parsedRequest.background === true &&
+      isGoblinsModel(selectedModel) &&
+      featureFlags.goblinsBackgroundEscalation &&
+      parsedRequest.threadId
+    ) {
+      const handle = await createGoblinsBackgroundRun({
+        userId: session.user.id,
+        threadId: parsedRequest.threadId,
+        requestId,
+        systemInstruction,
+        messages: parsedRequest.messages.map((message) => ({
+          role: message.role,
+          content: message.content,
+        })),
+      })
+
+      logger.info("Escalated goblins request to a background run.", {
+        requestId,
+        runId: handle.runId,
+        threadId: handle.threadId,
+      })
+
+      const backgroundHeaders = new Headers({
+        "Content-Type": "application/x-ndjson; charset=utf-8",
+        "Cache-Control": "no-store, no-transform",
+        "X-Request-Id": requestId,
+      })
+      const encoder = new TextEncoder()
+      const body = [
+        { type: "agent_status", status: "in_progress" },
+        {
+          type: "background_run",
+          runId: handle.runId,
+          threadId: handle.threadId,
+          status: handle.status,
+        },
+      ]
+        .map((event) => `${JSON.stringify(event)}\n`)
+        .join("")
+
+      return observeRouteResponse(
+        observation,
+        new Response(encoder.encode(body), { headers: backgroundHeaders }),
+        { outcome: "background_run_created" }
+      )
+    }
 
     // Goblins hosted tools: give file_search-enabled goblins access to the
     // conversation's PDF attachments via a per-request vector store. Failure

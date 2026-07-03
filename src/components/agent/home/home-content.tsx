@@ -100,9 +100,10 @@ export function HomePageContent({
       message: string,
       model: ModelType,
       _queue: boolean,
-      attachments: MessageAttachment[]
+      attachments: MessageAttachment[],
+      options?: { background?: boolean }
     ) => {
-      handlePromptSubmit(message, model, attachments)
+      handlePromptSubmit(message, model, attachments, options)
     },
     [handlePromptSubmit]
   )
@@ -220,11 +221,12 @@ export function HomePageContent({
       message: string,
       model: ModelType,
       _queue: boolean,
-      attachments: MessageAttachment[]
+      attachments: MessageAttachment[],
+      options?: { background?: boolean }
     ) => {
       if (isMobile) {
         startFallbackConversationTransition()
-        handlePromptSubmit(message, model, attachments)
+        handlePromptSubmit(message, model, attachments, options)
         return
       }
 
@@ -239,13 +241,13 @@ export function HomePageContent({
 
       if (!startViewTransition) {
         startFallbackConversationTransition()
-        handlePromptSubmit(message, model, attachments)
+        handlePromptSubmit(message, model, attachments, options)
         return
       }
 
       startViewTransition(() => {
         flushSync(() => {
-          handlePromptSubmit(message, model, attachments)
+          handlePromptSubmit(message, model, attachments, options)
         })
       })
     },

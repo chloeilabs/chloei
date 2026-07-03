@@ -11,6 +11,12 @@ import { resetTestMocks, setTestMocks } from "./stubs/mock-state.mjs"
 
 setTestModuleStubs({
   "@/lib/logger": toProjectFileUrl("tests/stubs/logger.mjs"),
+  "@/lib/server/goblins-run-store": toProjectFileUrl(
+    "tests/stubs/goblins-run-store.mjs"
+  ),
+  "@/lib/server/llm/goblins-background-run": toProjectFileUrl(
+    "tests/stubs/goblins-background-run.mjs"
+  ),
   "@/lib/server/llm/openai-raw-client": toProjectFileUrl(
     "tests/stubs/openai-raw-client.mjs"
   ),
@@ -81,4 +87,80 @@ test("acks a valid event with 200 and de-dupes repeats", async () => {
   const second = await POST(makeRequest("{}"))
   assert.equal(second.status, 200)
   assert.equal(calls, 2)
+})
+
+test("response.completed with a known goblins run drives the continuation once", async () => {
+  const continued = []
+  setTestMocks({
+    webhookUnwrap: () => ({
+      id: "evt-goblins-1",
+      type: "response.completed",
+      data: { id: "resp-goblins-1" },
+    }),
+    goblinsRunStore: {
+      getByResponseId: (responseId) =>
+        responseId === "resp-goblins-1"
+          ? { id: "run-1", userId: "user-1", status: "awaiting_manager" }
+          : null,
+    },
+    goblinsBackgroundRun: {
+      continue: (runId, responseId) => {
+        continued.push([runId, responseId])
+      },
+    },
+  })
+
+  const response = await POST(makeRequest("{}"))
+  assert.equal(response.status, 200)
+  assert.deepEqual(continued, [["run-1", "resp-goblins-1"]])
+})
+
+test("response.failed marks the run failed; unknown response ids stay no-ops", async () => {
+  const failed = []
+  const continued = []
+  setTestMocks({
+    webhookUnwrap: () => ({
+      id: "evt-goblins-2",
+      type: "response.failed",
+      data: { id: "resp-goblins-2" },
+    }),
+    goblinsRunStore: {
+      getByResponseId: () => ({
+        id: "run-2",
+        userId: "user-1",
+        status: "awaiting_manager",
+      }),
+    },
+    goblinsBackgroundRun: {
+      fail: (runId, status) => {
+        failed.push([runId, status])
+      },
+      continue: (runId) => {
+        continued.push(runId)
+      },
+    },
+  })
+
+  const failedResponse = await POST(makeRequest("{}"))
+  assert.equal(failedResponse.status, 200)
+  assert.deepEqual(failed, [["run-2", "failed"]])
+  assert.deepEqual(continued, [])
+
+  // Unknown response id: acked, nothing invoked.
+  setTestMocks({
+    webhookUnwrap: () => ({
+      id: "evt-goblins-3",
+      type: "response.completed",
+      data: { id: "resp-unknown" },
+    }),
+    goblinsRunStore: { getByResponseId: () => null },
+    goblinsBackgroundRun: {
+      continue: (runId) => {
+        continued.push(runId)
+      },
+    },
+  })
+  const unknownResponse = await POST(makeRequest("{}"))
+  assert.equal(unknownResponse.status, 200)
+  assert.deepEqual(continued, [])
 })

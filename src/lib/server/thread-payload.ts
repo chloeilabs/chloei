@@ -2,6 +2,7 @@ import { z } from "zod"
 
 import {
   AGENT_RUN_STATUSES,
+  BACKGROUND_RUN_STATUSES,
   DEFAULT_THREAD_TITLE,
   GOBLINS_PHASES,
   isModelType,
@@ -245,6 +246,13 @@ const messageMetadataSchema = z
     attachments: z.array(messageAttachmentSchema).max(10).optional(),
     followUpQuestions: z.array(followUpQuestionSchema).max(3).optional(),
     followUpQuestionsPending: z.boolean().optional(),
+    backgroundRun: z
+      .object({
+        runId: z.string().trim().min(1).max(200),
+        status: z.enum(BACKGROUND_RUN_STATUSES),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
 
@@ -511,6 +519,9 @@ function sanitizeMessageMetadata(value: unknown) {
         })
         .slice(0, 3)
     : undefined
+  const backgroundRun = messageMetadataSchema.shape.backgroundRun.safeParse(
+    metadata.backgroundRun
+  )
 
   return {
     ...(parts ? { parts } : {}),
@@ -527,6 +538,9 @@ function sanitizeMessageMetadata(value: unknown) {
     ...(followUpQuestions?.length ? { followUpQuestions } : {}),
     ...(followUpQuestionsPending !== undefined
       ? { followUpQuestionsPending }
+      : {}),
+    ...(backgroundRun.success && backgroundRun.data
+      ? { backgroundRun: backgroundRun.data }
       : {}),
   }
 }

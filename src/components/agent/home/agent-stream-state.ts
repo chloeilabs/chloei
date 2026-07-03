@@ -224,6 +224,15 @@ export function applyAgentStreamEvent(
     }
   }
 
+  // background_run marks the stream's handoff to a durable run; the session
+  // hook owns that transition, the accumulator only tracks checkpoints.
+  if (event.type === "background_run") {
+    return {
+      ...current,
+      ...checkpointFields,
+    }
+  }
+
   return {
     ...current,
     ...checkpointFields,

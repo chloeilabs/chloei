@@ -38,6 +38,12 @@ setTestModuleStubs({
   "@/lib/server/llm/attachment-uploads": toProjectFileUrl(
     "tests/stubs/attachment-uploads.mjs"
   ),
+  "@/lib/server/llm/goblins-background-run": toProjectFileUrl(
+    "tests/stubs/goblins-background-run.mjs"
+  ),
+  "@/lib/server/llm/vector-stores": toProjectFileUrl(
+    "tests/stubs/vector-stores.mjs"
+  ),
   "@/lib/server/threads": toProjectFileUrl("tests/stubs/threads.mjs"),
   "next/server": toProjectFileUrl("tests/stubs/next-server.mjs"),
 })

@@ -253,6 +253,41 @@ interface GoblinsPhaseStreamEvent extends InteractionCheckpointFields {
   round?: number
 }
 
+// Statuses of a durable background Goblins run (goblins_run rows).
+export const BACKGROUND_RUN_STATUSES = [
+  "pending_dispatch",
+  "awaiting_manager",
+  "executing_tools",
+  "completed",
+  "failed",
+  "cancelled",
+  "expired",
+] as const
+export type BackgroundRunStatus = (typeof BACKGROUND_RUN_STATUSES)[number]
+
+const BACKGROUND_RUN_STATUS_SET: ReadonlySet<BackgroundRunStatus> = new Set(
+  BACKGROUND_RUN_STATUSES
+)
+
+export function isBackgroundRunStatus(
+  value: unknown
+): value is BackgroundRunStatus {
+  return (
+    typeof value === "string" &&
+    BACKGROUND_RUN_STATUS_SET.has(value as BackgroundRunStatus)
+  )
+}
+
+// Emitted when a request escalates into a durable background research run;
+// the stream then closes and the client follows the run via its poll/resume
+// routes.
+interface BackgroundRunStreamEvent extends InteractionCheckpointFields {
+  type: "background_run"
+  runId: string
+  threadId: string
+  status: BackgroundRunStatus
+}
+
 export type AgentStreamEvent =
   | TextDeltaStreamEvent
   | ReasoningDeltaStreamEvent
@@ -263,6 +298,7 @@ export type AgentStreamEvent =
   | SubagentCallStreamEvent
   | SubagentResultStreamEvent
   | GoblinsPhaseStreamEvent
+  | BackgroundRunStreamEvent
 
 export interface Message {
   id: string
@@ -307,6 +343,9 @@ interface MessageMetadata {
   attachments?: MessageAttachment[]
   followUpQuestions?: FollowUpQuestion[]
   followUpQuestionsPending?: boolean
+  // Durable background Goblins run backing this assistant message. A
+  // non-terminal status on thread load tells the client to resume the run.
+  backgroundRun?: { runId: string; status: BackgroundRunStatus }
 }
 
 export const isUserMessage = (

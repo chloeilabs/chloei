@@ -2,7 +2,15 @@
 
 import "../shared/shell-styles.css"
 
-import { ArrowUp, FileText, Loader2, Plus, Square, X } from "lucide-react"
+import {
+  ArrowUp,
+  FileText,
+  Loader2,
+  Plus,
+  Square,
+  Telescope,
+  X,
+} from "lucide-react"
 import {
   type CSSProperties,
   type TransitionStartFunction,
@@ -21,6 +29,7 @@ import { useModels } from "@/hooks/agent/use-models"
 import { usePersistentSelectedModel } from "@/hooks/agent/use-persistent-selected-model"
 import {
   getModelSelectorModels,
+  isGoblinsModel,
   type MessageAttachment,
   type ModelType,
 } from "@/lib/shared"
@@ -65,7 +74,8 @@ export function PromptForm({
     message: string,
     model: ModelType,
     queue: boolean,
-    attachments: MessageAttachment[]
+    attachments: MessageAttachment[],
+    options?: { background?: boolean }
   ) => void
   onStopStream?: () => void
   isStreaming?: boolean
@@ -94,6 +104,9 @@ export function PromptForm({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [attachments, setAttachments] = useState<MessageAttachment[]>([])
+  // Deep research toggle (goblins model only): escalates the next send into a
+  // durable background run when the server flag allows it.
+  const [deepResearch, setDeepResearch] = useState(false)
   const attachmentsRef = useRef<MessageAttachment[]>([])
   useEffect(() => {
     attachmentsRef.current = attachments
@@ -206,13 +219,22 @@ export function PromptForm({
       }
     }
 
-    onSubmit?.(nextMessage, resolvedSelectedModel, isStreaming, nextAttachments)
+    onSubmit?.(
+      nextMessage,
+      resolvedSelectedModel,
+      isStreaming,
+      nextAttachments,
+      deepResearch && isGoblinsModel(resolvedSelectedModel)
+        ? { background: true }
+        : undefined
+    )
     setMessage("")
     setAttachments([])
 
     return true
   }, [
     attachments,
+    deepResearch,
     dismissKeyboardOnSubmit,
     isFormPending,
     isStreaming,
@@ -423,6 +445,26 @@ export function PromptForm({
             >
               <Plus className="size-6" strokeWidth={1.65} />
             </Button>
+
+            {isGoblinsModel(resolvedSelectedModel) && (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                aria-pressed={deepResearch}
+                onClick={() => {
+                  setDeepResearch((previous) => !previous)
+                }}
+                aria-label="Toggle deep research"
+                className={cn(
+                  "h-9 shrink-0 gap-1 rounded-full px-3 text-xs text-foreground/70 transition-colors hover:bg-[#383838] hover:text-foreground dark:hover:bg-[#383838]",
+                  deepResearch && "bg-[#383838] text-foreground"
+                )}
+              >
+                <Telescope className="size-4" strokeWidth={1.65} />
+                Deep research
+              </Button>
+            )}
 
             <Textarea
               ref={textareaRef}

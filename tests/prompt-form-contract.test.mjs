@@ -10,13 +10,16 @@ const promptFormPath = path.join(
   "src/components/agent/prompt-form/prompt-form.tsx"
 )
 
-test("prompt form drops the tools popover and research mode controls", async () => {
+test("prompt form drops the tools popover and legacy run-mode controls", async () => {
   const source = await readFile(promptFormPath, "utf8")
 
+  // The legacy Tools popover / persisted run-mode plumbing stays banned. The
+  // flag-gated "Deep research" background toggle (goblins model only) is the
+  // one intentional research control.
   assert.doesNotMatch(
     source,
-    /runMode|usePersistentRunMode|Research|Telescope|Popover|setIsToolsOpen/,
-    "Expected PromptForm to drop the Tools popover and Research mode controls."
+    /runMode|usePersistentRunMode|Popover|setIsToolsOpen/,
+    "Expected PromptForm to drop the Tools popover and run-mode controls."
   )
   assert.doesNotMatch(
     source,

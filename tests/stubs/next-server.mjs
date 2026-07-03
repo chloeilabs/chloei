@@ -17,3 +17,11 @@ export class NextResponse extends Response {
     return new NextResponse(JSON.stringify(body), normalizedInit)
   }
 }
+
+// Next 16 after(): run the task immediately so tests observe its effects
+// synchronously (the real one defers until the response is sent).
+export function after(task) {
+  if (typeof task === "function") {
+    void task()
+  }
+}

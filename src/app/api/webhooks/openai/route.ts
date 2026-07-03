@@ -1,9 +1,14 @@
-import { type NextRequest } from "next/server"
+import { after, type NextRequest } from "next/server"
 
 import { createLogger } from "@/lib/logger"
 import { resolveRequestIdFromHeaders } from "@/lib/request-id"
 import { createApiHeaders } from "@/lib/server/api-response"
 import { getOpenAiApiKey, getOpenAiWebhookSecret } from "@/lib/server/env"
+import { getGoblinsRunByResponseId } from "@/lib/server/goblins-run-store"
+import {
+  continueGoblinsRun,
+  failGoblinsRun,
+} from "@/lib/server/llm/goblins-background-run"
 import { getOpenAiClient } from "@/lib/server/llm/openai-raw-client"
 import {
   createRouteObservation,
@@ -11,6 +16,7 @@ import {
 } from "@/lib/server/route-observability"
 
 export const runtime = "nodejs"
+export const maxDuration = 800
 
 // Best-effort, per-instance idempotency: OpenAI retries deliveries, so we drop
 // webhook ids we have already handled. A multi-instance deploy would back this
@@ -109,9 +115,42 @@ export async function POST(request: NextRequest) {
     responseId,
   })
 
-  // The hook point for background work: a `response.completed` / `response.failed`
-  // delivery is where a worker would mark the stored background run done and
-  // wake any resumable stream waiting on it (see background-responses.ts).
+  // Background Goblins runs advance here: a terminal response delivery wakes
+  // the continuation engine. Ack 2xx immediately and do the work via after();
+  // the DB lease inside continueGoblinsRun makes duplicate/racing deliveries
+  // safe, and unknown response ids stay acked no-ops (other products' events).
+  if (
+    responseId &&
+    (event.type === "response.completed" ||
+      event.type === "response.failed" ||
+      event.type === "response.cancelled" ||
+      event.type === "response.incomplete")
+  ) {
+    const webhookType = event.type
+    after(async () => {
+      try {
+        const run = await getGoblinsRunByResponseId(responseId)
+        if (!run) {
+          return
+        }
+        if (webhookType === "response.completed") {
+          await continueGoblinsRun(run.id, responseId)
+        } else {
+          await failGoblinsRun(
+            run.id,
+            webhookType === "response.cancelled" ? "cancelled" : "failed",
+            webhookType
+          )
+        }
+      } catch (error) {
+        logger.error("Goblins webhook continuation failed.", {
+          requestId,
+          responseId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    })
+  }
 
   return observeRouteResponse(
     observation,

@@ -104,6 +104,67 @@ const COVERAGE_CHECK_INSTRUCTION = [
   "Judge coverage only — never answer the question yourself.",
 ].join(" ")
 
+// Frozen manager instruction for a durable background run: deep-tier budgets
+// with the evaluator step, composed once at escalation so every background
+// turn of the run uses identical instructions.
+export function buildGoblinsBackgroundManagerInstruction(
+  systemInstruction: string
+): string {
+  const tier = GOBLINS_BUDGET_TIERS.deep
+  return [
+    systemInstruction,
+    `${MANAGER_ORCHESTRATION_INSTRUCTION_V2} ${MANAGER_EVALUATOR_INSTRUCTION}`,
+    buildManagerBudgetLine({ tier, source: "fallback" }),
+  ].join("\n\n")
+}
+
+export const COVERAGE_CHECK_TOOL_NAME = "coverage_check"
+
+export const COVERAGE_CHECK_TOOL_DESCRIPTION =
+  "Judges whether the gathered findings fully answer the user's question. Call once before writing the final answer."
+
+export { coverageCheckInputSchema }
+
+/**
+ * Runs the cheap pre-synthesis coverage judge. Any failure returns "complete"
+ * so the check can never block synthesis. Shared by the interactive manager
+ * tool below and the background continuation engine.
+ */
+export async function executeCoverageCheck(params: {
+  question: string
+  findingsSummary: string
+  requestId?: string
+  signal?: AbortSignal
+}): Promise<string> {
+  try {
+    const judge = new Agent({
+      name: "goblins-evaluator",
+      instructions: COVERAGE_CHECK_INSTRUCTION,
+      model: AvailableModels.OPENAI_GPT_5_4_MINI,
+      modelSettings: {
+        reasoning: { effort: "low" },
+        providerData: { prompt_cache_key: "goblins-evaluator" },
+      },
+      outputType: coverageCheckOutputSchema,
+    })
+    const result = await run(
+      judge,
+      `Question:\n${params.question}\n\nFindings:\n${params.findingsSummary}`,
+      { maxTurns: 1, signal: params.signal }
+    )
+    const parsed = coverageCheckOutputSchema.safeParse(result.finalOutput)
+    if (parsed.success) {
+      return JSON.stringify(parsed.data)
+    }
+  } catch (error) {
+    logger.warn("coverage_check failed; reporting complete.", {
+      requestId: params.requestId,
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
+  return JSON.stringify({ verdict: "complete", gaps: [] })
+}
+
 // Cheap pre-synthesis judge, attached to the manager only on evaluator-enabled
 // tiers. Any failure returns "complete" so the check can never block synthesis.
 export function createCoverageCheckTool(params: {
@@ -112,9 +173,8 @@ export function createCoverageCheckTool(params: {
   onPhaseEvent: (event: AgentStreamEvent) => void
 }): Tool {
   return tool({
-    name: "coverage_check",
-    description:
-      "Judges whether the gathered findings fully answer the user's question. Call once before writing the final answer.",
+    name: COVERAGE_CHECK_TOOL_NAME,
+    description: COVERAGE_CHECK_TOOL_DESCRIPTION,
     parameters: coverageCheckInputSchema,
     execute: async ({ question, findingsSummary }) => {
       params.onPhaseEvent({
@@ -122,33 +182,12 @@ export function createCoverageCheckTool(params: {
         phase: "evaluate",
         label: "Checking coverage",
       })
-      try {
-        const judge = new Agent({
-          name: "goblins-evaluator",
-          instructions: COVERAGE_CHECK_INSTRUCTION,
-          model: AvailableModels.OPENAI_GPT_5_4_MINI,
-          modelSettings: {
-            reasoning: { effort: "low" },
-            providerData: { prompt_cache_key: "goblins-evaluator" },
-          },
-          outputType: coverageCheckOutputSchema,
-        })
-        const result = await run(
-          judge,
-          `Question:\n${question}\n\nFindings:\n${findingsSummary}`,
-          { maxTurns: 1, signal: params.signal }
-        )
-        const parsed = coverageCheckOutputSchema.safeParse(result.finalOutput)
-        if (parsed.success) {
-          return JSON.stringify(parsed.data)
-        }
-      } catch (error) {
-        logger.warn("coverage_check failed; reporting complete.", {
-          requestId: params.requestId,
-          error: error instanceof Error ? error.message : String(error),
-        })
-      }
-      return JSON.stringify({ verdict: "complete", gaps: [] })
+      return executeCoverageCheck({
+        question,
+        findingsSummary,
+        requestId: params.requestId,
+        signal: params.signal,
+      })
     },
   })
 }
