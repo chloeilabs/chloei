@@ -1,11 +1,7 @@
 import { AvailableModels, type ModelType } from "@/lib/shared"
 
 export type PromptProvider =
-  | "alibaba"
-  | "anthropic"
-  | "moonshotai"
-  | "openai"
-  | "zai"
+  "alibaba" | "anthropic" | "moonshotai" | "openai" | "zai"
 
 interface PromptSteeringBlock {
   label: string
