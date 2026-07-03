@@ -12,6 +12,12 @@ updates:
     commit-message:
       prefix: "chore(deps)"
       prefix-development: "chore(dev-deps)"
+    # @types/node must track the deployed Node runtime major (engines.node,
+    # Vercel project setting), not the newest Node release. Bump it manually
+    # alongside a runtime upgrade; minor/patch bumps still flow via the group.
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     # Batch low-risk minor/patch bumps into two PRs (prod vs dev). Major
     # updates are intentionally left ungrouped so each gets its own PR for
     # deliberate, isolated review (tooling-compat risk).
