@@ -1,4 +1,4 @@
-import { AvailableModels, type ModelType } from "@/lib/shared"
+import { type ModelType } from "@/lib/shared"
 
 export type PromptProvider =
   "alibaba" | "anthropic" | "moonshotai" | "openai" | "zai"
@@ -57,9 +57,7 @@ Use GLM reasoning mode efficiently.
 }
 
 export function resolvePromptProvider(model: ModelType): PromptProvider {
-  // Goblins mode is orchestrated by GPT-5.5 (an OpenAI model), so it uses the
-  // OpenAI overlay even though "goblins" is not a real model id.
-  if (model === AvailableModels.OPENAI_GOBLINS || model.startsWith("gpt-")) {
+  if (model.startsWith("gpt-")) {
     return "openai"
   }
 

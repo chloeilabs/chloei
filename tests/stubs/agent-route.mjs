@@ -41,7 +41,7 @@ export function parseAgentStreamRequest(params) {
       parsedRequest: {
         messages: params.body?.messages ?? [],
       },
-      selectedModel: "gpt-5.4-mini",
+      selectedModel: "gpt-5.6-terra",
     }
   )
 }

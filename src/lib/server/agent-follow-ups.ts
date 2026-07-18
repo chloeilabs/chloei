@@ -13,7 +13,7 @@ import {
 const FOLLOW_UP_QUESTION_LIMIT = 3
 const FOLLOW_UP_QUESTION_MAX_CHARS = 160
 const FOLLOW_UP_CONTEXT_MAX_CHARS = 16_000
-const FOLLOW_UP_GENERATION_MODEL = "gpt-5.4-mini"
+const FOLLOW_UP_GENERATION_MODEL = "gpt-5.6-terra"
 
 const generatedFollowUpQuestionTextsSchema = z
   .array(z.string().trim().min(1).max(FOLLOW_UP_QUESTION_MAX_CHARS))

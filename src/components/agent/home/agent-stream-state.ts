@@ -13,15 +13,6 @@ import { createClientMessageId } from "./home-agent-utils"
 
 type ToolCallEvent = Extract<AgentStreamEvent, { type: "tool_call" }>
 type ToolResultEvent = Extract<AgentStreamEvent, { type: "tool_result" }>
-type SubagentCallEvent = Extract<AgentStreamEvent, { type: "subagent_call" }>
-type SubagentResultEvent = Extract<
-  AgentStreamEvent,
-  { type: "subagent_result" }
->
-type SubagentActivityTimelineEntry = Extract<
-  ActivityTimelineEntry,
-  { kind: "subagent" }
->
 type ToolActivityTimelineEntry = Extract<
   ActivityTimelineEntry,
   { kind: "tool" }
@@ -179,30 +170,6 @@ export function applyAgentStreamEvent(
         nextOrder
       ),
       nextActivityOrder,
-    }
-  }
-
-  if (event.type === "subagent_call") {
-    return {
-      ...current,
-      ...checkpointFields,
-      activityTimeline: upsertSubagentTimelineFromCall(
-        current.activityTimeline,
-        event,
-        nextOrder
-      ),
-      nextActivityOrder,
-    }
-  }
-
-  if (event.type === "subagent_result") {
-    return {
-      ...current,
-      ...checkpointFields,
-      activityTimeline: applySubagentResultToTimeline(
-        current.activityTimeline,
-        event
-      ),
     }
   }
 
@@ -538,101 +505,6 @@ function applyToolResultToTimeline(
   return updated
 }
 
-function upsertSubagentTimelineFromCall(
-  current: ActivityTimelineEntry[],
-  event: SubagentCallEvent,
-  nextOrder: () => number
-): ActivityTimelineEntry[] {
-  const existingIndex =
-    event.callId !== null
-      ? current.findIndex(
-          (entry) =>
-            entry.kind === "subagent" &&
-            entry.callId !== null &&
-            entry.callId === event.callId
-        )
-      : current.findIndex(
-          (entry) =>
-            entry.kind === "subagent" &&
-            entry.callId === null &&
-            entry.subagentId === event.subagentId
-        )
-
-  if (existingIndex === -1) {
-    const nextEntry: SubagentActivityTimelineEntry = {
-      id: createClientMessageId(),
-      kind: "subagent",
-      order: nextOrder(),
-      createdAt: new Date().toISOString(),
-      callId: event.callId,
-      subagentId: event.subagentId,
-      label: event.label,
-      ...(event.task ? { task: event.task } : {}),
-      status: "running",
-    }
-
-    return [...current, nextEntry]
-  }
-
-  const existing = current[existingIndex]
-  if (existing?.kind !== "subagent") {
-    return current
-  }
-
-  const nextStatus =
-    existing.status === "success" || existing.status === "error"
-      ? existing.status
-      : "running"
-
-  const updatedEntry: SubagentActivityTimelineEntry = {
-    ...existing,
-    callId: event.callId,
-    subagentId: event.subagentId,
-    label: event.label,
-    ...(event.task ? { task: event.task } : {}),
-    status: nextStatus,
-  }
-
-  const updated = [...current]
-  updated[existingIndex] = updatedEntry
-  return updated
-}
-
-function applySubagentResultToTimeline(
-  current: ActivityTimelineEntry[],
-  event: SubagentResultEvent
-): ActivityTimelineEntry[] {
-  const targetIndex =
-    event.callId !== null
-      ? findLastIndexBy(
-          current,
-          (entry) =>
-            entry.kind === "subagent" &&
-            entry.callId !== null &&
-            entry.callId === event.callId
-        )
-      : findLastIndexBy(
-          current,
-          (entry) => entry.kind === "subagent" && entry.status === "running"
-        )
-
-  if (targetIndex === -1) {
-    return current
-  }
-
-  const target = current[targetIndex]
-  if (target?.kind !== "subagent" || target.status === event.status) {
-    return current
-  }
-
-  const updated = [...current]
-  updated[targetIndex] = {
-    ...target,
-    status: event.status,
-  }
-  return updated
-}
-
 function upsertSourcesTimelineFromSource(
   current: ActivityTimelineEntry[],
   source: MessageSource,
@@ -742,9 +614,7 @@ function finalizeRunningTimelineToolEntries(
   if (
     !current.some(
       (entry) =>
-        (entry.kind === "tool" ||
-          entry.kind === "search" ||
-          entry.kind === "subagent") &&
+        (entry.kind === "tool" || entry.kind === "search") &&
         entry.status === "running"
     )
   ) {
@@ -752,9 +622,7 @@ function finalizeRunningTimelineToolEntries(
   }
 
   return current.map((entry) =>
-    (entry.kind === "tool" ||
-      entry.kind === "search" ||
-      entry.kind === "subagent") &&
+    (entry.kind === "tool" || entry.kind === "search") &&
     entry.status === "running"
       ? { ...entry, status }
       : entry

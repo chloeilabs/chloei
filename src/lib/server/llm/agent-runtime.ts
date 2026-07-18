@@ -32,24 +32,23 @@ const logger = createLogger("agent-runtime")
 
 export type ReasoningEffortLevel = "high" | "xhigh"
 
-// GPT-5.5 runs at xhigh reasoning effort; other models default to high. Callers
-// (e.g. the Goblins sub-agents) may force a level via reasoningEffort.
+// GPT-5.6 Sol runs at xhigh reasoning effort; other models default to high.
+// Callers (e.g. the Goblins sub-agents) may force a level via reasoningEffort.
 const resolveReasoningEffort = (
   model: ModelType,
   override?: ReasoningEffortLevel
 ): ReasoningEffortLevel =>
-  override ?? (model === AvailableModels.OPENAI_GPT_5_5 ? "xhigh" : "high")
+  override ?? (model === AvailableModels.OPENAI_GPT_5_6_SOL ? "xhigh" : "high")
 
 // The single-agent path's default cache key. The prompt cache key co-locates
 // requests that share a prompt prefix on the same cache, so the large stable
-// system-prompt prefix is reused across turns/users. Sub-agents (goblins) pass
-// their own per-specialist key.
+// system-prompt prefix is reused across turns/users.
 export const DEFAULT_PROMPT_CACHE_KEY = "chloei-agent"
 
-// Enables prompt caching for a model run. GPT-5.5 supports 24h cache retention
-// (extended KV reuse across sessions); other models keep the automatic in-memory
-// cache. `prompt_cache_key` is forwarded verbatim by the SDK (via providerData)
-// as the Responses `prompt_cache_key` param.
+// Enables prompt caching for a model run. GPT-5.6 Sol supports 24h cache
+// retention (extended KV reuse across sessions); other models keep the automatic
+// in-memory cache. `prompt_cache_key` is forwarded verbatim by the SDK (via
+// providerData) as the Responses `prompt_cache_key` param.
 function resolvePromptCacheSettings(
   model: ModelType,
   promptCacheKey: string
@@ -58,7 +57,7 @@ function resolvePromptCacheSettings(
   providerData: { prompt_cache_key: string }
 } {
   return {
-    ...(model === AvailableModels.OPENAI_GPT_5_5
+    ...(model === AvailableModels.OPENAI_GPT_5_6_SOL
       ? { promptCacheRetention: "24h" as const }
       : {}),
     providerData: { prompt_cache_key: promptCacheKey },

@@ -201,7 +201,7 @@ test("threads GET returns a full thread when an id is requested", async () => {
               id: "message-1",
               role: "user",
               content: "Open the thread",
-              llmModel: "gpt-5.4-mini",
+              llmModel: "gpt-5.6-terra",
               createdAt: "2026-04-15T10:00:00.000Z",
             },
           ],

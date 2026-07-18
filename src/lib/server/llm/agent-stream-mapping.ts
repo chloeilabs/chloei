@@ -1,5 +1,5 @@
 import { asRecord, asString } from "@/lib/cast"
-import { type AgentStreamEvent, type SubagentId } from "@/lib/shared"
+import { type AgentStreamEvent } from "@/lib/shared"
 
 import { createReasoningDisplaySanitizer } from "./initial-reasoning-chunk-sanitizer"
 import {
@@ -90,18 +90,6 @@ function normalizeToolOutput(value: unknown): unknown {
   return value
 }
 
-export interface SubagentToolInfo {
-  subagentId: SubagentId
-  label: string
-}
-
-export interface AgentStreamMapperOptions {
-  // When provided, run-item tool events whose tool name resolves to a sub-agent
-  // are surfaced as subagent_call / subagent_result events instead of the
-  // Exa-tool tool_call / tool_result events. Used by Goblins mode.
-  resolveSubagent?: (toolName: string) => SubagentToolInfo | null
-}
-
 type SourceStreamEvent = Extract<AgentStreamEvent, { type: "source" }>
 
 export interface AgentStreamMapper {
@@ -112,19 +100,13 @@ export interface AgentStreamMapper {
 
 /**
  * Builds a stateful mapper that converts Agents SDK stream events into the
- * NDJSON AgentStreamEvent contract. Extracted from the single-model runtime so
- * the Goblins (multi-agent) runtime reuses identical source-dedup and reasoning
- * sanitization. One mapper instance per request/run.
+ * NDJSON AgentStreamEvent contract. One mapper instance per request/run.
  */
-export function createAgentStreamMapper(
-  options: AgentStreamMapperOptions = {}
-): AgentStreamMapper {
+export function createAgentStreamMapper(): AgentStreamMapper {
   const seenToolCalls = new Set<string>()
   const finalizedToolCalls = new Set<string>()
   const seenSourceKeys = new Set<string>()
   const toolNamesByCallId = new Map<string, string>()
-  const seenSubagentCalls = new Set<string>()
-  const finalizedSubagentCalls = new Set<string>()
   const sanitizeReasoningChunk = createReasoningDisplaySanitizer()
 
   const createSourceEvent = (
@@ -261,23 +243,6 @@ export function createAgentStreamMapper(
         }
         toolNamesByCallId.set(callId, toolName)
 
-        const subagent = options.resolveSubagent?.(toolName)
-        if (subagent) {
-          if (!seenSubagentCalls.has(callId)) {
-            seenSubagentCalls.add(callId)
-            const args = asRecord(parseToolArguments(rawItem?.arguments))
-            const task = asString(args?.input)?.trim()
-            events.push({
-              type: "subagent_call",
-              callId,
-              subagentId: subagent.subagentId,
-              label: subagent.label,
-              ...(task ? { task } : {}),
-            })
-          }
-          return events
-        }
-
         const metadata = getExaToolCallMetadata({
           toolCallId: callId,
           toolName,
@@ -306,20 +271,6 @@ export function createAgentStreamMapper(
           asString(rawItem?.name) ??
           (callId ? toolNamesByCallId.get(callId) : undefined)
         if (!callId || !toolName) {
-          return events
-        }
-
-        const subagent = options.resolveSubagent?.(toolName)
-        if (subagent) {
-          if (!finalizedSubagentCalls.has(callId)) {
-            finalizedSubagentCalls.add(callId)
-            events.push({
-              type: "subagent_result",
-              callId,
-              subagentId: subagent.subagentId,
-              status: "success",
-            })
-          }
           return events
         }
 

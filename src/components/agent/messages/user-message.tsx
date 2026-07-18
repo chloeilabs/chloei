@@ -269,10 +269,7 @@ export function UserMessage({
           {hasCopyableContent && (
             <div
               className={cn(
-                "max-w-full",
-                agentShellFrameClass,
-                agentShellInteractiveClass,
-                "rounded-3xl",
+                "relative max-w-full overflow-clip rounded-3xl bg-primary px-4 py-2.5 text-base text-primary-foreground",
                 !disableEditing && "cursor-pointer"
               )}
               role="button"
@@ -288,28 +285,18 @@ export function UserMessage({
                   handleStartEditing()
                 }
               }}
+              style={{
+                maxHeight: `${String(MAX_CONTENT_HEIGHT)}px`,
+              }}
             >
+              {isContentOverflowing && (
+                <div className="absolute bottom-0 left-0 h-1/3 w-full animate-in bg-gradient-to-t from-primary via-primary/80 to-transparent fade-in" />
+              )}
               <div
-                className={cn(
-                  agentSurfaceClass,
-                  "w-full overflow-clip rounded-3xl bg-[#212121] bg-none px-4 py-2 text-base"
-                )}
-                style={{
-                  maxHeight: `${String(MAX_CONTENT_HEIGHT)}px`,
-                }}
+                ref={messageContentRef}
+                className="break-words whitespace-pre-wrap"
               >
-                <div
-                  className={cn(
-                    agentSurfaceBackgroundClass,
-                    "rounded-3xl bg-[#212121]"
-                  )}
-                />
-                {isContentOverflowing && (
-                  <div className="absolute bottom-0 left-0 h-1/3 w-full animate-in bg-gradient-to-t from-[#212121] via-[#212121]/80 to-transparent fade-in" />
-                )}
-                <div ref={messageContentRef} className="whitespace-pre-wrap">
-                  {message.content}
-                </div>
+                {message.content}
               </div>
             </div>
           )}

@@ -1,7 +1,7 @@
-// Stub for ./openai-agents-exa-tools used by agent-stream-mapping / goblins
-// tests. The real module imports exa-js (CJS transitive deps that the test
-// loader's resolver hook can't traverse). These helpers are pure and mirror the
-// real shapes closely enough to exercise the mapper's branching.
+// Stub for ./openai-agents-exa-tools used by agent-stream-mapping tests. The
+// real module imports exa-js (CJS transitive deps that the test loader's
+// resolver hook can't traverse). These helpers are pure and mirror the real
+// shapes closely enough to exercise the mapper's branching.
 
 export function isExaToolName(value) {
   return value === "exa_search" || value === "exa_get_contents"

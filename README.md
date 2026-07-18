@@ -1,6 +1,6 @@
 # Chloei
 
-Chloei is a Next.js 16 chat app backed by the OpenAI Agents SDK and the OpenAI API. It currently exposes a curated model selector (top-left of the home page) offering GPT-5.5 (`gpt-5.5-2026-04-23`, the default) and GPT-5.4 Mini, and offers optional Exa web search and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
+Chloei is a Next.js 16 chat app backed by the OpenAI Agents SDK and the OpenAI API. It currently exposes a curated model selector (top-left of the home page) offering GPT-5.6 Sol (`gpt-5.6-sol`, the default), GPT-5.6 Terra, and GPT-5.6 Luna, and offers optional Exa web search and Better Auth email/password authentication with PostgreSQL-backed users and sessions.
 
 ## Documentation
 

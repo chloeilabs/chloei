@@ -51,7 +51,7 @@ test("inline citation instructions avoid separate sources sections", async () =>
   )
 })
 
-test("stale and fallback-only model ids fall back to GPT-5.4 Mini", () => {
+test("stale and fallback-only model ids fall back to GPT-5.6 Terra", () => {
   assert.equal(parseStoredSelectedModel("qwen/qwen3.6-plus"), null)
   assert.equal(
     parseStoredSelectedModel(
@@ -67,11 +67,11 @@ test("stale and fallback-only model ids fall back to GPT-5.4 Mini", () => {
       initialSelectedModel: null,
       availableModels: [
         {
-          id: "gpt-5.4-mini",
-          name: "GPT-5.4 Mini",
+          id: "gpt-5.6-terra",
+          name: "GPT-5.6 Terra",
         },
       ],
     }),
-    "gpt-5.4-mini"
+    "gpt-5.6-terra"
   )
 })

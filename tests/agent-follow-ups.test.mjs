@@ -125,11 +125,11 @@ test("follow-up generation uses the OpenAI Responses API for structured question
           "Love includes intimacy, commitment, repair after conflict, and care over time.",
       },
     ],
-    model: "gpt-5.4-mini",
+    model: "gpt-5.6-terra",
     userId: "user-1",
   })
 
-  assert.equal(recordedParams?.model, "gpt-5.4-mini")
+  assert.equal(recordedParams?.model, "gpt-5.6-terra")
   assert.equal(recordedParams?.text?.format?.type, "json_schema")
   assert.equal(recordedParams?.text?.format?.name, "follow_up_questions")
   assert.equal(followUps.length, 3)

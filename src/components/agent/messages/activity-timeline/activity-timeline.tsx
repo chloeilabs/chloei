@@ -45,9 +45,7 @@ export function ActivityTimeline({
     () =>
       entries.some(
         (entry) =>
-          (entry.kind === "tool" ||
-            entry.kind === "search" ||
-            entry.kind === "subagent") &&
+          (entry.kind === "tool" || entry.kind === "search") &&
           entry.status === "running"
       ),
     [entries]
@@ -100,16 +98,13 @@ export function ActivityTimeline({
     lastEntry != null &&
     ((lastEntry.kind === "reasoning" && lastEntry.text.length > 0) ||
       lastEntry.kind === "search" ||
-      lastEntry.kind === "sources" ||
-      (lastEntry.kind === "subagent" && Boolean(lastEntry.task)))
+      lastEntry.kind === "sources")
   const showPreview = hasActiveActivity && isCollapsed && lastEntryHasPreview
 
   const runningEntry = entries
     .filter(
       (entry) =>
-        (entry.kind === "tool" ||
-          entry.kind === "search" ||
-          entry.kind === "subagent") &&
+        (entry.kind === "tool" || entry.kind === "search") &&
         entry.status === "running"
     )
     .at(-1)
@@ -118,8 +113,6 @@ export function ActivityTimeline({
     currentActivityLabel = "Searching the web"
   } else if (runningEntry?.kind === "tool") {
     currentActivityLabel = runningEntry.label
-  } else if (runningEntry?.kind === "subagent") {
-    currentActivityLabel = `Goblin: ${runningEntry.label}`
   }
 
   // Live timer drives the streaming header; on a reloaded thread there is no
@@ -219,11 +212,6 @@ export function ActivityTimeline({
                   sources={lastEntry.sources}
                   showFavicon={SHOW_SOURCE_FAVICON}
                 />
-              )}
-              {lastEntry.kind === "subagent" && lastEntry.task && (
-                <div className="line-clamp-2 text-[13px] leading-relaxed text-muted-foreground/60">
-                  {lastEntry.task}
-                </div>
               )}
             </div>
           </div>

@@ -37,7 +37,7 @@ test("thread payload sanitizes private prompt terminology in reasoning", () => {
         id: "message-1",
         role: "assistant",
         content: "Done.",
-        llmModel: "gpt-5.4-mini",
+        llmModel: "gpt-5.6-terra",
         createdAt: "2026-04-26T00:00:00.000Z",
         metadata: {
           reasoning: "Use SOUL.md and the system prompt.",
@@ -75,7 +75,7 @@ test("thread payload keeps attachment descriptors but strips the base64 url", ()
         id: "message-1",
         role: "user",
         content: "Analyze this",
-        llmModel: "gpt-5.5-2026-04-23",
+        llmModel: "gpt-5.6-sol",
         createdAt: "2026-04-26T00:00:00.000Z",
         metadata: {
           attachments: [
@@ -112,7 +112,7 @@ test("thread payload persists the attachment fileId while stripping the base64 u
         id: "message-1",
         role: "user",
         content: "Analyze this",
-        llmModel: "gpt-5.5-2026-04-23",
+        llmModel: "gpt-5.6-sol",
         createdAt: "2026-04-26T00:00:00.000Z",
         metadata: {
           attachments: [
@@ -152,7 +152,7 @@ test("thread payload truncates sanitized activity reasoning to the schema limit"
         id: "message-1",
         role: "assistant",
         content: "Done.",
-        llmModel: "gpt-5.4-mini",
+        llmModel: "gpt-5.6-terra",
         createdAt: "2026-04-26T00:00:00.000Z",
         metadata: {
           activityTimeline: [
@@ -202,16 +202,16 @@ test("thread store delegates parsing and persistence shaping to the payload help
 test("thread payload drops legacy run-mode metadata from stored threads", () => {
   const parsed = parseThreadPayload({
     id: "thread-1",
-    model: "gpt-5.4-mini",
+    model: "gpt-5.6-terra",
     messages: [
       {
         id: "message-1",
         role: "user",
         content: "Research this.",
-        llmModel: "gpt-5.4-mini",
+        llmModel: "gpt-5.6-terra",
         createdAt: "2026-04-26T00:00:00.000Z",
         metadata: {
-          selectedModel: "gpt-5.4-mini",
+          selectedModel: "gpt-5.6-terra",
           runMode: "research",
         },
       },
@@ -220,6 +220,6 @@ test("thread payload drops legacy run-mode metadata from stored threads", () => 
     updatedAt: "2026-04-26T00:00:01.000Z",
   })
 
-  assert.equal(parsed.messages[0]?.metadata?.selectedModel, "gpt-5.4-mini")
+  assert.equal(parsed.messages[0]?.metadata?.selectedModel, "gpt-5.6-terra")
   assert.equal(parsed.messages[0]?.metadata?.runMode, undefined)
 })

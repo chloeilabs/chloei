@@ -461,12 +461,11 @@ function parseToolResultPayload(value: unknown): ExaToolResultPayload | null {
   }
 }
 
-// Exa rate-limits per key. The Goblins fan-out (up to 6 sub-agents searching in
-// parallel) easily exceeds that, so a process-wide gate caps in-flight Exa calls
-// and any 429/5xx that still slips through is retried with capped exponential
-// backoff — otherwise searches surface as failed (red ✗) steps and goblins waste
-// their budget retrying the same query. Kept conservative (and now Exa carries
-// 100% of search load since the OpenAI web_search tool was removed).
+// Exa rate-limits per key. A process-wide gate caps in-flight Exa calls and any
+// 429/5xx that still slips through is retried with capped exponential backoff —
+// otherwise searches surface as failed (red ✗) steps. Kept conservative (and
+// now Exa carries 100% of search load since the OpenAI web_search tool was
+// removed).
 const EXA_MAX_CONCURRENCY = 4
 const EXA_MAX_RETRIES = 6
 const EXA_RETRY_MAX_DELAY_MS = 6000

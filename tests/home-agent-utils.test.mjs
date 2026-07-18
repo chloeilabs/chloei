@@ -76,10 +76,10 @@ test("appended user messages record the selected model", () => {
   const messages = appendUserMessage(
     [],
     "Research Apple supply chain risk.",
-    "gpt-5.4-mini"
+    "gpt-5.6-terra"
   )
 
-  assert.equal(messages[0]?.metadata?.selectedModel, "gpt-5.4-mini")
+  assert.equal(messages[0]?.metadata?.selectedModel, "gpt-5.6-terra")
 })
 
 const sampleImageAttachment = {
@@ -91,18 +91,15 @@ const sampleImageAttachment = {
 }
 
 test("appended user messages carry attachments in metadata", () => {
-  const messages = appendUserMessage(
-    [],
-    "Describe this",
-    "gpt-5.5-2026-04-23",
-    [sampleImageAttachment]
-  )
+  const messages = appendUserMessage([], "Describe this", "gpt-5.6-sol", [
+    sampleImageAttachment,
+  ])
 
   assert.deepEqual(messages[0]?.metadata?.attachments, [sampleImageAttachment])
 })
 
 test("attachment-only user messages (empty content) are still appended", () => {
-  const messages = appendUserMessage([], "", "gpt-5.5-2026-04-23", [
+  const messages = appendUserMessage([], "", "gpt-5.6-sol", [
     sampleImageAttachment,
   ])
 
