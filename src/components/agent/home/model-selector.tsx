@@ -16,23 +16,19 @@ import { useModels } from "@/hooks/agent/use-models"
 import { usePersistentSelectedModel } from "@/hooks/agent/use-persistent-selected-model"
 import {
   getModelSelectorModels,
-  isGoblinsModel,
   type ModelInfo,
   type ModelType,
 } from "@/lib/shared"
 
-/** Per-model selector icon: goblin face for Goblins mode, OpenAI mark for GPT. */
+/** Per-model selector icon: OpenAI mark for GPT models. */
 function modelIconSrc(model: ModelInfo): string | null {
-  if (isGoblinsModel(model.id)) {
-    return "/goblin.png"
-  }
   if (model.id.startsWith("gpt-")) {
     return "/openai_dark.svg"
   }
   return null
 }
 
-/** Model name, prefixed with its brand/mode icon. */
+/** Model name, prefixed with its brand icon. */
 function ModelOptionLabel({ model }: { model: ModelInfo }) {
   const iconSrc = modelIconSrc(model)
   return (
@@ -83,7 +79,7 @@ export function ModelSelector({
           type="button"
           variant="ghost"
           size="sm"
-          className="pointer-events-auto -ml-2 gap-1 font-medium text-muted-foreground hover:text-foreground"
+          className="pointer-events-auto h-8 gap-1.5 px-2 font-medium text-white/70 hover:bg-white/10 hover:text-white"
           aria-label="Select model"
         >
           {activeModel ? <ModelOptionLabel model={activeModel} /> : "Model"}

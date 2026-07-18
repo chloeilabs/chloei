@@ -45,7 +45,7 @@ export function SearchChats({
     >
       <DialogPrimitive.Trigger
         render={
-          <SidebarMenuButton tooltip="Search chats">
+          <SidebarMenuButton tooltip="Search chats" className="h-8 px-2">
             <SearchIcon />
             <span>Search chats</span>
           </SidebarMenuButton>

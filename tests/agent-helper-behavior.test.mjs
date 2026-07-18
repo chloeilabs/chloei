@@ -122,12 +122,12 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "gpt-5.4-mini" }],
+    availableModels: [{ id: "gpt-5.6-terra" }],
     requestId: "request-default-mode",
   })
 
   assert(!(defaultModeResult instanceof Response))
-  assert.equal(defaultModeResult.selectedModel, "gpt-5.4-mini")
+  assert.equal(defaultModeResult.selectedModel, "gpt-5.6-terra")
 
   const unavailableModelResult = parseAgentStreamRequest({
     body: {
@@ -139,7 +139,7 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "gpt-5.4-mini" }],
+    availableModels: [{ id: "gpt-5.6-terra" }],
     requestId: "request-unavailable-model",
   })
 
@@ -161,7 +161,7 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "gpt-5.4-mini" }],
+    availableModels: [{ id: "gpt-5.6-terra" }],
     requestId: "request-unknown-field",
   })
 
@@ -180,7 +180,7 @@ test("agent helper validates total size, last-message role, and default model su
         content: "hello",
       })),
     },
-    availableModels: [{ id: "gpt-5.4-mini" }],
+    availableModels: [{ id: "gpt-5.6-terra" }],
     requestId: "request-too-many",
   })
 
@@ -201,7 +201,7 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "gpt-5.4-mini" }],
+    availableModels: [{ id: "gpt-5.6-terra" }],
     requestId: "request-message-too-large",
   })
 
@@ -220,7 +220,7 @@ test("agent helper validates total size, last-message role, and default model su
         content: `${String(index).padStart(2, "0")}${"x".repeat(10_998)}`,
       })),
     },
-    availableModels: [{ id: "gpt-5.4-mini" }],
+    availableModels: [{ id: "gpt-5.6-terra" }],
     requestId: "request-1",
   })
 
@@ -241,7 +241,7 @@ test("agent helper validates total size, last-message role, and default model su
         },
       ],
     },
-    availableModels: [{ id: "gpt-5.4-mini" }],
+    availableModels: [{ id: "gpt-5.6-terra" }],
     requestId: "request-2",
   })
 
@@ -289,7 +289,7 @@ test("agent helper streams fallback output when the model yields no content", as
     request: createRequest(),
     requestId: "request-1",
     timeoutMs: 30_000,
-    selectedModel: "gpt-5.4-mini",
+    selectedModel: "gpt-5.6-terra",
     openAiApiKey: "openai-key",
     exaApiKey: "exa-key",
     messages: [{ role: "user", content: "Hello" }],
@@ -339,7 +339,7 @@ test("agent helper marks tool-backed partial output incomplete when a tool call 
     request: createRequest(),
     requestId: "request-unresolved-tool",
     timeoutMs: 30_000,
-    selectedModel: "gpt-5.4-mini",
+    selectedModel: "gpt-5.6-terra",
     openAiApiKey: "openai-key",
     exaApiKey: "exa-key",
     messages: [{ role: "user", content: "Search latest docs" }],
@@ -394,7 +394,7 @@ test("agent helper does not add an incomplete fallback when a meaningful answer 
     request: createRequest(),
     requestId: "request-tool-error",
     timeoutMs: 30_000,
-    selectedModel: "gpt-5.4-mini",
+    selectedModel: "gpt-5.6-terra",
     openAiApiKey: "openai-key",
     exaApiKey: "exa-key",
     messages: [{ role: "user", content: "Search latest docs" }],
@@ -441,7 +441,7 @@ test("agent helper turns upstream body timeouts into visible timeout output", as
     request: createRequest(),
     requestId: "request-body-timeout",
     timeoutMs: 30_000,
-    selectedModel: "gpt-5.4-mini",
+    selectedModel: "gpt-5.6-terra",
     openAiApiKey: "openai-key",
     messages: [{ role: "user", content: "Latest AI news" }],
     systemInstruction: "system",
@@ -487,7 +487,7 @@ test("agent helper returns an auth-key fallback when provider auth fails", async
     request: createRequest(),
     requestId: "request-2",
     timeoutMs: 30_000,
-    selectedModel: "gpt-5.4-mini",
+    selectedModel: "gpt-5.6-terra",
     openAiApiKey: "openai-key",
     messages: [{ role: "user", content: "Hello" }],
     systemInstruction: "system",

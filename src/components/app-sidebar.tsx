@@ -1,20 +1,14 @@
 "use client"
 
-import "@/components/graphics/logo/logo-animation.css"
-
 import { SearchIcon, SquarePenIcon } from "lucide-react"
 import dynamic from "next/dynamic"
-import Link from "next/link"
 import * as React from "react"
 
-import { ChloeiLogoHoverSvg } from "@/components/graphics/logo/logo-hover-svg"
-import { ChloeiLogoSvg } from "@/components/graphics/logo/logo-svg"
 import { NavUser } from "@/components/nav-user"
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarGroup,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -25,9 +19,15 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import type { AuthViewer, ThreadSummary } from "@/lib/shared"
 
+const TRIGGER_CLASS = "size-8 text-white/70 hover:bg-white/10 hover:text-white"
+
 function SearchChatsPlaceholder() {
   return (
-    <SidebarMenuButton tooltip="Search chats" disabled className="gap-2">
+    <SidebarMenuButton
+      tooltip="Search chats"
+      disabled
+      className="h-8 gap-2 px-2"
+    >
       <SearchIcon />
       <span>Search chats</span>
     </SidebarMenuButton>
@@ -36,7 +36,7 @@ function SearchChatsPlaceholder() {
 
 function ThreadListSkeleton() {
   return (
-    <SidebarGroup>
+    <div className="px-0.5 pt-3">
       <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
         Threads
       </div>
@@ -49,7 +49,7 @@ function ThreadListSkeleton() {
           </div>
         </SidebarMenuItem>
       </SidebarMenu>
-    </SidebarGroup>
+    </div>
   )
 }
 
@@ -112,55 +112,47 @@ export function AppSidebar({
 
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader>
+      <SidebarHeader className="px-2.5 pt-3">
+        {/* Toggle sits on the right when open; when collapsed it drops to the
+            left of the rail to line up with the New chat icon. */}
+        <div className="flex items-center justify-between gap-1 group-data-[collapsible=icon]:justify-start">
+          <button
+            type="button"
+            onClick={handleNewChat}
+            className="pl-2 text-lg font-semibold group-data-[collapsible=icon]:hidden"
+          >
+            Chloei
+          </button>
+          <SidebarTrigger className={TRIGGER_CLASS} />
+        </div>
+      </SidebarHeader>
+      <SidebarContent className="px-2.5 pt-2">
         <SidebarMenu>
-          <SidebarMenuItem className="flex flex-row items-center gap-1 group-data-[collapsible=icon]:justify-center">
+          <SidebarMenuItem>
+            {/* h-8 + px-2 match the collapsed icon button (size-8, p-2), so the
+                New chat icon stays at the exact same x AND y when the sidebar
+                opens/closes. */}
             <SidebarMenuButton
-              className="group/chloei-home h-7 min-w-0 flex-1 gap-2 group-data-[collapsible=icon]:hidden hover:bg-transparent hover:text-sidebar-foreground active:bg-transparent active:text-sidebar-foreground"
+              className="h-8 px-2"
+              tooltip="New chat"
               onClick={handleNewChat}
-              render={<Link href="/" aria-label="Chloei home" />}
             >
-              <span className="relative -ml-0.5 block size-5 shrink-0 overflow-hidden">
-                <span className="absolute inset-0 transition-opacity duration-100 group-hover/chloei-home:opacity-0 group-focus-visible/chloei-home:opacity-0">
-                  <ChloeiLogoSvg className="size-full!" />
-                </span>
-                <span className="absolute inset-0 opacity-0 transition-opacity duration-100 group-hover/chloei-home:opacity-100 group-focus-visible/chloei-home:opacity-100">
-                  <span className="block h-5 w-[300px]">
-                    <ChloeiLogoHoverSvg className="logo-sm size-full! [animation-play-state:paused] group-hover/chloei-home:[animation-play-state:running] group-focus-visible/chloei-home:[animation-play-state:running]" />
-                  </span>
-                </span>
-              </span>
+              <SquarePenIcon />
+              <span>New chat</span>
             </SidebarMenuButton>
-            <SidebarTrigger className="size-8 shrink-0 text-muted-foreground hover:text-foreground" />
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            {shouldShowThreadLoading ? (
+              <SearchChatsPlaceholder />
+            ) : (
+              <SearchChats
+                threadSummaries={threadSummaries}
+                isLoading={isThreadSummariesLoading}
+                onSelectThread={handleSelectThread}
+              />
+            )}
           </SidebarMenuItem>
         </SidebarMenu>
-      </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                tooltip="New chat"
-                onClick={handleNewChat}
-                className="gap-2"
-              >
-                <SquarePenIcon />
-                <span>New chat</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              {shouldShowThreadLoading ? (
-                <SearchChatsPlaceholder />
-              ) : (
-                <SearchChats
-                  threadSummaries={threadSummaries}
-                  isLoading={isThreadSummariesLoading}
-                  onSelectThread={handleSelectThread}
-                />
-              )}
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroup>
         <div className="min-h-0 group-data-[collapsible=icon]:hidden">
           {shouldShowThreadLoading ? (
             <ThreadListSkeleton />
@@ -175,7 +167,7 @@ export function AppSidebar({
           )}
         </div>
       </SidebarContent>
-      <SidebarFooter className="pb-1">
+      <SidebarFooter className="px-2.5 pb-2">
         <NavUser viewer={viewer} />
       </SidebarFooter>
     </Sidebar>

@@ -21,6 +21,6 @@ test("prompt form drops the tools popover and research mode controls", async () 
   assert.doesNotMatch(
     source,
     /<ModelSelector/,
-    "Expected PromptForm to no longer render a model selector (GPT-5.4 Mini only)."
+    "Expected PromptForm to no longer render a model selector (GPT-5.6 Terra only)."
   )
 })

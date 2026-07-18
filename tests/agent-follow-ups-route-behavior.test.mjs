@@ -37,7 +37,7 @@ function createRequest(overrides = {}) {
     signal: AbortSignal.timeout(30_000),
     json: async () => ({
       assistantMessageId: "assistant-1",
-      model: "gpt-5.4-mini",
+      model: "gpt-5.6-terra",
       threadId: "thread-1",
       messages: [
         { role: "user", content: "Explain love" },

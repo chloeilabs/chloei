@@ -31,7 +31,7 @@ function createMessage(overrides = {}) {
     id: "message-1",
     role: "user",
     content: "First question about streaming behavior",
-    llmModel: "gpt-5.4-mini",
+    llmModel: "gpt-5.6-terra",
     createdAt: "2026-04-15T10:00:00.000Z",
     ...overrides,
   }
@@ -101,7 +101,7 @@ test("parseThreadPayload sanitizes invalid metadata and converts legacy activity
         id: "assistant-1",
         role: "assistant",
         content: "Summarize this thread",
-        llmModel: "gpt-5.4-mini",
+        llmModel: "gpt-5.6-terra",
         createdAt: "2026-04-15T10:00:00.000Z",
         metadata: {
           selectedModel: "not-a-model",
@@ -296,7 +296,7 @@ test("parseThreadPayload keeps generated follow-ups after malformed entries", ()
 test("prepareThreadForPersistence aligns createdAt with the first message", () => {
   const normalizedThread = prepareThreadForPersistence({
     id: "thread-persist",
-    model: "gpt-5.4-mini",
+    model: "gpt-5.6-terra",
     messages: [
       createMessage({
         createdAt: "2026-04-15T09:59:00.000Z",

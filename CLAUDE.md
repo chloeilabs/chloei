@@ -97,7 +97,7 @@ This boundary is **enforced by Next.js bundling at build time** (importing `pg`/
 
 Inline-citation rules are appended **later**, by `withAiSdkInlineCitationInstruction` (`system-instruction-augmentations.ts`), inside `createAgentStreamResponse` — not by `buildAgentSystemInstruction`.
 
-**Prompt caching** (`agent-runtime.ts` `resolvePromptCacheSettings`): every run sets a `prompt_cache_key` (via `modelSettings.providerData`) to co-locate identical prefixes — `"chloei-agent"` for the single-agent path, `"goblins-manager"` for the manager, and the goblin's `subagentId` for each sub-agent. GPT-5.5 paths also set `promptCacheRetention: "24h"`. Token usage (`result.state.usage`, incl. `inputTokensDetails.cached_tokens`) is logged on stream finish via `summarizeRunUsage`.
+**Prompt caching** (`agent-runtime.ts` `resolvePromptCacheSettings`): every run sets a `prompt_cache_key` (via `modelSettings.providerData`) to co-locate identical prefixes — `"chloei-agent"`. GPT-5.6 Sol paths also set `promptCacheRetention: "24h"`. Token usage (`result.state.usage`, incl. `inputTokensDetails.cached_tokens`) is logged on stream finish via `summarizeRunUsage`.
 
 ### Streaming Protocol
 
@@ -151,12 +151,13 @@ The only tools are the two Exa web-search tools, and both are registered togethe
 
 All models are defined in `src/lib/shared/llm/models.ts`:
 
-| Key                   | Model ID             | Display Name |
-| --------------------- | -------------------- | ------------ |
-| `OPENAI_GPT_5_5`      | `gpt-5.5-2026-04-23` | GPT-5.5      |
-| `OPENAI_GPT_5_4_MINI` | `gpt-5.4-mini`       | GPT-5.4 Mini |
+| Key                    | Model ID        | Display Name  |
+| ---------------------- | --------------- | ------------- |
+| `OPENAI_GPT_5_6_SOL`   | `gpt-5.6-sol`   | GPT-5.6 Sol   |
+| `OPENAI_GPT_5_6_TERRA` | `gpt-5.6-terra` | GPT-5.6 Terra |
+| `OPENAI_GPT_5_6_LUNA`  | `gpt-5.6-luna`  | GPT-5.6 Luna  |
 
-- `MODEL_SELECTOR_MODELS` — the chat selector subset, rendered as a dropdown at the top-left of the home page (`model-selector.tsx`). **Order matters: the first entry (GPT-5.5) is the default.** The selection persists in `localStorage` and syncs across components via the `model-selector-updated` event.
+- `MODEL_SELECTOR_MODELS` — the chat selector subset, rendered as a dropdown at the top-left of the home page (`model-selector.tsx`). **Order matters: the first entry (GPT-5.6 Sol) is the default.** The selection persists in `localStorage` and syncs across components via the `model-selector-updated` event.
 - The agent accepts **multimodal input**: plain text plus image (`image/png|jpeg|webp|gif`) and PDF (`application/pdf`) attachments for vision / document analysis. Attachments are added via the paperclip button in the prompt form and sent as base64 data URLs the **first** time (`attachments[]` in `agentMessageSchema`). **Files-API round-trip:** before streaming, the route uploads each new base64 attachment once via the OpenAI Files API (`resolveAttachmentFileIds` in `src/lib/server/llm/attachment-uploads.ts`; images use `purpose: "vision"`, PDFs `"user_data"`), sets its `fileId`, and echoes a `{ attachmentId: fileId }` map in the `X-Attachment-File-Ids` response header. The client (`use-agent-session.ts`) stores the `fileId` on the message and, on later turns, resends the `fileId` instead of the base64 (`toRequestMessages`). `toAgentInputItems` (`agent-runtime-messages.ts`) references the file by `{ id: fileId }` (falling back to the inline base64 url). Net effect: each file is uploaded once and stays prompt-cacheable across turns. Limits live in `src/lib/shared/agent-request-limits.ts` (≤5 files/message, ≤10 MB each); the request body cap is `proxyClientMaxBodySize` in `next.config.mjs`. On persistence the base64 `url` is **stripped** but the `fileId` is **kept** (`thread-payload.ts` `messageAttachmentSchema`), so a reloaded thread can still resend the file by id.
 - Adding a model means updating `AvailableModels`, `ModelInfos`, `SUPPORTED_MODELS`, and optionally `MODEL_SELECTOR_MODELS`. `/api/models` filters this registry by configured keys (`getModels()` in `src/lib/actions/api-keys.ts`).
 

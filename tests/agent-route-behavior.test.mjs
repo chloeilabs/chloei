@@ -129,7 +129,7 @@ beforeEach(() => {
           parsedRequest: {
             messages: body.messages,
           },
-          selectedModel: "gpt-5.4-mini",
+          selectedModel: "gpt-5.6-terra",
         }
       },
       createAgentStreamResponse(params) {
@@ -272,7 +272,7 @@ test("agent route passes the resolved prompt context into stream creation", asyn
     context: {
       now: recorded.buildInstructionCalls[0].context.now,
       userTimeZone: "America/Chicago",
-      provider: "provider:gpt-5.4-mini",
+      provider: "provider:gpt-5.6-terra",
     },
   })
   assert.deepEqual(recorded.streamCalls[0]?.messages, [

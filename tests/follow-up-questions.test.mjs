@@ -25,7 +25,7 @@ const {
 const { AvailableModels } = await import(modelsUrl)
 const { ASSISTANT_EMPTY_RESPONSE_FALLBACK } = await import(constantsUrl)
 
-const MODEL = AvailableModels.OPENAI_GPT_5_4_MINI
+const MODEL = AvailableModels.OPENAI_GPT_5_6_TERRA
 
 function assistantMessage(overrides = {}) {
   const { metadata = {}, ...rest } = overrides

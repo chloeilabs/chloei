@@ -1,8 +1,13 @@
 "use client"
 
-import "../shared/shell-styles.css"
-
-import { ArrowUp, FileText, Loader2, Plus, Square, X } from "lucide-react"
+import {
+  CornerRightUpIcon,
+  FileText,
+  Loader2,
+  Plus,
+  Square,
+  X,
+} from "lucide-react"
 import {
   type CSSProperties,
   type TransitionStartFunction,
@@ -14,7 +19,6 @@ import {
 } from "react"
 import { toast } from "sonner"
 
-import { RefreshGlow } from "@/components/graphics/effects/refresh-glow"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { useModels } from "@/hooks/agent/use-models"
@@ -27,13 +31,6 @@ import {
 import { cn } from "@/lib/utils"
 
 import { QueuedAction } from "../messages/queued-message"
-import {
-  agentShellFrameClass,
-  agentShellHighlightClass,
-  agentShellInteractiveClass,
-  agentSurfaceBackgroundClass,
-  agentSurfaceClass,
-} from "../shared/shell-styles"
 import {
   ACCEPTED_ATTACHMENT_TYPES,
   MAX_ATTACHMENTS,
@@ -60,6 +57,7 @@ export function PromptForm({
   isPendingOverride,
   transition,
   viewTransitionName,
+  seedMessage,
 }: {
   onSubmit?: (
     message: string,
@@ -83,15 +81,32 @@ export function PromptForm({
     startTransition: TransitionStartFunction
   }
   viewTransitionName?: string
+  seedMessage?: { id: number; text: string } | null
 }) {
   const isPending = transition?.isPending
   const isFormPending = isPendingOverride ?? isPending ?? false
   const shouldDockPrompt = !isHome || dockToBottomOnHome
-  const shouldShowRefreshAnimation = isHome && !dockToBottomOnHome
 
   const [message, setMessage] = useState("")
   const trimmedMessage = useMemo(() => message.trim(), [message])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (!seedMessage) {
+      return
+    }
+
+    setMessage(seedMessage.text)
+    requestAnimationFrame(() => {
+      const textarea = textareaRef.current
+      if (!textarea) {
+        return
+      }
+      textarea.focus()
+      const cursor = textarea.value.length
+      textarea.setSelectionRange(cursor, cursor)
+    })
+  }, [seedMessage])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [attachments, setAttachments] = useState<MessageAttachment[]>([])
   const attachmentsRef = useRef<MessageAttachment[]>([])
@@ -263,6 +278,19 @@ export function PromptForm({
   // edge instead of being cut off hard.
   const [scrollFade, setScrollFade] = useState({ top: false, bottom: false })
 
+  const syncTextareaHeight = useCallback(() => {
+    const textarea = textareaRef.current
+    if (!textarea) {
+      return
+    }
+
+    // Reset then grow to content so the shell expands with the text instead of
+    // jumping between discrete row counts.
+    textarea.style.height = "auto"
+    const nextHeight = Math.min(Math.max(textarea.scrollHeight, 40), 192)
+    textarea.style.height = `${String(nextHeight)}px`
+  }, [])
+
   const syncScrollFades = useCallback(() => {
     const textarea = textareaRef.current
     if (!textarea) {
@@ -281,15 +309,20 @@ export function PromptForm({
   }, [])
 
   useEffect(() => {
+    syncTextareaHeight()
     syncScrollFades()
-  }, [message, syncScrollFades])
+  }, [message, attachments.length, syncScrollFades, syncTextareaHeight])
 
   useEffect(() => {
-    window.addEventListener("resize", syncScrollFades)
-    return () => {
-      window.removeEventListener("resize", syncScrollFades)
+    const handleResize = () => {
+      syncTextareaHeight()
+      syncScrollFades()
     }
-  }, [syncScrollFades])
+    window.addEventListener("resize", handleResize)
+    return () => {
+      window.removeEventListener("resize", handleResize)
+    }
+  }, [syncScrollFades, syncTextareaHeight])
 
   const textareaMaskStyle = useMemo<CSSProperties | undefined>(() => {
     if (!scrollFade.top && !scrollFade.bottom) {
@@ -322,14 +355,12 @@ export function PromptForm({
       style={formStyle}
       className={cn(
         "relative isolate z-0 flex w-full flex-col",
-        shouldDockPrompt && "sticky bottom-0 bg-background pb-4"
+        shouldDockPrompt && "sticky bottom-0 bg-background py-4"
       )}
     >
-      {shouldShowRefreshAnimation ? (
-        <RefreshGlow className="pointer-events-none -top-24 left-1/2 z-0 h-[calc(100svh-18rem)] w-screen max-w-5xl -translate-x-1/2" />
+      {shouldDockPrompt ? (
+        <div className="pointer-events-none absolute inset-x-0 -top-[calc(4rem-1px)] -z-10 h-16 -translate-y-px bg-gradient-to-t from-background via-background/45 to-transparent" />
       ) : null}
-
-      <div className="pointer-events-none absolute inset-x-0 -top-[calc(4rem-1px)] -z-10 h-16 -translate-y-px bg-gradient-to-t from-background via-background/45 to-transparent" />
 
       {queuedSubmission && onClearQueuedMessage && (
         <QueuedAction
@@ -341,136 +372,121 @@ export function PromptForm({
 
       <div
         className={cn(
-          agentShellFrameClass,
-          agentShellInteractiveClass,
-          agentShellHighlightClass,
-          "rounded-[28px]",
+          // 26px is half of the 52px shell — reads as a full pill on one line,
+          // and keeps the same soft corners when attachments / multiline grow it
+          // (avoids the jarring rounded-full ↔ radius morph).
+          "flex min-h-[52px] flex-col rounded-[26px] border border-white/5 bg-[#212121] transition-opacity",
+          "focus-within:border-white/5 focus-within:ring-0",
           isFormPending && "opacity-50"
         )}
       >
-        <div
-          className={cn(
-            agentSurfaceClass,
-            "flex flex-col rounded-[28px] bg-[#212121] bg-none"
-          )}
-        >
-          <div
-            className={cn(
-              agentSurfaceBackgroundClass,
-              "rounded-[28px] bg-[#212121]"
-            )}
+        {attachments.length > 0 && (
+          <div className="flex flex-wrap gap-2 px-4 pt-3 duration-200 animate-in fade-in slide-in-from-top-1">
+            {attachments.map((attachment) => (
+              <div
+                key={attachment.id}
+                className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 py-1 pr-2 pl-1"
+              >
+                {attachment.kind === "image" && attachment.url ? (
+                  <span
+                    className="size-9 shrink-0 rounded-full bg-cover bg-center"
+                    style={{ backgroundImage: `url(${attachment.url})` }}
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-[#afafaf]">
+                    <FileText className="size-4" aria-hidden="true" />
+                  </span>
+                )}
+                <span className="max-w-32 truncate text-xs text-white/80">
+                  {attachment.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    removeAttachment(attachment.id)
+                  }}
+                  aria-label={`Remove ${attachment.name}`}
+                  className="rounded-full p-0.5 text-[#afafaf] transition-colors hover:text-white"
+                >
+                  <X className="size-3.5" aria-hidden="true" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex items-end gap-1 p-1.5">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ACCEPTED_ATTACHMENT_TYPES}
+            multiple
+            className="hidden"
+            onChange={(event) => {
+              const files = Array.from(event.target.files ?? [])
+              event.target.value = ""
+              void addFiles(files)
+            }}
+          />
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            disabled={isFormPending || attachments.length >= MAX_ATTACHMENTS}
+            onClick={() => {
+              fileInputRef.current?.click()
+            }}
+            aria-label="Attach images or PDFs"
+            className="size-[40px] shrink-0 rounded-full text-white transition-colors hover:bg-[#383838] hover:text-white dark:hover:bg-[#383838]"
+          >
+            <Plus className="size-[22px]" strokeWidth={1.75} />
+          </Button>
+
+          <Textarea
+            ref={textareaRef}
+            value={message}
+            rows={1}
+            onChange={(e) => {
+              if (!isFormPending) {
+                setMessage(e.target.value)
+              }
+            }}
+            onKeyDown={onKeyDown}
+            onScroll={syncScrollFades}
+            onFocus={onFocus}
+            onBlur={onBlur}
+            placeholder="Ask anything"
+            style={textareaMaskStyle}
+            className="no-scrollbar max-h-48 min-h-10 flex-1 resize-none overflow-y-auto border-0 bg-transparent! px-1 py-2 shadow-none placeholder:text-[#afafaf] focus-visible:ring-0 md:text-base"
           />
 
-          {attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2 px-3 pt-3">
-              {attachments.map((attachment) => (
-                <div
-                  key={attachment.id}
-                  className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 py-1 pr-2 pl-1"
-                >
-                  {attachment.kind === "image" && attachment.url ? (
-                    <span
-                      className="size-9 shrink-0 rounded-lg bg-cover bg-center"
-                      style={{ backgroundImage: `url(${attachment.url})` }}
-                      aria-hidden="true"
-                    />
-                  ) : (
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/10 text-muted-foreground">
-                      <FileText className="size-4" aria-hidden="true" />
-                    </span>
-                  )}
-                  <span className="max-w-32 truncate text-xs text-foreground/80">
-                    {attachment.name}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      removeAttachment(attachment.id)
-                    }}
-                    aria-label={`Remove ${attachment.name}`}
-                    className="rounded-full p-0.5 text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    <X className="size-3.5" aria-hidden="true" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="flex items-end gap-1 p-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={ACCEPTED_ATTACHMENT_TYPES}
-              multiple
-              className="hidden"
-              onChange={(event) => {
-                const files = Array.from(event.target.files ?? [])
-                event.target.value = ""
-                void addFiles(files)
-              }}
-            />
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              disabled={isFormPending || attachments.length >= MAX_ATTACHMENTS}
-              onClick={() => {
-                fileInputRef.current?.click()
-              }}
-              aria-label="Attach images or PDFs"
-              className="size-9 shrink-0 rounded-full text-foreground/80 transition-colors hover:bg-[#383838] hover:text-foreground dark:hover:bg-[#383838]"
-            >
-              <Plus className="size-6" strokeWidth={1.65} />
-            </Button>
-
-            <Textarea
-              ref={textareaRef}
-              value={message}
-              rows={1}
-              onChange={(e) => {
-                if (!isFormPending) {
-                  setMessage(e.target.value)
-                }
-              }}
-              onKeyDown={onKeyDown}
-              onScroll={syncScrollFades}
-              onFocus={onFocus}
-              onBlur={onBlur}
-              placeholder="Ask anything"
-              style={textareaMaskStyle}
-              className="no-scrollbar max-h-48 min-h-9 flex-1 resize-none border-0 bg-transparent! px-1 py-1.5 shadow-none placeholder:text-muted-foreground focus-visible:ring-0 md:text-base"
-            />
-
-            <Button
-              type="submit"
-              size="icon"
-              disabled={isSubmitButtonDisabled}
-              aria-label={
-                isFormPending
-                  ? "Sending message"
-                  : isStreaming && isComposerEmpty
-                    ? "Stop response"
-                    : "Send message"
-              }
-              className="size-9 shrink-0 rounded-full bg-white text-black ring-offset-background transition-colors hover:bg-white/90"
-            >
-              {isFormPending ? (
-                <Loader2 className="size-5 animate-spin" />
-              ) : isStreaming && isComposerEmpty ? (
-                <div className="p-0.5">
-                  <Square className="size-3.5 fill-black" />
-                </div>
-              ) : (
-                <ArrowUp className="size-5" />
-              )}
-            </Button>
-          </div>
+          <Button
+            type="submit"
+            size="icon"
+            disabled={isSubmitButtonDisabled}
+            aria-label={
+              isFormPending
+                ? "Sending message"
+                : isStreaming && isComposerEmpty
+                  ? "Stop response"
+                  : "Send message"
+            }
+            className="size-[40px] shrink-0 rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
+          >
+            {isFormPending ? (
+              <Loader2 className="size-5 animate-spin" />
+            ) : isStreaming && isComposerEmpty ? (
+              <Square className="size-[15px] fill-current" />
+            ) : (
+              <CornerRightUpIcon className="size-5" />
+            )}
+          </Button>
         </div>
       </div>
 
       {!resolvedSelectedModel && (
-        <p className="mt-2 text-xs text-muted-foreground">
+        <p className="mt-2 text-xs text-[#afafaf]">
           Configure `OPENAI_API_KEY` on the server to enable model access.
         </p>
       )}

@@ -16,25 +16,6 @@ export interface FollowUpQuestion {
 export const TOOL_NAMES = ["exa_search", "exa_get_contents"] as const
 export type ToolName = (typeof TOOL_NAMES)[number]
 
-// Goblins-mode sub-agents. These are NOT tools (kept out of ToolName); the
-// GPT-5.5 manager delegates to them via the Agents SDK `asTool` pattern, and the
-// server surfaces their lifecycle as subagent_call / subagent_result events.
-export const SUBAGENT_IDS = [
-  "goblin_web_researcher",
-  "goblin_source_verifier",
-  "goblin_recency_scout",
-  "goblin_numbers_analyst",
-  "goblin_contrarian",
-  "goblin_context_scout",
-] as const
-export type SubagentId = (typeof SUBAGENT_IDS)[number]
-
-const SUBAGENT_ID_SET: ReadonlySet<SubagentId> = new Set(SUBAGENT_IDS)
-
-export function isSubagentId(value: unknown): value is SubagentId {
-  return typeof value === "string" && SUBAGENT_ID_SET.has(value as SubagentId)
-}
-
 export const SEARCH_TOOL_NAMES = [
   "exa_search",
 ] as const satisfies readonly ToolName[]
@@ -124,23 +105,11 @@ export interface ReasoningActivityTimelineEntry extends ActivityTimelineBaseEntr
   text: string
 }
 
-export interface SubagentActivityTimelineEntry extends ActivityTimelineBaseEntry {
-  kind: "subagent"
-  callId: string | null
-  subagentId: SubagentId
-  label: string
-  // The focused task the manager delegated to this goblin (shown in the timeline
-  // so the user can see what each goblin is researching).
-  task?: string
-  status: ToolInvocationStatus
-}
-
 export type ActivityTimelineEntry =
   | ToolActivityTimelineEntry
   | SearchActivityTimelineEntry
   | SourcesActivityTimelineEntry
   | ReasoningActivityTimelineEntry
-  | SubagentActivityTimelineEntry
 
 interface InteractionCheckpointFields {
   interactionId?: string
@@ -194,21 +163,6 @@ interface AgentStatusStreamEvent extends InteractionCheckpointFields {
   status: AgentRunStatus
 }
 
-interface SubagentCallStreamEvent extends InteractionCheckpointFields {
-  type: "subagent_call"
-  callId: string | null
-  subagentId: SubagentId
-  label: string
-  task?: string
-}
-
-interface SubagentResultStreamEvent extends InteractionCheckpointFields {
-  type: "subagent_result"
-  callId: string | null
-  subagentId: SubagentId
-  status: Extract<ToolInvocationStatus, "success" | "error">
-}
-
 export type AgentStreamEvent =
   | TextDeltaStreamEvent
   | ReasoningDeltaStreamEvent
@@ -216,8 +170,6 @@ export type AgentStreamEvent =
   | ToolResultStreamEvent
   | SourceStreamEvent
   | AgentStatusStreamEvent
-  | SubagentCallStreamEvent
-  | SubagentResultStreamEvent
 
 export interface Message {
   id: string

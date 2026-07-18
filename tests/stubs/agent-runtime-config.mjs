@@ -1,4 +1,1 @@
 export const AGENT_STREAM_TIMEOUT_MS = 30_000
-export const GOBLIN_COUNT = 6
-export const GOBLIN_SUBAGENT_MAX_STEPS = 5
-export const GOBLINS_MANAGER_MAX_TURNS = 8
