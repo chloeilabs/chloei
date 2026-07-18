@@ -347,8 +347,9 @@ export function HomePageContent({
                 </h1>
                 <div className="flex flex-col gap-7">
                   <PromptForm
+                    key={seedMessage?.id ?? "home-prompt"}
                     isHome
-                    seedMessage={seedMessage}
+                    initialMessage={seedMessage?.text}
                     onSubmit={handleAnimatedPromptSubmit}
                     onStopStream={handleStopStream}
                     isStreaming={streamingState}
@@ -381,7 +382,7 @@ export function HomePageContent({
         {showConversationView ? (
           <StickToBottom
             className={cn(
-              "relative flex min-h-0 w-full grow flex-col overflow-y-auto [scrollbar-gutter:stable_both-edges]",
+              "relative flex min-h-0 w-full grow [scrollbar-gutter:stable_both-edges] flex-col overflow-y-auto",
               isFallbackEnteringConversation &&
                 (isMobile
                   ? "animate-[chloei-thread-layer-in_110ms_var(--ease-out-cubic)_both]"

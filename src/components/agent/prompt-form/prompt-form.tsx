@@ -57,7 +57,7 @@ export function PromptForm({
   isPendingOverride,
   transition,
   viewTransitionName,
-  seedMessage,
+  initialMessage,
 }: {
   onSubmit?: (
     message: string,
@@ -81,32 +81,31 @@ export function PromptForm({
     startTransition: TransitionStartFunction
   }
   viewTransitionName?: string
-  seedMessage?: { id: number; text: string } | null
+  /** Prefill text; remount the form (via `key`) when this should change. */
+  initialMessage?: string
 }) {
   const isPending = transition?.isPending
   const isFormPending = isPendingOverride ?? isPending ?? false
   const shouldDockPrompt = !isHome || dockToBottomOnHome
 
-  const [message, setMessage] = useState("")
+  const [message, setMessage] = useState(initialMessage ?? "")
   const trimmedMessage = useMemo(() => message.trim(), [message])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    if (!seedMessage) {
+    if (!initialMessage) {
       return
     }
 
-    setMessage(seedMessage.text)
-    requestAnimationFrame(() => {
-      const textarea = textareaRef.current
-      if (!textarea) {
-        return
-      }
-      textarea.focus()
-      const cursor = textarea.value.length
-      textarea.setSelectionRange(cursor, cursor)
-    })
-  }, [seedMessage])
+    const textarea = textareaRef.current
+    if (!textarea) {
+      return
+    }
+
+    textarea.focus()
+    const cursor = textarea.value.length
+    textarea.setSelectionRange(cursor, cursor)
+  }, [initialMessage])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [attachments, setAttachments] = useState<MessageAttachment[]>([])
   const attachmentsRef = useRef<MessageAttachment[]>([])
@@ -381,7 +380,7 @@ export function PromptForm({
         )}
       >
         {attachments.length > 0 && (
-          <div className="flex flex-wrap gap-2 px-4 pt-3 duration-200 animate-in fade-in slide-in-from-top-1">
+          <div className="flex animate-in flex-wrap gap-2 px-4 pt-3 duration-200 fade-in slide-in-from-top-1">
             {attachments.map((attachment) => (
               <div
                 key={attachment.id}

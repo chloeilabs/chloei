@@ -91,12 +91,9 @@ const sampleImageAttachment = {
 }
 
 test("appended user messages carry attachments in metadata", () => {
-  const messages = appendUserMessage(
-    [],
-    "Describe this",
-    "gpt-5.6-sol",
-    [sampleImageAttachment]
-  )
+  const messages = appendUserMessage([], "Describe this", "gpt-5.6-sol", [
+    sampleImageAttachment,
+  ])
 
   assert.deepEqual(messages[0]?.metadata?.attachments, [sampleImageAttachment])
 })

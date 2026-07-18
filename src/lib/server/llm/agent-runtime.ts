@@ -38,8 +38,7 @@ const resolveReasoningEffort = (
   model: ModelType,
   override?: ReasoningEffortLevel
 ): ReasoningEffortLevel =>
-  override ??
-  (model === AvailableModels.OPENAI_GPT_5_6_SOL ? "xhigh" : "high")
+  override ?? (model === AvailableModels.OPENAI_GPT_5_6_SOL ? "xhigh" : "high")
 
 // The single-agent path's default cache key. The prompt cache key co-locates
 // requests that share a prompt prefix on the same cache, so the large stable
